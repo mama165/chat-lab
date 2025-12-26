@@ -1,41 +1,33 @@
 package projection
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/event"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
-func TestTimeline_PullEvents_UpdatesMessages(t *testing.T) {
-	room := domain.Room{}
-	timeline := Timeline{Owner: "Bob"}
+func TestTimeline_Consume_MessagePosted(t *testing.T) {
+	timeline := NewTimeline()
 
-	msg1 := domain.Message{
-		SenderID:  "Alice",
-		Content:   "Hello Bob",
-		CreatedAt: time.Now(),
-	}
-	msg2 := domain.Message{
-		SenderID:  "Clara",
-		Content:   "Hi Bob",
-		CreatedAt: time.Now().Add(time.Second),
+	evt1 := event.MessagePosted{
+		Author:  "Alice",
+		Content: "Hello Bob",
+		At:      time.Now(),
 	}
 
-	room.PostMessage(msg1)
-	room.PostMessage(msg2)
+	evt2 := event.MessagePosted{
+		Author:  "Clara",
+		Content: "Hi Bob",
+		At:      time.Now().Add(time.Second),
+	}
 
-	events := room.FlushEvents()
+	// Act
+	timeline.Consume(evt1)
+	timeline.Consume(evt2)
 
-	// Timeline consumes events from the room
-	timeline.Apply(events)
-
-	// Check that the timeline contains the two messages
+	// Assert
 	require.Len(t, timeline.Messages, 2)
-	require.Equal(t, msg1.SenderID, timeline.Messages[0].SenderID)
-	require.Equal(t, msg2.SenderID, timeline.Messages[1].SenderID)
-
-	// FlushEvents should empty the room outbox
-	events = room.FlushEvents()
-	require.Len(t, events, 0)
+	require.Equal(t, "Alice", timeline.Messages[0].SenderID)
+	require.Equal(t, "Clara", timeline.Messages[1].SenderID)
 }
