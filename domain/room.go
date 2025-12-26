@@ -7,14 +7,14 @@ import (
 type RoomID int
 
 type Room struct {
-	roomID   RoomID
+	ID       RoomID
 	messages []Message
 	outbox   []event.DomainEvent
 }
 
 func NewRoom(id int) *Room {
 	return &Room{
-		roomID:   RoomID(id),
+		ID:       RoomID(id),
 		messages: nil,
 		outbox:   nil,
 	}
