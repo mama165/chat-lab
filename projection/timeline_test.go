@@ -2,7 +2,7 @@ package projection
 
 import (
 	"chat-lab/domain"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -25,17 +25,17 @@ func TestTimeline_PullEvents_UpdatesMessages(t *testing.T) {
 	room.PostMessage(msg1)
 	room.PostMessage(msg2)
 
-	events := room.PullEvents()
+	events := room.FlushEvents()
 
 	// Timeline consumes events from the room
 	timeline.Apply(events)
 
 	// Check that the timeline contains the two messages
-	assert.Len(t, timeline.Messages, 2)
-	assert.Equal(t, msg1.SenderID, timeline.Messages[0].SenderID)
-	assert.Equal(t, msg2.SenderID, timeline.Messages[1].SenderID)
+	require.Len(t, timeline.Messages, 2)
+	require.Equal(t, msg1.SenderID, timeline.Messages[0].SenderID)
+	require.Equal(t, msg2.SenderID, timeline.Messages[1].SenderID)
 
-	// PullEvents should empty the room outbox
-	events = room.PullEvents()
-	assert.Len(t, events, 0)
+	// FlushEvents should empty the room outbox
+	events = room.FlushEvents()
+	require.Len(t, events, 0)
 }

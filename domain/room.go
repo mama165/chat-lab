@@ -4,9 +4,20 @@ import (
 	"chat-lab/domain/event"
 )
 
+type RoomID int
+
 type Room struct {
+	roomID   RoomID
 	messages []Message
 	outbox   []event.DomainEvent
+}
+
+func NewRoom(id int) *Room {
+	return &Room{
+		roomID:   RoomID(id),
+		messages: nil,
+		outbox:   nil,
+	}
 }
 
 func (r *Room) PostMessage(message Message) {
@@ -22,7 +33,7 @@ func toEvent(message Message) event.DomainEvent {
 	}
 }
 
-func (r *Room) PullEvents() []event.DomainEvent {
+func (r *Room) FlushEvents() []event.DomainEvent {
 	events := r.outbox
 	r.outbox = nil
 	return events
