@@ -35,18 +35,3 @@ func TestRoom_PostMessage_AddsMessageAndEvent(t *testing.T) {
 	// The outbox should be empty after FlushEvents
 	require.Len(t, room.FlushEvents(), 0)
 }
-
-// Temporary helper to append a dummy event for testing
-func (r *Room) AppendEventForTest(e event.DomainEvent) {
-	r.outbox = append(r.outbox, e)
-}
-
-type DummyEvent struct{}
-
-func (DummyEvent) Name() string {
-	return "Dummy"
-}
-
-func (DummyEvent) OccurredAt() time.Time {
-	return time.Now()
-}

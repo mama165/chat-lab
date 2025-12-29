@@ -17,15 +17,15 @@ func (s *RecordingSink) Consume(e event.DomainEvent) {
 	s.events = append(s.events, e)
 }
 
-func Test_Engine_dispatches_domain_events_to_sinks(t *testing.T) {
+func Test_Orchestrator_dispatches_domain_events_to_sinks(t *testing.T) {
 	// Arrange
-	engine := runtime.NewEngine()
+	orchestrator := runtime.NewOrchestrator()
 	room := domain.NewRoom(1)
 
 	sink := &RecordingSink{}
 
-	engine.RegisterRoom(room)
-	engine.RegisterSink(sink)
+	orchestrator.RegisterRoom(room)
+	orchestrator.RegisterSink(sink)
 
 	msg := domain.Message{
 		SenderID:  "alice",
@@ -34,7 +34,7 @@ func Test_Engine_dispatches_domain_events_to_sinks(t *testing.T) {
 	}
 
 	// Act
-	engine.Dispatch(1, func(r *domain.Room) {
+	orchestrator.Dispatch(1, func(r *domain.Room) {
 		r.PostMessage(msg)
 	})
 
