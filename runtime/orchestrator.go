@@ -6,6 +6,8 @@ import (
 	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/runtime/workers"
+	"log/slog"
+	"sync"
 	"time"
 )
 
@@ -29,25 +31,33 @@ func (a AsyncSink) Consume(event event.DomainEvent) {
 }
 
 type Orchestrator struct {
-	commands map[domain.RoomID]chan domain.Command
-	sinks    []EventSink
-	workers.Supervisor
+	mu           sync.Mutex
+	commands     map[domain.RoomID]chan domain.Command
+	sinks        []EventSink
+	supervisor   workers.Supervisor
+	domainEvents chan event.DomainEvent
 }
 
 func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{
-		commands: make(map[domain.RoomID]chan domain.Command),
-		sinks:    nil,
+		commands:     make(map[domain.RoomID]chan domain.Command),
+		sinks:        nil,
+		domainEvents: make(chan event.DomainEvent),
 	}
 }
 
 func (e *Orchestrator) RegisterRoom(room *domain.Room) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	// 1. On crée le canal d'entrée pour les commandes de cette room
+	if _, ok := e.commands[room.ID]; ok {
+		return
+	}
 	cmdChan := make(chan domain.Command, 100)
 	e.commands[room.ID] = cmdChan
 
 	// 2. On crée le Worker qui encapsule la Room
-	worker := runtime.NewRoomWorker(room, cmdChan, e.eventBus)
+	worker := workers.NewRoomWorker(room, cmdChan, e.domainEvents, slog.Default())
 
 	// 3. On délègue la vie du worker au supervisor
 	e.supervisor.Add(worker)
@@ -59,6 +69,8 @@ func (e *Orchestrator) RegisterSink(sink EventSink) {
 }
 
 func (e *Orchestrator) Dispatch(cmd domain.Command) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	commandChan, ok := e.commands[cmd.RoomID()]
 	if !ok {
 		return
