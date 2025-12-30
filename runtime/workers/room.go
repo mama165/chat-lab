@@ -8,6 +8,11 @@ import (
 	"log/slog"
 )
 
+// Ensure *RoomWorker implements the contract.Worker interface at compile time.
+// This prevents "type mismatch" errors from appearing late in other packages
+// and acts as a static assertion of our architectural rules.
+var _ contract.Worker = (*RoomWorker)(nil)
+
 type RoomWorker struct {
 	name     contract.WorkerName
 	room     *domain.Room
@@ -16,20 +21,20 @@ type RoomWorker struct {
 	log      *slog.Logger
 }
 
-func NewRoomWorker(room *domain.Room, commands chan domain.Command, events chan event.DomainEvent, log *slog.Logger) RoomWorker {
-	return RoomWorker{room: room, commands: commands, events: events, log: log}
+func NewRoomWorker(room *domain.Room, commands chan domain.Command, events chan event.DomainEvent, log *slog.Logger) *RoomWorker {
+	return &RoomWorker{room: room, commands: commands, events: events, log: log}
 }
 
-func (w RoomWorker) GetName() contract.WorkerName {
+func (w *RoomWorker) GetName() contract.WorkerName {
 	return w.name
 }
 
-func (w RoomWorker) WithName(name string) contract.Worker {
+func (w *RoomWorker) WithName(name string) contract.Worker {
 	w.name = contract.WorkerName(name)
 	return w
 }
 
-func (w RoomWorker) Run(ctx context.Context) error {
+func (w *RoomWorker) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():

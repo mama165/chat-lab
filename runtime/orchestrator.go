@@ -28,39 +28,42 @@ func (a AsyncSink) Consume(event event.DomainEvent) {
 	panic("implement me")
 }
 
+// Internal structure to keep track of a room and its resources
+type roomEntry struct {
+	room    *domain.Room
+	command chan domain.Command
+}
+
 type Orchestrator struct {
 	mu              sync.Mutex
-	commands        map[domain.RoomID]chan domain.Command
+	log             *slog.Logger
+	rooms           map[domain.RoomID]roomEntry
 	sinks           []contract.EventSink
-	supervisor      workers.Supervisor
+	supervisor      contract.ISupervisor
 	domainEvents    chan event.DomainEvent
 	telemetryEvents chan event.DomainEvent
 }
 
-func NewOrchestrator() *Orchestrator {
+func NewOrchestrator(log *slog.Logger, bufferSize int) *Orchestrator {
 	return &Orchestrator{
-		commands:     make(map[domain.RoomID]chan domain.Command),
-		sinks:        nil,
-		domainEvents: make(chan event.DomainEvent),
+		log:             log,
+		rooms:           make(map[domain.RoomID]roomEntry),
+		sinks:           nil,
+		supervisor:      workers.NewSupervisor(&sync.WaitGroup{}, log),
+		domainEvents:    make(chan event.DomainEvent, bufferSize),
+		telemetryEvents: make(chan event.DomainEvent, bufferSize),
 	}
 }
 
+// RegisterRoom creates a dedicated worker and command channel for a room.
 func (e *Orchestrator) RegisterRoom(room *domain.Room) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	// 1. On crée le canal d'entrée pour les commandes de cette room
-	if _, ok := e.commands[room.ID]; ok {
-		return
+	if _, ok := e.rooms[room.ID]; ok {
+		return // Room already exists, do nothing
 	}
 	cmdChan := make(chan domain.Command, 100)
-	e.commands[room.ID] = cmdChan
-
-	// 2. On crée le Worker qui encapsule la Room
-	worker := workers.NewRoomWorker(room, cmdChan, e.domainEvents, slog.Default())
-
-	// 3. On délègue la vie du worker au supervisor
-	e.supervisor.Add(worker)
-	e.supervisor.Start(worker)
+	e.rooms[room.ID] = roomEntry{room: room, command: cmdChan}
 }
 
 func (e *Orchestrator) RegisterSink(sink contract.EventSink) {
@@ -70,24 +73,40 @@ func (e *Orchestrator) RegisterSink(sink contract.EventSink) {
 func (e *Orchestrator) Dispatch(cmd domain.Command) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	commandChan, ok := e.commands[cmd.RoomID()]
+	entry, ok := e.rooms[cmd.RoomID()]
 	if !ok {
 		return
 	}
 	select {
-	case commandChan <- cmd:
+	case entry.command <- cmd:
 	default:
 		// TODO à gérer
 	}
 }
 
 func (e *Orchestrator) Start(ctx context.Context) {
+	e.mu.Lock()
+
+	for _, entry := range e.rooms {
+		worker := workers.NewRoomWorker(entry.room, entry.command, e.domainEvents, e.log)
+		e.supervisor.Add(worker)
+	}
+
 	fanoutWorker := workers.NewEventFanout(
-		slog.Default(),
+		e.log,
 		e.domainEvents,
 		e.telemetryEvents,
 	)
 	fanoutWorker.Add(e.sinks)
-	e.supervisor.Add(fanoutWorker.WithName("event-distributor"))
-	e.supervisor.Start(fanoutWorker)
+	e.supervisor.Add(fanoutWorker.WithName("fanout-worker"))
+
+	e.mu.Unlock() // Unlock before blocking on Run
+
+	e.log.Info("Starting orchestrator and all supervised workers")
+	e.supervisor.Run(ctx)
+}
+
+func (e *Orchestrator) Stop() {
+	e.log.Info("Requesting orchestrator shutdown")
+	e.supervisor.Stop()
 }

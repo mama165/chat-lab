@@ -7,16 +7,16 @@ import (
 	"log/slog"
 )
 
-// EventFanout broadcasts domain events to multiple in-process consumers.
+// EventFanoutWorker broadcasts domain events to multiple in-process consumers.
 //
 // It provides best-effort fan-out with no guarantees regarding delivery,
-// ordering, durability, or retries. EventFanout is not a message broker.
+// ordering, durability, or retries. EventFanoutWorker is not a message broker.
 //
 // It is intended for observability and side effects (UI, logs, metrics),
 // not for core domain logic.
 //
-// EventFanout is safe for concurrent use by multiple goroutines.
-type EventFanout struct {
+// EventFanoutWorker is safe for concurrent use by multiple goroutines.
+type EventFanoutWorker struct {
 	Log            *slog.Logger
 	Name           contract.WorkerName
 	DomainEvent    chan event.DomainEvent
@@ -24,23 +24,23 @@ type EventFanout struct {
 	sinks          []contract.EventSink
 }
 
-func NewEventFanout(log *slog.Logger, domainEvent, telemetryEvent chan event.DomainEvent) *EventFanout {
-	return &EventFanout{Log: log, DomainEvent: domainEvent, TelemetryEvent: telemetryEvent}
+func NewEventFanout(log *slog.Logger, domainEvent, telemetryEvent chan event.DomainEvent) *EventFanoutWorker {
+	return &EventFanoutWorker{Log: log, DomainEvent: domainEvent, TelemetryEvent: telemetryEvent}
 }
 
-func (w EventFanout) Add(sinks []contract.EventSink) EventFanout {
+func (w *EventFanoutWorker) Add(sinks []contract.EventSink) contract.Worker {
 	w.sinks = append(w.sinks, sinks...)
 	return w
 }
 
-func (w EventFanout) WithName(name string) contract.Worker {
+func (w *EventFanoutWorker) WithName(name string) contract.Worker {
 	w.Name = contract.WorkerName(name)
 	return w
 }
 
-func (w EventFanout) GetName() contract.WorkerName { return w.Name }
+func (w *EventFanoutWorker) GetName() contract.WorkerName { return w.Name }
 
-func (w EventFanout) Run(ctx context.Context) error {
+func (w *EventFanoutWorker) Run(ctx context.Context) error {
 	for {
 		select {
 		case evt := <-w.DomainEvent:
@@ -58,7 +58,7 @@ func (w EventFanout) Run(ctx context.Context) error {
 }
 
 // Fanout One sink for each event
-func (w EventFanout) Fanout(event event.DomainEvent) {
+func (w *EventFanoutWorker) Fanout(event event.DomainEvent) {
 	for _, sink := range w.sinks {
 		sink.Consume(event)
 	}
