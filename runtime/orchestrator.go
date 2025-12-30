@@ -3,17 +3,15 @@
 package runtime
 
 import (
+	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/runtime/workers"
+	"context"
 	"log/slog"
 	"sync"
 	"time"
 )
-
-type EventSink interface {
-	Consume(event event.DomainEvent)
-}
 
 type AsyncSink struct {
 	name   string
@@ -31,11 +29,12 @@ func (a AsyncSink) Consume(event event.DomainEvent) {
 }
 
 type Orchestrator struct {
-	mu           sync.Mutex
-	commands     map[domain.RoomID]chan domain.Command
-	sinks        []EventSink
-	supervisor   workers.Supervisor
-	domainEvents chan event.DomainEvent
+	mu              sync.Mutex
+	commands        map[domain.RoomID]chan domain.Command
+	sinks           []contract.EventSink
+	supervisor      workers.Supervisor
+	domainEvents    chan event.DomainEvent
+	telemetryEvents chan event.DomainEvent
 }
 
 func NewOrchestrator() *Orchestrator {
@@ -64,7 +63,7 @@ func (e *Orchestrator) RegisterRoom(room *domain.Room) {
 	e.supervisor.Start(worker)
 }
 
-func (e *Orchestrator) RegisterSink(sink EventSink) {
+func (e *Orchestrator) RegisterSink(sink contract.EventSink) {
 	e.sinks = append(e.sinks, sink)
 }
 
@@ -80,4 +79,15 @@ func (e *Orchestrator) Dispatch(cmd domain.Command) {
 	default:
 		// TODO à gérer
 	}
+}
+
+func (e *Orchestrator) Start(ctx context.Context) {
+	fanoutWorker := workers.NewEventFanout(
+		slog.Default(),
+		e.domainEvents,
+		e.telemetryEvents,
+	)
+	fanoutWorker.Add(e.sinks)
+	e.supervisor.Add(fanoutWorker.WithName("event-distributor"))
+	e.supervisor.Start(fanoutWorker)
 }

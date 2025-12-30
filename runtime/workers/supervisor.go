@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"chat-lab/contract"
 	"chat-lab/domain/event"
 	"chat-lab/errors"
 	"context"
@@ -10,20 +11,12 @@ import (
 	"time"
 )
 
-type WorkerName string
-
-// Worker doesn't protect itself
-// Can be silly, focused
-type Worker interface {
-	WithName(name string) Worker
-	GetName() WorkerName
-	Run(ctx context.Context) error
-}
+const waitTimeBeforeRestart = 200 * time.Millisecond
 
 type ISupervisor interface {
 	Run()
-	Add(worker ...Worker) ISupervisor
-	Start(worker Worker)
+	Add(worker ...contract.Worker) ISupervisor
+	Start(worker contract.Worker)
 	Stop()
 }
 
@@ -38,7 +31,7 @@ type Supervisor struct {
 	Cancel  context.CancelFunc // To stop the context
 	wg      *sync.WaitGroup    // Wait for the end of goroutines
 	log     *slog.Logger
-	workers []Worker
+	workers []contract.Worker
 	Event   chan event.DomainEvent
 }
 
@@ -52,7 +45,7 @@ func (s *Supervisor) Run() {
 	}
 }
 
-func (s *Supervisor) Add(worker ...Worker) ISupervisor {
+func (s *Supervisor) Add(worker ...contract.Worker) ISupervisor {
 	s.workers = append(s.workers, worker...)
 	return s
 }
@@ -62,7 +55,7 @@ func (s *Supervisor) Add(worker ...Worker) ISupervisor {
 // the supervisor recovers, restarts the worker, and keeps the supervision
 // loop alive. A failure in one worker must not stop the supervisor itself.
 // This provides fault isolation and basic self-healing behavior.
-func (s *Supervisor) Start(worker Worker) {
+func (s *Supervisor) Start(worker contract.Worker) {
 	s.wg.Add(1)
 
 	go func() {
@@ -93,7 +86,7 @@ func (s *Supervisor) Start(worker Worker) {
 			}
 
 			s.log.Info(fmt.Sprintf("Restarting : %s", worker.GetName()))
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(waitTimeBeforeRestart)
 		}
 	}()
 }

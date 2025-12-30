@@ -1,9 +1,5 @@
 package domain
 
-import (
-	"chat-lab/domain/event"
-)
-
 type RoomID int
 
 type Room struct {
@@ -20,12 +16,4 @@ func NewRoom(id int) *Room {
 
 func (r *Room) PostMessage(message Message) {
 	r.messages = append(r.messages, message)
-}
-
-func toEvent(message Message) event.DomainEvent {
-	return event.MessagePosted{
-		Author:  message.SenderID,
-		Content: message.Content,
-		At:      message.CreatedAt,
-	}
 }

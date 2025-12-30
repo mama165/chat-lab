@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"context"
@@ -8,6 +9,7 @@ import (
 )
 
 type RoomWorker struct {
+	name     contract.WorkerName
 	room     *domain.Room
 	commands chan domain.Command
 	events   chan event.DomainEvent
@@ -18,14 +20,13 @@ func NewRoomWorker(room *domain.Room, commands chan domain.Command, events chan 
 	return RoomWorker{room: room, commands: commands, events: events, log: log}
 }
 
-func (w RoomWorker) GetName() WorkerName {
-	//TODO implement me
-	panic("implement me")
+func (w RoomWorker) GetName() contract.WorkerName {
+	return w.name
 }
 
-func (w RoomWorker) WithName(name string) Worker {
-	//TODO implement me
-	panic("implement me")
+func (w RoomWorker) WithName(name string) contract.Worker {
+	w.name = contract.WorkerName(name)
+	return w
 }
 
 func (w RoomWorker) Run(ctx context.Context) error {
@@ -54,7 +55,6 @@ func (w RoomWorker) Run(ctx context.Context) error {
 	}
 }
 
-// Petite fonction helper pour la clarté
 func toEvent(c domain.PostMessageCommand) event.MessagePosted {
 	return event.MessagePosted{
 		Author:  c.SenderID,
