@@ -46,7 +46,7 @@ func (w *RoomWorker) Run(ctx context.Context) error {
 			}
 			if postCmd, ok := cmd.(domain.PostMessageCommand); ok {
 				w.room.PostMessage(domain.Message{
-					SenderID:  postCmd.SenderID,
+					SenderID:  postCmd.UserID,
 					Content:   postCmd.Content,
 					CreatedAt: postCmd.CreatedAt,
 				})
@@ -62,7 +62,8 @@ func (w *RoomWorker) Run(ctx context.Context) error {
 
 func toEvent(c domain.PostMessageCommand) event.MessagePosted {
 	return event.MessagePosted{
-		Author:  c.SenderID,
+		Room:    c.Room,
+		Author:  c.UserID,
 		Content: c.Content,
 		At:      c.CreatedAt,
 	}

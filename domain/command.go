@@ -10,7 +10,7 @@ type Command interface {
 
 type PostMessageCommand struct {
 	Room      int
-	SenderID  string
+	UserID    string
 	Content   string
 	CreatedAt time.Time
 }

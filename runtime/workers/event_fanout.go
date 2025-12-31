@@ -57,7 +57,9 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 	}
 }
 
-// Fanout One sink for each event
+// Fanout One sink for each domain event
+// 1. Disk storage
+// 2. Websocket
 func (w *EventFanoutWorker) Fanout(event event.DomainEvent) {
 	for _, sink := range w.sinks {
 		sink.Consume(event)

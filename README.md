@@ -94,40 +94,52 @@ is used as a heuristic for local stability, never as an absolute truth.
 
 ---
 
-## Observation and UI 👀🖥️
+## Persistence and Protobuf 📦
+
+Some parts of the system rely on **Protocol Buffers** for message serialization,  
+not as a network contract, but as a **stable and explicit disk representation**.
+
+The Protobuf definitions live under the `proto/` directory.
+
+### Generate Protobuf code
+
+The Go code is generated using `protoc` via Docker:
+
+```bash
+docker run --rm -v "$PWD:/defs" protoc-image \
+  -I . \
+  --go_out=paths=source_relative:. \
+  --go-grpc_out=paths=source_relative:. \
+  proto/message.proto
+````
+This keeps the environment reproducible and avoids installing protoc locally.
+
+### Observation and UI 👀🖥️
 
 The user interface (to be introduced later) is treated as:
 
-- 👁 An **observer**
-- 📡 An **event consumer**
+- 👁 An observer
+
+- 📡 An event consumer
+
 - 🚫 Never a decision-maker for the domain
 
-It does not control the system. It reflects a **local, potentially imperfect view**.
+It does not control the system. It reflects a local, potentially imperfect view.
 
 This separation is deliberate and fundamental 🧱.
 
----
+### Current project status 🛠️
 
-## Current project status 🛠️
-
-The project is currently in a **design and exploration phase**:
+The project is currently in a design and exploration phase:
 
 - 🚫 No domain logic implemented yet
 - 📝 Concepts defined before technical optimizations
 - 🧭 Architecture prioritized over implementation details
 
----
-
-## Inspirations 💡
+### Inspirations 💡
 
 - 🤖 Distributed “robot” secret reconstruction exercise
 - 🌐 Event-driven systems
 - 📡 Gossip and anti-entropy protocols
 - 🔄 Eventually consistent architectures
 - 👁 Observable and reactive UIs (e.g., TUIs)
-
----
-
-## License 📝
-
-Experimental project, free to use in a personal or educational context.

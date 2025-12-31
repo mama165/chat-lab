@@ -8,6 +8,7 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/runtime/workers"
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -56,25 +57,27 @@ func NewOrchestrator(log *slog.Logger, bufferSize int) *Orchestrator {
 }
 
 // RegisterRoom creates a dedicated worker and command channel for a room.
-func (e *Orchestrator) RegisterRoom(room *domain.Room) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if _, ok := e.rooms[room.ID]; ok {
+func (o *Orchestrator) RegisterRoom(room *domain.Room) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if _, ok := o.rooms[room.ID]; ok {
+		o.log.Info(fmt.Sprintf("Room %d already exists", room.ID))
 		return // Room already exists, do nothing
 	}
 	cmdChan := make(chan domain.Command, 100)
-	e.rooms[room.ID] = roomEntry{room: room, command: cmdChan}
+	o.rooms[room.ID] = roomEntry{room: room, command: cmdChan}
 }
 
-func (e *Orchestrator) RegisterSink(sink contract.EventSink) {
-	e.sinks = append(e.sinks, sink)
+func (o *Orchestrator) RegisterSink(sink contract.EventSink) {
+	o.sinks = append(o.sinks, sink)
 }
 
-func (e *Orchestrator) Dispatch(cmd domain.Command) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	entry, ok := e.rooms[cmd.RoomID()]
+func (o *Orchestrator) Dispatch(cmd domain.Command) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	entry, ok := o.rooms[cmd.RoomID()]
 	if !ok {
+		o.log.Info(fmt.Sprintf("Room %d doesn't exists", cmd.RoomID()))
 		return
 	}
 	select {
@@ -84,29 +87,29 @@ func (e *Orchestrator) Dispatch(cmd domain.Command) {
 	}
 }
 
-func (e *Orchestrator) Start(ctx context.Context) {
-	e.mu.Lock()
+func (o *Orchestrator) Start(ctx context.Context) {
+	o.mu.Lock()
 
-	for _, entry := range e.rooms {
-		worker := workers.NewRoomWorker(entry.room, entry.command, e.domainEvents, e.log)
-		e.supervisor.Add(worker)
+	for _, entry := range o.rooms {
+		worker := workers.NewRoomWorker(entry.room, entry.command, o.domainEvents, o.log)
+		o.supervisor.Add(worker)
 	}
 
 	fanoutWorker := workers.NewEventFanout(
-		e.log,
-		e.domainEvents,
-		e.telemetryEvents,
+		o.log,
+		o.domainEvents,
+		o.telemetryEvents,
 	)
-	fanoutWorker.Add(e.sinks)
-	e.supervisor.Add(fanoutWorker.WithName("fanout-worker"))
+	fanoutWorker.Add(o.sinks)
+	o.supervisor.Add(fanoutWorker.WithName("fanout-worker"))
 
-	e.mu.Unlock() // Unlock before blocking on Run
+	o.mu.Unlock() // Unlock before blocking on Run
 
-	e.log.Info("Starting orchestrator and all supervised workers")
-	e.supervisor.Run(ctx)
+	o.log.Info("Starting orchestrator and all supervised workers")
+	o.supervisor.Run(ctx)
 }
 
-func (e *Orchestrator) Stop() {
-	e.log.Info("Requesting orchestrator shutdown")
-	e.supervisor.Stop()
+func (o *Orchestrator) Stop() {
+	o.log.Info("Requesting orchestrator shutdown")
+	o.supervisor.Stop()
 }

@@ -8,6 +8,7 @@ type DomainEvent interface {
 }
 
 type MessagePosted struct {
+	Room    int
 	Author  string
 	Content string
 	At      time.Time
