@@ -15,7 +15,8 @@ type Repository interface {
 }
 
 type MessageRepository struct {
-	Db *badger.DB
+	Db           *badger.DB
+	limitMessage *int
 }
 
 type DiskMessage struct {
@@ -47,6 +48,9 @@ func (m MessageRepository) GetMessages(room int) ([]DiskMessage, error) {
 		defer it.Close()
 		prefix := []byte(fmt.Sprintf("msg:%d:", room))
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			if m.limitMessage != nil && len(byteMessages) == *m.limitMessage {
+				break
+			}
 			item := it.Item()
 			err := item.Value(func(value []byte) error {
 				byteMessages = append(byteMessages, value)
