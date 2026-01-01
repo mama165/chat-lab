@@ -12,6 +12,10 @@ type DiskSink struct {
 	log        *slog.Logger
 }
 
+func NewDiskSink(repository repositories.Repository, log *slog.Logger) DiskSink {
+	return DiskSink{repository: repository, log: log}
+}
+
 func (d DiskSink) Consume(e event.DomainEvent) {
 	switch evt := e.(type) {
 	case event.MessagePosted:

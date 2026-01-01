@@ -12,41 +12,40 @@ import (
 
 const waitTimeBeforeRestart = 200 * time.Millisecond
 
-// Supervisor Own a context and a cancel function
+// Supervisor Own a context and a Cancel function
 // Run each worker in a goroutine
 // Check panics and errors
 // Restart workers automatically
 // Shutdown properly if parent context is canceled
 // Wait for the end of all goroutines via WaitGroup
 type Supervisor struct {
-	cancel  context.CancelFunc // To stop the context
+	Cancel  context.CancelFunc // To stop the context
 	wg      *sync.WaitGroup    // Wait for the end of goroutines
 	log     *slog.Logger
 	workers []contract.Worker
 }
 
-func NewSupervisor(wg *sync.WaitGroup, log *slog.Logger) *Supervisor {
-	return &Supervisor{wg: wg, log: log}
+func NewSupervisor(log *slog.Logger) *Supervisor {
+	return &Supervisor{wg: &sync.WaitGroup{}, log: log}
 }
 
 // Run Create a local cancellation trigger tied to the parent ctx
 //
-//	// If the parent (main) cancels, we cancel.
-//	// If WE call s.cancel(), only our children cancel.
+//	// If the parent (main) cancels, we Cancel.
+//	// If WE call s.Cancel(), only our children Cancel.
 func (s *Supervisor) Run(ctx context.Context) {
 	// 1. We create a local cancellation trigger tied to the parent ctx
-	// If the parent (main) cancels, we cancel.
-	// If WE call s.cancel(), only our children cancel.
+	// If the parent (main) cancels, we Cancel.
+	// If WE call s.Cancel(), only our children Cancel.
 	supervisedCtx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
+	s.Cancel = cancel
 	// Safety: ensure resources are cleaned up when Run exits
-	defer s.cancel()
+	defer s.Cancel()
 
 	for _, worker := range s.workers {
 		s.Start(supervisedCtx, worker)
 	}
 	s.wg.Wait()
-
 }
 
 func (s *Supervisor) Add(worker ...contract.Worker) contract.ISupervisor {
@@ -95,10 +94,10 @@ func (s *Supervisor) Start(ctx context.Context, worker contract.Worker) {
 	}()
 }
 
-// Stop cancel all goroutines listening channel for Ctx.Done
+// Stop Cancel all goroutines listening channel for Ctx.Done
 // Supervisor will wait for all goroutines to finish
 func (s *Supervisor) Stop() {
-	if s.cancel != nil {
-		s.cancel()
+	if s.Cancel != nil {
+		s.Cancel()
 	}
 }

@@ -1,3 +1,4 @@
+//go:generate go run go.uber.org/mock/mockgen -source=contract.go -destination=../mocks/mock_contract.go -package=mocks
 package contract
 
 import (

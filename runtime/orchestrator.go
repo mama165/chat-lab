@@ -11,23 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 )
-
-type AsyncSink struct {
-	name   string
-	inbox  chan event.DomainEvent
-	delay  time.Duration
-	handle func(domainEvent event.DomainEvent)
-}
-
-func (a AsyncSink) Consume(event event.DomainEvent) {
-	select {
-	case a.inbox <- event:
-	}
-	//TODO implement me
-	panic("implement me")
-}
 
 // Internal structure to keep track of a room and its resources
 type roomEntry struct {
@@ -45,12 +29,12 @@ type Orchestrator struct {
 	telemetryEvents chan event.DomainEvent
 }
 
-func NewOrchestrator(log *slog.Logger, bufferSize int) *Orchestrator {
+func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor, bufferSize int) *Orchestrator {
 	return &Orchestrator{
 		log:             log,
 		rooms:           make(map[domain.RoomID]roomEntry),
 		sinks:           nil,
-		supervisor:      workers.NewSupervisor(&sync.WaitGroup{}, log),
+		supervisor:      supervisor,
 		domainEvents:    make(chan event.DomainEvent, bufferSize),
 		telemetryEvents: make(chan event.DomainEvent, bufferSize),
 	}
@@ -68,8 +52,8 @@ func (o *Orchestrator) RegisterRoom(room *domain.Room) {
 	o.rooms[room.ID] = roomEntry{room: room, command: cmdChan}
 }
 
-func (o *Orchestrator) RegisterSink(sink contract.EventSink) {
-	o.sinks = append(o.sinks, sink)
+func (o *Orchestrator) RegisterSinks(sink ...contract.EventSink) {
+	o.sinks = append(o.sinks, sink...)
 }
 
 func (o *Orchestrator) Dispatch(cmd domain.Command) {

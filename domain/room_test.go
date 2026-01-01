@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestRoom_PostMessage_AddsMessageAndEvent(t *testing.T) {
+func TestRoom_PostMessage(t *testing.T) {
 	room := Room{}
 
 	msg := Message{

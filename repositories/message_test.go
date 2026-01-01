@@ -3,6 +3,7 @@ package repositories
 import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
+	"log/slog"
 	"testing"
 	"time"
 )
@@ -13,7 +14,7 @@ func Test_Record_Multiple_Message(t *testing.T) {
 	req.NoError(err)
 	defer db.Close()
 
-	repository := MessageRepository{Db: db}
+	repository := NewMessageRepository(db, slog.Default(), nil)
 	room := 1
 	content := "this message will self destruct in 5 seconds"
 	at := time.Now().UTC()
@@ -39,7 +40,7 @@ func Test_Record_Multiple_Message_And_Limit(t *testing.T) {
 	defer db.Close()
 
 	limit := 2
-	repository := MessageRepository{Db: db, limitMessage: &limit}
+	repository := NewMessageRepository(db, slog.Default(), &limit)
 	room := 1
 	content := "this message will self destruct in 5 seconds"
 	at := time.Now().UTC()

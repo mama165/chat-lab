@@ -22,11 +22,9 @@ func TestTimeline_Consume_MessagePosted(t *testing.T) {
 		At:      time.Now().Add(time.Second),
 	}
 
-	// Act
 	timeline.Consume(evt1)
 	timeline.Consume(evt2)
 
-	// Assert
 	require.Len(t, timeline.Messages, 2)
 	require.Equal(t, "Alice", timeline.Messages[0].SenderID)
 	require.Equal(t, "Clara", timeline.Messages[1].SenderID)

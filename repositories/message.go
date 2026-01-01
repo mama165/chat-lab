@@ -1,3 +1,4 @@
+//go:generate go run go.uber.org/mock/mockgen -source=message.go -destination=../mocks/mock_repository.go -package=mocks
 package repositories
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/proto"
+	"log/slog"
 	"time"
 )
 
@@ -15,8 +17,13 @@ type Repository interface {
 }
 
 type MessageRepository struct {
-	Db           *badger.DB
-	limitMessage *int
+	Db            *badger.DB
+	log           *slog.Logger
+	LimitMessages *int
+}
+
+func NewMessageRepository(db *badger.DB, log *slog.Logger, limitMessages *int) MessageRepository {
+	return MessageRepository{Db: db, log: log, LimitMessages: limitMessages}
 }
 
 type DiskMessage struct {
@@ -48,7 +55,8 @@ func (m MessageRepository) GetMessages(room int) ([]DiskMessage, error) {
 		defer it.Close()
 		prefix := []byte(fmt.Sprintf("msg:%d:", room))
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			if m.limitMessage != nil && len(byteMessages) == *m.limitMessage {
+			if m.LimitMessages != nil && len(byteMessages) == *m.LimitMessages {
+				m.log.Debug(fmt.Sprintf("Maximum of %d message reached", *m.LimitMessages))
 				break
 			}
 			item := it.Item()
