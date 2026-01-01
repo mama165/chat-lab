@@ -21,3 +21,18 @@ func (m MessagePosted) Name() string {
 func (m MessagePosted) OccurredAt() time.Time {
 	return m.At
 }
+
+type SanitizedMessage struct {
+	Room    int
+	Author  string
+	Content string
+	At      time.Time
+}
+
+func (m SanitizedMessage) Name() string {
+	return "message_sanitized"
+}
+
+func (m SanitizedMessage) OccurredAt() time.Time {
+	return m.At
+}

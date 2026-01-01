@@ -25,6 +25,7 @@ type Orchestrator struct {
 	rooms           map[domain.RoomID]roomEntry
 	sinks           []contract.EventSink
 	supervisor      contract.ISupervisor
+	rawEvents       chan event.DomainEvent
 	domainEvents    chan event.DomainEvent
 	telemetryEvents chan event.DomainEvent
 }
@@ -35,6 +36,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor, bufferSiz
 		rooms:           make(map[domain.RoomID]roomEntry),
 		sinks:           nil,
 		supervisor:      supervisor,
+		rawEvents:       make(chan event.DomainEvent, bufferSize),
 		domainEvents:    make(chan event.DomainEvent, bufferSize),
 		telemetryEvents: make(chan event.DomainEvent, bufferSize),
 	}
@@ -78,6 +80,9 @@ func (o *Orchestrator) Start(ctx context.Context) {
 		worker := workers.NewRoomWorker(entry.room, entry.command, o.domainEvents, o.log)
 		o.supervisor.Add(worker)
 	}
+
+	moderationWorker := workers.NewModerationWorker(o.rawEvents, o.domainEvents)
+	o.supervisor.Add(moderationWorker)
 
 	fanoutWorker := workers.NewEventFanout(
 		o.log,
