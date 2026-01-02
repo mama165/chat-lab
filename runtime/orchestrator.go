@@ -6,6 +6,7 @@ import (
 	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
+	"chat-lab/moderation"
 	"chat-lab/runtime/workers"
 	"context"
 	"fmt"
@@ -73,7 +74,7 @@ func (o *Orchestrator) Dispatch(cmd domain.Command) {
 	}
 }
 
-func (o *Orchestrator) Start(ctx context.Context) {
+func (o *Orchestrator) Start(ctx context.Context) error {
 	o.mu.Lock()
 
 	for _, entry := range o.rooms {
@@ -81,7 +82,12 @@ func (o *Orchestrator) Start(ctx context.Context) {
 		o.supervisor.Add(worker)
 	}
 
-	moderationWorker := workers.NewModerationWorker(o.rawEvents, o.domainEvents)
+	blacklist := []string{"maison, smartphone"}
+	moderator, err := moderation.NewModerator(blacklist)
+	if err != nil {
+		return err
+	}
+	moderationWorker := workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents)
 	o.supervisor.Add(moderationWorker)
 
 	fanoutWorker := workers.NewEventFanout(
@@ -96,6 +102,7 @@ func (o *Orchestrator) Start(ctx context.Context) {
 
 	o.log.Info("Starting orchestrator and all supervised workers")
 	o.supervisor.Run(ctx)
+	return nil
 }
 
 func (o *Orchestrator) Stop() {

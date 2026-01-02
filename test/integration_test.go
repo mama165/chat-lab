@@ -39,7 +39,10 @@ func Test_Scenario(t *testing.T) {
 	room := domain.NewRoom(id)
 	orchestrator.RegisterRoom(room)
 
-	go orchestrator.Start(ctx)
+	go func() {
+		err = orchestrator.Start(ctx)
+		req.NoError(err)
+	}()
 	defer orchestrator.Stop()
 
 	userID := uuid.NewString()

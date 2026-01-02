@@ -3,19 +3,21 @@ package workers
 import (
 	"chat-lab/contract"
 	"chat-lab/domain/event"
+	"chat-lab/moderation"
 	"context"
 	"log/slog"
 )
 
 type ModerationWorker struct {
 	name      contract.WorkerName
+	moderator moderation.Moderator
 	rawEvents chan event.DomainEvent
 	events    chan event.DomainEvent
 	log       *slog.Logger
 }
 
-func NewModerationWorker(rawEvents, events chan event.DomainEvent) contract.Worker {
-	return ModerationWorker{rawEvents: rawEvents, events: events}
+func NewModerationWorker(moderator moderation.Moderator, rawEvents, events chan event.DomainEvent) contract.Worker {
+	return ModerationWorker{moderator: moderator, rawEvents: rawEvents, events: events}
 }
 
 func (w ModerationWorker) GetName() contract.WorkerName {
@@ -43,15 +45,11 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 				case w.events <- event.SanitizedMessage{
 					Room:    evt.Room,
 					Author:  evt.Author,
-					Content: sanitize(evt.Content),
+					Content: w.moderator.Censor(evt.Content),
 					At:      evt.At,
 				}:
 				}
 			}
 		}
 	}
-}
-
-func sanitize(content string) string {
-	return "I'm a clean content"
 }
