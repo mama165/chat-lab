@@ -24,15 +24,23 @@ func Test_Scenario(t *testing.T) {
 	req.NoError(err)
 	defer db.Close()
 
+	// 1. On crée un canal pour signaler la fin du traitement
+	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	supervisor := workers.NewSupervisor(log)
-	orchestrator := runtime.NewOrchestrator(log, supervisor, 100)
+	orchestrator := runtime.NewOrchestrator(log, supervisor, 10, 1000)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockRepository(ctrl)
-	mockMessageRepository.EXPECT().StoreMessage(gomock.Any()).Return(nil)
+	mockMessageRepository.EXPECT().
+		StoreMessage(gomock.Any()).
+		Do(func(msg any) {
+			close(done) // On signale qu'on a reçu le message
+		}).
+		Return(nil).
+		Times(1) // On attend exactement 1 appel
 
 	mockTimelineSink := mocks.NewMockEventSink(ctrl)
-	mockTimelineSink.EXPECT().Consume(gomock.Any()).Return()
+	mockTimelineSink.EXPECT().Consume(gomock.Any()).Return().Times(1)
 	diskSink := storage.NewDiskSink(mockMessageRepository, log)
 	orchestrator.RegisterSinks(mockTimelineSink, diskSink)
 	id := 1
@@ -58,13 +66,13 @@ func Test_Scenario(t *testing.T) {
 	})
 
 	// And wait time for channels & goroutines
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-done:
+		// Then the message has reached the repository
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout: message has never reached the repository")
+	}
 
 	// Then supervisor can be canceled
 	req.NotNil(supervisor.Cancel)
-
-	// And message is stored in database
-	//messages, err := mockMessageRepository.GetMessages(id)
-	//req.NoError(err)
-	//req.Len(messages, 1)
 }

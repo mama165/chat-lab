@@ -60,13 +60,14 @@ func (s *Supervisor) Add(worker ...contract.Worker) contract.ISupervisor {
 // This provides fault isolation and basic self-healing behavior.
 func (s *Supervisor) Start(ctx context.Context, worker contract.Worker) {
 	s.wg.Add(1)
+	workerName := contract.GetWorkerName(worker)
 
 	go func() {
 		defer s.wg.Done()
 
 		for {
 			if ctx.Err() != nil {
-				s.log.Info(fmt.Sprintf("Stopping : %s", worker.GetName()))
+				s.log.Info(fmt.Sprintf("Stopping : %s", workerName))
 				return
 			}
 
@@ -84,12 +85,25 @@ func (s *Supervisor) Start(ctx context.Context, worker contract.Worker) {
 
 			if err == nil {
 				// Terminated properly, never restart !
-				s.log.Info(fmt.Sprintf("Worker finished : %s", worker.GetName()))
+				s.log.Info(fmt.Sprintf("Worker finished : %s", workerName))
 				return
 			}
 
-			s.log.Info(fmt.Sprintf("Restarting : %s", worker.GetName()))
-			time.Sleep(waitTimeBeforeRestart)
+			if ctx.Err() != nil {
+				s.log.Info("Worker stopped (context canceled)", "name", workerName)
+				return
+			}
+
+			s.log.Warn("Worker crashed, restarting", "name", workerName, "error", err)
+			select {
+			case <-ctx.Done():
+				// Context canceled: priority stop.
+				// Exit immediately without waiting for the restart delay.
+				return
+			case <-time.After(waitTimeBeforeRestart):
+				// Delay elapsed and context is still active.
+				// Proceed with the worker restart.
+			}
 		}
 	}()
 }

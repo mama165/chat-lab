@@ -14,45 +14,42 @@ import (
 	"sync"
 )
 
-// Internal structure to keep track of a room and its resources
-type roomEntry struct {
-	room    *domain.Room
-	command chan domain.Command
-}
-
 type Orchestrator struct {
 	mu              sync.Mutex
 	log             *slog.Logger
-	rooms           map[domain.RoomID]roomEntry
+	numWorkers      int
+	rooms           map[domain.RoomID]*domain.Room
 	sinks           []contract.EventSink
 	supervisor      contract.ISupervisor
+	globalCommands  chan domain.Command
 	rawEvents       chan event.DomainEvent
 	domainEvents    chan event.DomainEvent
 	telemetryEvents chan event.DomainEvent
 }
 
-func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor, bufferSize int) *Orchestrator {
+func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor, numWorkers, bufferSize int) *Orchestrator {
 	return &Orchestrator{
 		log:             log,
-		rooms:           make(map[domain.RoomID]roomEntry),
+		numWorkers:      numWorkers,
+		rooms:           make(map[domain.RoomID]*domain.Room),
 		sinks:           nil,
 		supervisor:      supervisor,
+		globalCommands:  make(chan domain.Command, bufferSize),
 		rawEvents:       make(chan event.DomainEvent, bufferSize),
 		domainEvents:    make(chan event.DomainEvent, bufferSize),
 		telemetryEvents: make(chan event.DomainEvent, bufferSize),
 	}
 }
 
-// RegisterRoom creates a dedicated worker and command channel for a room.
+// RegisterRoom creates a dedicated command channel for a Room.
 func (o *Orchestrator) RegisterRoom(room *domain.Room) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if _, ok := o.rooms[room.ID]; ok {
 		o.log.Info(fmt.Sprintf("Room %d already exists", room.ID))
-		return // Room already exists, do nothing
+		return
 	}
-	cmdChan := make(chan domain.Command, 100)
-	o.rooms[room.ID] = roomEntry{room: room, command: cmdChan}
+	o.rooms[room.ID] = room
 }
 
 func (o *Orchestrator) RegisterSinks(sink ...contract.EventSink) {
@@ -60,34 +57,27 @@ func (o *Orchestrator) RegisterSinks(sink ...contract.EventSink) {
 }
 
 func (o *Orchestrator) Dispatch(cmd domain.Command) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	entry, ok := o.rooms[cmd.RoomID()]
-	if !ok {
-		o.log.Info(fmt.Sprintf("Room %d doesn't exists", cmd.RoomID()))
-		return
-	}
 	select {
-	case entry.command <- cmd:
+	case o.globalCommands <- cmd:
 	default:
-		// TODO à gérer
+		o.log.Warn(fmt.Sprintf("Global command channel full for Room %d, dropping command", cmd.RoomID()))
 	}
 }
 
 func (o *Orchestrator) Start(ctx context.Context) error {
 	o.mu.Lock()
 
-	for _, entry := range o.rooms {
-		worker := workers.NewRoomWorker(entry.room, entry.command, o.domainEvents, o.log)
+	for i := 0; i < o.numWorkers; i++ {
+		worker := workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.rawEvents, o.log)
 		o.supervisor.Add(worker)
 	}
 
 	blacklist := []string{"maison, smartphone"}
-	moderator, err := moderation.NewModerator(blacklist)
+	moderator, err := moderation.NewModerator(blacklist, '*')
 	if err != nil {
 		return err
 	}
-	moderationWorker := workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents)
+	moderationWorker := workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents, o.log)
 	o.supervisor.Add(moderationWorker)
 
 	fanoutWorker := workers.NewEventFanout(
@@ -96,7 +86,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 		o.telemetryEvents,
 	)
 	fanoutWorker.Add(o.sinks)
-	o.supervisor.Add(fanoutWorker.WithName("fanout-worker"))
+	o.supervisor.Add(fanoutWorker)
 
 	o.mu.Unlock() // Unlock before blocking on Run
 
@@ -105,7 +95,24 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop initiates a graceful shutdown of the orchestrator.
+// It cancels the supervision context to signal workers to stop,
+// and then closes internal channels to ensure all remaining events are drained.
 func (o *Orchestrator) Stop() {
 	o.log.Info("Requesting orchestrator shutdown")
+
+	// 1. Cancel the supervised context.
+	// This immediately signals all workers to stop blocking on operations.
 	o.supervisor.Stop()
+
+	// 2. Close internal domain and telemetry channels.
+	// This allows workers to exit their loops when they detect the channel is closed (ok == false),
+	// ensuring any buffered events are processed before the worker goroutine terminates.
+	if o.domainEvents != nil {
+		close(o.domainEvents)
+	}
+	if o.telemetryEvents != nil {
+		close(o.telemetryEvents)
+	}
+	o.log.Debug("Orchestrator internal channels closed")
 }

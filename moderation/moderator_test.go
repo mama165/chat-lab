@@ -10,7 +10,7 @@ import (
 func TestModerator_Censor(t *testing.T) {
 	req := require.New(t)
 	dictionary := []string{"badger", "snake", "mushroom"}
-	mod, err := NewModerator(dictionary)
+	mod, err := NewModerator(dictionary, '*')
 	req.NoError(err)
 
 	tests := []struct {

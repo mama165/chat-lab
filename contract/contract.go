@@ -4,6 +4,7 @@ package contract
 import (
 	"chat-lab/domain/event"
 	"context"
+	"reflect"
 )
 
 type ISupervisor interface {
@@ -18,9 +19,21 @@ type WorkerName string
 // Worker doesn't protect itself
 // Can be silly, focused
 type Worker interface {
-	WithName(name string) Worker
-	GetName() WorkerName
 	Run(ctx context.Context) error
+}
+
+// GetWorkerName uses reflection to retrieve the type name of the worker.
+// This is used for logging and supervision purposes during worker initialization
+// or lifecycle events, avoiding the need for manual naming in the Worker interface.
+func GetWorkerName(w Worker) string {
+	if w == nil {
+		return "NilWorker"
+	}
+	t := reflect.TypeOf(w)
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t.Name()
 }
 
 type EventSink interface {

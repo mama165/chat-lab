@@ -16,17 +16,8 @@ type ModerationWorker struct {
 	log       *slog.Logger
 }
 
-func NewModerationWorker(moderator moderation.Moderator, rawEvents, events chan event.DomainEvent) contract.Worker {
-	return ModerationWorker{moderator: moderator, rawEvents: rawEvents, events: events}
-}
-
-func (w ModerationWorker) GetName() contract.WorkerName {
-	return w.name
-}
-
-func (w ModerationWorker) WithName(name string) contract.Worker {
-	w.name = contract.WorkerName(name)
-	return w
+func NewModerationWorker(moderator moderation.Moderator, rawEvents, events chan event.DomainEvent, log *slog.Logger) *ModerationWorker {
+	return &ModerationWorker{moderator: moderator, rawEvents: rawEvents, events: events, log: log}
 }
 
 func (w ModerationWorker) Run(ctx context.Context) error {

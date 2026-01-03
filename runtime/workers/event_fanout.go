@@ -33,26 +33,26 @@ func (w *EventFanoutWorker) Add(sinks []contract.EventSink) contract.Worker {
 	return w
 }
 
-func (w *EventFanoutWorker) WithName(name string) contract.Worker {
-	w.Name = contract.WorkerName(name)
-	return w
-}
-
-func (w *EventFanoutWorker) GetName() contract.WorkerName { return w.Name }
-
 func (w *EventFanoutWorker) Run(ctx context.Context) error {
 	for {
 		select {
-		case evt := <-w.DomainEvent:
+		case <-ctx.Done():
+			w.Log.Debug("Context done, stopping domainEvent send")
+			return nil
+		case evt, ok := <-w.DomainEvent:
+			if !ok {
+				w.Log.Debug("Canal is closed")
+				return nil
+			}
 			w.Fanout(evt)
 			select {
+			case <-ctx.Done():
+				w.Log.Debug("Context done, stopping domainEvent send")
+				return nil
 			case w.TelemetryEvent <- evt:
 			default:
 				w.Log.Debug("Observability telemetry event lost")
 			}
-		case <-ctx.Done():
-			w.Log.Debug("Context done, stopping domainEvent send")
-			return nil
 		}
 	}
 }

@@ -18,7 +18,7 @@ func NewDiskSink(repository repositories.Repository, log *slog.Logger) DiskSink 
 
 func (d DiskSink) Consume(e event.DomainEvent) {
 	switch evt := e.(type) {
-	case event.MessagePosted:
+	case event.SanitizedMessage:
 		d.log.Debug(fmt.Sprintf("Consumed event : %v", evt))
 		if err := d.repository.StoreMessage(toDiskMessage(evt)); err != nil {
 			d.log.Error(err.Error())
@@ -26,7 +26,7 @@ func (d DiskSink) Consume(e event.DomainEvent) {
 	}
 }
 
-func toDiskMessage(event event.MessagePosted) repositories.DiskMessage {
+func toDiskMessage(event event.SanitizedMessage) repositories.DiskMessage {
 	return repositories.DiskMessage{
 		Room:    event.Room,
 		Author:  event.Author,

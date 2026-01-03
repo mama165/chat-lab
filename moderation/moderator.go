@@ -6,7 +6,8 @@ import (
 )
 
 type Moderator struct {
-	matcher *goahocorasick.Machine
+	matcher      *goahocorasick.Machine
+	censoredChar rune
 }
 
 type TextMapping struct {
@@ -15,7 +16,7 @@ type TextMapping struct {
 }
 
 // NewModerator initializes the Aho-Corasick automaton with a normalized version of the provided blacklist.
-func NewModerator(blacklist []string) (Moderator, error) {
+func NewModerator(blacklist []string, censoredChar rune) (Moderator, error) {
 	patterns := make([][]rune, len(blacklist))
 	for i, word := range blacklist {
 		patterns[i] = normalizeRunes([]rune(word))
@@ -25,7 +26,7 @@ func NewModerator(blacklist []string) (Moderator, error) {
 	if err := m.Build(patterns); err != nil {
 		return Moderator{}, err
 	}
-	return Moderator{matcher: m}, nil
+	return Moderator{matcher: m, censoredChar: censoredChar}, nil
 }
 
 // Censor identifies forbidden patterns and replaces the original characters with stars while preserving spacing.
@@ -54,7 +55,7 @@ func (m *Moderator) Censor(original string) string {
 		origEnd := lastCharOrigIdx + 1
 
 		for i := origStart; i < origEnd; i++ {
-			origRunes[i] = '*'
+			origRunes[i] = m.censoredChar
 		}
 	}
 
