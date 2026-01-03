@@ -1,6 +1,7 @@
 package moderation
 
 import (
+	"fmt"
 	goahocorasick "github.com/anknown/ahocorasick"
 	"unicode"
 )
@@ -17,9 +18,16 @@ type TextMapping struct {
 
 // NewModerator initializes the Aho-Corasick automaton with a normalized version of the provided censored words list.
 func NewModerator(censoredWords []string, censoredChar rune) (Moderator, error) {
-	patterns := make([][]rune, len(censoredWords))
-	for i, word := range censoredWords {
-		patterns[i] = normalizeRunes([]rune(word))
+	patterns := make([][]rune, 0, len(censoredWords)) // Change la taille initiale à 0
+	for _, word := range censoredWords {
+		normalized := normalizeRunes([]rune(word))
+		if len(normalized) > 0 { // <--- Sécurité cruciale
+			patterns = append(patterns, normalized)
+		}
+	}
+
+	if len(patterns) == 0 {
+		return Moderator{}, fmt.Errorf("no valid patterns after normalization")
 	}
 
 	m := new(goahocorasick.Machine)
@@ -69,10 +77,11 @@ func (m *Moderator) normalize(input string) TextMapping {
 	origIdx := make([]int, 0, len(origRunes))
 
 	for i, r := range origRunes {
-		clean := simplifyRune(r)
-		if isNoise(clean) {
+		// On vérifie le caractère ORIGINAL 'r'
+		if isNoise(r) {
 			continue
 		}
+		clean := simplifyRune(r)
 		norm = append(norm, unicode.ToLower(clean))
 		origIdx = append(origIdx, i)
 	}
@@ -84,7 +93,7 @@ func normalizeRunes(input []rune) []rune {
 	out := make([]rune, 0, len(input))
 	for _, r := range input {
 		clean := simplifyRune(r)
-		if isNoise(clean) {
+		if isNoise(clean) { // clean ici sera 'i' pour '!', donc isNoise sera faux
 			continue
 		}
 		out = append(out, unicode.ToLower(clean))
@@ -112,5 +121,10 @@ func simplifyRune(r rune) rune {
 
 // isNoise identifies characters that should be ignored during the pattern matching phase.
 func isNoise(r rune) bool {
+	// Si c'est un caractère que tu simplifies (Leet Speak), on ne le considère PAS comme du bruit
+	switch r {
+	case '4', '@', '3', '€', '1', '!', '|', '0', '5', '$':
+		return false
+	}
 	return unicode.IsPunct(r) || unicode.IsSpace(r) || unicode.IsSymbol(r)
 }

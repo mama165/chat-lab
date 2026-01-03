@@ -68,3 +68,23 @@ func TestModerator_Censor(t *testing.T) {
 		})
 	}
 }
+
+func TestModerator_CornerCases(t *testing.T) {
+	req := require.New(t)
+
+	// Given real noise and not Leet Speak associated
+	dictionary := []string{"...", ",,,", "", "badger"}
+
+	mod, err := NewModerator(dictionary, '*')
+	req.NoError(err)
+
+	// Then the sentence is censored
+	input := "The badger is safe"
+	expected := "The ****** is safe"
+	req.Equal(expected, mod.Censor(input))
+
+	// Then real noise is uncensored
+	input = "Hello ..."
+	expected = "Hello ..."
+	req.Equal(expected, mod.Censor(input))
+}
