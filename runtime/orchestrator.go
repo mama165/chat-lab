@@ -155,14 +155,5 @@ func (o *Orchestrator) Stop() {
 	// This immediately signals all workers to stop blocking on operations.
 	o.supervisor.Stop()
 
-	// 2. Close internal domain and telemetry channels.
-	// This allows workers to exit their loops when they detect the channel is closed (ok == false),
-	// ensuring any buffered events are processed before the worker goroutine terminates.
-	if o.domainEvents != nil {
-		close(o.domainEvents)
-	}
-	if o.telemetryEvents != nil {
-		close(o.telemetryEvents)
-	}
 	o.log.Debug("Orchestrator internal channels closed")
 }
