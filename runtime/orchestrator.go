@@ -3,16 +3,25 @@
 package runtime
 
 import (
+	"bufio"
+	"bytes"
 	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
+	"chat-lab/errors"
 	"chat-lab/moderation"
 	"chat-lab/runtime/workers"
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"strings"
 	"sync"
 )
+
+//go:embed censored/*
+var censoredFolder embed.FS
 
 type Orchestrator struct {
 	mu              sync.Mutex
@@ -71,10 +80,51 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 		worker := workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.rawEvents, o.log)
 		o.supervisor.Add(worker)
 	}
-
-	blacklist := []string{"maison, smartphone"}
-	moderator, err := moderation.NewModerator(blacklist, '*')
+	entries, err := fs.ReadDir(censoredFolder, "censored")
 	if err != nil {
+		o.mu.Unlock()
+		return err
+	}
+	var languages, words []string
+	uniqueWords := make(map[string]struct{})
+	for _, entry := range entries {
+		if entry.IsDir() {
+			o.mu.Unlock()
+			return errors.ErrOnlyCensoredFiles
+		}
+		languages = append(languages, strings.TrimSuffix(entry.Name(), ".txt"))
+		data, err := censoredFolder.ReadFile("censored/" + entry.Name())
+		if err != nil {
+			o.mu.Unlock()
+			return err
+		}
+		// Use a scanner to properly read line (handle \n et \r\n)
+		// ⚠️Don't use strings.Split
+		scanner := bufio.NewScanner(bytes.NewReader(data))
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" {
+				uniqueWords[line] = struct{}{}
+			}
+		}
+		if err = scanner.Err(); err != nil {
+			o.mu.Unlock()
+			return err
+		}
+	}
+	for w := range uniqueWords {
+		words = append(words, w)
+	}
+	if len(words) == 0 {
+		o.mu.Unlock()
+		return errors.ErrEmptyWords
+	}
+	o.log.Info(fmt.Sprintf("%d censored files loaded [%s]", len(languages), strings.Join(languages, ",")))
+	o.log.Info(fmt.Sprintf("%d censored words loaded", len(words)))
+
+	moderator, err := moderation.NewModerator(words, '*')
+	if err != nil {
+		o.mu.Unlock()
 		return err
 	}
 	moderationWorker := workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents, o.log)

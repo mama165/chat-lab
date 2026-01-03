@@ -15,10 +15,10 @@ type TextMapping struct {
 	OrigIdx    []int
 }
 
-// NewModerator initializes the Aho-Corasick automaton with a normalized version of the provided blacklist.
-func NewModerator(blacklist []string, censoredChar rune) (Moderator, error) {
-	patterns := make([][]rune, len(blacklist))
-	for i, word := range blacklist {
+// NewModerator initializes the Aho-Corasick automaton with a normalized version of the provided censored words list.
+func NewModerator(censoredWords []string, censoredChar rune) (Moderator, error) {
+	patterns := make([][]rune, len(censoredWords))
+	for i, word := range censoredWords {
 		patterns[i] = normalizeRunes([]rune(word))
 	}
 

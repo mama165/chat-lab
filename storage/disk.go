@@ -23,6 +23,8 @@ func (d DiskSink) Consume(e event.DomainEvent) {
 		if err := d.repository.StoreMessage(toDiskMessage(evt)); err != nil {
 			d.log.Error(err.Error())
 		}
+	default:
+		d.log.Debug(fmt.Sprintf("Not implemented event : %v", evt))
 	}
 }
 

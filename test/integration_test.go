@@ -20,9 +20,11 @@ import (
 func Test_Scenario(t *testing.T) {
 	ctx := context.Background()
 	req := require.New(t)
-	db, err := badger.Open(badger.DefaultOptions(t.TempDir()).WithLoggingLevel(badger.ERROR))
+	// Reduced to 16 Mo for testing (avoid 20 Go of storage)
+	db, err := badger.Open(badger.DefaultOptions(t.TempDir()).
+		WithLoggingLevel(badger.ERROR).
+		WithValueLogFileSize(16 << 20))
 	req.NoError(err)
-	defer db.Close()
 
 	// 1. On crée un canal pour signaler la fin du traitement
 	done := make(chan struct{})
@@ -51,7 +53,12 @@ func Test_Scenario(t *testing.T) {
 		err = orchestrator.Start(ctx)
 		req.NoError(err)
 	}()
-	defer orchestrator.Stop()
+
+	// Clean everything at the end of the test
+	t.Cleanup(func() {
+		orchestrator.Stop()
+		db.Close()
+	})
 
 	userID := uuid.NewString()
 	content := "this message will self destruct in 5 seconds"
