@@ -120,20 +120,6 @@ func (m *MockWorker) EXPECT() *MockWorkerMockRecorder {
 	return m.recorder
 }
 
-// GetName mocks base method.
-func (m *MockWorker) GetName() contract.WorkerName {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetName")
-	ret0, _ := ret[0].(contract.WorkerName)
-	return ret0
-}
-
-// GetName indicates an expected call of GetName.
-func (mr *MockWorkerMockRecorder) GetName() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetName", reflect.TypeOf((*MockWorker)(nil).GetName))
-}
-
 // Run mocks base method.
 func (m *MockWorker) Run(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -146,20 +132,6 @@ func (m *MockWorker) Run(ctx context.Context) error {
 func (mr *MockWorkerMockRecorder) Run(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockWorker)(nil).Run), ctx)
-}
-
-// WithName mocks base method.
-func (m *MockWorker) WithName(name string) contract.Worker {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WithName", name)
-	ret0, _ := ret[0].(contract.Worker)
-	return ret0
-}
-
-// WithName indicates an expected call of WithName.
-func (mr *MockWorkerMockRecorder) WithName(name any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithName", reflect.TypeOf((*MockWorker)(nil).WithName), name)
 }
 
 // MockEventSink is a mock of EventSink interface.
