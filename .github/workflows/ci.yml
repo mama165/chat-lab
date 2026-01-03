@@ -22,6 +22,9 @@ jobs:
       - name: Verify Dependencies
         run: go mod verify
 
+      - name: Vet Code
+        run: go vet ./...
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
