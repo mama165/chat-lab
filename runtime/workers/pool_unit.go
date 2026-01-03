@@ -15,7 +15,6 @@ import (
 var _ contract.Worker = (*PoolUnitWorker)(nil)
 
 type PoolUnitWorker struct {
-	name     contract.WorkerName
 	rooms    map[domain.RoomID]*domain.Room
 	commands chan domain.Command
 	events   chan event.DomainEvent

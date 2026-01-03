@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"chat-lab/contract"
 	"chat-lab/domain/event"
 	"chat-lab/moderation"
 	"context"
@@ -9,7 +8,6 @@ import (
 )
 
 type ModerationWorker struct {
-	name      contract.WorkerName
 	moderator moderation.Moderator
 	rawEvents chan event.DomainEvent
 	events    chan event.DomainEvent

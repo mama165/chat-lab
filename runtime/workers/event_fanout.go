@@ -18,7 +18,6 @@ import (
 // EventFanoutWorker is safe for concurrent use by multiple goroutines.
 type EventFanoutWorker struct {
 	Log            *slog.Logger
-	Name           contract.WorkerName
 	DomainEvent    chan event.DomainEvent
 	TelemetryEvent chan event.DomainEvent
 	sinks          []contract.EventSink

@@ -1,12 +1,12 @@
 module chat-lab
 
-go 1.25.1
+go 1.24.0
 
 require (
 	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/google/uuid v1.6.0
-	github.com/mama165/sdk-go v1.0.2
+	github.com/mama165/sdk-go v1.0.3
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0

@@ -3,17 +3,17 @@ package moderation
 import (
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
 func Test_Moderation_Benchmark(t *testing.T) {
 	// 1. Setup Badger (Temporary)
+	req := require.New(t)
 	path := t.TempDir()
 	db, err := badger.Open(badger.DefaultOptions(path).WithLoggingLevel(badger.ERROR))
-	if err != nil {
-		t.Fatal(err)
-	}
+	req.NoError(err)
 	defer db.Close()
 
 	wordCount := 100_000
@@ -25,9 +25,9 @@ func Test_Moderation_Benchmark(t *testing.T) {
 		key := []byte(fmt.Sprintf("blacklist:word_%d", i))
 		_ = wb.Set(key, nil)
 	}
-	if err := wb.Flush(); err != nil {
-		t.Fatal(err)
-	}
+	err = wb.Flush()
+	req.NoError(err)
+
 	fmt.Printf("✅ Seeding %d words: %v\n", wordCount, time.Since(startSeed))
 
 	// --- Phase 2: LOADING ---
@@ -45,15 +45,14 @@ func Test_Moderation_Benchmark(t *testing.T) {
 		}
 		return nil
 	})
+	req.NoError(err)
 	fmt.Printf("✅ Loading from Badger: %v\n", time.Since(startLoad))
 
 	// --- Phase 3: BUILDING AHO-CORASICK ---
 	startBuild := time.Now()
 	_, err = NewModerator(words, '*')
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Printf("✅ Building AC Automaton: %v\n", time.Since(startBuild))
+	req.NoError(err)
 
+	fmt.Printf("✅ Building AC Automaton: %v\n", time.Since(startBuild))
 	fmt.Printf("\n🚀 Total startup time for moderation: %v\n", time.Since(startLoad))
 }
