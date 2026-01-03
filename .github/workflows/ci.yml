@@ -1,0 +1,78 @@
+name: Chat-Lab CI
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: main
+
+jobs:
+  quality-gate:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Security Check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  tests:
+    name: Integrity & Performance
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Check generated code (Mocks)
+        run: |
+          go generate ./...
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Error: Mocks are out of date. Please run 'go generate ./...' and commit changes."
+            git status
+            exit 1
+          fi
+
+      - name: Run Unit & Integration Tests (Race Detector)
+        run: go test -v -race -count=1 ./...
+
+      - name: Run Benchmarks
+        # Ensuring no performance regressions in moderation and storage
+        run: go test -bench=. -benchmem ./... | tee bench_output.txt
+
+  build:
+    name: Artifact Compilation
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build Binary
+        run: |
+          # Build with optimization flags for production
+          go build -ldflags="-s -w" cmd/main.go
