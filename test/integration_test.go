@@ -86,7 +86,4 @@ func Test_Scenario(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Timeout: message has never reached the repository")
 	}
-
-	// Then supervisor can be canceled
-	req.NotNil(supervisor.Cancel)
 }

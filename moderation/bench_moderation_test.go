@@ -28,7 +28,10 @@ func Test_Moderation_Benchmark(t *testing.T) {
 	err = wb.Flush()
 	req.NoError(err)
 
-	fmt.Printf("✅ Seeding %d words: %v\n", wordCount, time.Since(startSeed))
+	elapsed := time.Since(startSeed)
+
+	fmt.Printf("✅ Seeding %d words: %v\n", wordCount, elapsed)
+	req.Less(elapsed, 3*time.Second)
 
 	// --- Phase 2: LOADING ---
 	startLoad := time.Now()

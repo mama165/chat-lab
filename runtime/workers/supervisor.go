@@ -19,6 +19,7 @@ const waitTimeBeforeRestart = 200 * time.Millisecond
 // Shutdown properly if parent context is canceled
 // Wait for the end of all goroutines via WaitGroup
 type Supervisor struct {
+	mu      sync.RWMutex
 	Cancel  context.CancelFunc // To stop the context
 	wg      *sync.WaitGroup    // Wait for the end of goroutines
 	log     *slog.Logger
@@ -42,6 +43,11 @@ func (s *Supervisor) Run(ctx context.Context) {
 	// Safety: ensure resources are cleaned up when Run exits
 	defer s.Cancel()
 
+	s.mu.RLock()
+	workersToStart := make([]contract.Worker, len(s.workers))
+	copy(workersToStart, s.workers)
+	s.mu.RUnlock()
+
 	for _, worker := range s.workers {
 		s.Start(supervisedCtx, worker)
 	}
@@ -49,6 +55,8 @@ func (s *Supervisor) Run(ctx context.Context) {
 }
 
 func (s *Supervisor) Add(worker ...contract.Worker) contract.ISupervisor {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.workers = append(s.workers, worker...)
 	return s
 }
