@@ -3,6 +3,7 @@ package test
 import (
 	"chat-lab/domain"
 	"chat-lab/mocks"
+	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/storage"
@@ -10,6 +11,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
 	"github.com/mama165/sdk-go/logs"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"log/slog"
@@ -31,7 +33,11 @@ func Test_Scenario(t *testing.T) {
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	supervisor := workers.NewSupervisor(log)
 	registry := runtime.NewRegistry()
-	orchestrator := runtime.NewOrchestrator(log, supervisor, registry, 10, 1000)
+	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
+	orchestrator := runtime.NewOrchestrator(
+		log, supervisor, registry, messageRepository,
+		10, 1000, 3*time.Second,
+	)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockRepository(ctrl)
 	mockMessageRepository.EXPECT().

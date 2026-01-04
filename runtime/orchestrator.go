@@ -10,7 +10,10 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/errors"
 	"chat-lab/moderation"
+	"chat-lab/projection"
+	"chat-lab/repositories"
 	"chat-lab/runtime/workers"
+	"chat-lab/storage"
 	"context"
 	"embed"
 	"fmt"
@@ -25,32 +28,37 @@ import (
 var censoredFolder embed.FS
 
 type Orchestrator struct {
-	mu              sync.Mutex
-	log             *slog.Logger
-	numWorkers      int
-	rooms           map[domain.RoomID]*domain.Room
-	permanentSinks  []contract.EventSink
-	supervisor      contract.ISupervisor
-	registry        *Registry
-	globalCommands  chan domain.Command
-	rawEvents       chan event.DomainEvent
-	domainEvents    chan event.DomainEvent
-	telemetryEvents chan event.DomainEvent
+	mu                sync.Mutex
+	log               *slog.Logger
+	numWorkers        int
+	rooms             map[domain.RoomID]*domain.Room
+	permanentSinks    []contract.EventSink
+	supervisor        contract.ISupervisor
+	registry          contract.IRegistry
+	globalCommands    chan domain.Command
+	rawEvents         chan event.DomainEvent
+	domainEvents      chan event.DomainEvent
+	telemetryEvents   chan event.DomainEvent
+	messageRepository repositories.Repository
+	sinkTimeout       time.Duration
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
-	registry *Registry, numWorkers, bufferSize int) *Orchestrator {
+	registry *Registry, messageRepository repositories.Repository,
+	numWorkers, bufferSize int, sinkTimeout time.Duration) *Orchestrator {
 	return &Orchestrator{
-		log:             log,
-		numWorkers:      numWorkers,
-		rooms:           make(map[domain.RoomID]*domain.Room),
-		permanentSinks:  nil,
-		supervisor:      supervisor,
-		registry:        registry,
-		globalCommands:  make(chan domain.Command, bufferSize),
-		rawEvents:       make(chan event.DomainEvent, bufferSize),
-		domainEvents:    make(chan event.DomainEvent, bufferSize),
-		telemetryEvents: make(chan event.DomainEvent, bufferSize),
+		log:               log,
+		numWorkers:        numWorkers,
+		rooms:             make(map[domain.RoomID]*domain.Room),
+		permanentSinks:    nil,
+		supervisor:        supervisor,
+		registry:          registry,
+		globalCommands:    make(chan domain.Command, bufferSize),
+		rawEvents:         make(chan event.DomainEvent, bufferSize),
+		domainEvents:      make(chan event.DomainEvent, bufferSize),
+		telemetryEvents:   make(chan event.DomainEvent, bufferSize),
+		messageRepository: messageRepository,
+		sinkTimeout:       sinkTimeout,
 	}
 }
 
@@ -152,7 +160,13 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 		o.telemetryEvents,
 		3*time.Second,
 	)
+
 	o.supervisor.Add(fanoutWorker)
+
+	diskSink := storage.NewDiskSink(o.messageRepository, o.log)
+	timelineSink := projection.NewTimeline()
+
+	o.RegisterSinks(timelineSink, diskSink)
 
 	o.mu.Unlock() // Unlock before blocking on Run
 
