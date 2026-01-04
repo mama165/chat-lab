@@ -37,28 +37,25 @@ func NewEventFanout(log *slog.Logger,
 		sinkTimeout: sinkTimeout}
 }
 
+// Run starts the event distribution loop.
+// It uses a range loop over w.DomainEvent to ensure a graceful shutdown (drain):
+// even if the channel is closed, the worker will process all remaining buffered events
+// before returning. This guarantees that no events are lost during application shutdown.
 func (w *EventFanoutWorker) Run(ctx context.Context) error {
-	for {
+	for evt := range w.DomainEvent {
+		w.Fanout(evt)
 		select {
 		case <-ctx.Done():
-			w.Log.Debug("Context done, stopping domainEvent send")
-			return nil
-		case evt, ok := <-w.DomainEvent:
-			if !ok {
-				w.Log.Debug("channel is closed")
-				return nil
-			}
-			w.Fanout(evt)
-			select {
-			case <-ctx.Done():
-				w.Log.Debug("Context done, stopping domainEvent send")
-				return nil
-			case w.TelemetryEvent <- evt:
-			default:
-				w.Log.Debug("Observability telemetry event lost")
-			}
+			// We check the context only for the optional telemetry part.
+			// Core fanout continues until the channel is empty.
+			w.Log.Debug("Context done, skipping telemetry")
+		case w.TelemetryEvent <- evt:
+		default:
+			w.Log.Debug("Observability telemetry event lost")
 		}
 	}
+	w.Log.Info("EventFanoutWorker: domainEvent channel drained and closed. Shutting down.")
+	return nil
 }
 
 // Fanout distributes an event to all relevant sinks (permanent and room-specific).
