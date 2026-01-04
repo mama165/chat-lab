@@ -26,7 +26,7 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 			return ctx.Err()
 		case e, ok := <-w.rawEvents:
 			if !ok {
-				w.log.Debug("Canal is closed")
+				w.log.Debug("Channel is closed")
 				return nil
 			}
 			switch evt := e.(type) {

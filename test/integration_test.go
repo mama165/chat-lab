@@ -30,7 +30,8 @@ func Test_Scenario(t *testing.T) {
 	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	supervisor := workers.NewSupervisor(log)
-	orchestrator := runtime.NewOrchestrator(log, supervisor, 10, 1000)
+	registry := runtime.NewRegistry()
+	orchestrator := runtime.NewOrchestrator(log, supervisor, registry, 10, 1000)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockRepository(ctrl)
 	mockMessageRepository.EXPECT().
@@ -42,7 +43,7 @@ func Test_Scenario(t *testing.T) {
 		Times(1) // On attend exactement 1 appel
 
 	mockTimelineSink := mocks.NewMockEventSink(ctrl)
-	mockTimelineSink.EXPECT().Consume(gomock.Any()).Return().Times(1)
+	mockTimelineSink.EXPECT().Consume(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	diskSink := storage.NewDiskSink(mockMessageRepository, log)
 	orchestrator.RegisterSinks(mockTimelineSink, diskSink)
 	id := 1

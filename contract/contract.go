@@ -2,6 +2,7 @@
 package contract
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"context"
 	"reflect"
@@ -37,5 +38,10 @@ func GetWorkerName(w Worker) string {
 }
 
 type EventSink interface {
-	Consume(e event.DomainEvent)
+	Consume(ctx context.Context, e event.DomainEvent) error
+}
+type IRegistry interface {
+	GetSinksForRoom(roomID domain.RoomID) []EventSink
+	Subscribe(participantID string, roomID domain.RoomID, sink EventSink)
+	Unsubscribe(participantID string, roomID domain.RoomID)
 }

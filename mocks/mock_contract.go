@@ -11,6 +11,7 @@ package mocks
 
 import (
 	contract "chat-lab/contract"
+	domain "chat-lab/domain"
 	event "chat-lab/domain/event"
 	context "context"
 	reflect "reflect"
@@ -159,13 +160,77 @@ func (m *MockEventSink) EXPECT() *MockEventSinkMockRecorder {
 }
 
 // Consume mocks base method.
-func (m *MockEventSink) Consume(e event.DomainEvent) {
+func (m *MockEventSink) Consume(ctx context.Context, e event.DomainEvent) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Consume", e)
+	ret := m.ctrl.Call(m, "Consume", ctx, e)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Consume indicates an expected call of Consume.
-func (mr *MockEventSinkMockRecorder) Consume(e any) *gomock.Call {
+func (mr *MockEventSinkMockRecorder) Consume(ctx, e any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Consume", reflect.TypeOf((*MockEventSink)(nil).Consume), e)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Consume", reflect.TypeOf((*MockEventSink)(nil).Consume), ctx, e)
+}
+
+// MockIRegistry is a mock of IRegistry interface.
+type MockIRegistry struct {
+	ctrl     *gomock.Controller
+	recorder *MockIRegistryMockRecorder
+	isgomock struct{}
+}
+
+// MockIRegistryMockRecorder is the mock recorder for MockIRegistry.
+type MockIRegistryMockRecorder struct {
+	mock *MockIRegistry
+}
+
+// NewMockIRegistry creates a new mock instance.
+func NewMockIRegistry(ctrl *gomock.Controller) *MockIRegistry {
+	mock := &MockIRegistry{ctrl: ctrl}
+	mock.recorder = &MockIRegistryMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIRegistry) EXPECT() *MockIRegistryMockRecorder {
+	return m.recorder
+}
+
+// GetSinksForRoom mocks base method.
+func (m *MockIRegistry) GetSinksForRoom(roomID domain.RoomID) []contract.EventSink {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSinksForRoom", roomID)
+	ret0, _ := ret[0].([]contract.EventSink)
+	return ret0
+}
+
+// GetSinksForRoom indicates an expected call of GetSinksForRoom.
+func (mr *MockIRegistryMockRecorder) GetSinksForRoom(roomID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSinksForRoom", reflect.TypeOf((*MockIRegistry)(nil).GetSinksForRoom), roomID)
+}
+
+// Subscribe mocks base method.
+func (m *MockIRegistry) Subscribe(participantID string, roomID domain.RoomID, sink contract.EventSink) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Subscribe", participantID, roomID, sink)
+}
+
+// Subscribe indicates an expected call of Subscribe.
+func (mr *MockIRegistryMockRecorder) Subscribe(participantID, roomID, sink any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*MockIRegistry)(nil).Subscribe), participantID, roomID, sink)
+}
+
+// Unsubscribe mocks base method.
+func (m *MockIRegistry) Unsubscribe(participantID string, roomID domain.RoomID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Unsubscribe", participantID, roomID)
+}
+
+// Unsubscribe indicates an expected call of Unsubscribe.
+func (mr *MockIRegistryMockRecorder) Unsubscribe(participantID, roomID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unsubscribe", reflect.TypeOf((*MockIRegistry)(nil).Unsubscribe), participantID, roomID)
 }

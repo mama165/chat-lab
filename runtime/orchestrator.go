@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed censored/*
@@ -28,21 +29,24 @@ type Orchestrator struct {
 	log             *slog.Logger
 	numWorkers      int
 	rooms           map[domain.RoomID]*domain.Room
-	sinks           []contract.EventSink
+	permanentSinks  []contract.EventSink
 	supervisor      contract.ISupervisor
+	registry        *Registry
 	globalCommands  chan domain.Command
 	rawEvents       chan event.DomainEvent
 	domainEvents    chan event.DomainEvent
 	telemetryEvents chan event.DomainEvent
 }
 
-func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor, numWorkers, bufferSize int) *Orchestrator {
+func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
+	registry *Registry, numWorkers, bufferSize int) *Orchestrator {
 	return &Orchestrator{
 		log:             log,
 		numWorkers:      numWorkers,
 		rooms:           make(map[domain.RoomID]*domain.Room),
-		sinks:           nil,
+		permanentSinks:  nil,
 		supervisor:      supervisor,
+		registry:        registry,
 		globalCommands:  make(chan domain.Command, bufferSize),
 		rawEvents:       make(chan event.DomainEvent, bufferSize),
 		domainEvents:    make(chan event.DomainEvent, bufferSize),
@@ -62,7 +66,7 @@ func (o *Orchestrator) RegisterRoom(room *domain.Room) {
 }
 
 func (o *Orchestrator) RegisterSinks(sink ...contract.EventSink) {
-	o.sinks = append(o.sinks, sink...)
+	o.permanentSinks = append(o.permanentSinks, sink...)
 }
 
 func (o *Orchestrator) Dispatch(cmd domain.Command) {
@@ -71,6 +75,16 @@ func (o *Orchestrator) Dispatch(cmd domain.Command) {
 	default:
 		o.log.Warn(fmt.Sprintf("Global command channel full for Room %d, dropping command", cmd.RoomID()))
 	}
+}
+
+func (o *Orchestrator) RegisterParticipant(pID string, roomID domain.RoomID, sink contract.EventSink) {
+	o.registry.Subscribe(pID, roomID, sink)
+	// Why not send an event UserJoined to notify all members of the room through FanoutWorker
+}
+
+// UnregisterParticipant disconnects a user.
+func (o *Orchestrator) UnregisterParticipant(pID string, roomID domain.RoomID) {
+	o.registry.Unsubscribe(pID, roomID)
 }
 
 func (o *Orchestrator) Start(ctx context.Context) error {
@@ -132,10 +146,12 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 
 	fanoutWorker := workers.NewEventFanout(
 		o.log,
+		o.permanentSinks,
+		o.registry,
 		o.domainEvents,
 		o.telemetryEvents,
+		3*time.Second,
 	)
-	fanoutWorker.Add(o.sinks)
 	o.supervisor.Add(fanoutWorker)
 
 	o.mu.Unlock() // Unlock before blocking on Run

@@ -1,10 +1,12 @@
 package event
 
-import "time"
+import (
+	"chat-lab/domain"
+	"time"
+)
 
 type DomainEvent interface {
-	Name() string
-	OccurredAt() time.Time
+	RoomID() domain.RoomID
 }
 
 type MessagePosted struct {
@@ -14,12 +16,8 @@ type MessagePosted struct {
 	At      time.Time
 }
 
-func (m MessagePosted) Name() string {
-	return "message_posted"
-}
-
-func (m MessagePosted) OccurredAt() time.Time {
-	return m.At
+func (m MessagePosted) RoomID() domain.RoomID {
+	return domain.RoomID(m.Room)
 }
 
 type SanitizedMessage struct {
@@ -29,10 +27,6 @@ type SanitizedMessage struct {
 	At      time.Time
 }
 
-func (m SanitizedMessage) Name() string {
-	return "message_sanitized"
-}
-
-func (m SanitizedMessage) OccurredAt() time.Time {
-	return m.At
+func (m SanitizedMessage) RoomID() domain.RoomID {
+	return domain.RoomID(m.Room)
 }

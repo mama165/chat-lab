@@ -3,6 +3,7 @@ package storage
 import (
 	"chat-lab/domain/event"
 	"chat-lab/repositories"
+	"context"
 	"fmt"
 	"log/slog"
 )
@@ -16,15 +17,13 @@ func NewDiskSink(repository repositories.Repository, log *slog.Logger) DiskSink 
 	return DiskSink{repository: repository, log: log}
 }
 
-func (d DiskSink) Consume(e event.DomainEvent) {
+func (d DiskSink) Consume(ctx context.Context, e event.DomainEvent) error {
 	switch evt := e.(type) {
 	case event.SanitizedMessage:
-		d.log.Debug(fmt.Sprintf("Consumed event : %v", evt))
-		if err := d.repository.StoreMessage(toDiskMessage(evt)); err != nil {
-			d.log.Error(err.Error())
-		}
+		return d.repository.StoreMessage(toDiskMessage(evt))
 	default:
 		d.log.Debug(fmt.Sprintf("Not implemented event : %v", evt))
+		return nil
 	}
 }
 

@@ -6,6 +6,7 @@ package projection
 import (
 	"chat-lab/domain"
 	"chat-lab/domain/event"
+	"context"
 )
 
 // Timeline holds a simple local timeline
@@ -20,11 +21,13 @@ func NewTimeline() *Timeline {
 	}
 }
 
-func (t *Timeline) Consume(e event.DomainEvent) {
+func (t *Timeline) Consume(_ context.Context, e event.DomainEvent) error {
 	switch evt := e.(type) {
 	case event.MessagePosted:
 		t.Messages = append(t.Messages, fromEvent(evt))
+		return nil
 	}
+	return nil
 }
 
 func fromEvent(event event.MessagePosted) domain.Message {
