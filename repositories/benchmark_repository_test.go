@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	pb "chat-lab/proto"
+	pb "chat-lab/proto/storage"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
