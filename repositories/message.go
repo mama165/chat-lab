@@ -4,12 +4,13 @@ package repositories
 import (
 	pb "chat-lab/proto/storage"
 	"fmt"
+	"log/slog"
+	"time"
+
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/proto"
-	"log/slog"
-	"time"
 )
 
 type Repository interface {

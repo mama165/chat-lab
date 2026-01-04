@@ -17,7 +17,7 @@ message PostMessageRequest {
 }
 
 message PostMessageResponse {
-  string message_id = 1;
+  bool success = 1;
 }
 
 message ConnectRequest {

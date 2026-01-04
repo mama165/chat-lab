@@ -4,19 +4,20 @@ import (
 	"chat-lab/domain"
 	"chat-lab/mocks"
 	"chat-lab/repositories"
+	"chat-lab/repositories/storage"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
-	"chat-lab/storage"
 	"context"
+	"log/slog"
+	"testing"
+	"time"
+
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
 	"github.com/mama165/sdk-go/logs"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	"log/slog"
-	"testing"
-	"time"
 )
 
 func Test_Scenario(t *testing.T) {

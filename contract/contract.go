@@ -45,3 +45,13 @@ type IRegistry interface {
 	Subscribe(participantID string, roomID domain.RoomID, sink EventSink)
 	Unsubscribe(participantID string, roomID domain.RoomID)
 }
+
+type IOrchestrator interface {
+	RegisterRoom(room *domain.Room)
+	RegisterSinks(sink ...EventSink)
+	Dispatch(cmd domain.Command)
+	RegisterParticipant(pID string, roomID domain.RoomID, sink EventSink)
+	UnregisterParticipant(pID string, roomID domain.RoomID)
+	Start(ctx context.Context) error
+	Stop()
+}
