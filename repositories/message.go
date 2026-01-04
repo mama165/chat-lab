@@ -2,7 +2,7 @@
 package repositories
 
 import (
-	pb "chat-lab/proto"
+	pb "chat-lab/proto/storage"
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"

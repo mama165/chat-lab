@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "chat-lab/proto/chat/v1";
+
+import "google/protobuf/timestamp.proto";
+
+service ChatService {
+  rpc PostMessage(PostMessageRequest) returns (PostMessageResponse);
+  rpc Connect(ConnectRequest) returns (stream ChatEvent);
+}
+
+message PostMessageRequest {
+  int64 room_id = 1;
+  string content = 2;
+}
+
+message PostMessageResponse {
+  string message_id = 1;
+}
+
+message ConnectRequest {
+  int64 room_id = 1;
+}
+
+message ChatEvent {
+  oneof event {
+    MessageEvent message = 1;
+    PresenceEvent presence = 2;
+  }
+}
+
+message MessageEvent {
+  string message_id = 1;
+  string author = 2;
+  string content = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message PresenceEvent {
+  string user_id = 1;
+  enum Type {
+    JOINED = 0;
+    LEFT = 1;
+  }
+  Type type = 2;
+}
