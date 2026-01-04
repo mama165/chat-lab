@@ -5,6 +5,7 @@ import (
 	pb "chat-lab/proto"
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/proto"
 	"log/slog"
@@ -27,15 +28,24 @@ func NewMessageRepository(db *badger.DB, log *slog.Logger, limitMessages *int) M
 }
 
 type DiskMessage struct {
+	ID      uuid.UUID
 	Room    int
 	Author  string
 	Content string
 	At      time.Time
 }
 
-// StoreMessage Key is --> msg:{room_id}:{timestamp}:{user_id}
+// StoreMessage persists a message in BadgerDB.
+// The key is formatted as "msg:{room_id}:{timestamp_padded}:{uuid}" to:
+//  1. Ensure chronological sorting using 19-digit zero padding (lexicographical order).
+//  2. Prevent data loss by using UUID as a collision disconnector if two messages
+//     arrive at the same nanosecond.
 func (m MessageRepository) StoreMessage(message DiskMessage) error {
-	key := fmt.Sprintf("msg:%d:%d:%s", message.Room, message.At.UnixNano(), message.Author)
+	key := fmt.Sprintf("msg:%d:%019d:%s",
+		message.Room,
+		message.At.UnixNano(),
+		message.ID,
+	)
 	bytes, err := proto.Marshal(lo.ToPtr(fromDiskMessage(message)))
 	if err != nil {
 		return err
@@ -46,15 +56,22 @@ func (m MessageRepository) StoreMessage(message DiskMessage) error {
 	})
 }
 
-// GetMessages Key is --> msg:
+// GetMessages retrieves messages for a specific room using a prefix scan.
+// Thanks to the padded timestamp in the key, messages are naturally sorted by time.
+// It stops collecting messages once the configured LimitMessages is reached.
 func (m MessageRepository) GetMessages(room int) ([]DiskMessage, error) {
 	var byteMessages [][]byte
 	var diskMessages []DiskMessage
 	err := m.Db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		options := badger.DefaultIteratorOptions
+		options.Reverse = true
+		it := txn.NewIterator(options)
 		defer it.Close()
+
 		prefix := []byte(fmt.Sprintf("msg:%d:", room))
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		seekKey := append(prefix, []byte("9999999999999999999")...)
+
+		for it.Seek(seekKey); it.ValidForPrefix(prefix); it.Next() {
 			if m.LimitMessages != nil && len(byteMessages) == *m.LimitMessages {
 				m.log.Debug(fmt.Sprintf("Maximum of %d message reached", *m.LimitMessages))
 				break
@@ -79,13 +96,18 @@ func (m MessageRepository) GetMessages(room int) ([]DiskMessage, error) {
 		if err = proto.Unmarshal(b, &messagePb); err != nil {
 			return nil, err
 		}
-		diskMessages = append(diskMessages, toDiskMessage(&messagePb))
+		message, err := toDiskMessage(&messagePb)
+		if err != nil {
+			return nil, err
+		}
+		diskMessages = append(diskMessages, message)
 	}
 	return diskMessages, err
 }
 
 func fromDiskMessage(message DiskMessage) pb.Message {
 	return pb.Message{
+		Id:      message.ID.String(),
 		Room:    int64(message.Room),
 		Author:  message.Author,
 		Content: message.Content,
@@ -93,11 +115,16 @@ func fromDiskMessage(message DiskMessage) pb.Message {
 	}
 }
 
-func toDiskMessage(messagePb *pb.Message) DiskMessage {
+func toDiskMessage(messagePb *pb.Message) (DiskMessage, error) {
+	parsedID, err := uuid.Parse(messagePb.Id)
+	if err != nil {
+		return DiskMessage{}, err
+	}
 	return DiskMessage{
+		ID:      parsedID,
 		Room:    int(messagePb.Room),
 		Author:  messagePb.Author,
 		Content: messagePb.Content,
 		At:      time.Unix(0, messagePb.At).UTC(),
-	}
+	}, nil
 }

@@ -17,7 +17,7 @@ func NewDiskSink(repository repositories.Repository, log *slog.Logger) DiskSink 
 	return DiskSink{repository: repository, log: log}
 }
 
-func (d DiskSink) Consume(ctx context.Context, e event.DomainEvent) error {
+func (d DiskSink) Consume(_ context.Context, e event.DomainEvent) error {
 	switch evt := e.(type) {
 	case event.SanitizedMessage:
 		return d.repository.StoreMessage(toDiskMessage(evt))
@@ -29,6 +29,7 @@ func (d DiskSink) Consume(ctx context.Context, e event.DomainEvent) error {
 
 func toDiskMessage(event event.SanitizedMessage) repositories.DiskMessage {
 	return repositories.DiskMessage{
+		ID:      event.ID,
 		Room:    event.Room,
 		Author:  event.Author,
 		Content: event.Content,

@@ -6,6 +6,7 @@ import (
 	"chat-lab/domain/event"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"log/slog"
 )
 
@@ -62,6 +63,7 @@ func (w *PoolUnitWorker) Run(ctx context.Context) error {
 
 func toEvent(c domain.PostMessageCommand) event.MessagePosted {
 	return event.MessagePosted{
+		ID:      uuid.New(),
 		Room:    c.Room,
 		Author:  c.UserID,
 		Content: c.Content,

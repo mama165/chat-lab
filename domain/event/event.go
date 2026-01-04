@@ -2,6 +2,7 @@ package event
 
 import (
 	"chat-lab/domain"
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -10,6 +11,7 @@ type DomainEvent interface {
 }
 
 type MessagePosted struct {
+	ID      uuid.UUID
 	Room    int
 	Author  string
 	Content string
@@ -21,6 +23,7 @@ func (m MessagePosted) RoomID() domain.RoomID {
 }
 
 type SanitizedMessage struct {
+	ID      uuid.UUID
 	Room    int
 	Author  string
 	Content string

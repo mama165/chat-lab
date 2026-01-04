@@ -3,6 +3,7 @@ package repositories
 import (
 	pb "chat-lab/proto"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"log/slog"
 	"testing"
@@ -15,7 +16,9 @@ import (
 func Test_MessageHistory_Performance(t *testing.T) {
 	req := require.New(t)
 	path := t.TempDir()
-	db, err := badger.Open(badger.DefaultOptions(path).WithLoggingLevel(badger.ERROR))
+	db, err := badger.Open(badger.DefaultOptions(path).
+		WithLoggingLevel(badger.ERROR).
+		WithValueLogFileSize(16 << 20))
 	req.NoError(err)
 	defer db.Close()
 
@@ -45,6 +48,7 @@ func Test_MessageHistory_Performance(t *testing.T) {
 
 		// 2. On sérialise en Protobuf comme le fait ton code de prod
 		pbMsg := pb.Message{
+			Id:      uuid.NewString(),
 			Room:    int64(roomID),
 			Author:  author,
 			Content: content,

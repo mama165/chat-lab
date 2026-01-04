@@ -3,8 +3,9 @@ package message.proto;
 option go_package = "messages/proto/pb-go;pb";
 
 message Message {
-  int64 room = 1;
-  string author = 2;
-  string content = 3;
-  int64 at = 4;
+  string id = 1;
+  int64 room = 2;
+  string author = 3;
+  string content = 4;
+  int64 at = 5;
 }
