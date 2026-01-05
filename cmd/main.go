@@ -1,16 +1,22 @@
 package main
 
 import (
+	grpc2 "chat-lab/grpc"
+	v1 "chat-lab/proto/chat"
 	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"context"
+	"fmt"
 	"github.com/Netflix/go-env"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/mama165/sdk-go/logs"
+	"google.golang.org/grpc"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -42,13 +48,35 @@ func main() {
 	defer stop()
 
 	// 5. Start the engine
-	err = orchestrator.Start(ctx)
-	if err != nil {
-		log.Error(err.Error())
+	if err = orchestrator.Start(ctx); err != nil {
+		panic(err)
 	}
 
-	<-ctx.Done() // Wait for Ctrl+C
+	// 6. Start gRPC Server now that orchestrator is ready
+	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		panic("error building server: " + err.Error())
+	}
 
-	// 6. Graceful stop
+	s := grpc.NewServer()
+	server := grpc2.NewChatServer(log, orchestrator, config.ConnectionBufferSize)
+	v1.RegisterChatServiceServer(s, server)
+
+	// Running the blocking gRPC server in a goroutine
+	go func() {
+		log.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
+		if err = s.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+			log.Error("gRPC server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done() // Wait for Ctrl+C
+	log.Info("Shutting down gracefully...")
+
+	// 7. Graceful stop
+	s.GracefulStop()
 	orchestrator.Stop()
+	log.Info("Program stopped")
 }
