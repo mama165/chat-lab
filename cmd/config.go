@@ -9,6 +9,7 @@ type Config struct {
 	ModerationCharReplacement rune          `env:"MODERATION_CHARACTER_REPLACEMENT,required=true"`
 	LimitMessages             *int          `env:"LIMIT_MESSAGES"`
 	SinkTimeout               time.Duration `env:"SINK_TIMEOUT,required=true"`
+	RestartInterval           time.Duration `env:"RESTART_INTERVAL,required=true"`
 	BadgerFilepath            string        `env:"BADGER_FILEPATH,required=true"`
 	LogLevel                  string        `env:"LOG_LEVEL,required=true"`
 	Host                      string        `env:"HOST,default=localhost"`

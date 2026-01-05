@@ -32,7 +32,7 @@ func Test_Scenario(t *testing.T) {
 	// 1. On crée un canal pour signaler la fin du traitement
 	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
-	supervisor := workers.NewSupervisor(log)
+	supervisor := workers.NewSupervisor(log, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
 	orchestrator := runtime.NewOrchestrator(

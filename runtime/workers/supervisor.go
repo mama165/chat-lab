@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-const waitTimeBeforeRestart = 200 * time.Millisecond
-
 // Supervisor Own a context and a Cancel function
 // Run each worker in a goroutine
 // Check panics and errors
@@ -19,15 +17,16 @@ const waitTimeBeforeRestart = 200 * time.Millisecond
 // Shutdown properly if parent context is canceled
 // Wait for the end of all goroutines via WaitGroup
 type Supervisor struct {
-	mu      sync.RWMutex
-	Cancel  context.CancelFunc // To stop the context
-	wg      *sync.WaitGroup    // Wait for the end of goroutines
-	log     *slog.Logger
-	workers []contract.Worker
+	mu              sync.RWMutex
+	Cancel          context.CancelFunc // To stop the context
+	wg              *sync.WaitGroup    // Wait for the end of goroutines
+	log             *slog.Logger
+	workers         []contract.Worker
+	restartInterval time.Duration
 }
 
-func NewSupervisor(log *slog.Logger) *Supervisor {
-	return &Supervisor{wg: &sync.WaitGroup{}, log: log}
+func NewSupervisor(log *slog.Logger, restartInterval time.Duration) *Supervisor {
+	return &Supervisor{wg: &sync.WaitGroup{}, log: log, restartInterval: restartInterval}
 }
 
 // Run Create a local cancellation trigger tied to the parent ctx
@@ -108,7 +107,7 @@ func (s *Supervisor) Start(ctx context.Context, worker contract.Worker) {
 				// Context canceled: priority stop.
 				// Exit immediately without waiting for the restart delay.
 				return
-			case <-time.After(waitTimeBeforeRestart):
+			case <-time.After(s.restartInterval):
 				// Delay elapsed and context is still active.
 				// Proceed with the worker restart.
 			}

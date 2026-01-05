@@ -26,7 +26,7 @@ func TestSupervisor_RestartOnPanic(t *testing.T) {
 		}).
 		AnyTimes()
 
-	sup := NewSupervisor(log)
+	sup := NewSupervisor(log, 200*time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -53,7 +53,7 @@ func TestSupervisor_StopOnSuccess(t *testing.T) {
 		Return(nil).
 		Times(1)
 
-	sup := NewSupervisor(log)
+	sup := NewSupervisor(log, 200*time.Millisecond)
 
 	// Given a channel to notify when Run() terminated
 	done := make(chan struct{})

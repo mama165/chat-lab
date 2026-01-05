@@ -32,7 +32,7 @@ func main() {
 	}
 	defer db.Close()
 
-	sup := workers.NewSupervisor(log)
+	sup := workers.NewSupervisor(log, config.RestartInterval)
 	registry := runtime.NewRegistry()
 
 	messageRepository := repositories.NewMessageRepository(db, log, config.LimitMessages)
