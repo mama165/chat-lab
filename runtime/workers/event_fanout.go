@@ -30,7 +30,8 @@ type EventFanoutWorker struct {
 func NewEventFanout(log *slog.Logger,
 	permanentSinks []contract.EventSink,
 	registry contract.IRegistry,
-	domainEvent, telemetryEvent chan event.DomainEvent, sinkTimeout time.Duration) *EventFanoutWorker {
+	domainEvent, telemetryEvent chan event.DomainEvent,
+	sinkTimeout time.Duration) *EventFanoutWorker {
 	return &EventFanoutWorker{
 		Log: log, permanentSinks: permanentSinks, registry: registry,
 		DomainEvent: domainEvent, TelemetryEvent: telemetryEvent,
