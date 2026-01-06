@@ -41,18 +41,19 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 }
 
 // GetMessages mocks base method.
-func (m *MockRepository) GetMessages(room int) ([]repositories.DiskMessage, error) {
+func (m *MockRepository) GetMessages(room int, cursor string) ([]repositories.DiskMessage, string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMessages", room)
+	ret := m.ctrl.Call(m, "GetMessages", room, cursor)
 	ret0, _ := ret[0].([]repositories.DiskMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // GetMessages indicates an expected call of GetMessages.
-func (mr *MockRepositoryMockRecorder) GetMessages(room any) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) GetMessages(room, cursor any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessages", reflect.TypeOf((*MockRepository)(nil).GetMessages), room)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessages", reflect.TypeOf((*MockRepository)(nil).GetMessages), room, cursor)
 }
 
 // StoreMessage mocks base method.

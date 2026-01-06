@@ -11,6 +11,14 @@ service ChatService {
   rpc Connect(ConnectRequest) returns (stream ChatEvent);
 }
 
+message GetMessageRequest {
+  int64 room = 1;
+}
+
+message GetMessageResponse {
+  int64 room = 1;
+}
+
 message PostMessageRequest {
   int64 room_id = 1;
   string content = 2;

@@ -73,7 +73,7 @@ func Test_MessageHistory_Performance(t *testing.T) {
 	fmt.Printf("Retrieving last %d messages for Room %d...\n", limit, targetRoom)
 	startGet := time.Now()
 
-	messages, err := repo.GetMessages(targetRoom)
+	messages, _, err := repo.GetMessages(targetRoom, "")
 	req.NoError(err)
 
 	duration := time.Since(startGet)

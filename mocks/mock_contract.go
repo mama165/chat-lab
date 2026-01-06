@@ -234,3 +234,117 @@ func (mr *MockIRegistryMockRecorder) Unsubscribe(participantID, roomID any) *gom
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unsubscribe", reflect.TypeOf((*MockIRegistry)(nil).Unsubscribe), participantID, roomID)
 }
+
+// MockIOrchestrator is a mock of IOrchestrator interface.
+type MockIOrchestrator struct {
+	ctrl     *gomock.Controller
+	recorder *MockIOrchestratorMockRecorder
+	isgomock struct{}
+}
+
+// MockIOrchestratorMockRecorder is the mock recorder for MockIOrchestrator.
+type MockIOrchestratorMockRecorder struct {
+	mock *MockIOrchestrator
+}
+
+// NewMockIOrchestrator creates a new mock instance.
+func NewMockIOrchestrator(ctrl *gomock.Controller) *MockIOrchestrator {
+	mock := &MockIOrchestrator{ctrl: ctrl}
+	mock.recorder = &MockIOrchestratorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIOrchestrator) EXPECT() *MockIOrchestratorMockRecorder {
+	return m.recorder
+}
+
+// Dispatch mocks base method.
+func (m *MockIOrchestrator) Dispatch(cmd domain.Command) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Dispatch", cmd)
+}
+
+// Dispatch indicates an expected call of Dispatch.
+func (mr *MockIOrchestratorMockRecorder) Dispatch(cmd any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockIOrchestrator)(nil).Dispatch), cmd)
+}
+
+// RegisterParticipant mocks base method.
+func (m *MockIOrchestrator) RegisterParticipant(pID string, roomID domain.RoomID, sink contract.EventSink) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RegisterParticipant", pID, roomID, sink)
+}
+
+// RegisterParticipant indicates an expected call of RegisterParticipant.
+func (mr *MockIOrchestratorMockRecorder) RegisterParticipant(pID, roomID, sink any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterParticipant", reflect.TypeOf((*MockIOrchestrator)(nil).RegisterParticipant), pID, roomID, sink)
+}
+
+// RegisterRoom mocks base method.
+func (m *MockIOrchestrator) RegisterRoom(room *domain.Room) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RegisterRoom", room)
+}
+
+// RegisterRoom indicates an expected call of RegisterRoom.
+func (mr *MockIOrchestratorMockRecorder) RegisterRoom(room any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRoom", reflect.TypeOf((*MockIOrchestrator)(nil).RegisterRoom), room)
+}
+
+// RegisterSinks mocks base method.
+func (m *MockIOrchestrator) RegisterSinks(sink ...contract.EventSink) {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range sink {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "RegisterSinks", varargs...)
+}
+
+// RegisterSinks indicates an expected call of RegisterSinks.
+func (mr *MockIOrchestratorMockRecorder) RegisterSinks(sink ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterSinks", reflect.TypeOf((*MockIOrchestrator)(nil).RegisterSinks), sink...)
+}
+
+// Start mocks base method.
+func (m *MockIOrchestrator) Start(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockIOrchestratorMockRecorder) Start(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockIOrchestrator)(nil).Start), ctx)
+}
+
+// Stop mocks base method.
+func (m *MockIOrchestrator) Stop() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockIOrchestratorMockRecorder) Stop() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockIOrchestrator)(nil).Stop))
+}
+
+// UnregisterParticipant mocks base method.
+func (m *MockIOrchestrator) UnregisterParticipant(pID string, roomID domain.RoomID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "UnregisterParticipant", pID, roomID)
+}
+
+// UnregisterParticipant indicates an expected call of UnregisterParticipant.
+func (mr *MockIOrchestratorMockRecorder) UnregisterParticipant(pID, roomID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterParticipant", reflect.TypeOf((*MockIOrchestrator)(nil).UnregisterParticipant), pID, roomID)
+}

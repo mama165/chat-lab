@@ -12,7 +12,9 @@ func Test_Moderation_Benchmark(t *testing.T) {
 	// 1. Setup Badger (Temporary)
 	req := require.New(t)
 	path := t.TempDir()
-	db, err := badger.Open(badger.DefaultOptions(path).WithLoggingLevel(badger.ERROR))
+	db, err := badger.Open(badger.DefaultOptions(path).
+		WithLoggingLevel(badger.ERROR).
+		WithValueLogFileSize(16 << 20))
 	req.NoError(err)
 	defer db.Close()
 
