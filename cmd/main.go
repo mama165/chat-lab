@@ -20,11 +20,21 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Exit codes to provide meaningful status to the operating system or service manager (e.g., systemd).
+const (
+	exitOK      = 0
+	exitRuntime = 1
+	exitConfig  = 2
+)
+
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %v\n", err)
-		os.Exit(1)
+	// The main function acts as a thin wrapper.
+	// Its only responsibility is to call run() and handle the OS exit code.
+	code, err := run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Chat-Lab terminated with error: %v\n", err)
 	}
+	os.Exit(code)
 }
 
 // run initializes all components, manages the server lifecycle, and centralizes error reporting.
@@ -32,11 +42,11 @@ func main() {
 // 1. It ensures all 'defer' statements (like database cleanup) are executed before the program exits.
 // 2. It improves testability by decoupling the initialization logic from the main entry point.
 // 3. It provides a structured way to handle graceful shutdowns for gRPC and background workers.
-func run() error {
+func run() (int, error) {
 	// 1. Configuration & Logger
 	var config Config
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
-		return fmt.Errorf("config error: %w", err)
+		return exitConfig, fmt.Errorf("config error: %w", err)
 	}
 	log := logs.GetLoggerFromString(config.LogLevel)
 
@@ -44,9 +54,9 @@ func run() error {
 	db, err := badger.Open(badger.DefaultOptions(config.BadgerFilepath).
 		WithLoggingLevel(badger.INFO))
 	if err != nil {
-		return fmt.Errorf("database opening failed: %w", err)
+		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
 	}
-	//  Defer will be executed before run() returned anything to main()
+	// Defer ensures the database lock is released and buffers are flushed before the function returns.
 	defer func() {
 		log.Info("Closing BadgerDB...")
 		_ = db.Close()
@@ -63,26 +73,27 @@ func run() error {
 	)
 
 	// 4. Context & Signals
+	// NotifyContext captures OS signals and cancels the context to trigger a shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// 5. Start the Engine
+	// 5. Start the Engine (Workers and Fanout)
 	if err = orchestrator.Start(ctx); err != nil {
-		return fmt.Errorf("orchestrator failed to start: %w", err)
+		return exitRuntime, fmt.Errorf("orchestrator failed to start: %w", err)
 	}
 
 	// 6. gRPC Server Setup
 	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", address, err)
+		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
 
 	s := grpc.NewServer()
 	server := grpc2.NewChatServer(log, orchestrator, config.ConnectionBufferSize)
 	v1.RegisterChatServiceServer(s, server)
 
-	// Use an error channel to capture Serve() issues
+	// Use an error channel to capture Serve() issues asynchronously.
 	errChan := make(chan error, 1)
 	go func() {
 		log.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
@@ -92,17 +103,20 @@ func run() error {
 	}()
 
 	// 7. Wait for Stop or Error
+	// The execution blocks here until either a signal is received or the server crashes.
 	select {
 	case <-ctx.Done():
-		log.Info("Shutting down gracefully...")
+		log.Info("Shutdown signal received")
 	case err := <-errChan:
-		return err
+		return exitRuntime, err
 	}
 
-	// 8. Final Cleanup
+	// 8. Final Cleanup (Graceful Shutdown)
+	// We allow active gRPC streams to finish and workers to drain their channels.
+	log.Info("Shutting down gracefully...")
 	s.GracefulStop()
 	orchestrator.Stop()
 	log.Info("Program stopped cleanly")
 
-	return nil
+	return exitOK, nil
 }
