@@ -40,14 +40,14 @@ chat-lab is structured as an **event-driven runtime** around a small, explicit d
 
 ```
 ┌────────────┐        Commands        ┌──────────────┐
-│   Client   │ ───────────────────▶ │   Runtime     │
-│ (future UI)│                      │ (Orchestrator)│
-└────────────┘                      └──────┬────────┘
+│   Client   │ ───────────────────▶   │   Runtime    │
+│ (future UI)│                        │(Orchestrator)│
+└────────────┘                        └──────┬───────┘
                                              │
                                              │ emits Events
                                              ▼
                                       ┌──────────────┐
-                                      │    Domain     │
+                                      │    Domain    │
                                       │ (pure logic) │
                                       └──────┬───────┘
                                              │
@@ -168,8 +168,6 @@ The Protobuf definitions live under the `proto/` directory.
 
 ### Generate Protobuf code
 
-The Go code is generated using `protoc` via Docker:
-
 ```bash
 docker run --rm -v "$PWD:/defs" protoc-image \
   -I . \
@@ -204,6 +202,30 @@ The project is actively evolving:
 * ✅ Event flows observable
 * 🧪 Focus on robustness, tests, and invariants
 * 🖥️ UI planned as a thin observational layer
+
+---
+
+## Tests 🧪
+
+* Unit tests for registry, pool units, moderation, and fanout workers
+* Integration tests for end-to-end message dispatch
+* Supervisor tests for restart and graceful shutdown
+
+---
+
+## Project Layout 📁
+
+```
+chat-lab/
+├─ client/           # UI (future)
+├─ domain/           # pure domain logic
+├─ runtime/          # orchestrator & workers
+├─ repositories/     # message storage & projections
+├─ proto/            # Protobuf definitions
+├─ mocks/            # generated mocks for tests
+├─ test/             # integration tests
+└─ tools.go          # tooling dependencies
+```
 
 ---
 
