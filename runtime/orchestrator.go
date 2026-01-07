@@ -17,6 +17,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"github.com/samber/lo"
 	"io/fs"
 	"log/slog"
 	"strings"
@@ -83,6 +84,22 @@ func (o *Orchestrator) Dispatch(cmd domain.Command) {
 	default:
 		o.log.Warn(fmt.Sprintf("Global command channel full for Room %d, dropping command", cmd.RoomID()))
 	}
+}
+
+func (o *Orchestrator) GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error) {
+	messages, cursor, err := o.messageRepository.GetMessages(cmd.Room, cmd.Cursor)
+	return fromDiskMessage(messages), cursor, err
+}
+
+func fromDiskMessage(messages []repositories.DiskMessage) []domain.Message {
+	return lo.Map(messages, func(item repositories.DiskMessage, _ int) domain.Message {
+		return domain.Message{
+			ID:        item.ID,
+			SenderID:  item.Author,
+			Content:   item.Content,
+			CreatedAt: item.At,
+		}
+	})
 }
 
 func (o *Orchestrator) RegisterParticipant(pID string, roomID domain.RoomID, sink contract.EventSink) {

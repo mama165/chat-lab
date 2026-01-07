@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
+	ChatService_GetMessage_FullMethodName  = "/chat.v1.ChatService/GetMessage"
 	ChatService_PostMessage_FullMethodName = "/chat.v1.ChatService/PostMessage"
 	ChatService_Connect_FullMethodName     = "/chat.v1.ChatService/Connect"
 )
@@ -27,6 +28,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChatServiceClient interface {
+	GetMessage(ctx context.Context, in *GetMessageRequest, opts ...grpc.CallOption) (*GetMessageResponse, error)
 	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error)
 	Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (ChatService_ConnectClient, error)
 }
@@ -37,6 +39,15 @@ type chatServiceClient struct {
 
 func NewChatServiceClient(cc grpc.ClientConnInterface) ChatServiceClient {
 	return &chatServiceClient{cc}
+}
+
+func (c *chatServiceClient) GetMessage(ctx context.Context, in *GetMessageRequest, opts ...grpc.CallOption) (*GetMessageResponse, error) {
+	out := new(GetMessageResponse)
+	err := c.cc.Invoke(ctx, ChatService_GetMessage_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *chatServiceClient) PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error) {
@@ -84,6 +95,7 @@ func (x *chatServiceConnectClient) Recv() (*ChatEvent, error) {
 // All implementations must embed UnimplementedChatServiceServer
 // for forward compatibility
 type ChatServiceServer interface {
+	GetMessage(context.Context, *GetMessageRequest) (*GetMessageResponse, error)
 	PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error)
 	Connect(*ConnectRequest, ChatService_ConnectServer) error
 	mustEmbedUnimplementedChatServiceServer()
@@ -93,6 +105,9 @@ type ChatServiceServer interface {
 type UnimplementedChatServiceServer struct {
 }
 
+func (UnimplementedChatServiceServer) GetMessage(context.Context, *GetMessageRequest) (*GetMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMessage not implemented")
+}
 func (UnimplementedChatServiceServer) PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PostMessage not implemented")
 }
@@ -110,6 +125,24 @@ type UnsafeChatServiceServer interface {
 
 func RegisterChatServiceServer(s grpc.ServiceRegistrar, srv ChatServiceServer) {
 	s.RegisterService(&ChatService_ServiceDesc, srv)
+}
+
+func _ChatService_GetMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).GetMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_GetMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).GetMessage(ctx, req.(*GetMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ChatService_PostMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -158,6 +191,10 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "chat.v1.ChatService",
 	HandlerType: (*ChatServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetMessage",
+			Handler:    _ChatService_GetMessage_Handler,
+		},
 		{
 			MethodName: "PostMessage",
 			Handler:    _ChatService_PostMessage_Handler,

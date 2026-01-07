@@ -50,6 +50,7 @@ type IOrchestrator interface {
 	RegisterRoom(room *domain.Room)
 	RegisterSinks(sink ...EventSink)
 	Dispatch(cmd domain.Command)
+	GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error)
 	RegisterParticipant(pID string, roomID domain.RoomID, sink EventSink)
 	UnregisterParticipant(pID string, roomID domain.RoomID)
 	Start(ctx context.Context) error

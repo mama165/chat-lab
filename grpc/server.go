@@ -27,6 +27,28 @@ func NewChatServer(log *slog.Logger, orchestrator *runtime.Orchestrator, connect
 	return &ChatServer{orchestrator: orchestrator, connectionBufferSize: connectionBufferSize, log: log}
 }
 
+func (s *ChatServer) GetMessage(_ context.Context, req *pb.GetMessageRequest) (*pb.GetMessageResponse, error) {
+	messages, cursor, err := s.orchestrator.GetMessages(domain.GetMessageCommand{
+		Room:   int(req.Room),
+		Cursor: req.Cursor,
+	})
+	return &pb.GetMessageResponse{
+		MessageResponse: toMessageResponse(messages),
+		Cursor:          cursor,
+	}, err
+}
+
+func toMessageResponse(messages []domain.Message) []*pb.MessageResponse {
+	return lo.Map(messages, func(item domain.Message, _ int) *pb.MessageResponse {
+		return &pb.MessageResponse{
+			MessageId: item.ID.String(),
+			Author:    item.SenderID,
+			Content:   item.Content,
+			CreatedAt: timestamppb.New(item.CreatedAt),
+		}
+	})
+}
+
 // PostMessage handles an incoming message sending intent.
 // It follows an asynchronous pattern: the message is dispatched to the engine
 // but not immediately broadcast back to the sender in this call.

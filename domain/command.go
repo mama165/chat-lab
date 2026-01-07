@@ -18,3 +18,12 @@ type PostMessageCommand struct {
 func (p PostMessageCommand) RoomID() RoomID {
 	return RoomID(p.Room)
 }
+
+type GetMessageCommand struct {
+	Room   int
+	Cursor *string
+}
+
+func (p GetMessageCommand) RoomID() RoomID {
+	return RoomID(p.Room)
+}

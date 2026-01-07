@@ -3,11 +3,14 @@
 // Messages are immutable and validated by the domain.
 package domain
 
-import "time"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 // Message represents an immutable chat event.
 type Message struct {
-	ID        string // unique identifier
+	ID        uuid.UUID // unique identifier
 	SenderID  string
 	Content   string
 	CreatedAt time.Time

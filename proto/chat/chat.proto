@@ -7,16 +7,26 @@ option go_package = "chat-lab/proto/chat/v1";
 import "google/protobuf/timestamp.proto";
 
 service ChatService {
+  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
   rpc PostMessage(PostMessageRequest) returns (PostMessageResponse);
   rpc Connect(ConnectRequest) returns (stream ChatEvent);
 }
 
 message GetMessageRequest {
   int64 room = 1;
+  optional string cursor = 2;
 }
 
 message GetMessageResponse {
-  int64 room = 1;
+  repeated MessageResponse message_response = 1;
+  optional string cursor = 2;
+}
+
+message MessageResponse {
+  string message_id = 1;
+  string author = 2;
+  string content = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 message PostMessageRequest {

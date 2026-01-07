@@ -271,6 +271,22 @@ func (mr *MockIOrchestratorMockRecorder) Dispatch(cmd any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockIOrchestrator)(nil).Dispatch), cmd)
 }
 
+// GetMessages mocks base method.
+func (m *MockIOrchestrator) GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMessages", cmd)
+	ret0, _ := ret[0].([]domain.Message)
+	ret1, _ := ret[1].(*string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetMessages indicates an expected call of GetMessages.
+func (mr *MockIOrchestratorMockRecorder) GetMessages(cmd any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMessages", reflect.TypeOf((*MockIOrchestrator)(nil).GetMessages), cmd)
+}
+
 // RegisterParticipant mocks base method.
 func (m *MockIOrchestrator) RegisterParticipant(pID string, roomID domain.RoomID, sink contract.EventSink) {
 	m.ctrl.T.Helper()
