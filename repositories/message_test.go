@@ -40,7 +40,7 @@ func Test_Record_And_Get_Sorted_Messages(t *testing.T) {
 	}
 
 	// When fetching messages
-	fetchedMessages, _, err := repository.GetMessages(room, "")
+	fetchedMessages, _, err := repository.GetMessages(room, nil)
 	req.NoError(err)
 
 	// Then the messages are sorted
@@ -70,7 +70,7 @@ func Test_Record_Multiple_Message_And_Limit(t *testing.T) {
 		err = repository.StoreMessage(dm)
 		req.NoError(err)
 	}
-	fetchedMessages, _, err := repository.GetMessages(room, "")
+	fetchedMessages, _, err := repository.GetMessages(room, nil)
 	req.NoError(err)
 	req.Len(fetchedMessages, limit)
 }
@@ -101,7 +101,7 @@ func Test_MessageRepository_Pagination(t *testing.T) {
 	}
 
 	// --- PAGE 1 ---
-	msgs1, cursor1, err := repo.GetMessages(room, "")
+	msgs1, cursor1, err := repo.GetMessages(room, nil)
 	req.NoError(err)
 	req.Len(msgs1, 4)
 	req.Equal("user_10", msgs1[0].Author) // Le plus récent

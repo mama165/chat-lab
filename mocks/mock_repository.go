@@ -41,11 +41,11 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 }
 
 // GetMessages mocks base method.
-func (m *MockRepository) GetMessages(room int, cursor string) ([]repositories.DiskMessage, string, error) {
+func (m *MockRepository) GetMessages(room int, cursor *string) ([]repositories.DiskMessage, *string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMessages", room, cursor)
 	ret0, _ := ret[0].([]repositories.DiskMessage)
-	ret1, _ := ret[1].(string)
+	ret1, _ := ret[1].(*string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }

@@ -15,7 +15,7 @@ import (
 
 type Repository interface {
 	StoreMessage(message DiskMessage) error
-	GetMessages(room int, cursor string) ([]DiskMessage, string, error)
+	GetMessages(room int, cursor *string) ([]DiskMessage, *string, error)
 }
 
 type MessageRepository struct {
@@ -60,7 +60,7 @@ func (m MessageRepository) StoreMessage(message DiskMessage) error {
 // GetMessages retrieves messages for a specific room using a prefix scan.
 // Thanks to the padded timestamp in the key, messages are naturally sorted by time.
 // It stops collecting messages once the configured LimitMessages is reached.
-func (m MessageRepository) GetMessages(room int, cursor string) ([]DiskMessage, string, error) {
+func (m MessageRepository) GetMessages(room int, cursor *string) ([]DiskMessage, *string, error) {
 	var byteMessages [][]byte
 	var diskMessages []DiskMessage
 	var lastKey string
@@ -76,17 +76,17 @@ func (m MessageRepository) GetMessages(room int, cursor string) ([]DiskMessage, 
 		prefix = []byte(fmt.Sprintf("msg:%d:", room))
 		var seekKey []byte
 		switch cursor {
-		case "":
+		case nil:
 			// Let's go the oldest position msg:22222:9999999999999999999
 			// Then, we go back and find few messages
 			seekKey = append(prefix, []byte("9999999999999999999")...)
 		default:
-			seekKey = append(prefix, []byte(cursor)...)
+			seekKey = append(prefix, []byte(*cursor)...)
 		}
 
 		it.Seek(seekKey)
 
-		if cursor != "" && it.ValidForPrefix(prefix) {
+		if cursor != nil && it.ValidForPrefix(prefix) {
 			it.Next()
 		}
 
@@ -109,21 +109,21 @@ func (m MessageRepository) GetMessages(room int, cursor string) ([]DiskMessage, 
 		return nil
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	for _, b := range byteMessages {
 		var messagePb pb.Message
 		if err = proto.Unmarshal(b, &messagePb); err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 		message, err := toDiskMessage(&messagePb)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 		diskMessages = append(diskMessages, message)
 	}
-	return diskMessages, lastKey, err
+	return diskMessages, &lastKey, err
 }
 
 func fromDiskMessage(message DiskMessage) pb.Message {
