@@ -75,7 +75,7 @@ func Test_Scenario(t *testing.T) {
 	at := time.Now().UTC()
 
 	// When a cmd message is posted
-	orchestrator.Dispatch(domain.PostMessageCommand{
+	orchestrator.PostMessage(domain.PostMessageCommand{
 		Room:      id,
 		UserID:    userID,
 		Content:   content,

@@ -76,7 +76,7 @@ func (o *Orchestrator) Add(sinks ...contract.EventSink) {
 	o.permanentSinks = append(o.permanentSinks, sinks...)
 }
 
-func (o *Orchestrator) Dispatch(cmd domain.Command) {
+func (o *Orchestrator) PostMessage(cmd domain.PostMessageCommand) {
 	select {
 	case o.globalCommands <- cmd:
 	default:

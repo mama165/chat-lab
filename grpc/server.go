@@ -62,7 +62,7 @@ func (s *ChatServer) PostMessage(_ context.Context, req *pb.PostMessageRequest) 
 		Content:   req.Content,
 		CreatedAt: time.Now().UTC(),
 	}
-	s.orchestrator.Dispatch(command)
+	s.orchestrator.PostMessage(command)
 	return &pb.PostMessageResponse{Success: true}, nil
 }
 

@@ -48,7 +48,7 @@ type IRegistry interface {
 
 type IOrchestrator interface {
 	RegisterRoom(room *domain.Room)
-	Dispatch(cmd domain.Command)
+	PostMessage(cmd domain.PostMessageCommand)
 	GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error)
 	RegisterParticipant(pID string, roomID domain.RoomID, sink EventSink)
 	UnregisterParticipant(pID string, roomID domain.RoomID)
