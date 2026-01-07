@@ -311,22 +311,6 @@ func (mr *MockIOrchestratorMockRecorder) RegisterRoom(room any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRoom", reflect.TypeOf((*MockIOrchestrator)(nil).RegisterRoom), room)
 }
 
-// RegisterSinks mocks base method.
-func (m *MockIOrchestrator) RegisterSinks(sink ...contract.EventSink) {
-	m.ctrl.T.Helper()
-	varargs := []any{}
-	for _, a := range sink {
-		varargs = append(varargs, a)
-	}
-	m.ctrl.Call(m, "RegisterSinks", varargs...)
-}
-
-// RegisterSinks indicates an expected call of RegisterSinks.
-func (mr *MockIOrchestratorMockRecorder) RegisterSinks(sink ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterSinks", reflect.TypeOf((*MockIOrchestrator)(nil).RegisterSinks), sink...)
-}
-
 // Start mocks base method.
 func (m *MockIOrchestrator) Start(ctx context.Context) error {
 	m.ctrl.T.Helper()

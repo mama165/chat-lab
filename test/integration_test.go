@@ -52,7 +52,8 @@ func Test_Scenario(t *testing.T) {
 	mockTimelineSink := mocks.NewMockEventSink(ctrl)
 	mockTimelineSink.EXPECT().Consume(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	diskSink := storage.NewDiskSink(mockMessageRepository, log)
-	orchestrator.RegisterSinks(mockTimelineSink, diskSink)
+	orchestrator.Add(mockTimelineSink, diskSink)
+
 	id := 1
 	room := domain.NewRoom(id)
 	orchestrator.RegisterRoom(room)

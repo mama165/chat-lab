@@ -74,8 +74,8 @@ func (o *Orchestrator) RegisterRoom(room *domain.Room) {
 	o.rooms[room.ID] = room
 }
 
-func (o *Orchestrator) RegisterSinks(sink ...contract.EventSink) {
-	o.permanentSinks = append(o.permanentSinks, sink...)
+func (o *Orchestrator) Add(sinks ...contract.EventSink) {
+	o.permanentSinks = append(o.permanentSinks, sinks...)
 }
 
 func (o *Orchestrator) Dispatch(cmd domain.Command) {
@@ -183,7 +183,8 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	diskSink := storage.NewDiskSink(o.messageRepository, o.log)
 	timelineSink := projection.NewTimeline()
 
-	o.RegisterSinks(timelineSink, diskSink)
+	o.permanentSinks = append(o.permanentSinks, timelineSink)
+	o.permanentSinks = append(o.permanentSinks, diskSink)
 
 	o.mu.Unlock() // Unlock before blocking on Run
 
