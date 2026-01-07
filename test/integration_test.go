@@ -29,7 +29,7 @@ func Test_Scenario(t *testing.T) {
 		WithValueLogFileSize(16 << 20))
 	req.NoError(err)
 
-	// 1. On crée un canal pour signaler la fin du traitement
+	// 1. Create channel to wait for a signal at the end of process
 	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	supervisor := workers.NewSupervisor(log, 200*time.Millisecond)
@@ -44,10 +44,10 @@ func Test_Scenario(t *testing.T) {
 	mockMessageRepository.EXPECT().
 		StoreMessage(gomock.Any()).
 		Do(func(msg any) {
-			close(done) // On signale qu'on a reçu le message
+			close(done) // Signaling a message has been received
 		}).
 		Return(nil).
-		Times(1) // On attend exactement 1 appel
+		Times(1)
 
 	mockTimelineSink := mocks.NewMockEventSink(ctrl)
 	mockTimelineSink.EXPECT().Consume(gomock.Any(), gomock.Any()).Return(nil).Times(1)
