@@ -38,6 +38,7 @@ func Test_Scenario(t *testing.T) {
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, messageRepository,
 		10, 1000, 3*time.Second,
+		'*',
 	)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockRepository(ctrl)

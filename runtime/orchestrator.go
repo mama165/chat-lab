@@ -3,12 +3,9 @@
 package runtime
 
 import (
-	"bufio"
-	"bytes"
 	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
-	"chat-lab/errors"
 	"chat-lab/moderation"
 	"chat-lab/projection"
 	"chat-lab/repositories"
@@ -18,7 +15,6 @@ import (
 	"embed"
 	"fmt"
 	"github.com/samber/lo"
-	"io/fs"
 	"log/slog"
 	"strings"
 	"sync"
@@ -42,11 +38,12 @@ type Orchestrator struct {
 	telemetryEvents   chan event.DomainEvent
 	messageRepository repositories.Repository
 	sinkTimeout       time.Duration
+	charReplacement   rune
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, messageRepository repositories.Repository,
-	numWorkers, bufferSize int, sinkTimeout time.Duration) *Orchestrator {
+	numWorkers, bufferSize int, sinkTimeout time.Duration, charReplacement rune) *Orchestrator {
 	return &Orchestrator{
 		log:               log,
 		numWorkers:        numWorkers,
@@ -60,6 +57,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		telemetryEvents:   make(chan event.DomainEvent, bufferSize),
 		messageRepository: messageRepository,
 		sinkTimeout:       sinkTimeout,
+		charReplacement:   charReplacement,
 	}
 }
 
@@ -112,85 +110,89 @@ func (o *Orchestrator) UnregisterParticipant(pID string, roomID domain.RoomID) {
 	o.registry.Unsubscribe(pID, roomID)
 }
 
+// Start initiates the orchestrator by preparing all components (workers, moderation, pipeline)
+// and then starting the supervisor. It uses a preparation pattern to minimize mutex locking time.
 func (o *Orchestrator) Start(ctx context.Context) error {
+	// 1. Preparation phase (No Lock)
+	// Heavy tasks like I/O (loading files) and CPU (Aho-Corasick build) are done here.
+	poolWorkers := o.preparePoolWorkers()
+
+	moderationWorker, err := o.prepareModeration("censored", o.charReplacement)
+	if err != nil {
+		return err
+	}
+
+	fanoutWorker, newSinks := o.preparePipeline()
+
+	// 2. Critical Section (Short Lock)
+	// We only lock to update the internal state and the supervisor.
 	o.mu.Lock()
+	o.permanentSinks = append(o.permanentSinks, newSinks...)
 
-	for i := 0; i < o.numWorkers; i++ {
-		worker := workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.rawEvents, o.log)
-		o.supervisor.Add(worker)
-	}
-	entries, err := fs.ReadDir(censoredFolder, "censored")
-	if err != nil {
-		o.mu.Unlock()
-		return err
-	}
-	var languages, words []string
-	uniqueWords := make(map[string]struct{})
-	for _, entry := range entries {
-		if entry.IsDir() {
-			o.mu.Unlock()
-			return errors.ErrOnlyCensoredFiles
-		}
-		languages = append(languages, strings.TrimSuffix(entry.Name(), ".txt"))
-		data, err := censoredFolder.ReadFile("censored/" + entry.Name())
-		if err != nil {
-			o.mu.Unlock()
-			return err
-		}
-		// Use a scanner to properly read line (handle \n et \r\n)
-		// ⚠️Don't use strings.Split
-		scanner := bufio.NewScanner(bytes.NewReader(data))
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line != "" {
-				uniqueWords[line] = struct{}{}
-			}
-		}
-		if err = scanner.Err(); err != nil {
-			o.mu.Unlock()
-			return err
-		}
-	}
-	for w := range uniqueWords {
-		words = append(words, w)
-	}
-	if len(words) == 0 {
-		o.mu.Unlock()
-		return errors.ErrEmptyWords
-	}
-	o.log.Info(fmt.Sprintf("%d censored files loaded [%s]", len(languages), strings.Join(languages, ",")))
-	o.log.Info(fmt.Sprintf("%d censored words loaded", len(words)))
-
-	moderator, err := moderation.NewModerator(words, '*')
-	if err != nil {
-		o.mu.Unlock()
-		return err
-	}
-	moderationWorker := workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents, o.log)
+	// Registering all workers to the supervisor
 	o.supervisor.Add(moderationWorker)
-
-	fanoutWorker := workers.NewEventFanout(
-		o.log,
-		o.permanentSinks,
-		o.registry,
-		o.domainEvents,
-		o.telemetryEvents,
-		3*time.Second,
-	)
-
 	o.supervisor.Add(fanoutWorker)
+	for _, w := range poolWorkers {
+		o.supervisor.Add(w)
+	}
+	o.mu.Unlock()
 
-	diskSink := storage.NewDiskSink(o.messageRepository, o.log)
-	timelineSink := projection.NewTimeline()
-
-	o.permanentSinks = append(o.permanentSinks, timelineSink)
-	o.permanentSinks = append(o.permanentSinks, diskSink)
-
-	o.mu.Unlock() // Unlock before blocking on Run
-
+	// 3. Execution phase (No Lock)
 	o.log.Info("Starting orchestrator and all supervised workers")
 	o.supervisor.Run(ctx)
 	return nil
+}
+
+// preparePoolWorkers creates the basic worker pool for raw command processing.
+func (o *Orchestrator) preparePoolWorkers() []contract.Worker {
+	var res []contract.Worker
+	for i := 0; i < o.numWorkers; i++ {
+		res = append(res, workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.rawEvents, o.log))
+	}
+	return res
+}
+
+// prepareModeration loads censored words and builds the Aho-Corasick automaton.
+func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (contract.Worker, error) {
+	loader := NewCensoredLoader(censoredFolder)
+	data, err := loader.LoadAll("censored")
+	if err != nil {
+		return nil, err
+	}
+
+	o.log.Info(fmt.Sprintf("%d censored files loaded [%s]",
+		len(data.Languages), strings.Join(data.Languages, ",")))
+	o.log.Info(fmt.Sprintf("%d unique censored words loaded", len(data.Words)))
+
+	moderator, err := moderation.NewModerator(data.Words, charReplacement)
+	if err != nil {
+		return nil, err
+	}
+
+	return workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents, o.log), nil
+}
+
+// preparePipeline initializes the sinks and the fanout worker.
+func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink) {
+	// Local sinks that will be added to permanentSinks
+	newSinks := []contract.EventSink{
+		projection.NewTimeline(),
+		storage.NewDiskSink(o.messageRepository, o.log),
+	}
+
+	// We prepare the fanout with current permanent sinks + the new ones
+	allSinks := append(o.permanentSinks, newSinks...)
+
+	fanoutWorker := workers.NewEventFanout(
+		o.log,
+		allSinks,
+		o.registry,
+		o.domainEvents,
+		o.telemetryEvents,
+		o.sinkTimeout,
+	)
+
+	return fanoutWorker, newSinks
 }
 
 // Stop initiates a graceful shutdown of the orchestrator.
