@@ -71,7 +71,7 @@ func (s *ChatServer) PostMessage(_ context.Context, req *pb.PostMessageRequest) 
 // This method blocks until the client disconnects or a network error occurs.
 // Proper cleanup is ensured via deferred unregistration to prevent memory leaks in the registry.
 func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_ConnectServer) error {
-	sink := NewGrpcSink(s.connectionBufferSize)
+	sink := NewGrpcSink(s.connectionBufferSize, s.log)
 	userID := uuid.NewString() // TODO To be extracted from metadata
 	room := domain.Room{ID: domain.RoomID(req.RoomId)}
 	s.orchestrator.RegisterRoom(&room)
@@ -83,7 +83,7 @@ func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_Conne
 		case <-stream.Context().Done():
 			s.log.Warn(fmt.Sprintf("Client %s disconnected from %d", userID, room.ID))
 			return nil
-		case evt := <-sink.ConnectedUserEvent:
+		case evt := <-sink.connectedUserEvent:
 			switch e := evt.(type) {
 			case event.SanitizedMessage:
 				if err := stream.Send(lo.ToPtr(toChatEvent(e))); err != nil {

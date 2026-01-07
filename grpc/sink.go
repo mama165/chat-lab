@@ -3,14 +3,19 @@ package grpc
 import (
 	"chat-lab/domain/event"
 	"context"
+	"log/slog"
 )
 
 type Sink struct {
-	ConnectedUserEvent chan event.DomainEvent
+	connectedUserEvent chan event.DomainEvent
+	log                *slog.Logger
 }
 
-func NewGrpcSink(bufferSize int) *Sink {
-	return &Sink{ConnectedUserEvent: make(chan event.DomainEvent, bufferSize)}
+func NewGrpcSink(bufferSize int, log *slog.Logger) *Sink {
+	return &Sink{
+		connectedUserEvent: make(chan event.DomainEvent, bufferSize),
+		log:                log,
+	}
 }
 
 // Consume is called by fanout
@@ -18,12 +23,12 @@ func NewGrpcSink(bufferSize int) *Sink {
 // The gRPC handler will take it from now
 func (s *Sink) Consume(ctx context.Context, e event.DomainEvent) error {
 	select {
-	case s.ConnectedUserEvent <- e:
-		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	case s.connectedUserEvent <- e:
+		return nil
 	default:
-		// Si le canal est plein, on pourrait logger une erreur de "Backpressure"
+		s.log.Warn("Sink gRPC is full, message dropped...")
 		return nil
 	}
 }
