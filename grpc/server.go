@@ -102,7 +102,7 @@ func toChatEvent(e event.SanitizedMessage) pb.ChatEvent {
 	messageEvent := pb.MessageEvent{
 		MessageId: e.ID.String(),
 		Author:    e.Author,
-		Content:   e.Content,
+		Content:   e.SanitizedContent,
 		CreatedAt: timestamppb.New(e.At),
 	}
 	return pb.ChatEvent{

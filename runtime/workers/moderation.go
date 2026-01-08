@@ -51,9 +51,9 @@ func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event 
 		Type:      event.DomainType,
 		CreatedAt: time.Now().UTC(),
 		Payload: event.SanitizedMessage{
-			Room:    evt.Room,
-			Author:  evt.Author,
-			Content: w.moderator.Censor(evt.Content),
-			At:      evt.At,
+			Room:             evt.Room,
+			Author:           evt.Author,
+			SanitizedContent: w.moderator.Censor(evt.Content),
+			At:               evt.At,
 		}}
 }

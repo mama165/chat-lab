@@ -27,7 +27,7 @@ type EventFanoutWorker struct {
 	sinkTimeout    time.Duration
 }
 
-func NewEventFanout(log *slog.Logger,
+func NewEventFanoutWorker(log *slog.Logger,
 	permanentSinks []contract.EventSink,
 	registry contract.IRegistry,
 	domainEvent, telemetryEvent chan event.Event,
@@ -50,8 +50,6 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			// We check the context only for the optional telemetry part.
-			// Core fanout continues until the channel is empty.
 			w.log.Debug("Context done, skipping telemetry")
 		case w.telemetryEvent <- evt:
 		default:

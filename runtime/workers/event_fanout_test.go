@@ -24,7 +24,7 @@ func TestEventFanoutWorker_Fanout(t *testing.T) {
 	permanentSinks := []contract.EventSink{mockSink, mockSink}
 	roomSinks := []contract.EventSink{mockSink, mockSink}
 
-	fanoutWorker := NewEventFanout(log, permanentSinks,
+	fanoutWorker := NewEventFanoutWorker(log, permanentSinks,
 		mockRegistry, nil, nil, 10*time.Second)
 
 	done := make(chan struct{})
@@ -64,7 +64,7 @@ func TestEventFanoutWorker_SinkTimeout(t *testing.T) {
 	roomSinks := []contract.EventSink{mockSink}
 
 	sinkTimeout := 20 * time.Millisecond
-	fanoutWorker := NewEventFanout(log, nil,
+	fanoutWorker := NewEventFanoutWorker(log, nil,
 		mockRegistry, nil, nil, sinkTimeout)
 
 	// Given two sink exist

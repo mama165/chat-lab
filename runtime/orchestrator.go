@@ -26,25 +26,27 @@ import (
 var censoredFolder embed.FS
 
 type Orchestrator struct {
-	mu                sync.Mutex
-	log               *slog.Logger
-	numWorkers        int
-	rooms             map[domain.RoomID]*domain.Room
-	permanentSinks    []contract.EventSink
-	supervisor        contract.ISupervisor
-	registry          contract.IRegistry
-	globalCommands    chan domain.Command
-	moderationChan    chan event.Event
-	domainEvents      chan event.Event
-	telemetryEvents   chan event.Event
-	messageRepository repositories.Repository
-	sinkTimeout       time.Duration
-	charReplacement   rune
+	mu                   sync.Mutex
+	log                  *slog.Logger
+	numWorkers           int
+	rooms                map[domain.RoomID]*domain.Room
+	permanentSinks       []contract.EventSink
+	supervisor           contract.ISupervisor
+	registry             contract.IRegistry
+	globalCommands       chan domain.Command
+	moderationChan       chan event.Event
+	domainChan           chan event.Event
+	telemetryChan        chan event.Event
+	messageRepository    repositories.Repository
+	sinkTimeout          time.Duration
+	metricInterval       time.Duration
+	charReplacement      rune
+	lowCapacityThreshold int
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, messageRepository repositories.Repository,
-	numWorkers, bufferSize int, sinkTimeout time.Duration, charReplacement rune) *Orchestrator {
+	numWorkers, bufferSize int, sinkTimeout, metricInterval time.Duration, charReplacement rune) *Orchestrator {
 	return &Orchestrator{
 		log:               log,
 		numWorkers:        numWorkers,
@@ -54,10 +56,11 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		registry:          registry,
 		globalCommands:    make(chan domain.Command, bufferSize),
 		moderationChan:    make(chan event.Event, bufferSize),
-		domainEvents:      make(chan event.Event, bufferSize),
-		telemetryEvents:   make(chan event.Event, bufferSize),
+		domainChan:        make(chan event.Event, bufferSize),
+		telemetryChan:     make(chan event.Event, bufferSize),
 		messageRepository: messageRepository,
 		sinkTimeout:       sinkTimeout,
+		metricInterval:    metricInterval,
 		charReplacement:   charReplacement,
 	}
 }
@@ -125,6 +128,8 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 
 	fanoutWorker, newSinks := o.preparePipeline()
 
+	telemetryWorker := o.prepareTelemetry()
+
 	// 2. Critical Section (Short Lock)
 	// We only lock to update the internal state and the supervisor.
 	o.mu.Lock()
@@ -133,6 +138,8 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	// Registering all workers to the supervisor
 	o.supervisor.Add(moderationWorker)
 	o.supervisor.Add(fanoutWorker)
+	o.supervisor.Add(telemetryWorker)
+
 	for _, w := range poolWorkers {
 		o.supervisor.Add(w)
 	}
@@ -170,7 +177,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 		return nil, err
 	}
 
-	return workers.NewModerationWorker(moderator, o.moderationChan, o.domainEvents, o.log), nil
+	return workers.NewModerationWorker(moderator, o.moderationChan, o.domainChan, o.log), nil
 }
 
 // preparePipeline initializes the sinks and the fanout worker.
@@ -184,16 +191,23 @@ func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink)
 	// We prepare the fanout with current permanent sinks + the new ones
 	allSinks := append(o.permanentSinks, newSinks...)
 
-	fanoutWorker := workers.NewEventFanout(
+	fanoutWorker := workers.NewEventFanoutWorker(
 		o.log,
 		allSinks,
 		o.registry,
-		o.domainEvents,
-		o.telemetryEvents,
+		o.domainChan,
+		o.telemetryChan,
 		o.sinkTimeout,
 	)
 
 	return fanoutWorker, newSinks
+}
+
+func (o *Orchestrator) prepareTelemetry() contract.Worker {
+	handlers := []event.Handler{
+		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
+	}
+	return workers.NewTelemetryWorker(o.log, o.metricInterval, o.telemetryChan, handlers)
 }
 
 // Stop initiates a graceful shutdown of the orchestrator.

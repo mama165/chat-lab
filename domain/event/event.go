@@ -9,10 +9,12 @@ import (
 type Type string
 
 const (
-	DomainType        Type = "DOMAIN_TYPE"
-	MessagePostedType Type = "MESSAGE_POSTED"
-	BufferUsageType   Type = "BUFFER_USAGE"
-	CensorshipHit     Type = "CENSORSHIP_HIT"
+	DomainType          Type = "DOMAIN_TYPE"
+	MessagePostedType   Type = "MESSAGE_POSTED"
+	BufferUsageType     Type = "BUFFER_USAGE"
+	CensorshipHit       Type = "CENSORSHIP_HIT"
+	RestartedAfterPanic Type = "WORKER_RESTARTED_AFTER_PANIC"
+	ChannelCapacityType Type = "CHANNEL_CAPACITY"
 )
 
 type Event struct {
@@ -34,17 +36,28 @@ type MessagePosted struct {
 }
 
 type SanitizedMessage struct {
-	ID      uuid.UUID
-	Room    int
-	Author  string
-	Content string
-	At      time.Time
+	ID               uuid.UUID
+	Room             int
+	Author           string
+	SanitizedContent string
+	At               time.Time
 }
 
 func (m MessagePosted) RoomID() domain.RoomID {
 	return domain.RoomID(m.Room)
 }
-
 func (m SanitizedMessage) RoomID() domain.RoomID {
 	return domain.RoomID(m.Room)
+}
+
+// Telemetry
+
+type WorkerRestartedAfterPanic struct {
+	WorkerName string
+}
+
+type ChannelCapacity struct {
+	WorkerName string
+	Capacity   int
+	Length     int
 }

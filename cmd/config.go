@@ -9,9 +9,11 @@ type Config struct {
 	CharReplacement      rune          `env:"CHARACTER_REPLACEMENT,required=true"`
 	LimitMessages        *int          `env:"LIMIT_MESSAGES"`
 	SinkTimeout          time.Duration `env:"SINK_TIMEOUT,required=true"`
+	MetricInterval       time.Duration `env:"METRIC_INTERVAL,required=true"`
 	RestartInterval      time.Duration `env:"RESTART_INTERVAL,required=true"`
 	BadgerFilepath       string        `env:"BADGER_FILEPATH,required=true"`
 	LogLevel             string        `env:"LOG_LEVEL,required=true"`
+	LowCapacityThreshold int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
 	Host                 string        `env:"HOST,default=localhost"`
 	Port                 int           `env:"PORT,default=8080"`
 }
