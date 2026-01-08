@@ -45,7 +45,8 @@ type Orchestrator struct {
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
-	registry *Registry, messageRepository repositories.Repository,
+	registry *Registry, telemetryChan chan event.Event,
+	messageRepository repositories.Repository,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval time.Duration, charReplacement rune,
 	lowCapacityThreshold int) *Orchestrator {
@@ -56,10 +57,10 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		permanentSinks:       nil,
 		supervisor:           supervisor,
 		registry:             registry,
+		telemetryChan:        telemetryChan,
 		globalCommands:       make(chan domain.Command, bufferSize),
 		moderationChan:       make(chan event.Event, bufferSize),
 		domainChan:           make(chan event.Event, bufferSize),
-		telemetryChan:        make(chan event.Event, bufferSize),
 		messageRepository:    messageRepository,
 		sinkTimeout:          sinkTimeout,
 		metricInterval:       metricInterval,

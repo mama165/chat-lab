@@ -2,6 +2,7 @@ package test
 
 import (
 	"chat-lab/domain"
+	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"chat-lab/repositories"
 	"chat-lab/repositories/storage"
@@ -32,11 +33,12 @@ func Test_Scenario(t *testing.T) {
 	// 1. Create channel to wait for a signal at the end of process
 	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
-	supervisor := workers.NewSupervisor(log, 200*time.Millisecond)
+	telemetryChan := make(chan event.Event)
+	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
 	orchestrator := runtime.NewOrchestrator(
-		log, supervisor, registry, messageRepository,
+		log, supervisor, registry, telemetryChan, messageRepository,
 		10, 1000, 3*time.Second,
 		500*time.Millisecond,
 		'*',

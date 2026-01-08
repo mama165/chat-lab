@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chat-lab/domain/event"
 	grpc2 "chat-lab/grpc"
 	v1 "chat-lab/proto/chat"
 	"chat-lab/repositories"
@@ -63,12 +64,13 @@ func run() (int, error) {
 	}()
 
 	// 3. Setup Supervision & Orchestration
-	sup := workers.NewSupervisor(log, config.RestartInterval)
+	telemetryChan := make(chan event.Event, config.BufferSize)
+	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, config.LimitMessages)
 
 	orchestrator := runtime.NewOrchestrator(
-		log, sup, registry, messageRepository,
+		log, sup, registry, telemetryChan, messageRepository,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.MetricInterval,
 		config.CharReplacement,

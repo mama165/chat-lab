@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"context"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,8 @@ func TestSupervisor_RestartOnPanic(t *testing.T) {
 		}).
 		AnyTimes()
 
-	sup := NewSupervisor(log, 200*time.Millisecond)
+	telemetryChan := make(chan event.Event)
+	sup := NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -53,7 +55,8 @@ func TestSupervisor_StopOnSuccess(t *testing.T) {
 		Return(nil).
 		Times(1)
 
-	sup := NewSupervisor(log, 200*time.Millisecond)
+	telemetryChan := make(chan event.Event)
+	sup := NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 
 	// Given a channel to notify when Run() terminated
 	done := make(chan struct{})

@@ -27,7 +27,7 @@ func NewTelemetryWorker(log *slog.Logger,
 }
 
 func (w TelemetryWorker) Run(ctx context.Context) error {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(w.metricInterval)
 	defer ticker.Stop()
 
 	for {

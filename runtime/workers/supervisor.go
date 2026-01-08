@@ -2,6 +2,7 @@ package workers
 
 import (
 	"chat-lab/contract"
+	"chat-lab/domain/event"
 	"chat-lab/errors"
 	"context"
 	"fmt"
@@ -21,12 +22,15 @@ type Supervisor struct {
 	Cancel          context.CancelFunc // To stop the context
 	wg              *sync.WaitGroup    // Wait for the end of goroutines
 	log             *slog.Logger
+	telemetryChan   chan event.Event
 	workers         []contract.Worker
 	restartInterval time.Duration
 }
 
-func NewSupervisor(log *slog.Logger, restartInterval time.Duration) *Supervisor {
-	return &Supervisor{wg: &sync.WaitGroup{}, log: log, restartInterval: restartInterval}
+func NewSupervisor(log *slog.Logger, telemetryChan chan event.Event, restartInterval time.Duration) *Supervisor {
+	return &Supervisor{wg: &sync.WaitGroup{}, log: log,
+		telemetryChan: telemetryChan, restartInterval: restartInterval,
+	}
 }
 
 // Run Create a local cancellation trigger tied to the parent ctx
@@ -81,6 +85,7 @@ func (s *Supervisor) Start(ctx context.Context, worker contract.Worker) {
 			err := func() (err error) {
 				defer func() {
 					if r := recover(); r != nil {
+						s.sendRestartEvent(ctx, workerName)
 						err = errors.ErrWorkerPanic
 					}
 				}()
@@ -120,5 +125,24 @@ func (s *Supervisor) Start(ctx context.Context, worker contract.Worker) {
 func (s *Supervisor) Stop() {
 	if s.Cancel != nil {
 		s.Cancel()
+	}
+}
+
+func (s *Supervisor) sendRestartEvent(ctx context.Context, workerName string) {
+	if s.telemetryChan == nil {
+		s.log.Warn("Telemetry channel not initialized in Supervisor", "worker", workerName)
+		return
+	}
+	select {
+	case <-ctx.Done():
+	case s.telemetryChan <- event.Event{
+		Type:      event.RestartedAfterPanic,
+		CreatedAt: time.Now().UTC(),
+		Payload: event.WorkerRestartedAfterPanic{
+			WorkerName: workerName,
+		},
+	}:
+	default:
+		s.log.Debug("Observability telemetry event lost")
 	}
 }
