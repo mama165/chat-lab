@@ -14,11 +14,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/samber/lo"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/samber/lo"
 )
 
 //go:embed censored/*
@@ -155,7 +156,7 @@ func (o *Orchestrator) preparePoolWorkers() []contract.Worker {
 // prepareModeration loads censored words and builds the Aho-Corasick automaton.
 func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (contract.Worker, error) {
 	loader := NewCensoredLoader(censoredFolder)
-	data, err := loader.LoadAll("censored")
+	data, err := loader.LoadAll(path)
 	if err != nil {
 		return nil, err
 	}
