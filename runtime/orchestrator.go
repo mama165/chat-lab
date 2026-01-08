@@ -34,9 +34,9 @@ type Orchestrator struct {
 	supervisor        contract.ISupervisor
 	registry          contract.IRegistry
 	globalCommands    chan domain.Command
-	rawEvents         chan event.DomainEvent
-	domainEvents      chan event.DomainEvent
-	telemetryEvents   chan event.DomainEvent
+	moderationChan    chan event.Event
+	domainEvents      chan event.Event
+	telemetryEvents   chan event.Event
 	messageRepository repositories.Repository
 	sinkTimeout       time.Duration
 	charReplacement   rune
@@ -53,9 +53,9 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		supervisor:        supervisor,
 		registry:          registry,
 		globalCommands:    make(chan domain.Command, bufferSize),
-		rawEvents:         make(chan event.DomainEvent, bufferSize),
-		domainEvents:      make(chan event.DomainEvent, bufferSize),
-		telemetryEvents:   make(chan event.DomainEvent, bufferSize),
+		moderationChan:    make(chan event.Event, bufferSize),
+		domainEvents:      make(chan event.Event, bufferSize),
+		telemetryEvents:   make(chan event.Event, bufferSize),
 		messageRepository: messageRepository,
 		sinkTimeout:       sinkTimeout,
 		charReplacement:   charReplacement,
@@ -148,7 +148,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 func (o *Orchestrator) preparePoolWorkers() []contract.Worker {
 	var res []contract.Worker
 	for i := 0; i < o.numWorkers; i++ {
-		res = append(res, workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.rawEvents, o.log))
+		res = append(res, workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.moderationChan, o.log))
 	}
 	return res
 }
@@ -170,7 +170,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 		return nil, err
 	}
 
-	return workers.NewModerationWorker(moderator, o.rawEvents, o.domainEvents, o.log), nil
+	return workers.NewModerationWorker(moderator, o.moderationChan, o.domainEvents, o.log), nil
 }
 
 // preparePipeline initializes the sinks and the fanout worker.

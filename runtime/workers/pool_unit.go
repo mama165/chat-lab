@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"log/slog"
+	"time"
 )
 
 // Ensure *PoolUnitWorker implements the contract.Worker interface at compile time.
@@ -16,22 +17,22 @@ import (
 var _ contract.Worker = (*PoolUnitWorker)(nil)
 
 type PoolUnitWorker struct {
-	rooms    map[domain.RoomID]*domain.Room
-	commands chan domain.Command
-	events   chan event.DomainEvent
-	log      *slog.Logger
+	rooms          map[domain.RoomID]*domain.Room
+	commands       chan domain.Command
+	moderationChan chan event.Event
+	log            *slog.Logger
 }
 
 func NewPoolUnitWorker(
 	rooms map[domain.RoomID]*domain.Room,
 	commands chan domain.Command,
-	events chan event.DomainEvent,
+	moderationChan chan event.Event,
 	log *slog.Logger) *PoolUnitWorker {
 	return &PoolUnitWorker{
-		rooms:    rooms,
-		commands: commands,
-		events:   events,
-		log:      log,
+		rooms:          rooms,
+		commands:       commands,
+		moderationChan: moderationChan,
+		log:            log,
 	}
 }
 
@@ -41,32 +42,37 @@ func (w *PoolUnitWorker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			w.log.Debug("Stopping worker")
 			return ctx.Err()
-		case cmd, ok := <-w.commands:
+		case command, ok := <-w.commands:
 			if !ok {
 				w.log.Debug("Channel is closed")
 				return nil
 			}
-			_, ok = w.rooms[cmd.RoomID()]
+			_, ok = w.rooms[command.RoomID()]
 			if !ok {
-				w.log.Debug(fmt.Sprintf("Room %d doesn't exist", cmd.RoomID()))
+				w.log.Debug(fmt.Sprintf("Room %d doesn't exist", command.RoomID()))
 			}
-			if postCmd, ok := cmd.(domain.PostMessageCommand); ok {
+			switch cmd := command.(type) {
+			case domain.PostMessageCommand:
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case w.events <- toEvent(postCmd):
+				case w.moderationChan <- toMessagePostedEvent(cmd):
 				}
 			}
 		}
 	}
 }
 
-func toEvent(c domain.PostMessageCommand) event.MessagePosted {
-	return event.MessagePosted{
-		ID:      uuid.New(),
-		Room:    c.Room,
-		Author:  c.UserID,
-		Content: c.Content,
-		At:      c.CreatedAt,
+func toMessagePostedEvent(c domain.PostMessageCommand) event.Event {
+	return event.Event{
+		Type:      event.DomainType,
+		CreatedAt: time.Now().UTC(),
+		Payload: event.MessagePosted{
+			ID:      uuid.New(),
+			Room:    c.Room,
+			Author:  c.UserID,
+			Content: c.Content,
+			At:      c.CreatedAt,
+		},
 	}
 }

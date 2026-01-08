@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// EventFanoutWorker broadcasts domain events to multiple in-process consumers.
+// EventFanoutWorker broadcasts domain moderationChan to multiple in-process consumers.
 //
 // It provides best-effort fan-out with no guarantees regarding delivery,
 // ordering, durability, or retries. EventFanoutWorker is not a message broker.
@@ -19,43 +19,46 @@ import (
 //
 // EventFanoutWorker is safe for concurrent use by multiple goroutines.
 type EventFanoutWorker struct {
-	Log            *slog.Logger
+	log            *slog.Logger
 	permanentSinks []contract.EventSink
 	registry       contract.IRegistry
-	TelemetryEvent chan event.DomainEvent
-	DomainEvent    chan event.DomainEvent
+	event          chan event.Event
+	telemetryEvent chan event.Event
 	sinkTimeout    time.Duration
 }
 
 func NewEventFanout(log *slog.Logger,
 	permanentSinks []contract.EventSink,
 	registry contract.IRegistry,
-	domainEvent, telemetryEvent chan event.DomainEvent,
+	domainEvent, telemetryEvent chan event.Event,
 	sinkTimeout time.Duration) *EventFanoutWorker {
 	return &EventFanoutWorker{
-		Log: log, permanentSinks: permanentSinks, registry: registry,
-		DomainEvent: domainEvent, TelemetryEvent: telemetryEvent,
+		log: log, permanentSinks: permanentSinks, registry: registry,
+		event: domainEvent, telemetryEvent: telemetryEvent,
 		sinkTimeout: sinkTimeout}
 }
 
 // Run starts the event distribution loop.
-// It uses a range loop over w.DomainEvent to ensure a graceful shutdown (drain):
-// even if the channel is closed, the worker will process all remaining buffered events
-// before returning. This guarantees that no events are lost during application shutdown.
+// It dispatches DomainEvents to rooms/sinks and forwards all moderationChan
+// to the telemetry channel for observability.
+// The range loop ensures all buffered moderationChan are processed before shutdown.
 func (w *EventFanoutWorker) Run(ctx context.Context) error {
-	for evt := range w.DomainEvent {
-		w.Fanout(evt)
+	for evt := range w.event {
+		switch e := evt.Payload.(type) {
+		case event.DomainEvent:
+			w.Fanout(e)
+		}
 		select {
 		case <-ctx.Done():
 			// We check the context only for the optional telemetry part.
 			// Core fanout continues until the channel is empty.
-			w.Log.Debug("Context done, skipping telemetry")
-		case w.TelemetryEvent <- evt:
+			w.log.Debug("Context done, skipping telemetry")
+		case w.telemetryEvent <- evt:
 		default:
-			w.Log.Debug("Observability telemetry event lost")
+			w.log.Debug("Observability telemetry event lost")
 		}
 	}
-	w.Log.Info("EventFanoutWorker: domainEvent channel drained and closed. Shutting down.")
+	w.log.Info("EventFanoutWorker: domainEvent channel drained and closed. Shutting down.")
 	return nil
 }
 
@@ -74,9 +77,9 @@ func (w *EventFanoutWorker) Fanout(evt event.DomainEvent) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), w.sinkTimeout)
 			defer cancel()
-			w.Log.Debug(fmt.Sprintf("Consumed event : %v", evt))
+			w.log.Debug(fmt.Sprintf("Consumed event : %v", evt))
 			if err := s.Consume(ctx, evt); err != nil {
-				w.Log.Error("sink failed", "error", err)
+				w.log.Error("sink failed", "error", err)
 			}
 		}()
 	}
