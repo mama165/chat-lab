@@ -46,22 +46,25 @@ type Orchestrator struct {
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, messageRepository repositories.Repository,
-	numWorkers, bufferSize int, sinkTimeout, metricInterval time.Duration, charReplacement rune) *Orchestrator {
+	numWorkers, bufferSize int, sinkTimeout,
+	metricInterval time.Duration, charReplacement rune,
+	lowCapacityThreshold int) *Orchestrator {
 	return &Orchestrator{
-		log:               log,
-		numWorkers:        numWorkers,
-		rooms:             make(map[domain.RoomID]*domain.Room),
-		permanentSinks:    nil,
-		supervisor:        supervisor,
-		registry:          registry,
-		globalCommands:    make(chan domain.Command, bufferSize),
-		moderationChan:    make(chan event.Event, bufferSize),
-		domainChan:        make(chan event.Event, bufferSize),
-		telemetryChan:     make(chan event.Event, bufferSize),
-		messageRepository: messageRepository,
-		sinkTimeout:       sinkTimeout,
-		metricInterval:    metricInterval,
-		charReplacement:   charReplacement,
+		log:                  log,
+		numWorkers:           numWorkers,
+		rooms:                make(map[domain.RoomID]*domain.Room),
+		permanentSinks:       nil,
+		supervisor:           supervisor,
+		registry:             registry,
+		globalCommands:       make(chan domain.Command, bufferSize),
+		moderationChan:       make(chan event.Event, bufferSize),
+		domainChan:           make(chan event.Event, bufferSize),
+		telemetryChan:        make(chan event.Event, bufferSize),
+		messageRepository:    messageRepository,
+		sinkTimeout:          sinkTimeout,
+		metricInterval:       metricInterval,
+		charReplacement:      charReplacement,
+		lowCapacityThreshold: lowCapacityThreshold,
 	}
 }
 
@@ -128,7 +131,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 
 	fanoutWorker, newSinks := o.preparePipeline()
 
-	telemetryWorker := o.prepareTelemetry()
+	channelCapWorker, telemetryWorker := o.prepareTelemetry()
 
 	// 2. Critical Section (Short Lock)
 	// We only lock to update the internal state and the supervisor.
@@ -138,6 +141,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	// Registering all workers to the supervisor
 	o.supervisor.Add(moderationWorker)
 	o.supervisor.Add(fanoutWorker)
+	o.supervisor.Add(channelCapWorker)
 	o.supervisor.Add(telemetryWorker)
 
 	for _, w := range poolWorkers {
@@ -203,11 +207,20 @@ func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink)
 	return fanoutWorker, newSinks
 }
 
-func (o *Orchestrator) prepareTelemetry() contract.Worker {
+func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	handlers := []event.Handler{
 		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
 	}
-	return workers.NewTelemetryWorker(o.log, o.metricInterval, o.telemetryChan, handlers)
+	channels := []workers.NamedChannel{
+		{Name: "DomainChan", Channel: o.domainChan},
+		{Name: "ModerationChan", Channel: o.moderationChan},
+		{Name: "TelemetryChan", Channel: o.telemetryChan},
+		{Name: "GlobalCommands", Channel: o.globalCommands},
+	}
+	channelCapWorker := workers.NewChannelCapacityWorker(o.log, channels, o.telemetryChan, o.metricInterval)
+	telemetryWorker := workers.NewTelemetryWorker(o.log, o.metricInterval, o.telemetryChan, handlers)
+
+	return channelCapWorker, telemetryWorker
 }
 
 // Stop initiates a graceful shutdown of the orchestrator.

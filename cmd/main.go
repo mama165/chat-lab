@@ -72,6 +72,7 @@ func run() (int, error) {
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.MetricInterval,
 		config.CharReplacement,
+		config.LowCapacityThreshold,
 	)
 
 	// 4. Context & Signals

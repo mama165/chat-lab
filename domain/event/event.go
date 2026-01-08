@@ -57,7 +57,7 @@ type WorkerRestartedAfterPanic struct {
 }
 
 type ChannelCapacity struct {
-	WorkerName string
-	Capacity   int
-	Length     int
+	ChannelName string
+	Capacity    int
+	Length      int
 }

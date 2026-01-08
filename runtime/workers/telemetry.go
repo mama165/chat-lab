@@ -14,7 +14,8 @@ type TelemetryWorker struct {
 	handlers       []event.Handler
 }
 
-func NewTelemetryWorker(log *slog.Logger, metricInterval time.Duration,
+func NewTelemetryWorker(log *slog.Logger,
+	metricInterval time.Duration,
 	telemetryChan chan event.Event,
 	handlers []event.Handler) *TelemetryWorker {
 	return &TelemetryWorker{
