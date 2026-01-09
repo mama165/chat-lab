@@ -73,7 +73,7 @@ func run() (int, error) {
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
 		config.NumberOfWorkers, config.BufferSize,
-		config.SinkTimeout, config.MetricInterval, config.WaitAndFail,
+		config.SinkTimeout, config.MetricInterval, config.IngestionTimeout,
 		config.CharReplacement,
 		config.LowCapacityThreshold,
 	)
@@ -96,7 +96,7 @@ func run() (int, error) {
 	}
 
 	s := grpc.NewServer()
-	server := grpc2.NewChatServer(log, orchestrator, config.ConnectionBufferSize)
+	server := grpc2.NewChatServer(log, orchestrator, config.ConnectionBufferSize, config.DeliveryTimeout)
 	v1.RegisterChatServiceServer(s, server)
 
 	// Use an error channel to capture Serve() issues asynchronously.

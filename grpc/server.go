@@ -24,10 +24,15 @@ type ChatServer struct {
 	orchestrator         contract.IOrchestrator
 	connectionBufferSize int
 	log                  *slog.Logger
+	deliveryTimeout      time.Duration
 }
 
-func NewChatServer(log *slog.Logger, orchestrator *runtime.Orchestrator, connectionBufferSize int) *ChatServer {
-	return &ChatServer{orchestrator: orchestrator, connectionBufferSize: connectionBufferSize, log: log}
+func NewChatServer(log *slog.Logger, orchestrator *runtime.Orchestrator,
+	connectionBufferSize int, deliveryTimeout time.Duration) *ChatServer {
+	return &ChatServer{orchestrator: orchestrator,
+		connectionBufferSize: connectionBufferSize, log: log,
+		deliveryTimeout: deliveryTimeout,
+	}
 }
 
 func (s *ChatServer) GetMessage(_ context.Context, req *pb.GetMessageRequest) (*pb.GetMessageResponse, error) {
@@ -76,7 +81,7 @@ func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest
 // This method blocks until the client disconnects or a network error occurs.
 // Proper cleanup is ensured via deferred unregistration to prevent memory leaks in the registry.
 func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_ConnectServer) error {
-	sink := NewGrpcSink(s.connectionBufferSize, s.log)
+	sink := NewGrpcSink(s.log, s.connectionBufferSize, s.deliveryTimeout)
 	userID := uuid.NewString() // TODO To be extracted from metadata
 	room := domain.Room{ID: domain.RoomID(req.RoomId)}
 	s.orchestrator.RegisterRoom(&room)
