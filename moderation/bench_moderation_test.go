@@ -2,15 +2,19 @@ package moderation
 
 import (
 	"fmt"
-	"github.com/dgraph-io/badger/v4"
-	"github.com/stretchr/testify/require"
+	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/dgraph-io/badger/v4"
+	"github.com/mama165/sdk-go/logs"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Moderation_Benchmark(t *testing.T) {
 	// 1. Setup Badger (Temporary)
 	req := require.New(t)
+	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	path := t.TempDir()
 	db, err := badger.Open(badger.DefaultOptions(path).
 		WithLoggingLevel(badger.ERROR).
@@ -55,7 +59,7 @@ func Test_Moderation_Benchmark(t *testing.T) {
 
 	// --- Phase 3: BUILDING AHO-CORASICK ---
 	startBuild := time.Now()
-	_, err = NewModerator(words, '*')
+	_, err = NewModerator(words, '*', log)
 	req.NoError(err)
 
 	fmt.Printf("✅ Building AC Automaton: %v\n", time.Since(startBuild))

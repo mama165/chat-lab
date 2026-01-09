@@ -11,8 +11,6 @@ type Type string
 
 const (
 	DomainType          Type = "DOMAIN_TYPE"
-	MessagePostedType   Type = "MESSAGE_POSTED"
-	BufferUsageType     Type = "BUFFER_USAGE"
 	CensorshipHit       Type = "CENSORSHIP_HIT"
 	RestartedAfterPanic Type = "WORKER_RESTARTED_AFTER_PANIC"
 	ChannelCapacityType Type = "CHANNEL_CAPACITY"
@@ -37,11 +35,12 @@ type MessagePosted struct {
 }
 
 type SanitizedMessage struct {
-	ID               uuid.UUID
-	Room             int
-	Author           string
-	SanitizedContent string
-	At               time.Time
+	ID            uuid.UUID
+	Room          int
+	Author        string
+	Content       string
+	CensoredWords []string
+	At            time.Time
 }
 
 func (m MessagePosted) RoomID() domain.RoomID {
@@ -61,9 +60,4 @@ type ChannelCapacity struct {
 	ChannelName string
 	Capacity    int
 	Length      int
-}
-
-type Censored struct {
-	Word string
-	At   time.Time
 }

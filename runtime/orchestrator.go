@@ -191,7 +191,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 		len(data.Languages), strings.Join(data.Languages, ",")))
 	o.log.Info(fmt.Sprintf("%d unique censored words loaded", len(data.Words)))
 
-	moderator, err := moderation.NewModerator(data.Words, charReplacement)
+	moderator, err := moderation.NewModerator(data.Words, charReplacement, o.log)
 	if err != nil {
 		return nil, err
 	}

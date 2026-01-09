@@ -1,14 +1,18 @@
 package moderation
 
 import (
-	"fmt"
-	goahocorasick "github.com/anknown/ahocorasick"
+	"chat-lab/errors"
+	"context"
+	"log/slog"
 	"unicode"
+
+	goahocorasick "github.com/anknown/ahocorasick"
 )
 
 type Moderator struct {
 	matcher      *goahocorasick.Machine
 	censoredChar rune
+	log          *slog.Logger
 }
 
 type TextMapping struct {
@@ -17,7 +21,7 @@ type TextMapping struct {
 }
 
 // NewModerator initializes the Aho-Corasick automaton with a normalized version of the provided censored words list.
-func NewModerator(censoredWords []string, censoredChar rune) (Moderator, error) {
+func NewModerator(censoredWords []string, censoredChar rune, log *slog.Logger) (Moderator, error) {
 	patterns := make([][]rune, 0, len(censoredWords)) // Change la taille initiale à 0
 	for _, word := range censoredWords {
 		normalized := normalizeRunes([]rune(word))
@@ -27,47 +31,76 @@ func NewModerator(censoredWords []string, censoredChar rune) (Moderator, error) 
 	}
 
 	if len(patterns) == 0 {
-		return Moderator{}, fmt.Errorf("no valid patterns after normalization")
+		return Moderator{}, errors.ErrNoValidPatterns
 	}
 
 	m := new(goahocorasick.Machine)
 	if err := m.Build(patterns); err != nil {
 		return Moderator{}, err
 	}
-	return Moderator{matcher: m, censoredChar: censoredChar}, nil
+	return Moderator{matcher: m, censoredChar: censoredChar, log: log}, nil
 }
 
-// Censor identifies forbidden patterns and replaces the original characters with stars while preserving spacing.
-func (m *Moderator) Censor(original string) string {
+// Censor identifies forbidden patterns in a normalized version of the text
+// but applies the replacement (stars) on the original string's runes.
+// It uses a mapping (OrigIdx) to bridge the gap between the normalized
+// coordinates (where noise and leet-speak are removed) and the
+// actual positions in the user's original message.
+func (m *Moderator) Censor(original string) (string, []string) {
+	isDebug := m.log.Enabled(context.Background(), slog.LevelDebug)
+
 	mapping := m.normalize(original)
 	if len(mapping.Normalized) == 0 {
-		return original
+		return original, nil
 	}
 
 	origRunes := []rune(original)
-	spans := m.matcher.MultiPatternSearch(mapping.Normalized, false)
-	if len(spans) == 0 {
-		return original
+	matches := m.matcher.MultiPatternSearch(mapping.Normalized, false)
+
+	if isDebug {
+		m.log.Debug("matches detected", "count", len(matches))
 	}
 
-	for _, span := range spans {
-		normStart := span.Pos
-		normEnd := normStart + len(span.Word)
+	if len(matches) == 0 {
+		return original, nil
+	}
+
+	// Prepare a slice to collect the words found for telemetry
+	foundWords := make([]string, 0, len(matches))
+
+	for _, match := range matches {
+		normStart := match.Pos
+		normEnd := normStart + len(match.Word)
 
 		if normStart < 0 || normEnd > len(mapping.OrigIdx) {
 			continue
 		}
 
+		// We collect the normalized word (e.g., "idiot" even if written "1d|0t")
+		foundWords = append(foundWords, string(match.Word))
+
 		origStart := mapping.OrigIdx[normStart]
 		lastCharOrigIdx := mapping.OrigIdx[normEnd-1]
 		origEnd := lastCharOrigIdx + 1
+
+		if isDebug {
+			m.log.Debug("applying stars",
+				"pattern", string(match.Word),
+				"orig_start", origStart,
+				"orig_end", origEnd)
+		}
 
 		for i := origStart; i < origEnd; i++ {
 			origRunes[i] = m.censoredChar
 		}
 	}
 
-	return string(origRunes)
+	result := string(origRunes)
+	if isDebug {
+		m.log.Debug("censor finished", "final", result)
+	}
+
+	return result, foundWords
 }
 
 // normalize transforms the input string into a searchable format and tracks original rune positions.

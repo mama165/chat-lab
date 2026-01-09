@@ -47,13 +47,15 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 }
 
 func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event {
+	sanitized, foundWords := w.moderator.Censor(evt.Content)
 	return event.Event{
 		Type:      event.DomainType,
 		CreatedAt: time.Now().UTC(),
 		Payload: event.SanitizedMessage{
-			Room:             evt.Room,
-			Author:           evt.Author,
-			SanitizedContent: w.moderator.Censor(evt.Content),
-			At:               evt.At,
+			Room:          evt.Room,
+			Author:        evt.Author,
+			Content:       sanitized,
+			CensoredWords: foundWords,
+			At:            evt.At,
 		}}
 }

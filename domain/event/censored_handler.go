@@ -22,17 +22,22 @@ func NewCensoredHandler(log *slog.Logger) *CensoredHandler {
 }
 
 func (h *CensoredHandler) Handle(event Event) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	switch event.Type {
 	case CensorshipHit:
-		payload, ok := event.Payload.(Censored)
+		payload, ok := event.Payload.(SanitizedMessage)
 		if !ok {
 			h.log.Error(errors.ErrInvalidPayload.Error())
 			return
 		}
+		if len(payload.CensoredWords) == 0 {
+			return
+		}
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
 		h.counter++
-		h.hit[payload.Word]++
+		for _, word := range payload.CensoredWords {
+			h.hit[word]++
+		}
 	}
 }

@@ -9,4 +9,5 @@ var (
 	ErrEmptyWords       = errors.New("no words have been found")
 	ErrInvalidPayload   = errors.New("payload of event has a wrong type")
 	ErrServerOverloaded = errors.New("system congested: please retry with exponential backoff")
+	ErrNoValidPatterns  = errors.New("no valid patterns after normalization")
 )

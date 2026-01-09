@@ -32,7 +32,7 @@ func toDiskMessage(event event.SanitizedMessage) repositories.DiskMessage {
 		ID:      event.ID,
 		Room:    event.Room,
 		Author:  event.Author,
-		Content: event.SanitizedContent,
+		Content: event.Content,
 		At:      event.At,
 	}
 }
