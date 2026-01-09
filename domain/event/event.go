@@ -2,6 +2,7 @@ package event
 
 import (
 	"chat-lab/domain"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,11 +11,43 @@ import (
 type Type string
 
 const (
-	DomainType          Type = "DOMAIN_TYPE"
-	CensorshipHit       Type = "CENSORSHIP_HIT"
-	RestartedAfterPanic Type = "WORKER_RESTARTED_AFTER_PANIC"
-	ChannelCapacityType Type = "CHANNEL_CAPACITY"
+	DomainType              Type = "DOMAIN_TYPE"
+	CensorshipHitType       Type = "CENSORSHIP_HIT"
+	RestartedAfterPanicType Type = "WORKER_RESTARTED_AFTER_PANIC"
+	ChannelCapacityType     Type = "CHANNEL_CAPACITY"
+	MessageSentType         Type = "MESSAGE_SENT"
 )
+
+type Counter struct {
+	mu         sync.Mutex
+	eventCount map[Type]uint64
+	wordHits   map[string]uint64
+}
+
+func NewCounter() *Counter {
+	return &Counter{
+		eventCount: make(map[Type]uint64),
+		wordHits:   make(map[string]uint64),
+	}
+}
+
+func (c *Counter) Increment(evt Type) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.eventCount[evt]++
+}
+
+func (c *Counter) IncrementHits(word string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.wordHits[word]++
+}
+
+func (c *Counter) Get(evt Type) uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.eventCount[evt]
+}
 
 type Event struct {
 	Type      Type
@@ -61,3 +94,5 @@ type ChannelCapacity struct {
 	Capacity    int
 	Length      int
 }
+
+type MessageSent struct{}

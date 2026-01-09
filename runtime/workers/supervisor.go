@@ -136,7 +136,7 @@ func (s *Supervisor) sendRestartEvent(ctx context.Context, workerName string) {
 	select {
 	case <-ctx.Done():
 	case s.telemetryChan <- event.Event{
-		Type:      event.RestartedAfterPanic,
+		Type:      event.RestartedAfterPanicType,
 		CreatedAt: time.Now().UTC(),
 		Payload: event.WorkerRestartedAfterPanic{
 			WorkerName: workerName,

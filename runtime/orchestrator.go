@@ -29,6 +29,7 @@ var censoredFolder embed.FS
 type Orchestrator struct {
 	mu                   sync.Mutex
 	log                  *slog.Logger
+	counter              *event.Counter
 	numWorkers           int
 	rooms                map[domain.RoomID]*domain.Room
 	permanentSinks       []contract.EventSink
@@ -55,6 +56,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	lowCapacityThreshold int) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
+		counter:              event.NewCounter(),
 		numWorkers:           numWorkers,
 		rooms:                make(map[domain.RoomID]*domain.Room),
 		permanentSinks:       nil,
@@ -227,8 +229,9 @@ func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink)
 func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	handlers := []event.Handler{
 		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
-		event.NewCensoredHandler(o.log),
+		event.NewCensoredHandler(o.log, o.counter),
 		event.NewLatencyHandler(o.log, o.latencyThreshold),
+		event.NewMessageSentHandler(o.log, o.counter),
 	}
 	channels := []workers.NamedChannel{
 		{Name: "DomainChan", Channel: o.domainChan},
