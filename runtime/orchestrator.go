@@ -6,6 +6,7 @@ import (
 	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
+	"chat-lab/errors"
 	"chat-lab/moderation"
 	"chat-lab/projection"
 	"chat-lab/repositories"
@@ -84,11 +85,17 @@ func (o *Orchestrator) Add(sinks ...contract.EventSink) {
 	o.permanentSinks = append(o.permanentSinks, sinks...)
 }
 
-func (o *Orchestrator) PostMessage(cmd domain.PostMessageCommand) {
+// PostMessage attempts to push a command into the pipeline.
+// If the buffer is full, it returns an error (Backpressure).
+func (o *Orchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
 	select {
+	case <-ctx.Done():
+		return ctx.Err()
 	case o.globalCommands <- cmd:
+		return nil
 	default:
-		o.log.Warn(fmt.Sprintf("Global command channel full for Room %d, dropping command", cmd.RoomID()))
+		o.log.Warn("backpressure triggered: globalCommands channel is full")
+		return errors.ErrServerOverloaded
 	}
 }
 

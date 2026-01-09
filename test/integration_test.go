@@ -79,12 +79,13 @@ func Test_Scenario(t *testing.T) {
 	at := time.Now().UTC()
 
 	// When a cmd message is posted
-	orchestrator.PostMessage(domain.PostMessageCommand{
+	err = orchestrator.PostMessage(ctx, domain.PostMessageCommand{
 		Room:      id,
 		UserID:    userID,
 		Content:   content,
 		CreatedAt: at,
 	})
+	req.NoError(err)
 
 	// And wait time for channels & goroutines
 	select {

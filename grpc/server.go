@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
@@ -55,7 +57,7 @@ func toMessageResponse(messages []domain.Message) []*pb.MessageResponse {
 // but not immediately broadcast back to the sender in this call.
 // The sender will receive its own message via the 'Connect' stream like any other participant,
 // ensuring a single source of truth for message order, timestamps, and sanitization.
-func (s *ChatServer) PostMessage(_ context.Context, req *pb.PostMessageRequest) (*pb.PostMessageResponse, error) {
+func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest) (*pb.PostMessageResponse, error) {
 	userID := uuid.NewString() // TODO To be extracted from metadata
 	command := domain.PostMessageCommand{
 		Room:      int(req.RoomId),
@@ -63,7 +65,9 @@ func (s *ChatServer) PostMessage(_ context.Context, req *pb.PostMessageRequest) 
 		Content:   req.Content,
 		CreatedAt: time.Now().UTC(),
 	}
-	s.orchestrator.PostMessage(command)
+	if err := s.orchestrator.PostMessage(ctx, command); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many messages, please backoff")
+	}
 	return &pb.PostMessageResponse{Success: true}, nil
 }
 
