@@ -2,8 +2,9 @@ package event
 
 import (
 	"chat-lab/domain"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Type string
@@ -60,4 +61,9 @@ type ChannelCapacity struct {
 	ChannelName string
 	Capacity    int
 	Length      int
+}
+
+type Censored struct {
+	Word string
+	At   time.Time
 }

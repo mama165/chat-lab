@@ -23,18 +23,18 @@ type EventFanoutWorker struct {
 	permanentSinks []contract.EventSink
 	registry       contract.IRegistry
 	event          chan event.Event
-	telemetryEvent chan event.Event
+	telemetryChan  chan event.Event
 	sinkTimeout    time.Duration
 }
 
 func NewEventFanoutWorker(log *slog.Logger,
 	permanentSinks []contract.EventSink,
 	registry contract.IRegistry,
-	domainEvent, telemetryEvent chan event.Event,
+	domainEvent, telemetryChan chan event.Event,
 	sinkTimeout time.Duration) *EventFanoutWorker {
 	return &EventFanoutWorker{
 		log: log, permanentSinks: permanentSinks, registry: registry,
-		event: domainEvent, telemetryEvent: telemetryEvent,
+		event: domainEvent, telemetryChan: telemetryChan,
 		sinkTimeout: sinkTimeout}
 }
 
@@ -51,7 +51,7 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			w.log.Debug("Context done, skipping telemetry")
-		case w.telemetryEvent <- evt:
+		case w.telemetryChan <- evt:
 		default:
 			w.log.Debug("Observability telemetry event lost")
 		}

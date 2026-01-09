@@ -225,6 +225,7 @@ func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink)
 func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	handlers := []event.Handler{
 		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
+		event.NewCensoredHandler(o.log),
 	}
 	channels := []workers.NamedChannel{
 		{Name: "DomainChan", Channel: o.domainChan},
