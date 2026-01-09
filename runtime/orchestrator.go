@@ -41,6 +41,7 @@ type Orchestrator struct {
 	messageRepository    repositories.Repository
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
+	latencyThreshold     time.Duration
 	waitAndFail          time.Duration
 	charReplacement      rune
 	lowCapacityThreshold int
@@ -50,7 +51,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository repositories.Repository,
 	numWorkers, bufferSize int, sinkTimeout,
-	metricInterval, waitAndFail time.Duration, charReplacement rune,
+	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold int) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
@@ -66,6 +67,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		messageRepository:    messageRepository,
 		sinkTimeout:          sinkTimeout,
 		metricInterval:       metricInterval,
+		latencyThreshold:     latencyThreshold,
 		waitAndFail:          waitAndFail,
 		charReplacement:      charReplacement,
 		lowCapacityThreshold: lowCapacityThreshold,
@@ -226,6 +228,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	handlers := []event.Handler{
 		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
 		event.NewCensoredHandler(o.log),
+		event.NewLatencyHandler(o.log, o.latencyThreshold),
 	}
 	channels := []workers.NamedChannel{
 		{Name: "DomainChan", Channel: o.domainChan},

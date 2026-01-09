@@ -73,7 +73,7 @@ func run() (int, error) {
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
 		config.NumberOfWorkers, config.BufferSize,
-		config.SinkTimeout, config.MetricInterval, config.IngestionTimeout,
+		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		config.CharReplacement,
 		config.LowCapacityThreshold,
 	)

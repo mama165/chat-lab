@@ -12,6 +12,7 @@ type Config struct {
 	MetricInterval       time.Duration `env:"METRIC_INTERVAL,required=true"`
 	IngestionTimeout     time.Duration `env:"INGESTION_TIMEOUT,required=true"`
 	DeliveryTimeout      time.Duration `env:"DELIVERY_TIMEOUT,required=true"`
+	LatencyThreshold     time.Duration `env:"LATENCY_THRESHOLD,required=true"`
 	RestartInterval      time.Duration `env:"RESTART_INTERVAL,required=true"`
 	BadgerFilepath       string        `env:"BADGER_FILEPATH,required=true"`
 	LogLevel             string        `env:"LOG_LEVEL,required=true"`

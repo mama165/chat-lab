@@ -41,6 +41,7 @@ func Test_Scenario(t *testing.T) {
 		log, supervisor, registry, telemetryChan, messageRepository,
 		10, 1000, 3*time.Second,
 		500*time.Millisecond,
+		500*time.Millisecond,
 		100*time.Millisecond,
 		'*',
 		500,
