@@ -41,6 +41,7 @@ type Orchestrator struct {
 	messageRepository    repositories.Repository
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
+	waitAndFail          time.Duration
 	charReplacement      rune
 	lowCapacityThreshold int
 }
@@ -49,7 +50,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository repositories.Repository,
 	numWorkers, bufferSize int, sinkTimeout,
-	metricInterval time.Duration, charReplacement rune,
+	metricInterval, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold int) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
@@ -65,6 +66,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		messageRepository:    messageRepository,
 		sinkTimeout:          sinkTimeout,
 		metricInterval:       metricInterval,
+		waitAndFail:          waitAndFail,
 		charReplacement:      charReplacement,
 		lowCapacityThreshold: lowCapacityThreshold,
 	}
@@ -85,16 +87,21 @@ func (o *Orchestrator) Add(sinks ...contract.EventSink) {
 	o.permanentSinks = append(o.permanentSinks, sinks...)
 }
 
-// PostMessage attempts to push a command into the pipeline.
-// If the buffer is full, it returns an error (Backpressure).
+// PostMessage attempts to buffer a command using a "Wait-and-Fail" backpressure strategy.
+// It allows for a short grace period (o.waitAndFail) to absorb traffic bursts
+// before rejecting the request with errors.ErrServerOverloaded to protect system stability.
 func (o *Orchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
+	timer := time.NewTimer(o.waitAndFail)
+	defer timer.Stop()
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case o.globalCommands <- cmd:
 		return nil
-	default:
-		o.log.Warn("backpressure triggered: globalCommands channel is full")
+	case <-timer.C:
+		o.log.Warn("backpressure: system too busy to accept message",
+			"room_id", cmd.RoomID())
 		return errors.ErrServerOverloaded
 	}
 }

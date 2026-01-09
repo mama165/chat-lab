@@ -41,6 +41,7 @@ func Test_Scenario(t *testing.T) {
 		log, supervisor, registry, telemetryChan, messageRepository,
 		10, 1000, 3*time.Second,
 		500*time.Millisecond,
+		100*time.Millisecond,
 		'*',
 		500,
 	)
@@ -92,6 +93,7 @@ func Test_Scenario(t *testing.T) {
 	case <-done:
 		// Then the message has reached the repository
 	case <-time.After(2 * time.Second):
-		t.Fatal("Timeout: message has never reached the repository")
+
+		req.Fail("Timeout: message has never reached the repository")
 	}
 }

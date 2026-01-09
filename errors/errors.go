@@ -1,10 +1,12 @@
 package errors
 
-import "fmt"
+import (
+	"errors"
+)
 
 var (
-	ErrWorkerPanic      = fmt.Errorf("worker panic")
-	ErrEmptyWords       = fmt.Errorf("no words have been found")
-	ErrInvalidPayload   = fmt.Errorf("payload of event has a wrong type")
-	ErrServerOverloaded = fmt.Errorf("server overloaded")
+	ErrWorkerPanic      = errors.New("worker panic")
+	ErrEmptyWords       = errors.New("no words have been found")
+	ErrInvalidPayload   = errors.New("payload of event has a wrong type")
+	ErrServerOverloaded = errors.New("system congested: please retry with exponential backoff")
 )

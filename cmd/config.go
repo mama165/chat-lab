@@ -10,6 +10,7 @@ type Config struct {
 	LimitMessages        *int          `env:"LIMIT_MESSAGES"`
 	SinkTimeout          time.Duration `env:"SINK_TIMEOUT,required=true"`
 	MetricInterval       time.Duration `env:"METRIC_INTERVAL,required=true"`
+	WaitAndFail          time.Duration `env:"WAIT_AND_FAIL,required=true"`
 	RestartInterval      time.Duration `env:"RESTART_INTERVAL,required=true"`
 	BadgerFilepath       string        `env:"BADGER_FILEPATH,required=true"`
 	LogLevel             string        `env:"LOG_LEVEL,required=true"`
