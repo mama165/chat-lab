@@ -276,15 +276,17 @@ func (mr *MockIOrchestratorMockRecorder) GetMessages(cmd any) *gomock.Call {
 }
 
 // PostMessage mocks base method.
-func (m *MockIOrchestrator) PostMessage(cmd domain.PostMessageCommand) {
+func (m *MockIOrchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PostMessage", cmd)
+	ret := m.ctrl.Call(m, "PostMessage", ctx, cmd)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PostMessage indicates an expected call of PostMessage.
-func (mr *MockIOrchestratorMockRecorder) PostMessage(cmd any) *gomock.Call {
+func (mr *MockIOrchestratorMockRecorder) PostMessage(ctx, cmd any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostMessage", reflect.TypeOf((*MockIOrchestrator)(nil).PostMessage), cmd)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostMessage", reflect.TypeOf((*MockIOrchestrator)(nil).PostMessage), ctx, cmd)
 }
 
 // RegisterParticipant mocks base method.

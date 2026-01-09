@@ -76,6 +76,7 @@ func run() (int, error) {
 		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		config.CharReplacement,
 		config.LowCapacityThreshold,
+		config.MaxContentLength,
 	)
 
 	// 4. Context & Signals

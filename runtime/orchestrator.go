@@ -46,6 +46,7 @@ type Orchestrator struct {
 	waitAndFail          time.Duration
 	charReplacement      rune
 	lowCapacityThreshold int
+	maxContentLength     int
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
@@ -53,7 +54,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	messageRepository repositories.Repository,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
-	lowCapacityThreshold int) *Orchestrator {
+	lowCapacityThreshold, maxContentLength int) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
 		counter:              event.NewCounter(),
@@ -73,6 +74,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		waitAndFail:          waitAndFail,
 		charReplacement:      charReplacement,
 		lowCapacityThreshold: lowCapacityThreshold,
+		maxContentLength:     maxContentLength,
 	}
 }
 
@@ -95,6 +97,9 @@ func (o *Orchestrator) Add(sinks ...contract.EventSink) {
 // It allows for a short grace period (o.waitAndFail) to absorb traffic bursts
 // before rejecting the request with errors.ErrServerOverloaded to protect system stability.
 func (o *Orchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
+	if len(cmd.Content) > o.maxContentLength {
+		return errors.ErrContentTooLarge
+	}
 	timer := time.NewTimer(o.waitAndFail)
 	defer timer.Stop()
 

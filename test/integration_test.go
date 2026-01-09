@@ -45,6 +45,7 @@ func Test_Scenario(t *testing.T) {
 		100*time.Millisecond,
 		'*',
 		500,
+		300,
 	)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockRepository(ctrl)

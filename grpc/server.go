@@ -4,6 +4,7 @@ import (
 	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
+	"chat-lab/errors"
 	pb "chat-lab/proto/chat"
 	"chat-lab/runtime"
 	"context"
@@ -12,8 +13,6 @@ import (
 	"time"
 
 	"github.com/samber/lo"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
@@ -71,7 +70,7 @@ func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest
 		CreatedAt: time.Now().UTC(),
 	}
 	if err := s.orchestrator.PostMessage(ctx, command); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many messages, please backoff")
+		return nil, errors.MapToGRPCError(err)
 	}
 	return &pb.PostMessageResponse{Success: true}, nil
 }

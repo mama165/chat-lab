@@ -17,6 +17,7 @@ type Config struct {
 	BadgerFilepath       string        `env:"BADGER_FILEPATH,required=true"`
 	LogLevel             string        `env:"LOG_LEVEL,required=true"`
 	LowCapacityThreshold int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
+	MaxContentLength     int           `env:"MAX_CONTENT_LENGTH,required=true"`
 	Host                 string        `env:"HOST,default=localhost"`
 	Port                 int           `env:"PORT,default=8080"`
 }
