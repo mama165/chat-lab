@@ -4,11 +4,12 @@ import (
 	v1 "chat-lab/proto/chat"
 	"context"
 	"fmt"
-	"github.com/mama165/sdk-go/logs"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/mama165/sdk-go/logs"
 
 	"github.com/Netflix/go-env"
 	"google.golang.org/grpc"
@@ -24,8 +25,8 @@ const (
 
 // Config defines the client-side environment variables.
 type Config struct {
-	ServerAddress string `env:"CHAT_SERVER_ADDR,default=localhost:8080"`
-	DefaultRoomID int    `env:"CHAT_ROOM_ID,default=1"`
+	ServerAddress string `env:"CHAT_SERVER_ADDR,required=true"`
+	DefaultRoomID int    `env:"CHAT_ROOM_ID,required=true"`
 	LogLevel      string `env:"LOG_LEVEL,required=true"`
 }
 
