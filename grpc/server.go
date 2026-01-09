@@ -8,10 +8,11 @@ import (
 	"chat-lab/runtime"
 	"context"
 	"fmt"
-	"github.com/samber/lo"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"log/slog"
 	"time"
+
+	"github.com/samber/lo"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
 )
