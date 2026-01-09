@@ -8,6 +8,7 @@ import (
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -102,7 +103,7 @@ func run() (int, error) {
 	errChan := make(chan error, 1)
 	go func() {
 		log.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
-		if err := s.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errChan <- fmt.Errorf("gRPC server error: %w", err)
 		}
 	}()
