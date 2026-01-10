@@ -13,19 +13,19 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Repository interface {
+type IMessageRepository interface {
 	StoreMessage(message DiskMessage) error
 	GetMessages(room int, cursor *string) ([]DiskMessage, *string, error)
 }
 
 type MessageRepository struct {
-	Db            *badger.DB
+	db            *badger.DB
 	log           *slog.Logger
-	LimitMessages *int
+	limitMessages *int
 }
 
 func NewMessageRepository(db *badger.DB, log *slog.Logger, limitMessages *int) MessageRepository {
-	return MessageRepository{Db: db, log: log, LimitMessages: limitMessages}
+	return MessageRepository{db: db, log: log, limitMessages: limitMessages}
 }
 
 type DiskMessage struct {
@@ -51,7 +51,7 @@ func (m MessageRepository) StoreMessage(message DiskMessage) error {
 	if err != nil {
 		return err
 	}
-	return m.Db.Update(func(txn *badger.Txn) error {
+	return m.db.Update(func(txn *badger.Txn) error {
 		err = txn.Set([]byte(key), bytes)
 		return err
 	})
@@ -59,12 +59,12 @@ func (m MessageRepository) StoreMessage(message DiskMessage) error {
 
 // GetMessages retrieves messages for a specific room using a prefix scan.
 // Thanks to the padded timestamp in the key, messages are naturally sorted by time.
-// It stops collecting messages once the configured LimitMessages is reached.
+// It stops collecting messages once the configured limitMessages is reached.
 func (m MessageRepository) GetMessages(room int, cursor *string) ([]DiskMessage, *string, error) {
 	var byteMessages [][]byte
 	var diskMessages []DiskMessage
 	var lastKey string
-	err := m.Db.View(func(txn *badger.Txn) error {
+	err := m.db.View(func(txn *badger.Txn) error {
 		prefixStr := fmt.Sprintf("msg:%d:", room)
 		prefix := []byte(prefixStr)
 		prefixLen := len(prefixStr)
@@ -91,8 +91,8 @@ func (m MessageRepository) GetMessages(room int, cursor *string) ([]DiskMessage,
 		}
 
 		for ; it.ValidForPrefix(prefix); it.Next() {
-			if m.LimitMessages != nil && len(byteMessages) == *m.LimitMessages {
-				m.log.Debug(fmt.Sprintf("Maximum of %d message reached", *m.LimitMessages))
+			if m.limitMessages != nil && len(byteMessages) == *m.limitMessages {
+				m.log.Debug(fmt.Sprintf("Maximum of %d message reached", *m.limitMessages))
 				break
 			}
 			item := it.Item()

@@ -39,7 +39,7 @@ type Orchestrator struct {
 	moderationChan       chan event.Event
 	domainChan           chan event.Event
 	telemetryChan        chan event.Event
-	messageRepository    repositories.Repository
+	messageRepository    repositories.IMessageRepository
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
@@ -51,7 +51,7 @@ type Orchestrator struct {
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
-	messageRepository repositories.Repository,
+	messageRepository repositories.IMessageRepository,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int) *Orchestrator {

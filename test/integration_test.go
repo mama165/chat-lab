@@ -63,7 +63,7 @@ func Test_Scenario(t *testing.T) {
 	orchestrator.Add(mockTimelineSink, diskSink)
 
 	id := 1
-	room := domain.NewRoom(id)
+	room := domain.NewRoom(domain.RoomID(id))
 	orchestrator.RegisterRoom(room)
 
 	go func() {

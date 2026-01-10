@@ -9,11 +9,11 @@ import (
 )
 
 type DiskSink struct {
-	repository repositories.Repository
+	repository repositories.IMessageRepository
 	log        *slog.Logger
 }
 
-func NewDiskSink(repository repositories.Repository, log *slog.Logger) DiskSink {
+func NewDiskSink(repository repositories.IMessageRepository, log *slog.Logger) DiskSink {
 	return DiskSink{repository: repository, log: log}
 }
 

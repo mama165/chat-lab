@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package auth;
+option go_package = "./pb";
+
+// AuthService handles user registration and session management
+service AuthService {
+  // Register creates a new user account after validating data
+  rpc Register(RegisterRequest) returns (AuthResponse);
+
+  // Login verifies credentials and returns a JWT
+  rpc Login(LoginRequest) returns (AuthResponse);
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string token = 1;      // The JWT token if successful
+  string user_id = 2;    // The unique identifier of the user
+  string error = 3;      // Error message if something went wrong
+}

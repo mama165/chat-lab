@@ -6,8 +6,8 @@ type Room struct {
 	ID RoomID
 }
 
-func NewRoom(id int) *Room {
+func NewRoom(id RoomID) *Room {
 	return &Room{
-		ID: RoomID(id),
+		ID: id,
 	}
 }

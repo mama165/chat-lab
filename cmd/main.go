@@ -7,6 +7,7 @@ import (
 	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
+	"chat-lab/services"
 	"context"
 	"errors"
 	"fmt"
@@ -97,7 +98,8 @@ func run() (int, error) {
 	}
 
 	s := grpc.NewServer()
-	server := grpc2.NewChatServer(log, orchestrator, config.ConnectionBufferSize, config.DeliveryTimeout)
+	chatService := services.NewChatService(orchestrator)
+	server := grpc2.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
 	v1.RegisterChatServiceServer(s, server)
 
 	// Use an error channel to capture Serve() issues asynchronously.

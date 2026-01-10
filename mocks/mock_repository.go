@@ -16,7 +16,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockRepository is a mock of Repository interface.
+// MockRepository is a mock of IMessageRepository interface.
 type MockRepository struct {
 	ctrl     *gomock.Controller
 	recorder *MockRepositoryMockRecorder

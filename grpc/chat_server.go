@@ -1,12 +1,11 @@
 package grpc
 
 import (
-	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/errors"
 	pb "chat-lab/proto/chat"
-	"chat-lab/runtime"
+	"chat-lab/services"
 	"context"
 	"fmt"
 	"log/slog"
@@ -20,22 +19,22 @@ import (
 
 type ChatServer struct {
 	pb.UnimplementedChatServiceServer
-	orchestrator         contract.IOrchestrator
+	chatService          services.IChatService
 	connectionBufferSize int
 	log                  *slog.Logger
 	deliveryTimeout      time.Duration
 }
 
-func NewChatServer(log *slog.Logger, orchestrator *runtime.Orchestrator,
+func NewChatServer(log *slog.Logger, chatService services.IChatService,
 	connectionBufferSize int, deliveryTimeout time.Duration) *ChatServer {
-	return &ChatServer{orchestrator: orchestrator,
+	return &ChatServer{chatService: chatService,
 		connectionBufferSize: connectionBufferSize, log: log,
 		deliveryTimeout: deliveryTimeout,
 	}
 }
 
 func (s *ChatServer) GetMessage(_ context.Context, req *pb.GetMessageRequest) (*pb.GetMessageResponse, error) {
-	messages, cursor, err := s.orchestrator.GetMessages(domain.GetMessageCommand{
+	messages, cursor, err := s.chatService.GetMessages(domain.GetMessageCommand{
 		Room:   int(req.Room),
 		Cursor: req.Cursor,
 	})
@@ -69,7 +68,7 @@ func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest
 		Content:   req.Content,
 		CreatedAt: time.Now().UTC(),
 	}
-	if err := s.orchestrator.PostMessage(ctx, command); err != nil {
+	if err := s.chatService.PostMessage(ctx, command); err != nil {
 		return nil, errors.MapToGRPCError(err)
 	}
 	return &pb.PostMessageResponse{Success: true}, nil
@@ -82,15 +81,14 @@ func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest
 func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_ConnectServer) error {
 	sink := NewGrpcSink(s.log, s.connectionBufferSize, s.deliveryTimeout)
 	userID := uuid.NewString() // TODO To be extracted from metadata
-	room := domain.Room{ID: domain.RoomID(req.RoomId)}
-	s.orchestrator.RegisterRoom(&room)
-	s.orchestrator.RegisterParticipant(userID, domain.RoomID(req.RoomId), sink)
-	defer s.orchestrator.UnregisterParticipant(userID, room.ID)
+	roomID := domain.RoomID(req.RoomId)
+	s.chatService.JoinRoom(userID, roomID, sink)
+	defer s.chatService.LeaveRoom(userID, roomID)
 
 	for {
 		select {
 		case <-stream.Context().Done():
-			s.log.Warn(fmt.Sprintf("Client %s disconnected from %d", userID, room.ID))
+			s.log.Warn(fmt.Sprintf("Client %s disconnected from %d", userID, roomID))
 			return nil
 		case evt := <-sink.connectedUserEvent:
 			switch e := evt.(type) {
@@ -98,7 +96,7 @@ func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_Conne
 				if err := stream.Send(lo.ToPtr(toChatEvent(e))); err != nil {
 					s.log.Error("failed to push event to stream",
 						"user_id", userID,
-						"room_id", room.ID,
+						"room_id", roomID,
 						"error", err)
 					return err
 				}
