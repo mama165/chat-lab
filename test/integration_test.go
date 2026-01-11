@@ -48,7 +48,7 @@ func Test_Scenario(t *testing.T) {
 		300,
 	)
 	ctrl := gomock.NewController(t)
-	mockMessageRepository := mocks.NewMockRepository(ctrl)
+	mockMessageRepository := mocks.NewMockIMessageRepository(ctrl)
 	mockMessageRepository.EXPECT().
 		StoreMessage(gomock.Any()).
 		Do(func(msg any) {

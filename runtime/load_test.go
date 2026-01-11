@@ -24,7 +24,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	defer cancel()
 
 	ctrl := gomock.NewController(t)
-	mockRepo := mocks.NewMockRepository(ctrl)
+	mockRepo := mocks.NewMockIMessageRepository(ctrl)
 	// On accepte tout sans rien faire pour simuler un stockage instantané
 	mockRepo.EXPECT().StoreMessage(gomock.Any()).Do(
 		func(_ repositories.DiskMessage) {
