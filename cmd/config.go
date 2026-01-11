@@ -1,12 +1,15 @@
 package main
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Config struct {
 	BufferSize           int           `env:"BUFFER_SIZE,required=true"`
 	ConnectionBufferSize int           `env:"CONNECTION_BUFFER_SIZE,required=true"`
 	NumberOfWorkers      int           `env:"NUMBER_OF_WORKERS,required=true"`
-	CharReplacement      rune          `env:"CHARACTER_REPLACEMENT,required=true"`
+	CharReplacement      string        `env:"CHARACTER_REPLACEMENT,required=true"`
 	LimitMessages        *int          `env:"LIMIT_MESSAGES"`
 	SinkTimeout          time.Duration `env:"SINK_TIMEOUT,required=true"`
 	MetricInterval       time.Duration `env:"METRIC_INTERVAL,required=true"`
@@ -21,4 +24,15 @@ type Config struct {
 	MaxContentLength     int           `env:"MAX_CONTENT_LENGTH,required=true"`
 	Host                 string        `env:"HOST,default=localhost"`
 	Port                 int           `env:"PORT,default=8080"`
+}
+
+func (c Config) CharacterRune() (rune, error) {
+	r := []rune(c.CharReplacement)
+	if len(r) != 1 {
+		return 0, fmt.Errorf(
+			"CHARACTER_REPLACEMENT must be a single character, got %q",
+			c.CharReplacement,
+		)
+	}
+	return r[0], nil
 }

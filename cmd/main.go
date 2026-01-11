@@ -54,6 +54,12 @@ func run() (int, error) {
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
 		return exitConfig, fmt.Errorf("config error: %w", err)
 	}
+
+	charReplacement, err := config.CharacterRune()
+	if err != nil {
+		return exitRuntime, err
+	}
+
 	log := logs.GetLoggerFromString(config.LogLevel)
 
 	// 2. Database (BadgerDB)
@@ -78,7 +84,7 @@ func run() (int, error) {
 		log, sup, registry, telemetryChan, messageRepository,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
-		config.CharReplacement,
+		charReplacement,
 		config.LowCapacityThreshold,
 		config.MaxContentLength,
 	)
