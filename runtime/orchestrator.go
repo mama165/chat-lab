@@ -260,5 +260,9 @@ func (o *Orchestrator) Stop() {
 	// This immediately signals all workers to stop blocking on operations.
 	o.supervisor.Stop()
 
+	close(o.globalCommands)
+	close(o.moderationChan)
+	close(o.domainChan)
+
 	o.log.Debug("Orchestrator internal channels closed")
 }

@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	grpc3 "github.com/mama165/sdk-go/grpc"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -62,9 +63,24 @@ func run() (int, error) {
 
 	log := logs.GetLoggerFromString(config.LogLevel)
 
+	ctx := context.Background()
+
 	// 2. Database (BadgerDB)
-	db, err := badger.Open(badger.DefaultOptions(config.BadgerFilepath).
-		WithLoggingLevel(badger.INFO))
+	options := badger.DefaultOptions(config.BadgerFilepath)
+
+	switch log.Enabled(ctx, slog.LevelDebug) {
+	case true:
+		options = options.WithLoggingLevel(badger.DEBUG).
+			WithBypassLockGuard(true)
+	case false:
+		options = options.WithLoggingLevel(badger.INFO)
+	}
+
+	if log.Enabled(ctx, slog.LevelDebug) {
+		options = badger.DefaultOptions(config.BadgerFilepath).
+			WithBypassLockGuard(true)
+	}
+	db, err := badger.Open(options)
 	if err != nil {
 		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
 	}
@@ -91,13 +107,19 @@ func run() (int, error) {
 
 	// 4. Context & Signals
 	// NotifyContext captures OS signals and cancels the context to trigger a shutdown.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Error (gRPC & Orchestrator)
+	errChan := make(chan error, 2)
+
 	// 5. Start the Engine (Workers and Fanout)
-	if err = orchestrator.Start(ctx); err != nil {
-		return exitRuntime, fmt.Errorf("orchestrator failed to start: %w", err)
-	}
+	go func() {
+		log.Info("Starting orchestrator...")
+		if err := orchestrator.Start(ctx); err != nil {
+			errChan <- fmt.Errorf("orchestrator error: %w", err)
+		}
+	}()
 
 	// 6. gRPC Server Setup
 	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
@@ -120,7 +142,6 @@ func run() (int, error) {
 	pb2.RegisterAuthServiceServer(s, authServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
-	errChan := make(chan error, 1)
 	go func() {
 		log.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
 		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
