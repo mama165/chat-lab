@@ -6,6 +6,7 @@ import (
 	"chat-lab/mocks"
 	"chat-lab/repositories"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -16,7 +17,7 @@ func TestAuthService_Register(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockIUserRepository(ctrl)
-	svc := NewAuthService(mockRepo)
+	svc := NewAuthService(mockRepo, 24*time.Hour)
 
 	t.Run("should register successfully when input is valid", func(t *testing.T) {
 		req := require.New(t)
@@ -72,7 +73,7 @@ func TestAuthService_Login(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockIUserRepository(ctrl)
-	svc := NewAuthService(mockRepo)
+	svc := NewAuthService(mockRepo, 24*time.Hour)
 
 	t.Run("should login successfully with correct credentials", func(t *testing.T) {
 		req := require.New(t)

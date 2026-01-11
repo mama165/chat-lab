@@ -17,9 +17,10 @@ type CustomClaims struct {
 }
 
 // GenerateToken creates a signed JWT for a specific user.
-func GenerateToken(userID string, roles []string) (string, error) {
+func GenerateToken(userID string, roles []string,
+	authTokenDuration time.Duration) (string, error) {
 	// Set token expiration to 24 hours from now.
-	expirationTime := time.Now().Add(24 * time.Hour)
+	expirationTime := time.Now().Add(authTokenDuration)
 
 	claims := &CustomClaims{
 		UserID: userID,

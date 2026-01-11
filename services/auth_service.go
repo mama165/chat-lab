@@ -5,6 +5,7 @@ import (
 	"chat-lab/errors"
 	"chat-lab/repositories"
 	"fmt"
+	"time"
 )
 
 type IAuthService interface {
@@ -13,7 +14,8 @@ type IAuthService interface {
 }
 
 type AuthService struct {
-	userRepository repositories.IUserRepository
+	userRepository    repositories.IUserRepository
+	authTokenDuration time.Duration
 }
 
 type Token string
@@ -22,19 +24,23 @@ func (t Token) string() string {
 	return string(t)
 }
 
-func NewAuthService(repo repositories.IUserRepository) IAuthService {
-	return &AuthService{userRepository: repo}
+func NewAuthService(repo repositories.IUserRepository,
+	authTokenDuration time.Duration) IAuthService {
+	return &AuthService{
+		userRepository:    repo,
+		authTokenDuration: authTokenDuration,
+	}
 }
 
 func (s *AuthService) Register(email, password string) (Token, error) {
-	valReq := auth.RegisterRequest{
+	request := auth.RegisterRequest{
 		Email:    email,
 		Password: password,
 	}
 
 	// 1. Validate business rules (email format, password complexity)
 	// We check this before any expensive cryptographic operation.
-	if err := auth.ValidateRegister(valReq); err != nil {
+	if err := auth.ValidateRegister(request); err != nil {
 		return "", fmt.Errorf("%w: %v", errors.ErrInvalidPassword, err)
 	}
 
@@ -52,7 +58,7 @@ func (s *AuthService) Register(email, password string) (Token, error) {
 	}
 
 	// 4. Generate the initial session token
-	token, err := auth.GenerateToken(userID, []string{"user"})
+	token, err := auth.GenerateToken(userID, []string{"user"}, s.authTokenDuration)
 	if err != nil {
 		return "", errors.ErrTokenGeneration
 	}
@@ -75,7 +81,7 @@ func (s *AuthService) Login(email, password string) (Token, error) {
 	}
 
 	// 3. Issue the JWT token
-	token, err := auth.GenerateToken(user.ID, user.Roles)
+	token, err := auth.GenerateToken(user.ID, user.Roles, s.authTokenDuration)
 	if err != nil {
 		return "", errors.ErrTokenGeneration
 	}

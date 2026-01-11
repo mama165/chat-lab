@@ -14,6 +14,7 @@ type Config struct {
 	DeliveryTimeout      time.Duration `env:"DELIVERY_TIMEOUT,required=true"`
 	LatencyThreshold     time.Duration `env:"LATENCY_THRESHOLD,required=true"`
 	RestartInterval      time.Duration `env:"RESTART_INTERVAL,required=true"`
+	AuthTokenDuration    time.Duration `env:"AUTH_TOKEN_DURATION,required=true"`
 	BadgerFilepath       string        `env:"BADGER_FILEPATH,required=true"`
 	LogLevel             string        `env:"LOG_LEVEL,required=true"`
 	LowCapacityThreshold int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"chat-lab/auth"
 	"chat-lab/domain/event"
 	grpc2 "chat-lab/grpc"
-	v1 "chat-lab/proto/chat"
+	pb2 "chat-lab/proto/account"
+	pb "chat-lab/proto/chat"
 	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
@@ -11,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	grpc3 "github.com/mama165/sdk-go/grpc"
 	"net"
 	"os"
 	"os/signal"
@@ -97,10 +100,18 @@ func run() (int, error) {
 		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpc3.UnaryLoggingInterceptor(log),
+			auth.AuthInterceptor,
+		))
 	chatService := services.NewChatService(orchestrator)
-	server := grpc2.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
-	v1.RegisterChatServiceServer(s, server)
+	userRepository := repositories.NewUserRepository(db)
+	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
+	chatServer := grpc2.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
+	authServer := grpc2.NewAuthServer(authService)
+	pb.RegisterChatServiceServer(s, chatServer)
+	pb2.RegisterAuthServiceServer(s, authServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	errChan := make(chan error, 1)

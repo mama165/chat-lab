@@ -4,57 +4,59 @@ import (
 	"context"
 	"strings"
 
+	pb "chat-lab/proto/account"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
-// AuthInterceptor handles JWT validation for incoming gRPC calls
-func AuthInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	// 1. Skip authentication for Login and Register methods
+// Map of methods that do not require JWT authentication.
+// Using generated constants from the proto package for type-safety.
+var publicMethods = map[string]struct{}{
+	pb.AuthService_Login_FullMethodName:    {},
+	pb.AuthService_Register_FullMethodName: {},
+}
+
+// AuthInterceptor handles JWT validation for incoming gRPC calls.
+func AuthInterceptor(ctx context.Context, req any,
+	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	// 1. Skip authentication for public methods (Login/Register)
 	if isPublicMethod(info.FullMethod) {
 		return handler(ctx, req)
 	}
 
-	// 2. Extract metadata (headers)
+	// 2. Extract metadata (headers) from the incoming gRPC context
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "metadata is missing")
 	}
 
-	// 3. Get Authorization header
+	// 3. Retrieve and validate the Authorization header
 	values := md.Get("authorization")
 	if len(values) == 0 {
 		return nil, status.Error(codes.Unauthenticated, "authorization token is missing")
 	}
 
-	// Expecting "Bearer <token>"
+	// Expecting the standard "Bearer <token>" format
 	tokenStr := strings.TrimPrefix(values[0], "Bearer ")
 
-	// 4. Use ValidateToken to check the JWT
+	// 4. Validate the JWT and extract claims
 	claims, err := ValidateToken(tokenStr)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 	}
 
-	// 5. Inject user info into context for the service layer
+	// 5. Inject user identity into context for downstream service layers
 	newCtx := context.WithValue(ctx, "user_id", claims.UserID)
 	newCtx = context.WithValue(newCtx, "roles", claims.Roles)
 
+	// Continue the execution chain with the enriched context
 	return handler(newCtx, req)
 }
 
+// isPublicMethod checks if the current gRPC method is allowed without a token.
 func isPublicMethod(method string) bool {
-	// Methods that don't require a token
-	publicMethods := []string{
-		"/account.AuthService/Login",
-		"/account.AuthService/Register",
-	}
-	for _, m := range publicMethods {
-		if m == method {
-			return true
-		}
-	}
-	return false
+	_, ok := publicMethods[method]
+	return ok
 }
