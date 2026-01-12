@@ -40,6 +40,7 @@ func HashPassword(password string) (string, error) {
 }
 
 // ComparePassword compares a plain text password with a stored hash
+// ComparePassword compares a plain text password with a stored hash
 func ComparePassword(password, encodedHash string) (bool, error) {
 	// 1. Parse the encoded hash
 	parts := strings.Split(encodedHash, "$")
@@ -48,8 +49,16 @@ func ComparePassword(password, encodedHash string) (bool, error) {
 	}
 
 	var version, memory, iterations, parallelism int
-	fmt.Sscanf(parts[2], "v=%d", &version)
-	fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism)
+
+	// Check error for version parsing
+	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil {
+		return false, fmt.Errorf("invalid version format: %w", err)
+	}
+
+	// Check error for parameters parsing
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism); err != nil {
+		return false, fmt.Errorf("invalid parameters format: %w", err)
+	}
 
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {

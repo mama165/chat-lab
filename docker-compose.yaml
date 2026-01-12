@@ -1,86 +1,12 @@
 services:
-  db:
-    image: postgres:17-alpine
-    container_name: chat-lab-db
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=zitadel
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d zitadel -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+  ai-gen:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    image: chat-lab-ai-gen
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  #  Step 1. Init SQL Schemas
-  zitadel-init:
-    image: ghcr.io/zitadel/zitadel:latest
-    container_name: chat-lab-zitadel-init
-    command: init zitadel
+      - ./ai:/app
+    # Utilisation des variables passées par le Makefile
+    user: "${D_UID}:${D_GID}"
     environment:
-      - ZITADEL_DATABASE_POSTGRES_HOST=db
-      - ZITADEL_DATABASE_POSTGRES_PORT=5432
-      - ZITADEL_DATABASE_POSTGRES_DATABASE=zitadel
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME=postgres
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD=postgres
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE=disable
-      - ZITADEL_DATABASE_POSTGRES_USER_USERNAME=postgres
-      - ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=postgres
-      - ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable
-    depends_on:
-      db:
-        condition: service_healthy
-
-  # Step 2. Fill database with data about (Organization, Admin, etc.)
-  zitadel-setup:
-    image: ghcr.io/zitadel/zitadel:latest
-    container_name: chat-lab-zitadel-setup
-    command: setup --masterkey "MasterkeyNeedsToHave32Characters"
-    environment:
-      - ZITADEL_DATABASE_POSTGRES_HOST=db
-      - ZITADEL_DATABASE_POSTGRES_PORT=5432
-      - ZITADEL_DATABASE_POSTGRES_DATABASE=zitadel
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME=postgres
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD=postgres
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE=disable
-      - ZITADEL_DATABASE_POSTGRES_USER_USERNAME=postgres
-      - ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=postgres
-      - ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable
-      - ZITADEL_FIRSTINSTANCE_ORG_NAME=Chat-Lab
-      - ZITADEL_EXTERNALDOMAIN=localhost
-      - ZITADEL_EXTERNALSECURE=false
-      - ZITADEL_EXTERNALPORT=8080
-    depends_on:
-      zitadel-init:
-        condition: service_completed_successfully
-
-  # Step 3.  Launch chat server
-  zitadel:
-    image: ghcr.io/zitadel/zitadel:latest
-    container_name: chat-lab-zitadel-server
-    restart: unless-stopped
-    command: start --masterkey "MasterkeyNeedsToHave32Characters" --tlsMode disabled
-    environment:
-      - ZITADEL_DATABASE_POSTGRES_HOST=db
-      - ZITADEL_DATABASE_POSTGRES_PORT=5432
-      - ZITADEL_DATABASE_POSTGRES_DATABASE=zitadel
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME=postgres
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD=postgres
-      - ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE=disable
-      - ZITADEL_DATABASE_POSTGRES_USER_USERNAME=postgres
-      - ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=postgres
-      - ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable
-      - ZITADEL_EXTERNALDOMAIN=localhost
-      - ZITADEL_EXTERNALSECURE=false
-      - ZITADEL_EXTERNALPORT=8080
-      - ZITADEL_TLS_ENABLED=false
-    ports:
-      - "8080:8080"
-    depends_on:
-      zitadel-setup:
-        condition: service_completed_successfully
-
-volumes:
-  postgres_data:
+      - PYTHONUNBUFFERED=1

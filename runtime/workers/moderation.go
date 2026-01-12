@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"chat-lab/ai"
 	"chat-lab/domain/event"
 	"chat-lab/moderation"
 	"context"
@@ -48,6 +49,18 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 
 func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event {
 	sanitized, foundWords := w.moderator.Censor(evt.Content)
+	// 2. Modération par IA
+	isMalicious, score := ai.IsMalicious(evt.Content)
+
+	if isMalicious {
+		w.log.Warn("AI Detection: malveillance détectée",
+			"score", score,
+			"author", evt.Author)
+
+		// On ajoute un marqueur spécial pour tes statistiques futures
+		foundWords = append(foundWords, "AI_MALICIOUS_DETECTION")
+	}
+
 	return event.Event{
 		Type:      event.DomainType,
 		CreatedAt: time.Now().UTC(),

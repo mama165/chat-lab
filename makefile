@@ -3,6 +3,10 @@ GO       := go
 CONF     := cmd/chat.conf
 CMD      := ./cmd
 
+# On utilise des noms différents de UID/GID car ils sont souvent readonly
+D_UID := $(shell id -u)
+D_GID := $(shell id -g)
+
 # Chargement de la configuration
 ifneq ("$(wildcard $(CONF))","")
    include $(CONF)
@@ -16,15 +20,25 @@ DB_PATH ?= $(BADGER_FILEPATH)
 build:
 	$(GO) build -o $(APP_NAME) $(CMD)
 
-# Cible de nettoyage pour éviter les blocages de lock Badger
+# --- Intelligence Artificielle ---
+
+.PHONY: ai-gen
+ai-gen:
+	@echo "--- 🧠 Generating AI Model (Python Transpilation) ---"
+	@# On passe D_UID et D_GID au shell de docker-compose
+	D_UID=$(D_UID) D_GID=$(D_GID) docker-compose run --rm ai-gen
+
+# --- Base de données ---
+
 .PHONY: clean-db
 clean-db:
 	@echo "--- Checking for BadgerDB locks at $(DB_PATH) ---"
 	@rm -f $(DB_PATH)/LOCK
-	@# fuser -k permet de tuer les processus zombies qui retiendraient le fichier
 	@if [ -f "$(DB_PATH)/LOCK" ]; then \
-		fuser -k $(DB_PATH)/LOCK 2>/dev/null || true; \
-	fi
+       fuser -k $(DB_PATH)/LOCK 2>/dev/null || true; \
+    fi
+
+# --- Exécution ---
 
 .PHONY: run
 run: clean-db
@@ -37,3 +51,6 @@ debug: clean-db
 .PHONY: test
 test:
 	$(GO) test -v ./...
+
+.PHONY: all
+all: ai-gen test build
