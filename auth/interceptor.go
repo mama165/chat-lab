@@ -18,6 +18,13 @@ var publicMethods = map[string]struct{}{
 	pb.AuthService_Register_FullMethodName: {},
 }
 
+type contextKey string
+
+const (
+	userIDKey contextKey = "user_id"
+	rolesKey  contextKey = "roles"
+)
+
 // AuthInterceptor handles JWT validation for incoming gRPC calls.
 func AuthInterceptor(ctx context.Context, req any,
 	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -48,8 +55,8 @@ func AuthInterceptor(ctx context.Context, req any,
 	}
 
 	// 5. Inject user identity into context for downstream service layers
-	newCtx := context.WithValue(ctx, "user_id", claims.UserID)
-	newCtx = context.WithValue(newCtx, "roles", claims.Roles)
+	newCtx := context.WithValue(ctx, userIDKey, claims.UserID)
+	newCtx = context.WithValue(newCtx, rolesKey, claims.Roles)
 
 	// Continue the execution chain with the enriched context
 	return handler(newCtx, req)

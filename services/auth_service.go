@@ -20,10 +20,6 @@ type AuthService struct {
 
 type Token string
 
-func (t Token) string() string {
-	return string(t)
-}
-
 func NewAuthService(repo repositories.IUserRepository,
 	authTokenDuration time.Duration) IAuthService {
 	return &AuthService{

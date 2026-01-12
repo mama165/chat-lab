@@ -51,16 +51,19 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 		800,
 		500,
 	)
-
-	go o.Start(ctx)
+	go func() {
+		if err := o.Start(ctx); err != nil {
+			fmt.Printf("Orchestrator failed to start: %v\n", err)
+		}
+	}()
 	time.Sleep(100 * time.Millisecond) // Laisse le temps aux workers de démarrer
 
 	// 2. Variables de mesure
 	var successCount atomic.Uint64
 	var failureCount atomic.Uint64
 
-	numClients := 100        // 100 utilisateurs simultanés
-	messagesPerClient := 200 // qui envoient 200 messages chacun
+	numClients := 100
+	messagesPerClient := 200
 
 	start := time.Now()
 	var wg sync.WaitGroup

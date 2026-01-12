@@ -73,7 +73,6 @@ func (m MessageRepository) GetMessages(room int, cursor *string) ([]DiskMessage,
 		it := txn.NewIterator(options)
 		defer it.Close()
 
-		prefix = []byte(fmt.Sprintf("msg:%d:", room))
 		var seekKey []byte
 		switch cursor {
 		case nil:
