@@ -64,7 +64,7 @@ def train_and_export():
     df_healthy = df_raw[df_raw['label'] == 0].sample(n=min(target_sample, len(df_raw[df_raw['label']==0])), random_state=42)
 
     # We repeat priority data to give it more "weight" in the brain of the AI
-    df = pd.concat([df_toxic, df_healthy] + [priority_data]*100).sample(frac=1, random_state=42)
+    df = pd.concat([df_toxic, df_healthy] + [priority_data]*2000).sample(frac=1, random_state=42)
 
     print(f"--- 🧠 Training XGBoost on {len(df)} rows ---")
     X = manual_vectorizer(df['tweet'].values, size=1024)
@@ -72,9 +72,9 @@ def train_and_export():
 
     # XGBoost setup for m2cgen compatibility
     model = XGBClassifier(
-        n_estimators=80,      # Number of trees (balance between size and smarts)
-        max_depth=6,          # Depth of logic
-        learning_rate=0.1,
+        n_estimators=200,      # Number of trees (balance between size and smarts)
+        max_depth=12,          # Depth of logic
+        learning_rate=0.05,
         n_jobs=-1,             # Use all CPU cores for training
         base_score=0.5
     )

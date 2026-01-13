@@ -4,7 +4,7 @@ package ai
 // This MUST match the 'size' parameter in the Python training script.
 const (
 	VectorSize = 4096
-	Threshold  = 0.45
+	Threshold  = 0.35
 )
 
 // Analysis provides a central point for message moderation using AI.
