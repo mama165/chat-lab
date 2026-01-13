@@ -6,7 +6,6 @@ services:
     image: chat-lab-ai-gen
     volumes:
       - ./ai:/app
-    # Utilisation des variables passées par le Makefile
     user: "${D_UID}:${D_GID}"
     environment:
       - PYTHONUNBUFFERED=1

@@ -33,7 +33,7 @@ func (s *ChatService) GetMessages(cmd domain.GetMessageCommand) ([]domain.Messag
 func (s *ChatService) JoinRoom(userID string, roomID domain.RoomID, sink contract.EventSink) {
 	room := domain.NewRoom(roomID)
 	s.orchestrator.RegisterRoom(room)
-	s.orchestrator.RegisterParticipant(userID, domain.RoomID(roomID), sink)
+	s.orchestrator.RegisterParticipant(userID, roomID, sink)
 }
 
 func (s *ChatService) LeaveRoom(userID string, roomID domain.RoomID) {

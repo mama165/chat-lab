@@ -29,10 +29,11 @@ func (d DiskSink) Consume(_ context.Context, e event.DomainEvent) error {
 
 func toDiskMessage(event event.SanitizedMessage) repositories.DiskMessage {
 	return repositories.DiskMessage{
-		ID:      event.ID,
-		Room:    event.Room,
-		Author:  event.Author,
-		Content: event.Content,
-		At:      event.At,
+		ID:            event.ID,
+		Room:          event.Room,
+		Author:        event.Author,
+		Content:       event.Content,
+		At:            event.At,
+		ToxicityScore: event.ToxicityScore,
 	}
 }

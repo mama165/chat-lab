@@ -8,4 +8,5 @@ message Message {
   string author = 3;
   string content = 4;
   int64 at = 5;
+  double toxicity_score = 6;
 }

@@ -29,11 +29,12 @@ func NewMessageRepository(db *badger.DB, log *slog.Logger, limitMessages *int) M
 }
 
 type DiskMessage struct {
-	ID      uuid.UUID
-	Room    int
-	Author  string
-	Content string
-	At      time.Time
+	ID            uuid.UUID
+	Room          int
+	Author        string
+	Content       string
+	At            time.Time
+	ToxicityScore float64
 }
 
 // StoreMessage persists a message in BadgerDB.
@@ -127,11 +128,12 @@ func (m MessageRepository) GetMessages(room int, cursor *string) ([]DiskMessage,
 
 func fromDiskMessage(message DiskMessage) pb.Message {
 	return pb.Message{
-		Id:      message.ID.String(),
-		Room:    int64(message.Room),
-		Author:  message.Author,
-		Content: message.Content,
-		At:      message.At.UnixNano(),
+		Id:            message.ID.String(),
+		Room:          int64(message.Room),
+		Author:        message.Author,
+		Content:       message.Content,
+		At:            message.At.UnixNano(),
+		ToxicityScore: message.ToxicityScore,
 	}
 }
 
@@ -141,10 +143,11 @@ func toDiskMessage(messagePb *pb.Message) (DiskMessage, error) {
 		return DiskMessage{}, err
 	}
 	return DiskMessage{
-		ID:      parsedID,
-		Room:    int(messagePb.Room),
-		Author:  messagePb.Author,
-		Content: messagePb.Content,
-		At:      time.Unix(0, messagePb.At).UTC(),
+		ID:            parsedID,
+		Room:          int(messagePb.Room),
+		Author:        messagePb.Author,
+		Content:       messagePb.Content,
+		At:            time.Unix(0, messagePb.At).UTC(),
+		ToxicityScore: messagePb.ToxicityScore,
 	}, nil
 }

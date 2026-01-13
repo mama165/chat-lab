@@ -24,9 +24,9 @@ func Test_Record_And_Get_Sorted_Messages(t *testing.T) {
 	content := "this message will self destruct in 5 seconds"
 	at := time.Now().UTC()
 	diskMessages := []DiskMessage{
-		{uuid.New(), room, "Alice", content, at},
-		{uuid.New(), room, "Bob", content, at.Add(1 * time.Minute)},
-		{uuid.New(), room, "Clara", content, at.Add(2 * time.Minute)},
+		{uuid.New(), room, "Alice", content, at, 2.9},
+		{uuid.New(), room, "Bob", content, at.Add(1 * time.Minute), 3.4},
+		{uuid.New(), room, "Clara", content, at.Add(2 * time.Minute), 4.6},
 	}
 
 	sortedDiskMessages := make([]DiskMessage, len(diskMessages))
@@ -62,9 +62,9 @@ func Test_Record_Multiple_Message_And_Limit(t *testing.T) {
 	content := "this message will self destruct in 5 seconds"
 	at := time.Now().UTC()
 	diskMessages := []DiskMessage{
-		{uuid.New(), room, "Alice", content, at},
-		{uuid.New(), room, "Bob", content, at.Add(1 * time.Minute)},
-		{uuid.New(), room, "Clara", content, at.Add(2 * time.Minute)},
+		{uuid.New(), room, "Alice", content, at, 3.4},
+		{uuid.New(), room, "Bob", content, at.Add(1 * time.Minute), 3.4},
+		{uuid.New(), room, "Clara", content, at.Add(2 * time.Minute), 3.4},
 	}
 	for _, dm := range diskMessages {
 		err = repository.StoreMessage(dm)

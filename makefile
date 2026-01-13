@@ -20,6 +20,34 @@ DB_PATH ?= $(BADGER_FILEPATH)
 gbuild:
 	$(GO) build -ldflags="-s -w" -o $(APP_NAME) $(CMD)
 
+# --- Protobuf Generation ---
+
+# Variables
+PROTO_DIR = proto
+# Updated to Go 1.24 to support latest protoc-gen-go-grpc requirements
+BUILDER_IMAGE = golang:1.24-alpine
+
+.PHONY: proto-gen
+## proto-gen: Generate Go code using Go 1.24 environment
+proto-gen:
+	@echo "--- 🚀 Generating gRPC/Protobuf code with Go 1.24 ---"
+	@docker run --rm -v $(PWD):/src -w /src $(BUILDER_IMAGE) sh -c "\
+		apk add --no-cache protobuf-dev protoc && \
+		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+		protoc --proto_path=. \
+			--experimental_allow_proto3_optional \
+			--go_out=. --go_opt=paths=source_relative \
+			--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+			$(shell find $(PROTO_DIR) -name "*.proto")"
+	@echo "--- ✅ Generation completed ---"
+
+.PHONY: proto-clean
+## proto-clean: Remove all generated .pb.go files
+proto-clean:
+	@find . -name "*.pb.go" -delete
+	@echo "--- 🧹 Deleted all generated files ---"
+
 # --- Intelligence Artificielle ---
 
 .PHONY: ai-gen

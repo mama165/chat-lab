@@ -5,6 +5,7 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/moderation"
 	"context"
+	"github.com/abadojack/whatlanggo"
 	"log/slog"
 	"time"
 )
@@ -52,18 +53,20 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 }
 
 func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event {
+	info := whatlanggo.Detect(evt.Content)
+	langCode := info.Lang.Iso6391()
+
 	sanitized, foundWords := w.moderator.Censor(evt.Content)
 
-	start := time.Now()
-
-	score, isMalicious := w.analysis.CheckMessage(evt.Content)
-
 	// Lead time measurement
+	start := time.Now()
+	score, isMalicious := w.analysis.CheckMessage(evt.Content)
 	leadTime := time.Since(start)
 
 	if isMalicious {
 		w.log.Warn("AI Detection",
 			"score", score,
+			"lang", langCode,
 			"author", evt.Author,
 			"latency_us", leadTime.Microseconds())
 
