@@ -17,8 +17,8 @@ endif
 DB_PATH ?= $(BADGER_FILEPATH)
 
 .PHONY: build
-build:
-	$(GO) build -o $(APP_NAME) $(CMD)
+gbuild:
+	$(GO) build -ldflags="-s -w" -o $(APP_NAME) $(CMD)
 
 # --- Intelligence Artificielle ---
 
