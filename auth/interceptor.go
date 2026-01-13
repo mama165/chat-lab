@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	pb "chat-lab/proto/account"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -21,8 +22,8 @@ var publicMethods = map[string]struct{}{
 type contextKey string
 
 const (
-	userIDKey contextKey = "user_id"
-	rolesKey  contextKey = "roles"
+	UserIDKey contextKey = "user_id"
+	RolesKey  contextKey = "roles"
 )
 
 // AuthInterceptor handles JWT validation for incoming gRPC calls.
@@ -55,8 +56,8 @@ func AuthInterceptor(ctx context.Context, req any,
 	}
 
 	// 5. Inject user identity into context for downstream service layers
-	newCtx := context.WithValue(ctx, userIDKey, claims.UserID)
-	newCtx = context.WithValue(newCtx, rolesKey, claims.Roles)
+	newCtx := context.WithValue(ctx, UserIDKey, claims.UserID)
+	newCtx = context.WithValue(newCtx, RolesKey, claims.Roles)
 
 	// Continue the execution chain with the enriched context
 	return handler(newCtx, req)

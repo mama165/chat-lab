@@ -91,7 +91,7 @@ func TestAuthInterceptor(t *testing.T) {
 
 		// Verify the context was enriched with user information
 		resultCtx := resCtx.(context.Context)
-		req.Equal(userID, resultCtx.Value("user_id"))
-		req.Equal(roles, resultCtx.Value("roles"))
+		req.Equal(userID, resultCtx.Value(auth.UserIDKey))
+		req.Equal(roles, resultCtx.Value(auth.RolesKey))
 	})
 }
