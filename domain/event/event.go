@@ -74,6 +74,7 @@ type SanitizedMessage struct {
 	Content       string
 	CensoredWords []string
 	At            time.Time
+	ToxicityScore float64
 }
 
 func (m MessagePosted) RoomID() domain.RoomID {

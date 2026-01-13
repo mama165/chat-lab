@@ -5,28 +5,38 @@ import (
 	"strings"
 )
 
-// Features transforms a raw string into a fixed-size numerical vector.
-// It uses the "Hashing Trick" (Feature Hashing) to map words to vector indices,
-// ensuring a consistent input format for the model without storing a vocabulary.
-func Features(text string) []float64 {
-	const size = 1000
-	vec := make([]float64, size)
+// Vectorizer provides methods to transform text into numerical features.
+type Vectorizer struct {
+	size int
+}
 
-	// 1. Basic preprocessing: lowercasing and punctuation removal.
-	// This must remain strictly synchronized with the Python vectorizer logic.
-	t := strings.ToLower(text)
-	t = strings.ReplaceAll(t, "!", "")
-	t = strings.ReplaceAll(t, "?", "")
-	t = strings.ReplaceAll(t, ",", "")
+// NewVectorizer initializes a vectorizer with a fixed size.
+// This size must match the 'n_features' parameter in the Python script.
+func NewVectorizer(size int) *Vectorizer {
+	return &Vectorizer{size: size}
+}
+
+// Features transforms a raw string into a fixed-size numerical vector.
+// It uses the "Hashing Trick" (Feature Hashing) to map words to vector indices.
+// Features transforms a raw string into a fixed-size numerical vector.
+func (v *Vectorizer) Features(text string) []float64 {
+	vec := make([]float64, v.size)
+
+	// 1. Minimal preprocessing: Just lowercase.
+	// We KEEP punctuation because "f*ck" is a different signal than "fck".
+	// We KEEP numbers because "1diot" is different from "idiot".
+	cleanText := strings.ToLower(text)
 
 	// 2. Tokenization and hashing.
-	// Each word is hashed using FNV-1a to determine its index in the feature vector.
-	words := strings.Fields(t)
+	words := strings.Fields(cleanText)
 	for _, w := range words {
 		h := fnv.New32a()
 		h.Write([]byte(w))
-		idx := int(h.Sum32()) % size
-		vec[idx] += 1.0
+		idx := int(h.Sum32()) % v.size
+
+		// Binary feature (1.0 if present) or count.
+		// For short chat messages, 1.0 is often more robust.
+		vec[idx] = 1.0
 	}
 	return vec
 }

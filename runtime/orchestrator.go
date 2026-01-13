@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"chat-lab/ai"
 	"chat-lab/contract"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
@@ -205,7 +206,11 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 		return nil, err
 	}
 
-	return workers.NewModerationWorker(moderator, o.moderationChan, o.domainChan, o.log), nil
+	analyzer := ai.NewAnalysis()
+
+	o.log.Info("Loading AI analyzer", "vector size", ai.VectorSize)
+
+	return workers.NewModerationWorker(moderator, analyzer, o.moderationChan, o.domainChan, o.log), nil
 }
 
 // preparePipeline initializes the sinks and the fanout worker.

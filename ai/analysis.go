@@ -1,14 +1,44 @@
 package ai
 
-// IsMalicious analyzes the input text and determines if it should be flagged.
-// It encapsulates the feature extraction and the model prediction logic.
-func IsMalicious(text string) (bool, float64) {
-	// 1. Transform the raw string into a numerical feature vector
-	input := Features(text)
+// VectorSize defines the number of features the model expects.
+// This MUST match the 'size' parameter in the Python training script.
+const (
+	VectorSize = 4096
+	Threshold  = 0.45
+)
 
-	// 2. Call the generated prediction logic from model.go
-	score := PredictToxicity(input)
+// Analysis provides a central point for message moderation using AI.
+type Analysis struct {
+	vectorizer *Vectorizer
+}
 
-	// 3. Define the decision threshold (0.5 is the standard balance point)
-	return score > 0.5, score
+// NewAnalysis initializes the moderation system with a 4096-dimension vectorizer.
+func NewAnalysis() *Analysis {
+	return &Analysis{
+		vectorizer: NewVectorizer(VectorSize),
+	}
+}
+
+// CheckMessage analyzes the content and returns the toxicity score and a boolean flag.
+func (a *Analysis) CheckMessage(content string) (float64, bool) {
+	// 1. Transform raw text into a numerical slice ([]float64)
+	vec := a.vectorizer.Features(content)
+
+	// 2. PredictToxicity returns a []float64 (probabilities for each class).
+	// Typically: index 0 is "Sane", index 1 is "Toxic".
+	predictions := PredictToxicity(vec)
+
+	// 3. Extract the toxic score (index 1)
+	// We check the length first to avoid a panic, just in case.
+	var score float64
+	if len(predictions) > 1 {
+		score = predictions[1]
+	} else if len(predictions) == 1 {
+		score = predictions[0]
+	}
+
+	// 4. Robustness threshold.
+	isToxic := score > Threshold
+
+	return score, isToxic
 }

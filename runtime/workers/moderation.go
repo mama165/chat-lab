@@ -11,14 +11,18 @@ import (
 
 type ModerationWorker struct {
 	moderator      moderation.Moderator
+	analysis       *ai.Analysis
 	moderationChan chan event.Event
 	events         chan event.Event
 	log            *slog.Logger
 }
 
 func NewModerationWorker(moderator moderation.Moderator,
-	moderationChan, events chan event.Event, log *slog.Logger) *ModerationWorker {
-	return &ModerationWorker{moderator: moderator,
+	analysis *ai.Analysis, moderationChan,
+	events chan event.Event, log *slog.Logger) *ModerationWorker {
+	return &ModerationWorker{
+		moderator:      moderator,
+		analysis:       analysis,
 		moderationChan: moderationChan, events: events, log: log,
 	}
 }
@@ -49,15 +53,21 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 
 func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event {
 	sanitized, foundWords := w.moderator.Censor(evt.Content)
-	// 2. Modération par IA
-	isMalicious, score := ai.IsMalicious(evt.Content)
+
+	start := time.Now()
+
+	score, isMalicious := w.analysis.CheckMessage(evt.Content)
+
+	// Lead time measurement
+	leadTime := time.Since(start)
 
 	if isMalicious {
-		w.log.Warn("AI Detection: malveillance détectée",
+		w.log.Warn("AI Detection",
 			"score", score,
-			"author", evt.Author)
+			"author", evt.Author,
+			"latency_us", leadTime.Microseconds())
 
-		// On ajoute un marqueur spécial pour tes statistiques futures
+		// Keep track of AI detection for future statistics
 		foundWords = append(foundWords, "AI_MALICIOUS_DETECTION")
 	}
 
@@ -70,5 +80,6 @@ func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event 
 			Content:       sanitized,
 			CensoredWords: foundWords,
 			At:            evt.At,
+			ToxicityScore: score,
 		}}
 }
