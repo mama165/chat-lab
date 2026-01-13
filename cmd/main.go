@@ -13,13 +13,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	grpc3 "github.com/mama165/sdk-go/grpc"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	grpc3 "github.com/mama165/sdk-go/grpc"
 
 	"github.com/Netflix/go-env"
 	"github.com/dgraph-io/badger/v4"
@@ -76,10 +77,6 @@ func run() (int, error) {
 		options = options.WithLoggingLevel(badger.INFO)
 	}
 
-	if log.Enabled(ctx, slog.LevelDebug) {
-		options = badger.DefaultOptions(config.BadgerFilepath).
-			WithBypassLockGuard(true)
-	}
 	db, err := badger.Open(options)
 	if err != nil {
 		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
