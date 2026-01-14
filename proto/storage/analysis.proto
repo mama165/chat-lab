@@ -1,0 +1,13 @@
+syntax = "proto3";
+package message.proto;
+option go_package = "analysis/proto/pb-go;pb";
+import "google/protobuf/timestamp.proto";
+
+message Analysis {
+  string id = 1;
+  string message_id = 2;
+  string content = 3;
+  double score = 4;
+  google.protobuf.Timestamp at = 5;
+  string version = 6;
+}

@@ -22,6 +22,8 @@ type Config struct {
 	LogLevel             string        `env:"LOG_LEVEL,required=true"`
 	LowCapacityThreshold int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
 	MaxContentLength     int           `env:"MAX_CONTENT_LENGTH,required=true"`
+	MinScoring           float64       `env:"MIN_SCORING,required=true"`
+	MaxScoring           float64       `env:"MAX_SCORING,required=true"`
 	Host                 string        `env:"HOST,default=localhost"`
 	Port                 int           `env:"PORT,default=8080"`
 }

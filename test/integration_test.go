@@ -37,8 +37,10 @@ func Test_Scenario(t *testing.T) {
 	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
+	analysisRepository := repositories.NewAnalysisRepository(db, log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, messageRepository,
+		analysisRepository,
 		10, 1000, 3*time.Second,
 		500*time.Millisecond,
 		500*time.Millisecond,
@@ -46,6 +48,7 @@ func Test_Scenario(t *testing.T) {
 		'*',
 		500,
 		300,
+		0.4, 0.6,
 	)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockIMessageRepository(ctrl)

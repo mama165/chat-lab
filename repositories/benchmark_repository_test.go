@@ -3,8 +3,11 @@ package repositories
 import (
 	pb "chat-lab/proto/storage"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"log/slog"
 	"testing"
 	"time"
@@ -52,7 +55,7 @@ func Test_MessageHistory_Performance(t *testing.T) {
 			Room:    int64(roomID),
 			Author:  author,
 			Content: content,
-			At:      at.UnixNano(),
+			At:      timestamppb.New(at),
 		}
 		bytes, _ := proto.Marshal(&pbMsg)
 

@@ -9,6 +9,7 @@ package pb
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -27,7 +28,7 @@ type Message struct {
 	Room          int64                  `protobuf:"varint,2,opt,name=room,proto3" json:"room,omitempty"`
 	Author        string                 `protobuf:"bytes,3,opt,name=author,proto3" json:"author,omitempty"`
 	Content       string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
-	At            int64                  `protobuf:"varint,5,opt,name=at,proto3" json:"at,omitempty"`
+	At            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=at,proto3" json:"at,omitempty"`
 	ToxicityScore float64                `protobuf:"fixed64,6,opt,name=toxicity_score,json=toxicityScore,proto3" json:"toxicity_score,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -91,11 +92,11 @@ func (x *Message) GetContent() string {
 	return ""
 }
 
-func (x *Message) GetAt() int64 {
+func (x *Message) GetAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.At
 	}
-	return 0
+	return nil
 }
 
 func (x *Message) GetToxicityScore() float64 {
@@ -109,13 +110,13 @@ var File_proto_storage_message_proto protoreflect.FileDescriptor
 
 const file_proto_storage_message_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/storage/message.proto\x12\rmessage.proto\"\x96\x01\n" +
+	"\x1bproto/storage/message.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x01\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04room\x18\x02 \x01(\x03R\x04room\x12\x16\n" +
 	"\x06author\x18\x03 \x01(\tR\x06author\x12\x18\n" +
-	"\acontent\x18\x04 \x01(\tR\acontent\x12\x0e\n" +
-	"\x02at\x18\x05 \x01(\x03R\x02at\x12%\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12*\n" +
+	"\x02at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
 	"\x0etoxicity_score\x18\x06 \x01(\x01R\rtoxicityScoreB\x19Z\x17messages/proto/pb-go;pbb\x06proto3"
 
 var (
@@ -132,14 +133,16 @@ func file_proto_storage_message_proto_rawDescGZIP() []byte {
 
 var file_proto_storage_message_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_proto_storage_message_proto_goTypes = []any{
-	(*Message)(nil), // 0: message.proto.Message
+	(*Message)(nil),               // 0: message.proto.Message
+	(*timestamppb.Timestamp)(nil), // 1: google.protobuf.Timestamp
 }
 var file_proto_storage_message_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: message.proto.Message.at:type_name -> google.protobuf.Timestamp
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_proto_storage_message_proto_init() }

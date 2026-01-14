@@ -92,14 +92,17 @@ func run() (int, error) {
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, config.LimitMessages)
+	analysisRepository := repositories.NewAnalysisRepository(db, log)
 
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
+		analysisRepository,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		charReplacement,
 		config.LowCapacityThreshold,
 		config.MaxContentLength,
+		config.MinScoring, config.MaxScoring,
 	)
 
 	// 4. Context & Signals

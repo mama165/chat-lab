@@ -41,6 +41,7 @@ type Orchestrator struct {
 	domainChan           chan event.Event
 	telemetryChan        chan event.Event
 	messageRepository    repositories.IMessageRepository
+	analysisRepository   repositories.IAnalysisRepository
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
@@ -48,14 +49,18 @@ type Orchestrator struct {
 	charReplacement      rune
 	lowCapacityThreshold int
 	maxContentLength     int
+	minScoring           float64
+	maxScoring           float64
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository repositories.IMessageRepository,
+	analysisRepository repositories.IAnalysisRepository,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
-	lowCapacityThreshold, maxContentLength int) *Orchestrator {
+	lowCapacityThreshold, maxContentLength int,
+	minScoring, maxScoring float64) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
 		counter:              event.NewCounter(),
@@ -69,6 +74,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		moderationChan:       make(chan event.Event, bufferSize),
 		domainChan:           make(chan event.Event, bufferSize),
 		messageRepository:    messageRepository,
+		analysisRepository:   analysisRepository,
 		sinkTimeout:          sinkTimeout,
 		metricInterval:       metricInterval,
 		latencyThreshold:     latencyThreshold,
@@ -76,6 +82,8 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		charReplacement:      charReplacement,
 		lowCapacityThreshold: lowCapacityThreshold,
 		maxContentLength:     maxContentLength,
+		minScoring:           minScoring,
+		maxScoring:           maxScoring,
 	}
 }
 
@@ -209,6 +217,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 	analyzer := ai.NewAnalysis()
 
 	o.log.Info("Loading AI analyzer", "vector size", ai.VectorSize)
+	o.log.Info("AI ambiguous scoring between", "min", o.minScoring, "max", o.maxScoring)
 
 	return workers.NewModerationWorker(moderator, analyzer, o.moderationChan, o.domainChan, o.log), nil
 }
@@ -219,6 +228,7 @@ func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink)
 	newSinks := []contract.EventSink{
 		projection.NewTimeline(),
 		storage.NewDiskSink(o.messageRepository, o.log),
+		storage.NewAnalysisSink(o.analysisRepository, o.log, o.minScoring, o.maxScoring),
 	}
 
 	// We prepare the fanout with current permanent sinks + the new ones

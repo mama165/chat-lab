@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type IMessageRepository interface {
@@ -132,7 +133,7 @@ func fromDiskMessage(message DiskMessage) pb.Message {
 		Room:          int64(message.Room),
 		Author:        message.Author,
 		Content:       message.Content,
-		At:            message.At.UnixNano(),
+		At:            timestamppb.New(message.At),
 		ToxicityScore: message.ToxicityScore,
 	}
 }
@@ -147,7 +148,7 @@ func toDiskMessage(messagePb *pb.Message) (DiskMessage, error) {
 		Room:          int(messagePb.Room),
 		Author:        messagePb.Author,
 		Content:       messagePb.Content,
-		At:            time.Unix(0, messagePb.At).UTC(),
+		At:            messagePb.At.AsTime(),
 		ToxicityScore: messagePb.ToxicityScore,
 	}, nil
 }
