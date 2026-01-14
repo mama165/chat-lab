@@ -5,9 +5,10 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/moderation"
 	"context"
-	"github.com/abadojack/whatlanggo"
 	"log/slog"
 	"time"
+
+	"github.com/abadojack/whatlanggo"
 )
 
 type ModerationWorker struct {
