@@ -17,7 +17,18 @@ type SpecialistRequest struct {
 type SpecialistResponse struct {
 	Score            float64
 	Label            string
-	version          string
+	Version          string
 	ProcessingTimeMs int
 	Status           string
+}
+
+type SpecialistConfig struct {
+	ID      SpecialistID
+	BinPath string
+	Host    string
+	Port    int
+}
+
+type AppConfig struct {
+	Specialists []SpecialistConfig
 }

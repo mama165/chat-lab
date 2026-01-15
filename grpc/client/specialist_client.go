@@ -4,28 +4,32 @@ import (
 	"chat-lab/domain"
 	pb "chat-lab/proto/analysis"
 	"context"
-
-	"google.golang.org/grpc"
+	"os"
+	"time"
 )
 
 type SpecialistClient struct {
-	Id     domain.SpecialistID
-	client pb.SpecialistServiceClient
+	Id         domain.SpecialistID
+	Client     pb.SpecialistServiceClient
+	Process    *os.Process
+	Port       int
+	LastHealth time.Time
 }
 
-type SpecialistGrpcClient struct {
-	address string
-}
-
-func NewSpecialistClient(id domain.SpecialistID, conn *grpc.ClientConn) *SpecialistClient {
-	client := pb.NewSpecialistServiceClient(conn)
-	return &SpecialistClient{Id: id, client: client}
+func NewSpecialistClient(id domain.SpecialistID,
+	client pb.SpecialistServiceClient,
+	process *os.Process, port int, lastHealth time.Time,
+) *SpecialistClient {
+	return &SpecialistClient{
+		Id: id, Client: client, Process: process, Port: port,
+		LastHealth: lastHealth,
+	}
 }
 
 // Analyze sends the message content to the specialized binary via gRPC.
 // It returns a score-based verdict used for moderation or business statistics.
 func (s *SpecialistClient) Analyze(ctx context.Context, request domain.SpecialistRequest) (domain.SpecialistResponse, error) {
-	response, err := s.client.Analyze(ctx, &pb.SpecialistRequest{
+	response, err := s.Client.Analyze(ctx, &pb.SpecialistRequest{
 		MessageId: request.MessageID,
 		Content:   request.Content,
 		Tags:      request.Tags,
