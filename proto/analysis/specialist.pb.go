@@ -22,7 +22,7 @@ const (
 )
 
 // Data sent by the Master binary (Chat-Lab)
-type AnalysisRequest struct {
+type SpecialistRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MessageId     string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`                                                // Unique identifier for BadgerDB correlation
 	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`                                                                     // Raw text to be processed by the model
@@ -31,20 +31,20 @@ type AnalysisRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AnalysisRequest) Reset() {
-	*x = AnalysisRequest{}
+func (x *SpecialistRequest) Reset() {
+	*x = SpecialistRequest{}
 	mi := &file_proto_analysis_specialist_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AnalysisRequest) String() string {
+func (x *SpecialistRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AnalysisRequest) ProtoMessage() {}
+func (*SpecialistRequest) ProtoMessage() {}
 
-func (x *AnalysisRequest) ProtoReflect() protoreflect.Message {
+func (x *SpecialistRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_analysis_specialist_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,26 +56,26 @@ func (x *AnalysisRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AnalysisRequest.ProtoReflect.Descriptor instead.
-func (*AnalysisRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SpecialistRequest.ProtoReflect.Descriptor instead.
+func (*SpecialistRequest) Descriptor() ([]byte, []int) {
 	return file_proto_analysis_specialist_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *AnalysisRequest) GetMessageId() string {
+func (x *SpecialistRequest) GetMessageId() string {
 	if x != nil {
 		return x.MessageId
 	}
 	return ""
 }
 
-func (x *AnalysisRequest) GetContent() string {
+func (x *SpecialistRequest) GetContent() string {
 	if x != nil {
 		return x.Content
 	}
 	return ""
 }
 
-func (x *AnalysisRequest) GetTags() map[string]string {
+func (x *SpecialistRequest) GetTags() map[string]string {
 	if x != nil {
 		return x.Tags
 	}
@@ -83,9 +83,9 @@ func (x *AnalysisRequest) GetTags() map[string]string {
 }
 
 // Response from the Specialist binary (m2cgen transpiled code)
-type AnalysisResponse struct {
+type SpecialistResponse struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
-	Score        float32                `protobuf:"fixed32,1,opt,name=score,proto3" json:"score,omitempty"`                                 // Probability score between 0.0 and 1.0
+	Score        float64                `protobuf:"fixed64,1,opt,name=score,proto3" json:"score,omitempty"`                                 // Probability score between 0.0 and 1.0
 	Label        string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`                                   // Human-readable verdict (e.g., "SPAM", "TOXIC")
 	ModelVersion string                 `protobuf:"bytes,3,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"` // Identifier for the specific model version used
 	// Performance metrics for Lead Time monitoring
@@ -96,20 +96,20 @@ type AnalysisResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AnalysisResponse) Reset() {
-	*x = AnalysisResponse{}
+func (x *SpecialistResponse) Reset() {
+	*x = SpecialistResponse{}
 	mi := &file_proto_analysis_specialist_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AnalysisResponse) String() string {
+func (x *SpecialistResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AnalysisResponse) ProtoMessage() {}
+func (*SpecialistResponse) ProtoMessage() {}
 
-func (x *AnalysisResponse) ProtoReflect() protoreflect.Message {
+func (x *SpecialistResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_analysis_specialist_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -121,40 +121,40 @@ func (x *AnalysisResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AnalysisResponse.ProtoReflect.Descriptor instead.
-func (*AnalysisResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SpecialistResponse.ProtoReflect.Descriptor instead.
+func (*SpecialistResponse) Descriptor() ([]byte, []int) {
 	return file_proto_analysis_specialist_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *AnalysisResponse) GetScore() float32 {
+func (x *SpecialistResponse) GetScore() float64 {
 	if x != nil {
 		return x.Score
 	}
 	return 0
 }
 
-func (x *AnalysisResponse) GetLabel() string {
+func (x *SpecialistResponse) GetLabel() string {
 	if x != nil {
 		return x.Label
 	}
 	return ""
 }
 
-func (x *AnalysisResponse) GetModelVersion() string {
+func (x *SpecialistResponse) GetModelVersion() string {
 	if x != nil {
 		return x.ModelVersion
 	}
 	return ""
 }
 
-func (x *AnalysisResponse) GetProcessTimeMs() int64 {
+func (x *SpecialistResponse) GetProcessTimeMs() int64 {
 	if x != nil {
 		return x.ProcessTimeMs
 	}
 	return 0
 }
 
-func (x *AnalysisResponse) GetStatus() string {
+func (x *SpecialistResponse) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
@@ -166,23 +166,23 @@ var File_proto_analysis_specialist_proto protoreflect.FileDescriptor
 const file_proto_analysis_specialist_proto_rawDesc = "" +
 	"\n" +
 	"\x1fproto/analysis/specialist.proto\x12\n" +
-	"specialist\"\xbe\x01\n" +
-	"\x0fAnalysisRequest\x12\x1d\n" +
+	"specialist\"\xc2\x01\n" +
+	"\x11SpecialistRequest\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\x129\n" +
-	"\x04tags\x18\x03 \x03(\v2%.specialist.AnalysisRequest.TagsEntryR\x04tags\x1a7\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x12;\n" +
+	"\x04tags\x18\x03 \x03(\v2'.specialist.SpecialistRequest.TagsEntryR\x04tags\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x01\n" +
-	"\x10AnalysisResponse\x12\x14\n" +
-	"\x05score\x18\x01 \x01(\x02R\x05score\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa5\x01\n" +
+	"\x12SpecialistResponse\x12\x14\n" +
+	"\x05score\x18\x01 \x01(\x01R\x05score\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12#\n" +
 	"\rmodel_version\x18\x03 \x01(\tR\fmodelVersion\x12&\n" +
 	"\x0fprocess_time_ms\x18\x04 \x01(\x03R\rprocessTimeMs\x12\x16\n" +
-	"\x06status\x18\x05 \x01(\tR\x06status2Y\n" +
-	"\x11SpecialistService\x12D\n" +
-	"\aAnalyze\x12\x1b.specialist.AnalysisRequest\x1a\x1c.specialist.AnalysisResponseB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
+	"\x06status\x18\x05 \x01(\tR\x06status2]\n" +
+	"\x11SpecialistService\x12H\n" +
+	"\aAnalyze\x12\x1d.specialist.SpecialistRequest\x1a\x1e.specialist.SpecialistResponseB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
 
 var (
 	file_proto_analysis_specialist_proto_rawDescOnce sync.Once
@@ -198,14 +198,14 @@ func file_proto_analysis_specialist_proto_rawDescGZIP() []byte {
 
 var file_proto_analysis_specialist_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_proto_analysis_specialist_proto_goTypes = []any{
-	(*AnalysisRequest)(nil),  // 0: specialist.AnalysisRequest
-	(*AnalysisResponse)(nil), // 1: specialist.AnalysisResponse
-	nil,                      // 2: specialist.AnalysisRequest.TagsEntry
+	(*SpecialistRequest)(nil),  // 0: specialist.SpecialistRequest
+	(*SpecialistResponse)(nil), // 1: specialist.SpecialistResponse
+	nil,                        // 2: specialist.SpecialistRequest.TagsEntry
 }
 var file_proto_analysis_specialist_proto_depIdxs = []int32{
-	2, // 0: specialist.AnalysisRequest.tags:type_name -> specialist.AnalysisRequest.TagsEntry
-	0, // 1: specialist.SpecialistService.Analyze:input_type -> specialist.AnalysisRequest
-	1, // 2: specialist.SpecialistService.Analyze:output_type -> specialist.AnalysisResponse
+	2, // 0: specialist.SpecialistRequest.tags:type_name -> specialist.SpecialistRequest.TagsEntry
+	0, // 1: specialist.SpecialistService.Analyze:input_type -> specialist.SpecialistRequest
+	1, // 2: specialist.SpecialistService.Analyze:output_type -> specialist.SpecialistResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

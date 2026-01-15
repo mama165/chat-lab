@@ -29,7 +29,7 @@ const (
 // Universal service for all specialized detectors (Toxicity, Business, etc.)
 type SpecialistServiceClient interface {
 	// Analyzes message content and returns a score-based verdict
-	Analyze(ctx context.Context, in *AnalysisRequest, opts ...grpc.CallOption) (*AnalysisResponse, error)
+	Analyze(ctx context.Context, in *SpecialistRequest, opts ...grpc.CallOption) (*SpecialistResponse, error)
 }
 
 type specialistServiceClient struct {
@@ -40,9 +40,9 @@ func NewSpecialistServiceClient(cc grpc.ClientConnInterface) SpecialistServiceCl
 	return &specialistServiceClient{cc}
 }
 
-func (c *specialistServiceClient) Analyze(ctx context.Context, in *AnalysisRequest, opts ...grpc.CallOption) (*AnalysisResponse, error) {
+func (c *specialistServiceClient) Analyze(ctx context.Context, in *SpecialistRequest, opts ...grpc.CallOption) (*SpecialistResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AnalysisResponse)
+	out := new(SpecialistResponse)
 	err := c.cc.Invoke(ctx, SpecialistService_Analyze_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (c *specialistServiceClient) Analyze(ctx context.Context, in *AnalysisReque
 // Universal service for all specialized detectors (Toxicity, Business, etc.)
 type SpecialistServiceServer interface {
 	// Analyzes message content and returns a score-based verdict
-	Analyze(context.Context, *AnalysisRequest) (*AnalysisResponse, error)
+	Analyze(context.Context, *SpecialistRequest) (*SpecialistResponse, error)
 	mustEmbedUnimplementedSpecialistServiceServer()
 }
 
@@ -68,7 +68,7 @@ type SpecialistServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSpecialistServiceServer struct{}
 
-func (UnimplementedSpecialistServiceServer) Analyze(context.Context, *AnalysisRequest) (*AnalysisResponse, error) {
+func (UnimplementedSpecialistServiceServer) Analyze(context.Context, *SpecialistRequest) (*SpecialistResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Analyze not implemented")
 }
 func (UnimplementedSpecialistServiceServer) mustEmbedUnimplementedSpecialistServiceServer() {}
@@ -93,7 +93,7 @@ func RegisterSpecialistServiceServer(s grpc.ServiceRegistrar, srv SpecialistServ
 }
 
 func _SpecialistService_Analyze_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AnalysisRequest)
+	in := new(SpecialistRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func _SpecialistService_Analyze_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: SpecialistService_Analyze_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SpecialistServiceServer).Analyze(ctx, req.(*AnalysisRequest))
+		return srv.(SpecialistServiceServer).Analyze(ctx, req.(*SpecialistRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

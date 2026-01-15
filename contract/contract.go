@@ -2,6 +2,7 @@
 package contract
 
 import (
+	"chat-lab/ai"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"context"
@@ -54,4 +55,12 @@ type IOrchestrator interface {
 	UnregisterParticipant(pID string, roomID domain.RoomID)
 	Start(ctx context.Context) error
 	Stop()
+}
+
+// ISpecialistClient defines the contract for interacting with specialized
+// analysis processes (Toxicity, Sentiment, Business).
+// This abstraction allows the Orchestrator to remain agnostic of the
+// underlying communication protocol (gRPC, HTTP, or local).
+type ISpecialistClient interface {
+	Analyze(ctx context.Context, request ai.SpecialistRequest) (ai.SpecialistResponse, error)
 }
