@@ -1,4 +1,12 @@
-package ai
+package domain
+
+type SpecialistID string
+
+const (
+	TOXICITY  SpecialistID = "Toxicity"
+	SENTIMENT SpecialistID = "Sentiment"
+	BUSINESS  SpecialistID = "Business"
+)
 
 type SpecialistRequest struct {
 	MessageID string

@@ -2,7 +2,6 @@
 package contract
 
 import (
-	"chat-lab/ai"
 	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"context"
@@ -62,5 +61,5 @@ type IOrchestrator interface {
 // This abstraction allows the Orchestrator to remain agnostic of the
 // underlying communication protocol (gRPC, HTTP, or local).
 type ISpecialistClient interface {
-	Analyze(ctx context.Context, request ai.SpecialistRequest) (ai.SpecialistResponse, error)
+	Analyze(ctx context.Context, request domain.SpecialistRequest) (domain.SpecialistResponse, error)
 }
