@@ -30,7 +30,7 @@ type Config struct {
 	ToxicityBinPath           string        `env:"TOXICITY_BIN_PATH"`
 	ToxicityPort              int           `env:"TOXICITY_PORT"`
 	SentimentBinPath          string        `env:"SENTIMENT_BIN_PATH"`
-	SentimentPort             int           `env:"vSENTIMENT_PORT"`
+	SentimentPort             int           `env:"SENTIMENT_PORT"`
 }
 
 func (c Config) CharacterRune() (rune, error) {
