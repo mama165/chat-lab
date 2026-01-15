@@ -1,6 +1,7 @@
-package auth
+package server
 
 import (
+	"chat-lab/auth"
 	"context"
 	"strings"
 
@@ -50,7 +51,7 @@ func AuthInterceptor(ctx context.Context, req any,
 	tokenStr := strings.TrimPrefix(values[0], "Bearer ")
 
 	// 4. Validate the JWT and extract claims
-	claims, err := ValidateToken(tokenStr)
+	claims, err := auth.ValidateToken(tokenStr)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 	}

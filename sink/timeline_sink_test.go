@@ -1,11 +1,12 @@
-package projection
+package sink
 
 import (
 	"chat-lab/domain/event"
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTimeline_Consume_MessagePosted(t *testing.T) {

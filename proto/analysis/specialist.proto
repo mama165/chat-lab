@@ -22,10 +22,8 @@ message AnalysisResponse {
   float score = 1;            // Probability score between 0.0 and 1.0
   string label = 2;           // Human-readable verdict (e.g., "SPAM", "TOXIC")
   string model_version = 3;   // Identifier for the specific model version used
-
   // Performance metrics for Lead Time monitoring
   int64 process_time_ms = 4;  // Internal execution time in milliseconds
-
   // Health and status tracking
   string status = 5;          // Status message (e.g., "OK", "ERROR_INFERENCE")
 }

@@ -9,10 +9,9 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/errors"
 	"chat-lab/moderation"
-	"chat-lab/projection"
 	"chat-lab/repositories"
-	"chat-lab/repositories/storage"
 	"chat-lab/runtime/workers"
+	"chat-lab/sink"
 	"context"
 	"embed"
 	"fmt"
@@ -226,9 +225,9 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink) {
 	// Local sinks that will be added to permanentSinks
 	newSinks := []contract.EventSink{
-		projection.NewTimeline(),
-		storage.NewDiskSink(o.messageRepository, o.log),
-		storage.NewAnalysisSink(o.analysisRepository, o.log, o.minScoring, o.maxScoring),
+		sink.NewTimeline(),
+		sink.NewDiskSink(o.messageRepository, o.log),
+		sink.NewAnalysisSink(o.analysisRepository, o.log, o.minScoring, o.maxScoring),
 	}
 
 	// We prepare the fanout with current permanent sinks + the new ones

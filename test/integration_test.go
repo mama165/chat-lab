@@ -5,9 +5,9 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"chat-lab/repositories"
-	"chat-lab/repositories/storage"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
+	"chat-lab/sink"
 	"context"
 	"log/slog"
 	"testing"
@@ -62,7 +62,7 @@ func Test_Scenario(t *testing.T) {
 
 	mockTimelineSink := mocks.NewMockEventSink(ctrl)
 	mockTimelineSink.EXPECT().Consume(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	diskSink := storage.NewDiskSink(mockMessageRepository, log)
+	diskSink := sink.NewDiskSink(mockMessageRepository, log)
 	orchestrator.Add(mockTimelineSink, diskSink)
 
 	id := 1

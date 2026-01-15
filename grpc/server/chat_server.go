@@ -1,4 +1,4 @@
-package grpc
+package server
 
 import (
 	"chat-lab/domain"
@@ -6,6 +6,7 @@ import (
 	"chat-lab/errors"
 	pb "chat-lab/proto/chat"
 	"chat-lab/services"
+	"chat-lab/sink"
 	"context"
 	"fmt"
 	"log/slog"
@@ -79,7 +80,7 @@ func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest
 // This method blocks until the client disconnects or a network error occurs.
 // Proper cleanup is ensured via deferred unregistration to prevent memory leaks in the registry.
 func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_ConnectServer) error {
-	sink := NewGrpcSink(s.log, s.connectionBufferSize, s.deliveryTimeout)
+	sink := sink.NewGrpcSink(s.log, s.connectionBufferSize, s.deliveryTimeout)
 	userID := uuid.NewString() // TODO To be extracted from metadata
 	roomID := domain.RoomID(req.RoomId)
 	s.chatService.JoinRoom(userID, roomID, sink)
@@ -90,7 +91,7 @@ func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_Conne
 		case <-stream.Context().Done():
 			s.log.Warn(fmt.Sprintf("Client %s disconnected from %d", userID, roomID))
 			return nil
-		case evt := <-sink.connectedUserEvent:
+		case evt := <-sink.ConnectedUserEvent:
 			switch e := evt.(type) {
 			case event.SanitizedMessage:
 				if err := stream.Send(lo.ToPtr(toChatEvent(e))); err != nil {

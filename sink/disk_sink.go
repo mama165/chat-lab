@@ -1,4 +1,4 @@
-package storage
+package sink
 
 import (
 	"chat-lab/domain/event"

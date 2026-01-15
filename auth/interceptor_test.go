@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"chat-lab/auth"
+	"chat-lab/grpc/server"
 	pb "chat-lab/proto/account"
 	pb2 "chat-lab/proto/chat"
 	"context"
@@ -29,7 +30,7 @@ func TestAuthInterceptor(t *testing.T) {
 			FullMethod: pb.AuthService_Login_FullMethodName,
 		}
 
-		resCtx, err := auth.AuthInterceptor(ctx, nil, info, dummyHandler)
+		resCtx, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
 
 		req.NoError(err)
 		req.NotNil(resCtx)
@@ -42,7 +43,7 @@ func TestAuthInterceptor(t *testing.T) {
 			FullMethod: pb2.ChatService_PostMessage_FullMethodName,
 		}
 
-		_, err := auth.AuthInterceptor(ctx, nil, info, dummyHandler)
+		_, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
 
 		req.Error(err)
 		st, ok := status.FromError(err)
@@ -60,7 +61,7 @@ func TestAuthInterceptor(t *testing.T) {
 			FullMethod: pb2.ChatService_PostMessage_FullMethodName,
 		}
 
-		_, err := auth.AuthInterceptor(ctx, nil, info, dummyHandler)
+		_, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
 
 		req.Error(err)
 		req.Contains(err.Error(), "invalid or expired token")
@@ -84,14 +85,14 @@ func TestAuthInterceptor(t *testing.T) {
 		}
 
 		// 3. Call the interceptor
-		resCtx, err := auth.AuthInterceptor(ctx, nil, info, dummyHandler)
+		resCtx, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
 
 		// 4. Assertions
 		req.NoError(err)
 
 		// Verify the context was enriched with user information
 		resultCtx := resCtx.(context.Context)
-		req.Equal(userID, resultCtx.Value(auth.UserIDKey))
-		req.Equal(roles, resultCtx.Value(auth.RolesKey))
+		req.Equal(userID, resultCtx.Value(server.UserIDKey))
+		req.Equal(roles, resultCtx.Value(server.RolesKey))
 	})
 }

@@ -1,9 +1,8 @@
 package main
 
 import (
-	"chat-lab/auth"
 	"chat-lab/domain/event"
-	grpc2 "chat-lab/grpc"
+	"chat-lab/grpc/server"
 	pb2 "chat-lab/proto/account"
 	pb "chat-lab/proto/chat"
 	"chat-lab/repositories"
@@ -131,13 +130,13 @@ func run() (int, error) {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc3.UnaryLoggingInterceptor(log),
-			auth.AuthInterceptor,
+			server.AuthInterceptor,
 		))
 	chatService := services.NewChatService(orchestrator)
 	userRepository := repositories.NewUserRepository(db)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
-	chatServer := grpc2.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
-	authServer := grpc2.NewAuthServer(authService)
+	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
+	authServer := server.NewAuthServer(authService)
 	pb.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
 

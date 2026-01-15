@@ -1,4 +1,4 @@
-package grpc
+package sink
 
 import (
 	"chat-lab/domain/event"
@@ -9,13 +9,13 @@ import (
 
 type Sink struct {
 	log                *slog.Logger
-	connectedUserEvent chan event.DomainEvent
+	ConnectedUserEvent chan event.DomainEvent
 	deliveryTimeout    time.Duration
 }
 
 func NewGrpcSink(log *slog.Logger, bufferSize int, deliveryTimeout time.Duration) *Sink {
 	return &Sink{
-		connectedUserEvent: make(chan event.DomainEvent, bufferSize),
+		ConnectedUserEvent: make(chan event.DomainEvent, bufferSize),
 		log:                log,
 		deliveryTimeout:    deliveryTimeout,
 	}
@@ -34,7 +34,7 @@ func (s *Sink) Consume(ctx context.Context, e event.DomainEvent) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case s.connectedUserEvent <- e:
+	case s.ConnectedUserEvent <- e:
 		return nil
 	case <-t.C:
 		s.log.Warn("sink overflow: dropping event to preserve system stability",
