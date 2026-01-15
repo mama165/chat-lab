@@ -7,6 +7,7 @@ import (
 	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
+	"chat-lab/specialist"
 	"context"
 	"fmt"
 	"log/slog"
@@ -39,10 +40,13 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	supervisor := workers.NewSupervisor(log, telemetryChan, 100*time.Millisecond)
 	registry := runtime.NewRegistry()
 
+	manager := specialist.NewManager(log)
+
 	// Orchestrator avec un buffer de 1000 et une latence de backpressure courte
 	o := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, mockMessageRepo,
 		mockAnalysisRepository,
+		manager,
 		2,                    // numWorkers (on monte à 50 pour encaisser)
 		1000,                 // bufferSize
 		100*time.Millisecond, // sinkTimeout

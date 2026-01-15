@@ -12,6 +12,7 @@ import (
 	"chat-lab/repositories"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
+	"chat-lab/specialist"
 	"context"
 	"embed"
 	"fmt"
@@ -41,6 +42,7 @@ type Orchestrator struct {
 	telemetryChan        chan event.Event
 	messageRepository    repositories.IMessageRepository
 	analysisRepository   repositories.IAnalysisRepository
+	manager              *specialist.Manager
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
@@ -56,6 +58,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository repositories.IMessageRepository,
 	analysisRepository repositories.IAnalysisRepository,
+	specialistManager *specialist.Manager,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,
@@ -74,6 +77,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		domainChan:           make(chan event.Event, bufferSize),
 		messageRepository:    messageRepository,
 		analysisRepository:   analysisRepository,
+		manager:              specialistManager,
 		sinkTimeout:          sinkTimeout,
 		metricInterval:       metricInterval,
 		latencyThreshold:     latencyThreshold,

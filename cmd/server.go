@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/grpc/server"
 	pb2 "chat-lab/proto/account"
@@ -9,6 +10,7 @@ import (
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/services"
+	"chat-lab/specialist"
 	"context"
 	"errors"
 	"fmt"
@@ -66,15 +68,7 @@ func run() (int, error) {
 	ctx := context.Background()
 
 	// 2. Database (BadgerDB)
-	options := badger.DefaultOptions(config.BadgerFilepath)
-
-	switch log.Enabled(ctx, slog.LevelDebug) {
-	case true:
-		options = options.WithLoggingLevel(badger.DEBUG).
-			WithBypassLockGuard(true)
-	case false:
-		options = options.WithLoggingLevel(badger.INFO)
-	}
+	options := buildBadgerOpts(config, log, ctx)
 
 	db, err := badger.Open(options)
 	if err != nil {
@@ -86,6 +80,26 @@ func run() (int, error) {
 		_ = db.Close()
 	}()
 
+	// 2.bis Sidecar Specialists Initialization
+	// We launch the specialized binaries (Toxicity, Sentiment, Business...) before the engine starts.
+	// This ensures the Orchestrator has all its analysis "organs" ready.
+	// We use a dedicated timeout to prevent the Master from hanging if a binary
+	// fails to load its resources (like ML models) or if a port is already in use.
+	specialistConfigs := []domain.SpecialistConfig{
+		{ID: "toxicity", BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
+		{ID: "sentiment", BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
+	}
+
+	specialistManager := specialist.NewManager(log)
+
+	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
+	defer cancelBoot()
+
+	log.Info("Launching sidecar specialists...")
+	if err := specialistManager.Init(bootCtx, specialistConfigs); err != nil {
+		return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
+	}
+
 	// 3. Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
@@ -96,6 +110,7 @@ func run() (int, error) {
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
 		analysisRepository,
+		specialistManager,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		charReplacement,
@@ -165,4 +180,17 @@ func run() (int, error) {
 	log.Info("Program stopped cleanly")
 
 	return exitOK, nil
+}
+
+func buildBadgerOpts(config Config, log *slog.Logger, ctx context.Context) badger.Options {
+	options := badger.DefaultOptions(config.BadgerFilepath)
+
+	if log.Enabled(ctx, slog.LevelDebug) {
+		options = options.WithLoggingLevel(badger.DEBUG).
+			WithBypassLockGuard(true)
+	} else {
+		options = options.WithLoggingLevel(badger.INFO)
+	}
+
+	return options
 }

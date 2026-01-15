@@ -8,6 +8,7 @@ import (
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
+	"chat-lab/specialist"
 	"context"
 	"log/slog"
 	"testing"
@@ -38,9 +39,11 @@ func Test_Scenario(t *testing.T) {
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
 	analysisRepository := repositories.NewAnalysisRepository(db, log)
+	manager := specialist.NewManager(log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, messageRepository,
 		analysisRepository,
+		manager,
 		10, 1000, 3*time.Second,
 		500*time.Millisecond,
 		500*time.Millisecond,
