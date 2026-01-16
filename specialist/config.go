@@ -7,14 +7,15 @@ import (
 	pb "chat-lab/proto/analysis"
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"os/exec"
 	"strconv"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // StartSpecialist orchestrates the full lifecycle of a sidecar process.
