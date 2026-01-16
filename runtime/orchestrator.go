@@ -217,12 +217,10 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 		return nil, err
 	}
 
-	analyzer := ai.NewAnalysis()
-
 	o.log.Info("Loading AI analyzer", "vector size", ai.VectorSize)
 	o.log.Info("AI ambiguous scoring between", "min", o.minScoring, "max", o.maxScoring)
 
-	return workers.NewModerationWorker(moderator, analyzer, o.moderationChan, o.domainChan, o.log), nil
+	return workers.NewModerationWorker(moderator, o.manager, o.moderationChan, o.domainChan, o.log), nil
 }
 
 // preparePipeline initializes the sinks and the fanout worker.

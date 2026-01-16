@@ -1,11 +1,13 @@
 package workers
 
 import (
-	"chat-lab/ai"
+	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/moderation"
+	"chat-lab/specialist"
 	"context"
 	"log/slog"
+	"math/rand"
 	"time"
 
 	"github.com/abadojack/whatlanggo"
@@ -13,18 +15,19 @@ import (
 
 type ModerationWorker struct {
 	moderator      moderation.Moderator
-	analysis       *ai.Analysis
+	manager        *specialist.Manager
 	moderationChan chan event.Event
 	events         chan event.Event
 	log            *slog.Logger
 }
 
 func NewModerationWorker(moderator moderation.Moderator,
-	analysis *ai.Analysis, moderationChan,
+	manager *specialist.Manager,
+	moderationChan,
 	events chan event.Event, log *slog.Logger) *ModerationWorker {
 	return &ModerationWorker{
 		moderator:      moderator,
-		analysis:       analysis,
+		manager:        manager,
 		moderationChan: moderationChan, events: events, log: log,
 	}
 }
@@ -46,33 +49,36 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 				case <-ctx.Done():
 					w.log.Debug("Stopping worker")
 					return ctx.Err()
-				case w.events <- w.toSanitizedEvent(evt):
+				case w.events <- w.processAndSanitize(ctx, evt):
 				}
 			}
 		}
 	}
 }
 
-func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event {
+// processAndSanitize handles the transformation of a raw message into a sanitized event.
+// It combines fast local operations (language detection, keyword filtering) with
+// asynchronous gRPC calls to external specialists for advanced scoring (Topic 4).
+// It aggregates specialist verdicts to determine the final toxicity score
+// and business flags before routing the event to the domain pipeline.
+func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.MessagePosted) event.Event {
 	info := whatlanggo.Detect(evt.Content)
-	langCode := info.Lang.Iso6391()
+	lang := info.Lang.Iso6391()
+	w.log.Debug("Detected language before moderation", "lang", lang)
 
 	sanitized, foundWords := w.moderator.Censor(evt.Content)
 
 	// Lead time measurement
-	start := time.Now()
-	score, isMalicious := w.analysis.CheckMessage(evt.Content)
-	leadTime := time.Since(start)
+	results := w.manager.AnalyzeAll(ctx, evt.ID.String(), evt.Content)
+	if len(results) == 0 {
+		w.log.Warn("no specialists available for analysis, message unverified")
+	}
 
-	if isMalicious {
-		w.log.Warn("AI Detection",
-			"score", score,
-			"lang", langCode,
-			"author", evt.Author,
-			"latency_us", leadTime.Microseconds())
-
-		// Keep track of AI detection for future statistics
-		foundWords = append(foundWords, "AI_MALICIOUS_DETECTION")
+	for specialistID, res := range results {
+		w.log.Warn("specialist alert",
+			"id", specialistID,
+			"score", res.Score,
+			"latency_ms", res.ProcessingTimeMs)
 	}
 
 	return event.Event{
@@ -84,6 +90,13 @@ func (w ModerationWorker) toSanitizedEvent(evt event.MessagePosted) event.Event 
 			Content:       sanitized,
 			CensoredWords: foundWords,
 			At:            evt.At,
-			ToxicityScore: score,
+			ToxicityScore: decide(results),
 		}}
+}
+
+// decide decides if the message should be dropped or forwarded
+// Completely random right now
+// Supposed to aggregate all scores from AI
+func decide(_ map[domain.SpecialistID]domain.SpecialistResponse) float64 {
+	return 0.4 + rand.Float64()*(0.6-0.4)
 }

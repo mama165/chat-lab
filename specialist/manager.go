@@ -52,7 +52,7 @@ func (m *Manager) Init(ctx context.Context, configs []domain.SpecialistConfig) e
 			return fmt.Errorf("failed to initialize specialist %s: %w", cfg.ID, err)
 		}
 
-		m.specialists[cfg.ID] = sClient
+		m.Add(sClient)
 		m.log.Info(fmt.Sprintf("Specialist %s is ready on port %d (PID: %d)\n", cfg.ID, cfg.Port, sClient.Process.Pid))
 	}
 	return nil
@@ -117,4 +117,39 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 		time.Sleep(500 * time.Millisecond)
 	}
 	return nil, fmt.Errorf("timeout: specialist not responding at %s after retries", addr)
+}
+
+// AnalyzeAll broadcasts the content to all registered specialists in parallel.
+// It implements the Fan-Out pattern to ensure minimum latency
+func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content string) map[domain.SpecialistID]domain.SpecialistResponse {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	results := make(map[domain.SpecialistID]domain.SpecialistResponse)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for id, spec := range m.specialists {
+		wg.Add(1)
+		go func(id domain.SpecialistID, s *client.SpecialistClient) {
+			defer wg.Done()
+
+			resp, err := s.Analyze(ctx, domain.SpecialistRequest{
+				MessageID: messageID,
+				Content:   content,
+			})
+
+			if err != nil {
+				m.log.Error("Specialist analysis failed", "id", id, "error", err)
+				return
+			}
+
+			mu.Lock()
+			results[id] = resp
+			mu.Unlock()
+		}(id, spec)
+	}
+
+	wg.Wait()
+	return results
 }
