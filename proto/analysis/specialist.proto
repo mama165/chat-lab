@@ -26,4 +26,5 @@ message SpecialistResponse {
   int64 process_time_ms = 4;  // Internal execution time in milliseconds
   // Health and status tracking
   string status = 5;          // Status message (e.g., "OK", "ERROR_INFERENCE")
+  optional string output_content = 6;
 }

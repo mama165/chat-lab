@@ -34,5 +34,6 @@ func (s *SpecialistServer) Analyze(ctx context.Context, req *pb.SpecialistReques
 		Label:         label,
 		ProcessTimeMs: time.Since(start).Milliseconds(),
 		Status:        "OK",
+		OutputContent: nil,
 	}, nil
 }

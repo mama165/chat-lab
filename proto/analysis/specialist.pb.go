@@ -91,7 +91,8 @@ type SpecialistResponse struct {
 	// Performance metrics for Lead Time monitoring
 	ProcessTimeMs int64 `protobuf:"varint,4,opt,name=process_time_ms,json=processTimeMs,proto3" json:"process_time_ms,omitempty"` // Internal execution time in milliseconds
 	// Health and status tracking
-	Status        string `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // Status message (e.g., "OK", "ERROR_INFERENCE")
+	Status        string  `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // Status message (e.g., "OK", "ERROR_INFERENCE")
+	OutputContent *string `protobuf:"bytes,6,opt,name=output_content,json=outputContent,proto3,oneof" json:"output_content,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -161,6 +162,13 @@ func (x *SpecialistResponse) GetStatus() string {
 	return ""
 }
 
+func (x *SpecialistResponse) GetOutputContent() string {
+	if x != nil && x.OutputContent != nil {
+		return *x.OutputContent
+	}
+	return ""
+}
+
 var File_proto_analysis_specialist_proto protoreflect.FileDescriptor
 
 const file_proto_analysis_specialist_proto_rawDesc = "" +
@@ -174,13 +182,15 @@ const file_proto_analysis_specialist_proto_rawDesc = "" +
 	"\x04tags\x18\x03 \x03(\v2'.specialist.SpecialistRequest.TagsEntryR\x04tags\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa5\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe4\x01\n" +
 	"\x12SpecialistResponse\x12\x14\n" +
 	"\x05score\x18\x01 \x01(\x01R\x05score\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12#\n" +
 	"\rmodel_version\x18\x03 \x01(\tR\fmodelVersion\x12&\n" +
 	"\x0fprocess_time_ms\x18\x04 \x01(\x03R\rprocessTimeMs\x12\x16\n" +
-	"\x06status\x18\x05 \x01(\tR\x06status2]\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12*\n" +
+	"\x0eoutput_content\x18\x06 \x01(\tH\x00R\routputContent\x88\x01\x01B\x11\n" +
+	"\x0f_output_content2]\n" +
 	"\x11SpecialistService\x12H\n" +
 	"\aAnalyze\x12\x1d.specialist.SpecialistRequest\x1a\x1e.specialist.SpecialistResponseB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
 
@@ -218,6 +228,7 @@ func file_proto_analysis_specialist_proto_init() {
 	if File_proto_analysis_specialist_proto != nil {
 		return
 	}
+	file_proto_analysis_specialist_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
