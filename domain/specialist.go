@@ -25,6 +25,7 @@ type SpecialistResponse struct {
 type SpecialistConfig struct {
 	ID      SpecialistID
 	BinPath string
+	Host    string
 	Port    int
 }
 
