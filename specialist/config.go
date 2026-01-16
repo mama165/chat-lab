@@ -7,6 +7,7 @@ import (
 	pb "chat-lab/proto/analysis"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -31,17 +32,27 @@ func StartSpecialist(ctx context.Context, cfg domain.SpecialistConfig) (*client.
 
 	// 2. Prepare the execution command
 	// We pass the port to the specialist so it knows where to listen.
-	cmd := exec.CommandContext(ctx, cfg.BinPath, "--port", strconv.Itoa(cfg.Port))
+	//cmd := exec.CommandContext(ctx, cfg.BinPath, "--port", strconv.Itoa(cfg.Port))
+	cmd := exec.CommandContext(ctx, cfg.BinPath,
+		"-id", string(cfg.ID),
+		"-port", strconv.Itoa(cfg.Port),
+		"-type", string(cfg.ID), // On utilise l'ID comme type pour l'instant
+		"-level", "INFO",
+	)
+	log.Printf("Specialist binary called : %s", cmd.String())
+	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: %v", errors.ErrSpecialistStartFailed, err)
 	}
 
-	conn, err := dialWithRetry(ctx, cfg.Host, cfg.Port)
+	time.Sleep(500 * time.Millisecond) // Laisse le temps au binaire de faire son net.Listen
+
+	conn, err := dialWithRetry(ctx, cfg.Port)
 	if err != nil {
 		// Cleanup: prevent zombie processes if the gRPC handshake fails.
 		_ = cmd.Process.Kill()
-		return nil, fmt.Errorf("%w on %s port %d: %v", errors.ErrSpecialistUnavailable, cfg.Host, cfg.Port, err)
+		return nil, fmt.Errorf("%w on port %d: %v", errors.ErrSpecialistUnavailable, cfg.Port, err)
 	}
 
 	// 5. Return the fully operational specialist client
@@ -59,8 +70,8 @@ func StartSpecialist(ctx context.Context, cfg domain.SpecialistConfig) (*client.
 // to ensure the sidecar is fully 'READY' before returning.
 // This prevents "cold-start" errors where the Master sends messages before
 // the Specialist has finished loading its resources (e.g., ML models).
-func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn, error) {
-	addr := fmt.Sprintf("%s:%d", host, port)
+func dialWithRetry(ctx context.Context, port int) (*grpc.ClientConn, error) {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
 	// 1. Modern non-blocking client initialization
 	// We add a ConnectParams with a Backoff strategy for long-term resilience.
