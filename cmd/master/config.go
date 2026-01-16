@@ -19,6 +19,7 @@ type Config struct {
 	RestartInterval           time.Duration `env:"RESTART_INTERVAL,required=true"`
 	AuthTokenDuration         time.Duration `env:"AUTH_TOKEN_DURATION,required=true"`
 	BadgerFilepath            string        `env:"BADGER_FILEPATH,required=true"`
+	BlugeFilepath             string        `env:"BLUGE_FILEPATH,required=true"`
 	LogLevel                  string        `env:"LOG_LEVEL,required=true"`
 	LowCapacityThreshold      int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
 	MaxContentLength          int           `env:"MAX_CONTENT_LENGTH,required=true"`

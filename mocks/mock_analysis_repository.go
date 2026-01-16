@@ -13,6 +13,7 @@ import (
 	repositories "chat-lab/repositories"
 	reflect "reflect"
 
+	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -40,18 +41,50 @@ func (m *MockIAnalysisRepository) EXPECT() *MockIAnalysisRepositoryMockRecorder 
 	return m.recorder
 }
 
-// Get mocks base method.
-func (m *MockIAnalysisRepository) Get() error {
+// GetAnalyses mocks base method.
+func (m *MockIAnalysisRepository) GetAnalyses(roomID string, cursor *string) ([]repositories.Analysis, *string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get")
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "GetAnalyses", roomID, cursor)
+	ret0, _ := ret[0].([]repositories.Analysis)
+	ret1, _ := ret[1].(*string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// Get indicates an expected call of Get.
-func (mr *MockIAnalysisRepositoryMockRecorder) Get() *gomock.Call {
+// GetAnalyses indicates an expected call of GetAnalyses.
+func (mr *MockIAnalysisRepositoryMockRecorder) GetAnalyses(roomID, cursor any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIAnalysisRepository)(nil).Get))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnalyses", reflect.TypeOf((*MockIAnalysisRepository)(nil).GetAnalyses), roomID, cursor)
+}
+
+// GetByMessageId mocks base method.
+func (m *MockIAnalysisRepository) GetByMessageId(roomID string, messageId uuid.UUID) (repositories.Analysis, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByMessageId", roomID, messageId)
+	ret0, _ := ret[0].(repositories.Analysis)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByMessageId indicates an expected call of GetByMessageId.
+func (mr *MockIAnalysisRepositoryMockRecorder) GetByMessageId(roomID, messageId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByMessageId", reflect.TypeOf((*MockIAnalysisRepository)(nil).GetByMessageId), roomID, messageId)
+}
+
+// Search mocks base method.
+func (m *MockIAnalysisRepository) Search(query, roomID string) ([]repositories.Analysis, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Search", query, roomID)
+	ret0, _ := ret[0].([]repositories.Analysis)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Search indicates an expected call of Search.
+func (mr *MockIAnalysisRepositoryMockRecorder) Search(query, roomID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Search", reflect.TypeOf((*MockIAnalysisRepository)(nil).Search), query, roomID)
 }
 
 // Store mocks base method.
@@ -66,4 +99,18 @@ func (m *MockIAnalysisRepository) Store(analysis repositories.Analysis) error {
 func (mr *MockIAnalysisRepositoryMockRecorder) Store(analysis any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockIAnalysisRepository)(nil).Store), analysis)
+}
+
+// StoreBatch mocks base method.
+func (m *MockIAnalysisRepository) StoreBatch(analyses []repositories.Analysis) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreBatch", analyses)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StoreBatch indicates an expected call of StoreBatch.
+func (mr *MockIAnalysisRepositoryMockRecorder) StoreBatch(analyses any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreBatch", reflect.TypeOf((*MockIAnalysisRepository)(nil).StoreBatch), analyses)
 }

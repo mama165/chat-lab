@@ -48,11 +48,16 @@ build-specialists:
 ## proto-gen: Generate Go code from .proto files using a containerized environment
 proto-gen:
 	@echo "--- 🚀 Generating gRPC/Protobuf code ---"
-	@docker run --rm -v $(PWD):/src -w /src golang:1.24-alpine sh -c "\
-	   apk add --no-cache protobuf-dev protoc && \
-	   go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
-	   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
-	   protoc --proto_path=. --experimental_allow_proto3_optional --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative $$(find proto -name "*.proto")"
+	@docker run --rm -v "$(PWD):/src" -w /src golang:1.24-alpine sh -c "\
+		apk add --no-cache protobuf-dev protoc && \
+		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+		find proto -name '*.proto' -exec sed -i 's/\r//' {} + && \
+		protoc -I. \
+		       -I/usr/include \
+		       --go_out=. --go_opt=paths=source_relative \
+		       --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		       \$$(find proto -name '*.proto')"
 	@$(MAKE) fmt
 
 ## ai-gen: Run the AI model generation (Python transpilation) and force formatting

@@ -62,7 +62,6 @@ func (m *Manager) Init(ctx context.Context, configs []domain.SpecialistConfig) e
 // It performs a "fail-fast" check on the binary, executes it as a child process
 // linked to the provided context, and ensures the gRPC server is ready before
 // returning a functional specialist client.
-// This is a key component for Topic 3 (Supervisor Health).
 func startSpecialist(ctx context.Context, cfg domain.SpecialistConfig) (*client.SpecialistClient, error) {
 	// 1. Validate binary existence using our custom error
 	if _, err := os.Stat(cfg.BinPath); err != nil {
@@ -85,7 +84,7 @@ func startSpecialist(ctx context.Context, cfg domain.SpecialistConfig) (*client.
 		return nil, fmt.Errorf("%w: %v", errors.ErrSpecialistStartFailed, err)
 	}
 
-	time.Sleep(500 * time.Millisecond) // Laisse le temps au binaire de faire son net.Listen
+	time.Sleep(500 * time.Millisecond)
 
 	conn, err := dialWithRetry(ctx, cfg.Host, cfg.Port)
 	if err != nil {
@@ -104,7 +103,7 @@ func startSpecialist(ctx context.Context, cfg domain.SpecialistConfig) (*client.
 	return specialistClient, nil
 }
 
-// Retry connection to the specialist to handle container startup latency
+// dialWithRetry Retry connection to the specialist to handle container startup latency
 func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	// Try for 10 seconds, every 500ms

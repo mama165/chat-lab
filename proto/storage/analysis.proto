@@ -6,8 +6,31 @@ import "google/protobuf/timestamp.proto";
 message Analysis {
   string id = 1;
   string message_id = 2;
-  string content = 3;
-  double score = 4;
-  google.protobuf.Timestamp at = 5;
-  string version = 6;
+  string room_id = 3;
+  google.protobuf.Timestamp at = 4;
+  string summary = 5;
+  // Tags (#urgent, #facture...)
+  repeated string tags = 6;
+  map<string, double> scores = 7;
+
+  oneof payload {
+    TextContent text_content = 8;
+    AudioDetails audio = 9;
+    FileDetails file = 10;
+  }
+}
+
+message TextContent {
+  string content = 1;
+}
+
+message AudioDetails {
+  string transcription = 1;
+  uint32 duration_sec = 2;
+}
+
+message FileDetails {
+  string filename = 1;
+  string mime_type = 2;
+  uint64 size = 3;
 }

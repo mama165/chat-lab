@@ -20,19 +20,35 @@ require (
 )
 
 require (
+	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/anknown/darts v0.0.0-20151216065714-83ff685239e6 // indirect
+	github.com/axiomhq/hyperloglog v0.0.0-20191112132149-a4c4c47bc57f // indirect
+	github.com/bits-and-blooms/bitset v1.2.0 // indirect
+	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect
+	github.com/blevesearch/mmap-go v1.0.4 // indirect
+	github.com/blevesearch/segment v0.9.0 // indirect
+	github.com/blevesearch/snowballstem v0.9.0 // indirect
+	github.com/blevesearch/vellum v1.0.7 // indirect
+	github.com/blugelabs/bluge v0.2.2 // indirect
+	github.com/blugelabs/bluge_segment_api v0.2.0 // indirect
+	github.com/blugelabs/ice v1.0.0 // indirect
+	github.com/blugelabs/ice/v2 v2.0.1 // indirect
+	github.com/caio/go-tdigest v3.1.0+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.3.0 // indirect
+	github.com/dgryski/go-metro v0.0.0-20180109044635-280f6062b5bc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.39.0 // indirect

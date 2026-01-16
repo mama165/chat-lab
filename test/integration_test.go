@@ -10,6 +10,7 @@ import (
 	"chat-lab/sink"
 	"chat-lab/specialist"
 	"context"
+	"github.com/blugelabs/bluge"
 	"log/slog"
 	"testing"
 	"time"
@@ -31,6 +32,11 @@ func Test_Scenario(t *testing.T) {
 		WithValueLogFileSize(16 << 20))
 	req.NoError(err)
 
+	blugeCfg := bluge.DefaultConfig(t.TempDir())
+	blugeWriter, err := bluge.OpenWriter(blugeCfg)
+	req.NoError(err)
+	defer blugeWriter.Close()
+
 	// 1. Create channel to wait for a signal at the end of process
 	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
@@ -38,7 +44,7 @@ func Test_Scenario(t *testing.T) {
 	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
-	analysisRepository := repositories.NewAnalysisRepository(db, log)
+	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50))
 	manager := specialist.NewManager(log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, messageRepository,

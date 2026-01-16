@@ -350,3 +350,42 @@ func (mr *MockIOrchestratorMockRecorder) UnregisterParticipant(pID, roomID any) 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterParticipant", reflect.TypeOf((*MockIOrchestrator)(nil).UnregisterParticipant), pID, roomID)
 }
+
+// MockISpecialistClient is a mock of ISpecialistClient interface.
+type MockISpecialistClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockISpecialistClientMockRecorder
+	isgomock struct{}
+}
+
+// MockISpecialistClientMockRecorder is the mock recorder for MockISpecialistClient.
+type MockISpecialistClientMockRecorder struct {
+	mock *MockISpecialistClient
+}
+
+// NewMockISpecialistClient creates a new mock instance.
+func NewMockISpecialistClient(ctrl *gomock.Controller) *MockISpecialistClient {
+	mock := &MockISpecialistClient{ctrl: ctrl}
+	mock.recorder = &MockISpecialistClientMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockISpecialistClient) EXPECT() *MockISpecialistClientMockRecorder {
+	return m.recorder
+}
+
+// Analyze mocks base method.
+func (m *MockISpecialistClient) Analyze(ctx context.Context, request domain.SpecialistRequest) (domain.SpecialistResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Analyze", ctx, request)
+	ret0, _ := ret[0].(domain.SpecialistResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Analyze indicates an expected call of Analyze.
+func (mr *MockISpecialistClientMockRecorder) Analyze(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Analyze", reflect.TypeOf((*MockISpecialistClient)(nil).Analyze), ctx, request)
+}

@@ -23,13 +23,21 @@ const (
 )
 
 type Analysis struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	MessageId     string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	Content       string                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	Score         float64                `protobuf:"fixed64,4,opt,name=score,proto3" json:"score,omitempty"`
-	At            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=at,proto3" json:"at,omitempty"`
-	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	MessageId string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	RoomId    string                 `protobuf:"bytes,3,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	At        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=at,proto3" json:"at,omitempty"`
+	Summary   string                 `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
+	// Tags (#urgent, #facture...)
+	Tags   []string           `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
+	Scores map[string]float64 `protobuf:"bytes,7,rep,name=scores,proto3" json:"scores,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*Analysis_TextContent
+	//	*Analysis_Audio
+	//	*Analysis_File
+	Payload       isAnalysis_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -78,18 +86,11 @@ func (x *Analysis) GetMessageId() string {
 	return ""
 }
 
-func (x *Analysis) GetContent() string {
+func (x *Analysis) GetRoomId() string {
 	if x != nil {
-		return x.Content
+		return x.RoomId
 	}
 	return ""
-}
-
-func (x *Analysis) GetScore() float64 {
-	if x != nil {
-		return x.Score
-	}
-	return 0
 }
 
 func (x *Analysis) GetAt() *timestamppb.Timestamp {
@@ -99,26 +100,270 @@ func (x *Analysis) GetAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Analysis) GetVersion() string {
+func (x *Analysis) GetSummary() string {
 	if x != nil {
-		return x.Version
+		return x.Summary
 	}
 	return ""
+}
+
+func (x *Analysis) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *Analysis) GetScores() map[string]float64 {
+	if x != nil {
+		return x.Scores
+	}
+	return nil
+}
+
+func (x *Analysis) GetPayload() isAnalysis_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *Analysis) GetTextContent() *TextContent {
+	if x != nil {
+		if x, ok := x.Payload.(*Analysis_TextContent); ok {
+			return x.TextContent
+		}
+	}
+	return nil
+}
+
+func (x *Analysis) GetAudio() *AudioDetails {
+	if x != nil {
+		if x, ok := x.Payload.(*Analysis_Audio); ok {
+			return x.Audio
+		}
+	}
+	return nil
+}
+
+func (x *Analysis) GetFile() *FileDetails {
+	if x != nil {
+		if x, ok := x.Payload.(*Analysis_File); ok {
+			return x.File
+		}
+	}
+	return nil
+}
+
+type isAnalysis_Payload interface {
+	isAnalysis_Payload()
+}
+
+type Analysis_TextContent struct {
+	TextContent *TextContent `protobuf:"bytes,8,opt,name=text_content,json=textContent,proto3,oneof"`
+}
+
+type Analysis_Audio struct {
+	Audio *AudioDetails `protobuf:"bytes,9,opt,name=audio,proto3,oneof"`
+}
+
+type Analysis_File struct {
+	File *FileDetails `protobuf:"bytes,10,opt,name=file,proto3,oneof"`
+}
+
+func (*Analysis_TextContent) isAnalysis_Payload() {}
+
+func (*Analysis_Audio) isAnalysis_Payload() {}
+
+func (*Analysis_File) isAnalysis_Payload() {}
+
+type TextContent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Content       string                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextContent) Reset() {
+	*x = TextContent{}
+	mi := &file_proto_storage_analysis_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextContent) ProtoMessage() {}
+
+func (x *TextContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_storage_analysis_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextContent.ProtoReflect.Descriptor instead.
+func (*TextContent) Descriptor() ([]byte, []int) {
+	return file_proto_storage_analysis_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TextContent) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type AudioDetails struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Transcription string                 `protobuf:"bytes,1,opt,name=transcription,proto3" json:"transcription,omitempty"`
+	DurationSec   uint32                 `protobuf:"varint,2,opt,name=duration_sec,json=durationSec,proto3" json:"duration_sec,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AudioDetails) Reset() {
+	*x = AudioDetails{}
+	mi := &file_proto_storage_analysis_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AudioDetails) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AudioDetails) ProtoMessage() {}
+
+func (x *AudioDetails) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_storage_analysis_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AudioDetails.ProtoReflect.Descriptor instead.
+func (*AudioDetails) Descriptor() ([]byte, []int) {
+	return file_proto_storage_analysis_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AudioDetails) GetTranscription() string {
+	if x != nil {
+		return x.Transcription
+	}
+	return ""
+}
+
+func (x *AudioDetails) GetDurationSec() uint32 {
+	if x != nil {
+		return x.DurationSec
+	}
+	return 0
+}
+
+type FileDetails struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"`
+	MimeType      string                 `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	Size          uint64                 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileDetails) Reset() {
+	*x = FileDetails{}
+	mi := &file_proto_storage_analysis_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileDetails) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileDetails) ProtoMessage() {}
+
+func (x *FileDetails) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_storage_analysis_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileDetails.ProtoReflect.Descriptor instead.
+func (*FileDetails) Descriptor() ([]byte, []int) {
+	return file_proto_storage_analysis_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FileDetails) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+func (x *FileDetails) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+func (x *FileDetails) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
 }
 
 var File_proto_storage_analysis_proto protoreflect.FileDescriptor
 
 const file_proto_storage_analysis_proto_rawDesc = "" +
 	"\n" +
-	"\x1cproto/storage/analysis.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\x01\n" +
+	"\x1cproto/storage/analysis.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd7\x03\n" +
 	"\bAnalysis\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x02 \x01(\tR\tmessageId\x12\x18\n" +
-	"\acontent\x18\x03 \x01(\tR\acontent\x12\x14\n" +
-	"\x05score\x18\x04 \x01(\x01R\x05score\x12*\n" +
-	"\x02at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x18\n" +
-	"\aversion\x18\x06 \x01(\tR\aversionB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
+	"message_id\x18\x02 \x01(\tR\tmessageId\x12\x17\n" +
+	"\aroom_id\x18\x03 \x01(\tR\x06roomId\x12*\n" +
+	"\x02at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x18\n" +
+	"\asummary\x18\x05 \x01(\tR\asummary\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12;\n" +
+	"\x06scores\x18\a \x03(\v2#.message.proto.Analysis.ScoresEntryR\x06scores\x12?\n" +
+	"\ftext_content\x18\b \x01(\v2\x1a.message.proto.TextContentH\x00R\vtextContent\x123\n" +
+	"\x05audio\x18\t \x01(\v2\x1b.message.proto.AudioDetailsH\x00R\x05audio\x120\n" +
+	"\x04file\x18\n" +
+	" \x01(\v2\x1a.message.proto.FileDetailsH\x00R\x04file\x1a9\n" +
+	"\vScoresEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01B\t\n" +
+	"\apayload\"'\n" +
+	"\vTextContent\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\tR\acontent\"W\n" +
+	"\fAudioDetails\x12$\n" +
+	"\rtranscription\x18\x01 \x01(\tR\rtranscription\x12!\n" +
+	"\fduration_sec\x18\x02 \x01(\rR\vdurationSec\"Z\n" +
+	"\vFileDetails\x12\x1a\n" +
+	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1b\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x04R\x04sizeB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
 
 var (
 	file_proto_storage_analysis_proto_rawDescOnce sync.Once
@@ -132,18 +377,26 @@ func file_proto_storage_analysis_proto_rawDescGZIP() []byte {
 	return file_proto_storage_analysis_proto_rawDescData
 }
 
-var file_proto_storage_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_proto_storage_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_proto_storage_analysis_proto_goTypes = []any{
 	(*Analysis)(nil),              // 0: message.proto.Analysis
-	(*timestamppb.Timestamp)(nil), // 1: google.protobuf.Timestamp
+	(*TextContent)(nil),           // 1: message.proto.TextContent
+	(*AudioDetails)(nil),          // 2: message.proto.AudioDetails
+	(*FileDetails)(nil),           // 3: message.proto.FileDetails
+	nil,                           // 4: message.proto.Analysis.ScoresEntry
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_proto_storage_analysis_proto_depIdxs = []int32{
-	1, // 0: message.proto.Analysis.at:type_name -> google.protobuf.Timestamp
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	5, // 0: message.proto.Analysis.at:type_name -> google.protobuf.Timestamp
+	4, // 1: message.proto.Analysis.scores:type_name -> message.proto.Analysis.ScoresEntry
+	1, // 2: message.proto.Analysis.text_content:type_name -> message.proto.TextContent
+	2, // 3: message.proto.Analysis.audio:type_name -> message.proto.AudioDetails
+	3, // 4: message.proto.Analysis.file:type_name -> message.proto.FileDetails
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_proto_storage_analysis_proto_init() }
@@ -151,13 +404,18 @@ func file_proto_storage_analysis_proto_init() {
 	if File_proto_storage_analysis_proto != nil {
 		return
 	}
+	file_proto_storage_analysis_proto_msgTypes[0].OneofWrappers = []any{
+		(*Analysis_TextContent)(nil),
+		(*Analysis_Audio)(nil),
+		(*Analysis_File)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_storage_analysis_proto_rawDesc), len(file_proto_storage_analysis_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

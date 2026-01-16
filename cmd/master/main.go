@@ -14,6 +14,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/blugelabs/bluge"
+	"github.com/samber/lo"
 	"log/slog"
 	"net"
 	"os"
@@ -80,6 +82,16 @@ func run() (int, error) {
 		_ = db.Close()
 	}()
 
+	blugeCfg := bluge.DefaultConfig(config.BlugeFilepath)
+	blugeWriter, err := bluge.OpenWriter(blugeCfg)
+	if err != nil {
+		return exitRuntime, fmt.Errorf("failed to open bluge writer: %w", err)
+	}
+	defer func() {
+		log.Info("Closing Bluge...")
+		_ = blugeWriter.Close()
+	}()
+
 	// 2.bis Sidecar Specialists Initialization
 	// We launch the specialized binaries (Toxicity, Sentiment, Business...) before the engine starts.
 	// This ensures the Orchestrator has all its analysis "organs" ready.
@@ -105,7 +117,7 @@ func run() (int, error) {
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, config.LimitMessages)
-	analysisRepository := repositories.NewAnalysisRepository(db, log)
+	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50))
 
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,

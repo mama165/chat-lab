@@ -42,7 +42,5 @@ func (a AnalysisSink) Consume(_ context.Context, e event.DomainEvent) error {
 }
 
 func toAnalysis(event event.SanitizedMessage) repositories.Analysis {
-	return repositories.Analysis{
-		Score: event.ToxicityScore,
-	}
+	return repositories.Analysis{}
 }
