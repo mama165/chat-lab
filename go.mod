@@ -6,11 +6,12 @@ require (
 	github.com/Netflix/go-env v0.1.2
 	github.com/abadojack/whatlanggo v1.0.1
 	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
+	github.com/blugelabs/bluge v0.2.2
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
-	github.com/mama165/sdk-go v1.0.3
+	github.com/mama165/sdk-go v1.0.5
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
@@ -29,7 +30,6 @@ require (
 	github.com/blevesearch/segment v0.9.0 // indirect
 	github.com/blevesearch/snowballstem v0.9.0 // indirect
 	github.com/blevesearch/vellum v1.0.7 // indirect
-	github.com/blugelabs/bluge v0.2.2 // indirect
 	github.com/blugelabs/bluge_segment_api v0.2.0 // indirect
 	github.com/blugelabs/ice v1.0.0 // indirect
 	github.com/blugelabs/ice/v2 v2.0.1 // indirect

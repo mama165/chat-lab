@@ -1,11 +1,19 @@
 package domain
 
-type SpecialistID string
+type DataType string
 
 const (
-	TOXICITY  SpecialistID = "Toxicity"
-	SENTIMENT SpecialistID = "Sentiment"
-	BUSINESS  SpecialistID = "Business"
+	TextType  DataType = "text"
+	AudioType DataType = "audio"
+	FileType  DataType = "file"
+)
+
+type AnalysisMetric string
+
+const (
+	MetricToxicity  AnalysisMetric = "toxicity"
+	MetricSentiment AnalysisMetric = "sentiment"
+	MetricBusiness  AnalysisMetric = "business"
 )
 
 type SpecialistRequest struct {
@@ -23,7 +31,7 @@ type SpecialistResponse struct {
 }
 
 type SpecialistConfig struct {
-	ID      SpecialistID
+	ID      AnalysisMetric
 	BinPath string
 	Host    string
 	Port    int

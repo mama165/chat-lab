@@ -22,13 +22,13 @@ import (
 type Manager struct {
 	mu          sync.RWMutex
 	log         *slog.Logger
-	specialists map[domain.SpecialistID]*client.SpecialistClient
+	specialists map[domain.AnalysisMetric]*client.SpecialistClient
 }
 
 func NewManager(log *slog.Logger) *Manager {
 	return &Manager{
 		log:         log,
-		specialists: make(map[domain.SpecialistID]*client.SpecialistClient),
+		specialists: make(map[domain.AnalysisMetric]*client.SpecialistClient),
 	}
 }
 
@@ -120,17 +120,17 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 
 // AnalyzeAll broadcasts the content to all registered specialists in parallel.
 // It implements the Fan-Out pattern to ensure minimum latency
-func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content string) map[domain.SpecialistID]domain.SpecialistResponse {
+func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content string) map[domain.AnalysisMetric]domain.SpecialistResponse {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	results := make(map[domain.SpecialistID]domain.SpecialistResponse)
+	results := make(map[domain.AnalysisMetric]domain.SpecialistResponse)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	for id, spec := range m.specialists {
 		wg.Add(1)
-		go func(id domain.SpecialistID, s *client.SpecialistClient) {
+		go func(id domain.AnalysisMetric, s *client.SpecialistClient) {
 			defer wg.Done()
 
 			resp, err := s.Analyze(ctx, domain.SpecialistRequest{

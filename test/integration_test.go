@@ -44,7 +44,7 @@ func Test_Scenario(t *testing.T) {
 	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
-	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50))
+	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
 	manager := specialist.NewManager(log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, messageRepository,

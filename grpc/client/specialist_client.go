@@ -9,14 +9,14 @@ import (
 )
 
 type SpecialistClient struct {
-	Id         domain.SpecialistID
+	Id         domain.AnalysisMetric
 	Client     pb.SpecialistServiceClient
 	Process    *os.Process
 	Port       int
 	LastHealth time.Time
 }
 
-func NewSpecialistClient(id domain.SpecialistID,
+func NewSpecialistClient(id domain.AnalysisMetric,
 	client pb.SpecialistServiceClient,
 	process *os.Process, port int, lastHealth time.Time,
 ) *SpecialistClient {

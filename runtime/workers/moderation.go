@@ -97,6 +97,6 @@ func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.Mess
 // decide decides if the message should be dropped or forwarded
 // Completely random right now
 // Supposed to aggregate all scores from AI
-func decide(_ map[domain.SpecialistID]domain.SpecialistResponse) float64 {
+func decide(_ map[domain.AnalysisMetric]domain.SpecialistResponse) float64 {
 	return 0.4 + rand.Float64()*(0.6-0.4)
 }

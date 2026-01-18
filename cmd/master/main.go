@@ -98,8 +98,8 @@ func run() (int, error) {
 	// We use a dedicated timeout to prevent the Master from hanging if a binary
 	// fails to load its resources (like ML models) or if a port is already in use.
 	specialistConfigs := []domain.SpecialistConfig{
-		{ID: domain.TOXICITY, BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
-		{ID: domain.SENTIMENT, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
+		{ID: domain.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
+		{ID: domain.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
 	}
 
 	specialistManager := specialist.NewManager(log)
@@ -117,7 +117,7 @@ func run() (int, error) {
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, config.LimitMessages)
-	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50))
+	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
 
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,

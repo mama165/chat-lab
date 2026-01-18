@@ -11,6 +11,7 @@ package mocks
 
 import (
 	repositories "chat-lab/repositories"
+	context "context"
 	reflect "reflect"
 
 	uuid "github.com/google/uuid"
@@ -41,50 +42,95 @@ func (m *MockIAnalysisRepository) EXPECT() *MockIAnalysisRepositoryMockRecorder 
 	return m.recorder
 }
 
-// GetAnalyses mocks base method.
-func (m *MockIAnalysisRepository) GetAnalyses(roomID string, cursor *string) ([]repositories.Analysis, *string, error) {
+// DeleteByMessageId mocks base method.
+func (m *MockIAnalysisRepository) DeleteByMessageId(roomID string, messageId uuid.UUID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAnalyses", roomID, cursor)
+	ret := m.ctrl.Call(m, "DeleteByMessageId", roomID, messageId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteByMessageId indicates an expected call of DeleteByMessageId.
+func (mr *MockIAnalysisRepositoryMockRecorder) DeleteByMessageId(roomID, messageId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByMessageId", reflect.TypeOf((*MockIAnalysisRepository)(nil).DeleteByMessageId), roomID, messageId)
+}
+
+// FetchFullByMessageId mocks base method.
+func (m *MockIAnalysisRepository) FetchFullByMessageId(roomID string, messageId uuid.UUID) (repositories.Analysis, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FetchFullByMessageId", roomID, messageId)
+	ret0, _ := ret[0].(repositories.Analysis)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FetchFullByMessageId indicates an expected call of FetchFullByMessageId.
+func (mr *MockIAnalysisRepositoryMockRecorder) FetchFullByMessageId(roomID, messageId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchFullByMessageId", reflect.TypeOf((*MockIAnalysisRepository)(nil).FetchFullByMessageId), roomID, messageId)
+}
+
+// Flush mocks base method.
+func (m *MockIAnalysisRepository) Flush() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Flush")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Flush indicates an expected call of Flush.
+func (mr *MockIAnalysisRepositoryMockRecorder) Flush() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Flush", reflect.TypeOf((*MockIAnalysisRepository)(nil).Flush))
+}
+
+// ScanAnalysesByRoom mocks base method.
+func (m *MockIAnalysisRepository) ScanAnalysesByRoom(roomID string, cursor *string) ([]repositories.Analysis, *string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ScanAnalysesByRoom", roomID, cursor)
 	ret0, _ := ret[0].([]repositories.Analysis)
 	ret1, _ := ret[1].(*string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// GetAnalyses indicates an expected call of GetAnalyses.
-func (mr *MockIAnalysisRepositoryMockRecorder) GetAnalyses(roomID, cursor any) *gomock.Call {
+// ScanAnalysesByRoom indicates an expected call of ScanAnalysesByRoom.
+func (mr *MockIAnalysisRepositoryMockRecorder) ScanAnalysesByRoom(roomID, cursor any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnalyses", reflect.TypeOf((*MockIAnalysisRepository)(nil).GetAnalyses), roomID, cursor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanAnalysesByRoom", reflect.TypeOf((*MockIAnalysisRepository)(nil).ScanAnalysesByRoom), roomID, cursor)
 }
 
-// GetByMessageId mocks base method.
-func (m *MockIAnalysisRepository) GetByMessageId(roomID string, messageId uuid.UUID) (repositories.Analysis, error) {
+// SearchByScoreRange mocks base method.
+func (m *MockIAnalysisRepository) SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, roomID string) ([]repositories.Analysis, uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByMessageId", roomID, messageId)
-	ret0, _ := ret[0].(repositories.Analysis)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetByMessageId indicates an expected call of GetByMessageId.
-func (mr *MockIAnalysisRepositoryMockRecorder) GetByMessageId(roomID, messageId any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByMessageId", reflect.TypeOf((*MockIAnalysisRepository)(nil).GetByMessageId), roomID, messageId)
-}
-
-// Search mocks base method.
-func (m *MockIAnalysisRepository) Search(query, roomID string) ([]repositories.Analysis, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Search", query, roomID)
+	ret := m.ctrl.Call(m, "SearchByScoreRange", ctx, scoreName, min, max, roomID)
 	ret0, _ := ret[0].([]repositories.Analysis)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// Search indicates an expected call of Search.
-func (mr *MockIAnalysisRepositoryMockRecorder) Search(query, roomID any) *gomock.Call {
+// SearchByScoreRange indicates an expected call of SearchByScoreRange.
+func (mr *MockIAnalysisRepositoryMockRecorder) SearchByScoreRange(ctx, scoreName, min, max, roomID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Search", reflect.TypeOf((*MockIAnalysisRepository)(nil).Search), query, roomID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchByScoreRange", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchByScoreRange), ctx, scoreName, min, max, roomID)
+}
+
+// SearchPaginated mocks base method.
+func (m *MockIAnalysisRepository) SearchPaginated(ctx context.Context, query, roomID string, offset int) ([]repositories.Analysis, uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchPaginated", ctx, query, roomID, offset)
+	ret0, _ := ret[0].([]repositories.Analysis)
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// SearchPaginated indicates an expected call of SearchPaginated.
+func (mr *MockIAnalysisRepositoryMockRecorder) SearchPaginated(ctx, query, roomID, offset any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchPaginated", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchPaginated), ctx, query, roomID, offset)
 }
 
 // Store mocks base method.
