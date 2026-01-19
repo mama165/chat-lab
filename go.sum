@@ -118,8 +118,8 @@ github.com/leesper/go_rng v0.0.0-20190531154944-a612b043e353/go.mod h1:N0SVk0uhy
 github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
 github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
-github.com/mama165/sdk-go v1.0.5 h1:bFFMIv0IovJCkfRxGfoap9XWO7m/gIf1Zoh82Yb3jYQ=
-github.com/mama165/sdk-go v1.0.5/go.mod h1:jjxIdOw3V/tCz+icu6qOVTpNIMOZ58VCoZ+ZkqrHsJk=
+github.com/mama165/sdk-go v1.0.6 h1:3zyUUqY+TsCLslBCs6Eh7YlIOkAlcRLraOAsHhuRg5k=
+github.com/mama165/sdk-go v1.0.6/go.mod h1:jjxIdOw3V/tCz+icu6qOVTpNIMOZ58VCoZ+ZkqrHsJk=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mschoch/smat v0.2.0 h1:8imxQsjDm8yFEAVBe7azKmKSgzSkZXDuKkSq9374khM=

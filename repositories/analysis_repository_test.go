@@ -2,18 +2,14 @@ package repositories
 
 import (
 	"chat-lab/domain"
-	"context"
 	"fmt"
-	"github.com/blugelabs/bluge"
-	"github.com/dgraph-io/badger/v4"
-	"github.com/google/uuid"
-	"github.com/mama165/sdk-go/db"
-	"github.com/mama165/sdk-go/logs"
-	"github.com/samber/lo"
-	"github.com/stretchr/testify/require"
-	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/mama165/sdk-go/db"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 )
 
 var MetricTest domain.AnalysisMetric = "test"
@@ -23,8 +19,10 @@ var MetricTest domain.AnalysisMetric = "test"
 // ============================================================================
 
 func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
@@ -47,7 +45,7 @@ func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
 	}
 
 	// When: Storing the analysis
-	err := repo.Store(analysis)
+	err = repo.Store(analysis)
 	req.NoError(err)
 
 	// Then: It should be retrievable from BadgerDB
@@ -70,8 +68,10 @@ func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
 }
 
 func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
@@ -93,7 +93,7 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 	}
 
 	// When: Storing
-	err := repo.Store(analysis)
+	err = repo.Store(analysis)
 	req.NoError(err)
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
@@ -112,8 +112,10 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 }
 
 func TestAnalysisRepository_Store_File_Success(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
@@ -134,7 +136,7 @@ func TestAnalysisRepository_Store_File_Success(t *testing.T) {
 	}
 
 	// When: Storing
-	err := repo.Store(analysis)
+	err = repo.Store(analysis)
 	req.NoError(err)
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
@@ -155,8 +157,10 @@ func TestAnalysisRepository_Store_File_Success(t *testing.T) {
 // ============================================================================
 
 func TestAnalysisRepository_SearchPaginated_MultipleResults(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "search-room"
@@ -207,8 +211,10 @@ func TestAnalysisRepository_SearchPaginated_MultipleResults(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchPaginated_CaseInsensitive(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "case-room"
@@ -238,9 +244,10 @@ func TestAnalysisRepository_SearchPaginated_CaseInsensitive(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchPaginated_RoomIsolation(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
-
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
 	// Given: Same content in different rooms
@@ -277,8 +284,10 @@ func TestAnalysisRepository_SearchPaginated_RoomIsolation(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchPaginated_EmptyQuery(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "test-room"
@@ -303,8 +312,10 @@ func TestAnalysisRepository_SearchPaginated_EmptyQuery(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchPaginated_NoResults(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "empty-room"
@@ -319,8 +330,10 @@ func TestAnalysisRepository_SearchPaginated_NoResults(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchPaginated_Pagination(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 3)
 	roomID := "pagination-room"
@@ -371,8 +384,10 @@ func TestAnalysisRepository_SearchPaginated_Pagination(t *testing.T) {
 // ============================================================================
 
 func TestAnalysisRepository_SearchByScoreRange_SingleScore(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "score-room"
@@ -416,8 +431,10 @@ func TestAnalysisRepository_SearchByScoreRange_SingleScore(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "multiscore-room"
@@ -462,8 +479,10 @@ func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchByScoreRange_EdgeCases(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "edge-room"
@@ -495,8 +514,10 @@ func TestAnalysisRepository_SearchByScoreRange_EdgeCases(t *testing.T) {
 }
 
 func TestAnalysisRepository_SearchByScoreRange_NonExistentScore(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "test-room"
@@ -523,8 +544,10 @@ func TestAnalysisRepository_SearchByScoreRange_NonExistentScore(t *testing.T) {
 // ============================================================================
 
 func TestAnalysisRepository_ScanAnalysesByRoom_FirstPage(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(3), 10)
 	roomID := "scan-room"
@@ -557,8 +580,10 @@ func TestAnalysisRepository_ScanAnalysesByRoom_FirstPage(t *testing.T) {
 }
 
 func TestAnalysisRepository_ScanAnalysesByRoom_SubsequentPages(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(2), 10)
 	roomID := "pagination-scan"
@@ -597,8 +622,10 @@ func TestAnalysisRepository_ScanAnalysesByRoom_SubsequentPages(t *testing.T) {
 }
 
 func TestAnalysisRepository_ScanAnalysesByRoom_EmptyRoom(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
@@ -616,8 +643,10 @@ func TestAnalysisRepository_ScanAnalysesByRoom_EmptyRoom(t *testing.T) {
 // ============================================================================
 
 func TestAnalysisRepository_FetchFullByMessageId_Success(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
@@ -652,20 +681,26 @@ func TestAnalysisRepository_FetchFullByMessageId_Success(t *testing.T) {
 }
 
 func TestAnalysisRepository_FetchFullByMessageId_NotFound(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
 	// When: Fetching non-existent message
-	_, err := repo.FetchFullByMessageId("test-room", uuid.New())
+	_, err = repo.FetchFullByMessageId("test-room", uuid.New())
 
 	// Then: Should return error
 	req.Error(err)
 	req.Contains(err.Error(), "not found")
 }
 func TestAnalysisRepository_FetchFullByMessageId_WrongRoom(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
 	// Given: Analysis in room-1
@@ -677,7 +712,7 @@ func TestAnalysisRepository_FetchFullByMessageId_WrongRoom(t *testing.T) {
 	}))
 
 	// When: Fetching with wrong room ID
-	_, err := repo.FetchFullByMessageId("room-2", msgID)
+	_, err = repo.FetchFullByMessageId("room-2", msgID)
 
 	// Then: Should not find it
 	req.Error(err)
@@ -687,8 +722,11 @@ func TestAnalysisRepository_FetchFullByMessageId_WrongRoom(t *testing.T) {
 // INTEGRATION TESTS - Complex Scenarios
 // ============================================================================
 func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "workflow-room"
 
@@ -748,8 +786,11 @@ func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 	req.Equal("Bug report", fetched.Summary)
 }
 func TestAnalysisRepository_Consistency_BadgerBlugeSync(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "consistency-room"
 	msgID := uuid.New()
@@ -786,8 +827,11 @@ func TestAnalysisRepository_Consistency_BadgerBlugeSync(t *testing.T) {
 // EDGE CASES & ERROR HANDLING
 // ============================================================================
 func TestAnalysisRepository_Store_ZeroValueTimestamp(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
 	// Given: Analysis with zero time (edge case)
@@ -800,7 +844,7 @@ func TestAnalysisRepository_Store_ZeroValueTimestamp(t *testing.T) {
 	}
 
 	// When: Storing
-	err := repo.Store(analysis)
+	err = repo.Store(analysis)
 
 	// Then: Should store successfully (no validation currently)
 	// If you want to reject this, add validation in Store()
@@ -812,8 +856,11 @@ func TestAnalysisRepository_Store_ZeroValueTimestamp(t *testing.T) {
 	req.True(fetched.At.IsZero())
 }
 func TestAnalysisRepository_Store_EmptyScores(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "empty-scores"
 
@@ -838,8 +885,11 @@ func TestAnalysisRepository_Store_EmptyScores(t *testing.T) {
 	req.Empty(results[0].Scores)
 }
 func TestAnalysisRepository_Store_LargeContent(t *testing.T) {
-	req, ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 	roomID := "large-content"
 
@@ -857,7 +907,7 @@ func TestAnalysisRepository_Store_LargeContent(t *testing.T) {
 	}
 
 	// When: Storing
-	err := repo.Store(analysis)
+	err = repo.Store(analysis)
 
 	// Then: Should handle successfully
 	// Note: BadgerDB default value size limit is 1MB
@@ -874,8 +924,10 @@ func TestAnalysisRepository_Store_LargeContent(t *testing.T) {
 }
 
 func TestAnalysisRepository_Flush_IdempotentExclamation(t *testing.T) {
-	req, _, log, badgerDB, blugeWriter := initTest(t)
-	defer cleanup(badgerDB, blugeWriter)
+	req := require.New(t)
+	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
 	// When: Calling Flush multiple times
@@ -887,30 +939,6 @@ func TestAnalysisRepository_Flush_IdempotentExclamation(t *testing.T) {
 	req.NoError(err1)
 	req.NoError(err2)
 	req.NoError(err3)
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-func initTest(t *testing.T) (*require.Assertions, context.Context, *slog.Logger, *badger.DB, *bluge.Writer) {
-	req := require.New(t)
-	ctx := context.Background()
-	log := logs.GetLoggerFromLevel(slog.LevelDebug)
-	badgerDB, err := db.LoadBadger(t)
-	req.NoError(err)
-
-	blugeWriter, err := db.LoadBluge(t)
-	req.NoError(err)
-
-	return req, ctx, log, badgerDB, blugeWriter
-}
-func cleanup(badgerDB *badger.DB, blugeWriter *bluge.Writer) {
-	if blugeWriter != nil {
-		blugeWriter.Close()
-	}
-	if badgerDB != nil {
-		badgerDB.Close()
-	}
 }
 
 func extractIDs(analyses []Analysis) []uuid.UUID {
