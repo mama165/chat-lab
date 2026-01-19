@@ -5,7 +5,7 @@ CMD_MASTER  := ./cmd/master
 CMD_SPEC    := ./cmd/specialist
 BIN_DIR     := ./bin
 BENCHMARK_IMAGE_NAME=benchmark
-BENCHMARK_OUTPUT_DIR=benchmark
+BENCHMARK_DIR=benchmark
 BENCHMARK_FILE_RESULT=benchmark.pdf
 DOC_COUNT_PROFILING=10000
 
@@ -115,13 +115,13 @@ bench-profile:
 	-docker run --rm -v $(PWD):/app $(BENCHMARK_IMAGE_NAME) \
 	   go test -v ./repositories \
 	   -run=TestAnalysisRepository_Search_100kDocuments \
-	   -cpuprofile=/app/repositories/cpu.out \
+	   -cpuprofile=/app/$(BENCHMARK_DIR)/benchmark.out \
 	   -timeout=5m \
 	   -args -count=$(DOC_COUNT_PROFILING)
 
 	@echo "📊 PDF report generation..."
 	# We mount the root directory to /app so pprof can see both the source profile and the output destination
 	docker run --rm -v $(PWD):/app $(BENCHMARK_IMAGE_NAME) \
-	   go tool pprof -pdf -output=/app/benchmark/$(BENCHMARK_FILE_RESULT) /app/repositories/cpu.out
+	   go tool pprof -pdf -output=/app/$(BENCHMARK_DIR)/$(BENCHMARK_FILE_RESULT) /app/$(BENCHMARK_DIR)/benchmark.out
 
-	@echo "✅ Successful! Report generated: ./benchmark/$(BENCHMARK_FILE_RESULT)"
+	@echo "✅ Report  successfully generated : ./$(BENCHMARK_DIR)/$(BENCHMARK_FILE_RESULT)"
