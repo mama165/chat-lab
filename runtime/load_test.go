@@ -27,12 +27,13 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockMessageRepo := mocks.NewMockIMessageRepository(ctrl)
 	mockAnalysisRepository := mocks.NewMockIAnalysisRepository(ctrl)
-	// On accepte tout sans rien faire pour simuler un stockage instantané
 	mockMessageRepo.EXPECT().StoreMessage(gomock.Any()).Do(
 		func(_ repositories.DiskMessage) {
 			time.Sleep(2 * time.Millisecond)
 		},
 	).Return(nil).AnyTimes()
+
+	mockAnalysisRepository.EXPECT().Store(gomock.Any()).Return(nil).AnyTimes()
 
 	telemetryChan := make(chan event.Event, 5000)
 	log := slog.New(slog.DiscardHandler) // On désactive les logs pour la perf
