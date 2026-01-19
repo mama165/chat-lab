@@ -941,6 +941,47 @@ func TestAnalysisRepository_Flush_IdempotentExclamation(t *testing.T) {
 	req.NoError(err3)
 }
 
+func TestAnalysisRepository_StoreBatch_MultiplePayloadTypes(t *testing.T) {
+	req := require.New(t)
+	// Setup using your SDK helper
+	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	req.NoError(err)
+	defer db.CleanupDB(badgerDB, blugeWriter)
+
+	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
+	roomID := "multi-type-room"
+
+	// Given: A batch containing different types, specifically a "stuck" filename
+	analyses := []Analysis{
+		{
+			MessageId: uuid.New(),
+			RoomId:    roomID,
+			At:        time.Now().Add(-1 * time.Hour),
+			Summary:   "File analysis",
+			Payload:   FileDetails{Filename: "document.pdf", MimeType: "application/pdf", Size: 1024},
+		},
+	}
+
+	// When: Storing and flushing
+	err = repo.StoreBatch(analyses)
+	req.NoError(err)
+	repo.Flush()
+
+	// Then: It should be searchable by "document", "pdf", or "document.pdf"
+
+	// Test 1: Search by filename without extension
+	res1, _, _ := repo.SearchPaginated(ctx, "document", roomID, 0)
+	req.Len(res1, 1, "Should find the file by name only")
+
+	// Test 2: Search by extension
+	res2, _, _ := repo.SearchPaginated(ctx, "pdf", roomID, 0)
+	req.Len(res2, 1, "Should find the file by extension")
+
+	// Test 3: Search by full name
+	res3, _, _ := repo.SearchPaginated(ctx, "document.pdf", roomID, 0)
+	req.Len(res3, 1, "Should find the file by full name")
+}
+
 func extractIDs(analyses []Analysis) []uuid.UUID {
 	ids := make([]uuid.UUID, len(analyses))
 	for i, a := range analyses {

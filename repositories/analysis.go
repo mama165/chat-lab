@@ -6,15 +6,16 @@ import (
 	pb "chat-lab/proto/storage"
 	"context"
 	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
 	"github.com/blugelabs/bluge"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"log/slog"
-	"strings"
-	"time"
 )
 
 type IAnalysisRepository interface {
@@ -89,37 +90,30 @@ type FileDetails struct {
 // and searchable in real-time. The method dynamically selects the most relevant
 // content to index based on the payload type (Text, Audio, or File).
 func (a *AnalysisRepository) Store(analysis Analysis) error {
-	key := buildKey(analysis.RoomId, analysis.At, analysis.MessageId)
+	mainKey := buildKey(analysis.RoomId, analysis.At, analysis.MessageId)
+	// Create the secondary index pointer for O(1) lookup
+	indexKey := []byte(fmt.Sprintf("idx:msg:%s", analysis.MessageId.String()))
 
 	bytes, err := proto.Marshal(fromAnalysis(analysis))
 	if err != nil {
 		return err
 	}
 
+	// Store both the main data AND the secondary index pointer
 	err = a.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(key, bytes)
+		if err := txn.Set(mainKey, bytes); err != nil {
+			return err
+		}
+		// CRITICAL: Also store the index pointer (this was missing!)
+		return txn.Set(indexKey, mainKey)
 	})
 	if err != nil {
 		return fmt.Errorf("badger storage failed: %w", err)
 	}
 
-	// 1. Combine Summary + Payload Content for full-text search
-	fullSearchableText := analysis.Summary
-	var category domain.DataType
+	// Extract searchable text based on payload type
 
-	switch p := analysis.Payload.(type) {
-	case TextContent:
-		fullSearchableText += " " + p.Content
-		category = domain.TextType
-	case AudioDetails:
-		fullSearchableText += " " + p.Transcription
-		category = domain.AudioType
-	case FileDetails:
-		fullSearchableText += " " + p.Filename
-		category = domain.FileType
-	default:
-		a.log.Error("Unexpected analyse type", "type", analysis.Payload)
-	}
+	fullSearchableText, category := a.prepareInternalData(analysis)
 
 	id := analysis.MessageId.String()
 	return a.upsertSearchIndex(id, fullSearchableText, analysis.Scores, category, analysis.RoomId)
@@ -150,25 +144,73 @@ func (a *AnalysisRepository) upsertSearchIndex(id, content string,
 	return a.writer.Update(doc.ID(), doc)
 }
 
-// StoreBatch persists multiple analysis records in BadgerDB using a WriteBatch for performance.
-// Note: This only updates BadgerDB; the search index must be updated separately or via a loop.
+// StoreBatch persists a collection of analysis records using a dual-write batching strategy.
+// It simultaneously updates the BadgerDB primary store and the Bluge search index.
+//
+// Performance Design:
+//   - BadgerDB: Uses a WriteBatch (wb) to group multiple LSM-tree insertions into a single
+//     flush, minimizing disk synchronization cycles. It also stores a secondary index
+//     pointer (idx:msg:{uuid}) to allow O(1) retrieval.
+//   - Bluge Index: Groups multiple document updates into a single bluge.Batch. This
+//     drastically reduces the CPU time spent in Syscall6 (I/O wait) by avoiding redundant
+//     file descriptor locks and segment merges for each document.
+//   - Hydration Strategy: Each document is indexed with its MessageId as the unique
+//     identifier, allowing O(1) retrieval from the primary store during search results hydration.
+//
+// Error Handling:
+//
+//	The method ensures that both batches are prepared before any disk commit. If either
+//	Badger or Bluge flush fails, an error is returned to the caller for retry or logging.
 func (a *AnalysisRepository) StoreBatch(analyses []Analysis) error {
 	wb := a.db.NewWriteBatch()
 	defer wb.Cancel()
 
-	for _, anal := range analyses {
-		analysisPb := fromAnalysis(anal)
+	blugeBatch := bluge.NewBatch()
+
+	for _, analysis := range analyses {
+		// --- Badger: Prepare Protobuf, Main Key and Index Key ---
+		analysisPb := fromAnalysis(analysis)
 		bytes, err := proto.Marshal(analysisPb)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to marshal analysis %s: %w", analysis.MessageId, err)
 		}
 
-		key := buildKey(anal.RoomId, anal.At, anal.MessageId)
-		if err := wb.Set(key, bytes); err != nil {
-			return err
+		mainKey := buildKey(analysis.RoomId, analysis.At, analysis.MessageId)
+		// Pointer key for O(1) lookup: idx:msg:{uuid} -> mainKey
+		indexKey := []byte(fmt.Sprintf("idx:msg:%s", analysis.MessageId.String()))
+
+		// Store both the data and the pointer in the same batch
+		if err := wb.Set(mainKey, bytes); err != nil {
+			return fmt.Errorf("failed to set badger main key: %w", err)
 		}
+		if err := wb.Set(indexKey, mainKey); err != nil {
+			return fmt.Errorf("failed to set badger index pointer: %w", err)
+		}
+
+		fullSearchableText, category := a.prepareInternalData(analysis)
+
+		doc := bluge.NewDocument(analysis.MessageId.String())
+		doc.AddField(bluge.NewTextField("content", fullSearchableText).StoreValue())
+		doc.AddField(bluge.NewKeywordField("room_id", analysis.RoomId).StoreValue())
+		doc.AddField(bluge.NewKeywordField("type", string(category)).StoreValue())
+
+		for name, score := range analysis.Scores {
+			fieldName := strings.ToLower(string(name))
+			doc.AddField(bluge.NewNumericField(fieldName, score).StoreValue())
+		}
+
+		blugeBatch.Update(doc.ID(), doc)
 	}
-	return wb.Flush()
+
+	// Finalize writes
+	if err := wb.Flush(); err != nil {
+		return fmt.Errorf("badger write batch flush failed: %w", err)
+	}
+	if err := a.writer.Batch(blugeBatch); err != nil {
+		return fmt.Errorf("bluge batch execution failed: %w", err)
+	}
+
+	return nil
 }
 
 // ScanAnalysesByRoom retrieves a paginated list of analyses for a specific room using Badger's prefix scan.
@@ -246,35 +288,55 @@ func (a *AnalysisRepository) ScanAnalysesByRoom(roomID string, cursor *string) (
 }
 
 // FetchFullByMessageId retrieves the complete Analysis object from BadgerDB.
-// Currently, performs a prefix scan on the room, which is O(N).
-// Optimization to O(1) via a secondary index is recommended for large datasets.
+// It uses a two-step O(1) lookup strategy to avoid expensive prefix scans:
+//  1. Lookup the main data key using a secondary index pointer (idx:msg:{uuid}).
+//  2. Retrieve and unmarshal the actual Protobuf data from the main key. [cite: 2026-01-19]
+//
+// Security & Consistency:
+//
+//	Even though the UUID lookup is global, the method validates that the retrieved
+//	record belongs to the requested roomID to ensure data isolation. [cite: 2026-01-19]
 func (a *AnalysisRepository) FetchFullByMessageId(roomID string, messageId uuid.UUID) (Analysis, error) {
 	var result Analysis
-	prefix := []byte(fmt.Sprintf("analysis:%s:", roomID))
-	msgIDStr := messageId.String()
+
+	// The secondary index key acts as a "shortcut" to the real data location.
+	indexKey := []byte(fmt.Sprintf("idx:msg:%s", messageId.String()))
 
 	err := a.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			item := it.Item()
-			key := string(item.Key())
-
-			// On cherche le messageId à la fin de la clé
-			if len(key) >= len(msgIDStr) && key[len(key)-len(msgIDStr):] == msgIDStr {
-				return item.Value(func(v []byte) error {
-					var pbAnal pb.Analysis
-					if err := proto.Unmarshal(v, &pbAnal); err != nil {
-						return err
-					}
-					res, errMapping := toAnalysis(&pbAnal)
-					result = res
-					return errMapping
-				})
-			}
+		// STEP 1: Retrieve the pointer (the main key) from the secondary index.
+		itemIdx, err := txn.Get(indexKey)
+		if err != nil {
+			return fmt.Errorf("analysis index not found for message %s: %w", messageId, err)
 		}
-		return fmt.Errorf("analysis not found for message: %s", messageId)
+
+		return itemIdx.Value(func(mainKey []byte) error {
+			// STEP 2: Retrieve the actual Protobuf payload using the main key pointer.
+			itemData, err := txn.Get(mainKey)
+			if err != nil {
+				return fmt.Errorf("analysis data not found for message %s: %w", messageId, err)
+			}
+
+			return itemData.Value(func(v []byte) error {
+				var pbAnal pb.Analysis
+				if err := proto.Unmarshal(v, &pbAnal); err != nil {
+					return fmt.Errorf("failed to unmarshal analysis protobuf: %w", err)
+				}
+
+				// Map Protobuf to our domain Analysis struct.
+				res, errMapping := toAnalysis(&pbAnal)
+				if errMapping != nil {
+					return fmt.Errorf("failed to map protobuf to domain: %w", errMapping)
+				}
+
+				// STEP 3: Security Check. Verify the record belongs to the requested room.
+				if res.RoomId != roomID {
+					return fmt.Errorf("security violation: message %s does not belong to room %s", messageId, roomID)
+				}
+
+				result = res
+				return nil
+			})
+		})
 	})
 
 	return result, err
@@ -303,7 +365,9 @@ func (a *AnalysisRepository) SearchPaginated(ctx context.Context, query string, 
 }
 
 // SearchByScoreRange allows filtering messages based on AI specialist metrics (e.g., toxicity > 0.8).
-func (a *AnalysisRepository) SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, roomID string) ([]Analysis, uint64, error) {
+func (a *AnalysisRepository) SearchByScoreRange(ctx context.Context,
+	scoreName string, min,
+	max float64, roomID string) ([]Analysis, uint64, error) {
 	fieldName := strings.ToLower(scoreName)
 	query := bluge.NewNumericRangeInclusiveQuery(min, max, true, true).SetField(fieldName)
 
@@ -438,26 +502,20 @@ func fromAnalysis(analysis Analysis) *pb.Analysis {
 		Scores:    scores,
 	}
 
+	// Gestion robuste des pointeurs pour Protobuf
 	switch p := analysis.Payload.(type) {
 	case TextContent:
-		res.Payload = &pb.Analysis_TextContent{
-			TextContent: &pb.TextContent{Content: p.Content},
-		}
+		res.Payload = &pb.Analysis_TextContent{TextContent: &pb.TextContent{Content: p.Content}}
+	case *TextContent:
+		res.Payload = &pb.Analysis_TextContent{TextContent: &pb.TextContent{Content: p.Content}}
 	case AudioDetails:
-		res.Payload = &pb.Analysis_Audio{
-			Audio: &pb.AudioDetails{
-				Transcription: p.Transcription,
-				DurationSec:   p.Duration,
-			},
-		}
+		res.Payload = &pb.Analysis_Audio{Audio: &pb.AudioDetails{Transcription: p.Transcription, DurationSec: p.Duration}}
+	case *AudioDetails:
+		res.Payload = &pb.Analysis_Audio{Audio: &pb.AudioDetails{Transcription: p.Transcription, DurationSec: p.Duration}}
 	case FileDetails:
-		res.Payload = &pb.Analysis_File{
-			File: &pb.FileDetails{
-				Filename: p.Filename,
-				MimeType: p.MimeType,
-				Size:     p.Size,
-			},
-		}
+		res.Payload = &pb.Analysis_File{File: &pb.FileDetails{Filename: p.Filename, MimeType: p.MimeType, Size: p.Size}}
+	case *FileDetails:
+		res.Payload = &pb.Analysis_File{File: &pb.FileDetails{Filename: p.Filename, MimeType: p.MimeType, Size: p.Size}}
 	}
 	return res
 }
@@ -504,4 +562,53 @@ func toAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 		}
 	}
 	return res, nil
+}
+
+// prepareInternalData extracts searchable text and determines the data category
+// from the flexible analysis payload. It handles both value and pointer types
+// to ensure consistency between storage and search indexing.
+func (a *AnalysisRepository) prepareInternalData(analysis Analysis) (string, domain.DataType) {
+	fullText := analysis.Summary
+	category := domain.TextType // Default category
+
+	if analysis.Payload == nil {
+		return fullText, category
+	}
+
+	switch p := analysis.Payload.(type) {
+	case TextContent:
+		fullText += " " + p.Content
+		category = domain.TextType
+	case *TextContent:
+		if p != nil {
+			fullText += " " + p.Content
+		}
+		category = domain.TextType
+
+	case AudioDetails:
+		fullText += " " + p.Transcription
+		category = domain.AudioType
+	case *AudioDetails:
+		if p != nil {
+			fullText += " " + p.Transcription
+		}
+		category = domain.AudioType
+
+	case FileDetails:
+		fullText += " " + p.Filename
+		category = domain.FileType
+	case *FileDetails:
+		if p != nil {
+			fullText += " " + p.Filename
+		}
+		category = domain.FileType
+
+	default:
+		// Log the exact type to help debugging unexpected AI pipeline outputs [cite: 2026-01-19]
+		a.log.Warn("unknown payload type during data preparation",
+			"message_id", analysis.MessageId,
+			"type", fmt.Sprintf("%T", analysis.Payload))
+	}
+
+	return fullText, category
 }
