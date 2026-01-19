@@ -3,8 +3,8 @@ package services
 import (
 	"chat-lab/auth"
 	"chat-lab/errors"
+	"chat-lab/infrastructure/storage"
 	"chat-lab/mocks"
-	"chat-lab/repositories"
 	"testing"
 	"time"
 
@@ -81,7 +81,7 @@ func TestAuthService_Login(t *testing.T) {
 		password := "Secret123456!"
 
 		hashedPassword, _ := auth.HashPassword(password)
-		storedUser := repositories.User{
+		storedUser := storage.User{
 			ID:           "uuid-123",
 			Email:        email,
 			PasswordHash: hashedPassword,
@@ -109,7 +109,7 @@ func TestAuthService_Login(t *testing.T) {
 		email := "user@example.com"
 
 		hashedPassword, _ := auth.HashPassword("CorrectPassword123!")
-		storedUser := repositories.User{
+		storedUser := storage.User{
 			Email:        email,
 			PasswordHash: hashedPassword,
 		}
@@ -129,7 +129,7 @@ func TestAuthService_Login(t *testing.T) {
 
 		mockRepo.EXPECT().
 			GetUserByEmail("unknown@example.com").
-			Return(repositories.User{}, errors.ErrInvalidCredentials).
+			Return(storage.User{}, errors.ErrInvalidCredentials).
 			Times(1)
 
 		_, err := svc.Login("unknown@example.com", "anyPassword")

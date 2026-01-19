@@ -2,20 +2,20 @@ package sink
 
 import (
 	"chat-lab/domain/event"
-	"chat-lab/repositories"
+	"chat-lab/infrastructure/storage"
 	"context"
 	"fmt"
 	"log/slog"
 )
 
 type AnalysisSink struct {
-	repository repositories.IAnalysisRepository
+	repository storage.IAnalysisRepository
 	log        *slog.Logger
 	minScoring float64
 	maxScoring float64
 }
 
-func NewAnalysisSink(repository repositories.IAnalysisRepository,
+func NewAnalysisSink(repository storage.IAnalysisRepository,
 	log *slog.Logger,
 	minScoring float64,
 	maxScoring float64) *AnalysisSink {
@@ -41,6 +41,6 @@ func (a AnalysisSink) Consume(_ context.Context, e event.DomainEvent) error {
 	}
 }
 
-func toAnalysis(event event.SanitizedMessage) repositories.Analysis {
-	return repositories.Analysis{}
+func toAnalysis(event event.SanitizedMessage) storage.Analysis {
+	return storage.Analysis{}
 }

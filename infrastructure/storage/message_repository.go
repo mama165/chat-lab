@@ -1,5 +1,5 @@
 //go:generate go run go.uber.org/mock/mockgen -source=message.go -destination=../mocks/mock_message_repository.go -package=mocks
-package repositories
+package storage
 
 import (
 	pb "chat-lab/proto/storage"

@@ -10,7 +10,7 @@
 package mocks
 
 import (
-	repositories "chat-lab/repositories"
+	repositories "chat-lab/infrastructure/storage"
 	context "context"
 	reflect "reflect"
 

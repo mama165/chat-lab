@@ -2,18 +2,18 @@ package sink
 
 import (
 	"chat-lab/domain/event"
-	"chat-lab/repositories"
+	"chat-lab/infrastructure/storage"
 	"context"
 	"fmt"
 	"log/slog"
 )
 
 type DiskSink struct {
-	repository repositories.IMessageRepository
+	repository storage.IMessageRepository
 	log        *slog.Logger
 }
 
-func NewDiskSink(repository repositories.IMessageRepository, log *slog.Logger) DiskSink {
+func NewDiskSink(repository storage.IMessageRepository, log *slog.Logger) DiskSink {
 	return DiskSink{repository: repository, log: log}
 }
 
@@ -27,8 +27,8 @@ func (d DiskSink) Consume(_ context.Context, e event.DomainEvent) error {
 	}
 }
 
-func toDiskMessage(event event.SanitizedMessage) repositories.DiskMessage {
-	return repositories.DiskMessage{
+func toDiskMessage(event event.SanitizedMessage) storage.DiskMessage {
+	return storage.DiskMessage{
 		ID:            event.ID,
 		Room:          event.Room,
 		Author:        event.Author,

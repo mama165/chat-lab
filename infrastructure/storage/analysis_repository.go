@@ -1,5 +1,5 @@
 //go:generate go run go.uber.org/mock/mockgen -source=analysis.go -destination=../mocks/mock_analysis_repository.go -package=mocks
-package repositories
+package storage
 
 import (
 	"chat-lab/domain/specialist"

@@ -3,11 +3,10 @@ package main
 import (
 	"chat-lab/domain/event"
 	"chat-lab/domain/specialist"
-
 	"chat-lab/grpc/server"
+	bluge2 "chat-lab/infrastructure/storage"
 	pb2 "chat-lab/proto/account"
 	pb "chat-lab/proto/chat"
-	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/services"
@@ -116,8 +115,8 @@ func run() (int, error) {
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
-	messageRepository := repositories.NewMessageRepository(db, log, config.LimitMessages)
-	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
+	messageRepository := bluge2.NewMessageRepository(db, log, config.LimitMessages)
+	analysisRepository := bluge2.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
 
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
@@ -160,7 +159,7 @@ func run() (int, error) {
 			server.AuthInterceptor,
 		))
 	chatService := services.NewChatService(orchestrator)
-	userRepository := repositories.NewUserRepository(db)
+	userRepository := bluge2.NewUserRepository(db)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
 	authServer := server.NewAuthServer(authService)

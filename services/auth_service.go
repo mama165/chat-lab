@@ -3,7 +3,7 @@ package services
 import (
 	"chat-lab/auth"
 	"chat-lab/errors"
-	"chat-lab/repositories"
+	"chat-lab/infrastructure/storage"
 	"fmt"
 	"time"
 )
@@ -14,13 +14,13 @@ type IAuthService interface {
 }
 
 type AuthService struct {
-	userRepository    repositories.IUserRepository
+	userRepository    storage.IUserRepository
 	authTokenDuration time.Duration
 }
 
 type Token string
 
-func NewAuthService(repo repositories.IUserRepository,
+func NewAuthService(repo storage.IUserRepository,
 	authTokenDuration time.Duration) IAuthService {
 	return &AuthService{
 		userRepository:    repo,

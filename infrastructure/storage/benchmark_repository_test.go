@@ -1,4 +1,4 @@
-package repositories
+package storage
 
 import (
 	"chat-lab/domain/specialist"

@@ -3,8 +3,8 @@ package runtime_test
 import (
 	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
+	"chat-lab/infrastructure/storage"
 	"chat-lab/mocks"
-	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"context"
@@ -27,7 +27,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	mockMessageRepo := mocks.NewMockIMessageRepository(ctrl)
 	mockAnalysisRepository := mocks.NewMockIAnalysisRepository(ctrl)
 	mockMessageRepo.EXPECT().StoreMessage(gomock.Any()).Do(
-		func(_ repositories.DiskMessage) {
+		func(_ storage.DiskMessage) {
 			time.Sleep(2 * time.Millisecond)
 		},
 	).Return(nil).AnyTimes()

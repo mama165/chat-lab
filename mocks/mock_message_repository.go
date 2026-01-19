@@ -10,7 +10,7 @@
 package mocks
 
 import (
-	repositories "chat-lab/repositories"
+	repositories "chat-lab/infrastructure/storage"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"

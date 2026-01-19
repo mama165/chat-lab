@@ -8,8 +8,8 @@ import (
 	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/errors"
+	"chat-lab/infrastructure/storage"
 	"chat-lab/moderation"
-	"chat-lab/repositories"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
 	"context"
@@ -39,8 +39,8 @@ type Orchestrator struct {
 	moderationChan       chan event.Event
 	domainChan           chan event.Event
 	telemetryChan        chan event.Event
-	messageRepository    repositories.IMessageRepository
-	analysisRepository   repositories.IAnalysisRepository
+	messageRepository    storage.IMessageRepository
+	analysisRepository   storage.IAnalysisRepository
 	manager              *Manager
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
@@ -55,8 +55,8 @@ type Orchestrator struct {
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
-	messageRepository repositories.IMessageRepository,
-	analysisRepository repositories.IAnalysisRepository,
+	messageRepository storage.IMessageRepository,
+	analysisRepository storage.IAnalysisRepository,
 	specialistManager *Manager,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
@@ -131,8 +131,8 @@ func (o *Orchestrator) GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, 
 	return fromDiskMessage(messages), cursor, err
 }
 
-func fromDiskMessage(messages []repositories.DiskMessage) []chat.Message {
-	return lo.Map(messages, func(item repositories.DiskMessage, _ int) chat.Message {
+func fromDiskMessage(messages []storage.DiskMessage) []chat.Message {
+	return lo.Map(messages, func(item storage.DiskMessage, _ int) chat.Message {
 		return chat.Message{
 			ID:        item.ID,
 			SenderID:  item.Author,
