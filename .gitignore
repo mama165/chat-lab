@@ -21,6 +21,9 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Benchmark results
+/benchmark/*.pdf
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
