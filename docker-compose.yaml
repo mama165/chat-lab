@@ -22,14 +22,6 @@ services:
       - /tmp/badger:/tmp/badger
     user: "${D_UID}:${D_GID}"
     env_file:
-      - cmd/master/chat.conf  # Docker va charger toutes les variables de ce fichier
-    environment:
-      - HOST=127.0.0.1
-      - PORT=8080
-      - TOXICITY_BIN_PATH=/usr/local/bin/specialist
-      - SENTIMENT_BIN_PATH=/usr/local/bin/specialist
-      - TOXICITY_PORT=8081
-      - SENTIMENT_PORT=8082
-      - BADGER_FILEPATH=/tmp/badger
+      - cmd/master/chat.conf
     ports:
       - "8080:8080"

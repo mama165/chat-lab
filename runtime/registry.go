@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"chat-lab/contract"
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"sync"
 )
 
@@ -11,13 +11,13 @@ type Set map[string]struct{}
 type Registry struct {
 	mu          sync.RWMutex
 	Sessions    map[string]contract.EventSink // map participant -> Sink
-	RoomMembers map[domain.RoomID]Set         // map room to users
+	RoomMembers map[chat.RoomID]Set           // map room to users
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
 		Sessions:    make(map[string]contract.EventSink),
-		RoomMembers: make(map[domain.RoomID]Set),
+		RoomMembers: make(map[chat.RoomID]Set),
 	}
 }
 
@@ -29,7 +29,7 @@ func NewRegistry() *Registry {
 // This decoupled approach ensures that even if a user is in multiple rooms,
 // their connection (Sink) is managed in a single place.
 // Returns nil if the room doesn't exist or has no members.
-func (r *Registry) GetSinksForRoom(roomID domain.RoomID) []contract.EventSink {
+func (r *Registry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -49,7 +49,7 @@ func (r *Registry) GetSinksForRoom(roomID domain.RoomID) []contract.EventSink {
 // Subscribe registers a participant's active connection and assigns them to a specific room.
 // It ensures thread-safe updates to both the global session directory and the room-specific membership set.
 // If the room does not yet exist in the registry, it is initialized on the fly.
-func (r *Registry) Subscribe(participantID string, roomID domain.RoomID, sink contract.EventSink) {
+func (r *Registry) Subscribe(participantID string, roomID chat.RoomID, sink contract.EventSink) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -64,7 +64,7 @@ func (r *Registry) Subscribe(participantID string, roomID domain.RoomID, sink co
 // Unsubscribe removes a participant from the registry and their current room.
 // It cleans up the session and ensures no empty sets are left in the room map
 // to prevent memory leaks over time.
-func (r *Registry) Unsubscribe(participantID string, roomID domain.RoomID) {
+func (r *Registry) Unsubscribe(participantID string, roomID chat.RoomID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

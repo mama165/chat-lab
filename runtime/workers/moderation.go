@@ -1,10 +1,10 @@
 package workers
 
 import (
-	"chat-lab/domain"
+	"chat-lab/contract"
 	"chat-lab/domain/event"
+	"chat-lab/domain/specialist"
 	"chat-lab/moderation"
-	"chat-lab/specialist"
 	"context"
 	"log/slog"
 	"math/rand"
@@ -15,14 +15,14 @@ import (
 
 type ModerationWorker struct {
 	moderator      moderation.Moderator
-	manager        *specialist.Manager
+	manager        contract.IAnalyzer
 	moderationChan chan event.Event
 	events         chan event.Event
 	log            *slog.Logger
 }
 
 func NewModerationWorker(moderator moderation.Moderator,
-	manager *specialist.Manager,
+	manager contract.IAnalyzer,
 	moderationChan,
 	events chan event.Event, log *slog.Logger) *ModerationWorker {
 	return &ModerationWorker{
@@ -97,6 +97,6 @@ func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.Mess
 // decide decides if the message should be dropped or forwarded
 // Completely random right now
 // Supposed to aggregate all scores from AI
-func decide(_ map[domain.AnalysisMetric]domain.SpecialistResponse) float64 {
+func decide(_ map[specialist.Metric]specialist.Response) float64 {
 	return 0.4 + rand.Float64()*(0.6-0.4)
 }

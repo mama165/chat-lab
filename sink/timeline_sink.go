@@ -1,7 +1,7 @@
 package sink
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"context"
 )
@@ -9,7 +9,7 @@ import (
 // Timeline holds a simple local timeline
 type Timeline struct {
 	Owner    string
-	Messages []domain.Message
+	Messages []chat.Message
 }
 
 func NewTimeline() *Timeline {
@@ -27,8 +27,8 @@ func (t *Timeline) Consume(_ context.Context, e event.DomainEvent) error {
 	return nil
 }
 
-func fromEvent(event event.MessagePosted) domain.Message {
-	return domain.Message{
+func fromEvent(event event.MessagePosted) chat.Message {
+	return chat.Message{
 		SenderID:  event.Author,
 		Content:   event.Content,
 		CreatedAt: event.At,

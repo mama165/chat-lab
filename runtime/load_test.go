@@ -1,13 +1,12 @@
 package runtime_test
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
-	"chat-lab/specialist"
 	"context"
 	"fmt"
 	"log/slog"
@@ -41,7 +40,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	supervisor := workers.NewSupervisor(log, telemetryChan, 100*time.Millisecond)
 	registry := runtime.NewRegistry()
 
-	manager := specialist.NewManager(log)
+	manager := runtime.NewManager(log)
 
 	// Orchestrator avec un buffer de 1000 et une latence de backpressure courte
 	o := runtime.NewOrchestrator(
@@ -82,7 +81,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 		go func(clientID int) {
 			defer wg.Done()
 			for j := 0; j < messagesPerClient; j++ {
-				cmd := domain.PostMessageCommand{
+				cmd := chat.PostMessageCommand{
 					Room:      1,
 					UserID:    fmt.Sprintf("user-%d", clientID),
 					Content:   "Ceci est un message de test de charge",

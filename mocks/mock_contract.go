@@ -11,8 +11,9 @@ package mocks
 
 import (
 	contract "chat-lab/contract"
-	domain "chat-lab/domain"
+	chat "chat-lab/domain/chat"
 	event "chat-lab/domain/event"
+	specialist "chat-lab/domain/specialist"
 	context "context"
 	reflect "reflect"
 
@@ -198,7 +199,7 @@ func (m *MockIRegistry) EXPECT() *MockIRegistryMockRecorder {
 }
 
 // GetSinksForRoom mocks base method.
-func (m *MockIRegistry) GetSinksForRoom(roomID domain.RoomID) []contract.EventSink {
+func (m *MockIRegistry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSinksForRoom", roomID)
 	ret0, _ := ret[0].([]contract.EventSink)
@@ -212,7 +213,7 @@ func (mr *MockIRegistryMockRecorder) GetSinksForRoom(roomID any) *gomock.Call {
 }
 
 // Subscribe mocks base method.
-func (m *MockIRegistry) Subscribe(participantID string, roomID domain.RoomID, sink contract.EventSink) {
+func (m *MockIRegistry) Subscribe(participantID string, roomID chat.RoomID, sink contract.EventSink) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Subscribe", participantID, roomID, sink)
 }
@@ -224,7 +225,7 @@ func (mr *MockIRegistryMockRecorder) Subscribe(participantID, roomID, sink any) 
 }
 
 // Unsubscribe mocks base method.
-func (m *MockIRegistry) Unsubscribe(participantID string, roomID domain.RoomID) {
+func (m *MockIRegistry) Unsubscribe(participantID string, roomID chat.RoomID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Unsubscribe", participantID, roomID)
 }
@@ -260,10 +261,10 @@ func (m *MockIOrchestrator) EXPECT() *MockIOrchestratorMockRecorder {
 }
 
 // GetMessages mocks base method.
-func (m *MockIOrchestrator) GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error) {
+func (m *MockIOrchestrator) GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, *string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMessages", cmd)
-	ret0, _ := ret[0].([]domain.Message)
+	ret0, _ := ret[0].([]chat.Message)
 	ret1, _ := ret[1].(*string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -276,7 +277,7 @@ func (mr *MockIOrchestratorMockRecorder) GetMessages(cmd any) *gomock.Call {
 }
 
 // PostMessage mocks base method.
-func (m *MockIOrchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
+func (m *MockIOrchestrator) PostMessage(ctx context.Context, cmd chat.PostMessageCommand) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PostMessage", ctx, cmd)
 	ret0, _ := ret[0].(error)
@@ -290,7 +291,7 @@ func (mr *MockIOrchestratorMockRecorder) PostMessage(ctx, cmd any) *gomock.Call 
 }
 
 // RegisterParticipant mocks base method.
-func (m *MockIOrchestrator) RegisterParticipant(pID string, roomID domain.RoomID, sink contract.EventSink) {
+func (m *MockIOrchestrator) RegisterParticipant(pID string, roomID chat.RoomID, sink contract.EventSink) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterParticipant", pID, roomID, sink)
 }
@@ -302,7 +303,7 @@ func (mr *MockIOrchestratorMockRecorder) RegisterParticipant(pID, roomID, sink a
 }
 
 // RegisterRoom mocks base method.
-func (m *MockIOrchestrator) RegisterRoom(room *domain.Room) {
+func (m *MockIOrchestrator) RegisterRoom(room *chat.Room) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterRoom", room)
 }
@@ -340,7 +341,7 @@ func (mr *MockIOrchestratorMockRecorder) Stop() *gomock.Call {
 }
 
 // UnregisterParticipant mocks base method.
-func (m *MockIOrchestrator) UnregisterParticipant(pID string, roomID domain.RoomID) {
+func (m *MockIOrchestrator) UnregisterParticipant(pID string, roomID chat.RoomID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UnregisterParticipant", pID, roomID)
 }
@@ -349,6 +350,44 @@ func (m *MockIOrchestrator) UnregisterParticipant(pID string, roomID domain.Room
 func (mr *MockIOrchestratorMockRecorder) UnregisterParticipant(pID, roomID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterParticipant", reflect.TypeOf((*MockIOrchestrator)(nil).UnregisterParticipant), pID, roomID)
+}
+
+// MockIAnalyzer is a mock of IAnalyzer interface.
+type MockIAnalyzer struct {
+	ctrl     *gomock.Controller
+	recorder *MockIAnalyzerMockRecorder
+	isgomock struct{}
+}
+
+// MockIAnalyzerMockRecorder is the mock recorder for MockIAnalyzer.
+type MockIAnalyzerMockRecorder struct {
+	mock *MockIAnalyzer
+}
+
+// NewMockIAnalyzer creates a new mock instance.
+func NewMockIAnalyzer(ctrl *gomock.Controller) *MockIAnalyzer {
+	mock := &MockIAnalyzer{ctrl: ctrl}
+	mock.recorder = &MockIAnalyzerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIAnalyzer) EXPECT() *MockIAnalyzerMockRecorder {
+	return m.recorder
+}
+
+// AnalyzeAll mocks base method.
+func (m *MockIAnalyzer) AnalyzeAll(ctx context.Context, messageID, content string) map[specialist.Metric]specialist.Response {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AnalyzeAll", ctx, messageID, content)
+	ret0, _ := ret[0].(map[specialist.Metric]specialist.Response)
+	return ret0
+}
+
+// AnalyzeAll indicates an expected call of AnalyzeAll.
+func (mr *MockIAnalyzerMockRecorder) AnalyzeAll(ctx, messageID, content any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AnalyzeAll", reflect.TypeOf((*MockIAnalyzer)(nil).AnalyzeAll), ctx, messageID, content)
 }
 
 // MockISpecialistClient is a mock of ISpecialistClient interface.
@@ -376,10 +415,10 @@ func (m *MockISpecialistClient) EXPECT() *MockISpecialistClientMockRecorder {
 }
 
 // Analyze mocks base method.
-func (m *MockISpecialistClient) Analyze(ctx context.Context, request domain.SpecialistRequest) (domain.SpecialistResponse, error) {
+func (m *MockISpecialistClient) Analyze(ctx context.Context, request specialist.Request) (specialist.Response, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Analyze", ctx, request)
-	ret0, _ := ret[0].(domain.SpecialistResponse)
+	ret0, _ := ret[0].(specialist.Response)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

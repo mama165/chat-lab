@@ -1,7 +1,7 @@
-package specialist
+package runtime
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/specialist"
 	"chat-lab/errors"
 	"chat-lab/grpc/client"
 	pb "chat-lab/proto/analysis"
@@ -22,13 +22,13 @@ import (
 type Manager struct {
 	mu          sync.RWMutex
 	log         *slog.Logger
-	specialists map[domain.AnalysisMetric]*client.SpecialistClient
+	specialists map[specialist.Metric]*client.SpecialistClient
 }
 
 func NewManager(log *slog.Logger) *Manager {
 	return &Manager{
 		log:         log,
-		specialists: make(map[domain.AnalysisMetric]*client.SpecialistClient),
+		specialists: make(map[specialist.Metric]*client.SpecialistClient),
 	}
 }
 
@@ -40,7 +40,7 @@ func (m *Manager) Add(s *client.SpecialistClient) {
 }
 
 // Init launches all configured specialists and blocks until they are all ready.
-func (m *Manager) Init(ctx context.Context, configs []domain.SpecialistConfig) error {
+func (m *Manager) Init(ctx context.Context, configs []specialist.Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -62,7 +62,7 @@ func (m *Manager) Init(ctx context.Context, configs []domain.SpecialistConfig) e
 // It performs a "fail-fast" check on the binary, executes it as a child process
 // linked to the provided context, and ensures the gRPC server is ready before
 // returning a functional specialist client.
-func startSpecialist(ctx context.Context, cfg domain.SpecialistConfig) (*client.SpecialistClient, error) {
+func startSpecialist(ctx context.Context, cfg specialist.Config) (*client.SpecialistClient, error) {
 	// 1. Validate binary existence using our custom error
 	if _, err := os.Stat(cfg.BinPath); err != nil {
 		return nil, fmt.Errorf("%w: %s", errors.ErrSpecialistNotFound, cfg.BinPath)
@@ -120,20 +120,20 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 
 // AnalyzeAll broadcasts the content to all registered specialists in parallel.
 // It implements the Fan-Out pattern to ensure minimum latency
-func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content string) map[domain.AnalysisMetric]domain.SpecialistResponse {
+func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	results := make(map[domain.AnalysisMetric]domain.SpecialistResponse)
+	results := make(map[specialist.Metric]specialist.Response)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	for id, spec := range m.specialists {
 		wg.Add(1)
-		go func(id domain.AnalysisMetric, s *client.SpecialistClient) {
+		go func(id specialist.Metric, s *client.SpecialistClient) {
 			defer wg.Done()
 
-			resp, err := s.Analyze(ctx, domain.SpecialistRequest{
+			resp, err := s.Analyze(ctx, specialist.Request{
 				MessageID: messageID,
 				Content:   content,
 			})

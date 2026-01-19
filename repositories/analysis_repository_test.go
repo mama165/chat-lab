@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/specialist"
 	"fmt"
 	"testing"
 	"time"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var MetricTest domain.AnalysisMetric = "test"
+var MetricTest specialist.Metric = "test"
 
 // ============================================================================
 // UNIT TESTS - Core Functionality
@@ -36,9 +36,9 @@ func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
 		At:        time.Now().UTC(),
 		Summary:   "Test Summary",
 		Tags:      []string{"urgent", "bug"},
-		Scores: map[domain.AnalysisMetric]float64{
-			domain.MetricToxicity: 0.12,
-			domain.MetricBusiness: 0.88,
+		Scores: map[specialist.Metric]float64{
+			specialist.MetricToxicity: 0.12,
+			specialist.MetricBusiness: 0.88,
 		},
 		Payload: TextContent{Content: "This is a test message about gRPC implementation"},
 		Version: uuid.New(),
@@ -84,8 +84,8 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 		RoomId:    roomID,
 		At:        time.Now().UTC(),
 		Summary:   "Meeting recording",
-		Scores: map[domain.AnalysisMetric]float64{
-			domain.MetricSentiment: 0.75},
+		Scores: map[specialist.Metric]float64{
+			specialist.MetricSentiment: 0.75},
 		Payload: AudioDetails{
 			Transcription: "We decided to migrate to PostgreSQL for better scalability",
 			Duration:      180, // 3 minutes
@@ -408,7 +408,7 @@ func TestAnalysisRepository_SearchByScoreRange_SingleScore(t *testing.T) {
 			MessageId: a.id,
 			RoomId:    roomID,
 			Summary:   fmt.Sprintf("Score %.2f", a.score),
-			Scores:    map[domain.AnalysisMetric]float64{domain.MetricToxicity: a.score},
+			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: a.score},
 		}))
 	}
 	req.NoError(repo.Flush())
@@ -444,10 +444,10 @@ func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 		MessageId: uuid.New(),
 		RoomId:    roomID,
 		Summary:   "High business value",
-		Scores: map[domain.AnalysisMetric]float64{
-			domain.MetricBusiness:  0.92,
-			domain.MetricToxicity:  0.05,
-			domain.MetricSentiment: 0.75,
+		Scores: map[specialist.Metric]float64{
+			specialist.MetricBusiness:  0.92,
+			specialist.MetricToxicity:  0.05,
+			specialist.MetricSentiment: 0.75,
 		},
 	}))
 
@@ -455,10 +455,10 @@ func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 		MessageId: uuid.New(),
 		RoomId:    roomID,
 		Summary:   "Low business value",
-		Scores: map[domain.AnalysisMetric]float64{
-			domain.MetricBusiness:  0.12,
-			domain.MetricToxicity:  0.88,
-			domain.MetricSentiment: 0.25,
+		Scores: map[specialist.Metric]float64{
+			specialist.MetricBusiness:  0.12,
+			specialist.MetricToxicity:  0.88,
+			specialist.MetricSentiment: 0.25,
 		},
 	}))
 
@@ -492,7 +492,7 @@ func TestAnalysisRepository_SearchByScoreRange_EdgeCases(t *testing.T) {
 		MessageId: uuid.New(),
 		RoomId:    roomID,
 		Summary:   "Exactly 0.5",
-		Scores:    map[domain.AnalysisMetric]float64{MetricTest: 0.5},
+		Scores:    map[specialist.Metric]float64{MetricTest: 0.5},
 	}))
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
@@ -525,7 +525,7 @@ func TestAnalysisRepository_SearchByScoreRange_NonExistentScore(t *testing.T) {
 	req.NoError(repo.Store(Analysis{
 		MessageId: uuid.New(),
 		RoomId:    roomID,
-		Scores:    map[domain.AnalysisMetric]float64{domain.MetricToxicity: 0.5},
+		Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.5},
 	}))
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
@@ -660,7 +660,7 @@ func TestAnalysisRepository_FetchFullByMessageId_Success(t *testing.T) {
 		At:        time.Now().UTC(),
 		Summary:   "Original summary",
 		Tags:      []string{"tag1", "tag2"},
-		Scores:    map[domain.AnalysisMetric]float64{MetricTest: 0.42},
+		Scores:    map[specialist.Metric]float64{MetricTest: 0.42},
 		Payload:   TextContent{Content: "Test content"},
 	}
 	req.NoError(repo.Store(original))
@@ -737,9 +737,9 @@ func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-2 * time.Hour),
 			Summary:   "Bug report",
-			Scores: map[domain.AnalysisMetric]float64{
-				domain.MetricToxicity: 0.15,
-				domain.MetricBusiness: 0.92,
+			Scores: map[specialist.Metric]float64{
+				specialist.MetricToxicity: 0.15,
+				specialist.MetricBusiness: 0.92,
 			},
 			Payload: TextContent{Content: "Critical bug in payment processing"},
 		},
@@ -748,9 +748,9 @@ func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-1 * time.Hour),
 			Summary:   "Feature request",
-			Scores: map[domain.AnalysisMetric]float64{
-				domain.MetricToxicity: 0.05,
-				domain.MetricBusiness: 0.88,
+			Scores: map[specialist.Metric]float64{
+				specialist.MetricToxicity: 0.05,
+				specialist.MetricBusiness: 0.88,
 			},
 			Payload: TextContent{Content: "Add dark mode to the application"},
 		},

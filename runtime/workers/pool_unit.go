@@ -2,7 +2,7 @@ package workers
 
 import (
 	"chat-lab/contract"
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"context"
 	"fmt"
@@ -17,15 +17,15 @@ import (
 var _ contract.Worker = (*PoolUnitWorker)(nil)
 
 type PoolUnitWorker struct {
-	rooms          map[domain.RoomID]*domain.Room
-	commands       chan domain.Command
+	rooms          map[chat.RoomID]*chat.Room
+	commands       chan chat.Command
 	moderationChan chan event.Event
 	log            *slog.Logger
 }
 
 func NewPoolUnitWorker(
-	rooms map[domain.RoomID]*domain.Room,
-	commands chan domain.Command,
+	rooms map[chat.RoomID]*chat.Room,
+	commands chan chat.Command,
 	moderationChan chan event.Event,
 	log *slog.Logger) *PoolUnitWorker {
 	return &PoolUnitWorker{
@@ -52,7 +52,7 @@ func (w *PoolUnitWorker) Run(ctx context.Context) error {
 				w.log.Debug(fmt.Sprintf("Room %d doesn't exist", command.RoomID()))
 			}
 			switch cmd := command.(type) {
-			case domain.PostMessageCommand:
+			case chat.PostMessageCommand:
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -63,7 +63,7 @@ func (w *PoolUnitWorker) Run(ctx context.Context) error {
 	}
 }
 
-func toMessagePostedEvent(c domain.PostMessageCommand) event.Event {
+func toMessagePostedEvent(c chat.PostMessageCommand) event.Event {
 	return event.Event{
 		Type:      event.DomainType,
 		CreatedAt: time.Now().UTC(),

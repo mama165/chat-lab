@@ -2,8 +2,9 @@
 package contract
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
+	"chat-lab/domain/specialist"
 	"context"
 	"reflect"
 )
@@ -41,19 +42,23 @@ type EventSink interface {
 	Consume(ctx context.Context, e event.DomainEvent) error
 }
 type IRegistry interface {
-	GetSinksForRoom(roomID domain.RoomID) []EventSink
-	Subscribe(participantID string, roomID domain.RoomID, sink EventSink)
-	Unsubscribe(participantID string, roomID domain.RoomID)
+	GetSinksForRoom(roomID chat.RoomID) []EventSink
+	Subscribe(participantID string, roomID chat.RoomID, sink EventSink)
+	Unsubscribe(participantID string, roomID chat.RoomID)
 }
 
 type IOrchestrator interface {
-	RegisterRoom(room *domain.Room)
-	PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error
-	GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error)
-	RegisterParticipant(pID string, roomID domain.RoomID, sink EventSink)
-	UnregisterParticipant(pID string, roomID domain.RoomID)
+	RegisterRoom(room *chat.Room)
+	PostMessage(ctx context.Context, cmd chat.PostMessageCommand) error
+	GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, *string, error)
+	RegisterParticipant(pID string, roomID chat.RoomID, sink EventSink)
+	UnregisterParticipant(pID string, roomID chat.RoomID)
 	Start(ctx context.Context) error
 	Stop()
+}
+
+type IAnalyzer interface {
+	AnalyzeAll(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response
 }
 
 // ISpecialistClient defines the contract for interacting with specialized
@@ -61,5 +66,5 @@ type IOrchestrator interface {
 // This abstraction allows the Orchestrator to remain agnostic of the
 // underlying communication protocol (gRPC, HTTP, or local).
 type ISpecialistClient interface {
-	Analyze(ctx context.Context, request domain.SpecialistRequest) (domain.SpecialistResponse, error)
+	Analyze(ctx context.Context, request specialist.Request) (specialist.Response, error)
 }

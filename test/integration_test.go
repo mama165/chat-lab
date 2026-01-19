@@ -1,14 +1,13 @@
 package test
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"chat-lab/repositories"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
-	"chat-lab/specialist"
 	"context"
 	"github.com/blugelabs/bluge"
 	"log/slog"
@@ -45,7 +44,7 @@ func Test_Scenario(t *testing.T) {
 	registry := runtime.NewRegistry()
 	messageRepository := repositories.NewMessageRepository(db, log, lo.ToPtr(100))
 	analysisRepository := repositories.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
-	manager := specialist.NewManager(log)
+	manager := runtime.NewManager(log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, messageRepository,
 		analysisRepository,
@@ -75,7 +74,7 @@ func Test_Scenario(t *testing.T) {
 	orchestrator.Add(mockTimelineSink, diskSink)
 
 	id := 1
-	room := domain.NewRoom(domain.RoomID(id))
+	room := chat.NewRoom(chat.RoomID(id))
 	orchestrator.RegisterRoom(room)
 
 	go func() {
@@ -94,7 +93,7 @@ func Test_Scenario(t *testing.T) {
 	at := time.Now().UTC()
 
 	// When a cmd message is posted
-	err = orchestrator.PostMessage(ctx, domain.PostMessageCommand{
+	err = orchestrator.PostMessage(ctx, chat.PostMessageCommand{
 		Room:      id,
 		UserID:    userID,
 		Content:   content,

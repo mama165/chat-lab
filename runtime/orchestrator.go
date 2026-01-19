@@ -5,14 +5,13 @@ package runtime
 import (
 	"chat-lab/ai"
 	"chat-lab/contract"
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/errors"
 	"chat-lab/moderation"
 	"chat-lab/repositories"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
-	"chat-lab/specialist"
 	"context"
 	"embed"
 	"fmt"
@@ -32,17 +31,17 @@ type Orchestrator struct {
 	log                  *slog.Logger
 	counter              *event.Counter
 	numWorkers           int
-	rooms                map[domain.RoomID]*domain.Room
+	rooms                map[chat.RoomID]*chat.Room
 	permanentSinks       []contract.EventSink
 	supervisor           contract.ISupervisor
 	registry             contract.IRegistry
-	globalCommands       chan domain.Command
+	globalCommands       chan chat.Command
 	moderationChan       chan event.Event
 	domainChan           chan event.Event
 	telemetryChan        chan event.Event
 	messageRepository    repositories.IMessageRepository
 	analysisRepository   repositories.IAnalysisRepository
-	manager              *specialist.Manager
+	manager              *Manager
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
@@ -58,7 +57,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository repositories.IMessageRepository,
 	analysisRepository repositories.IAnalysisRepository,
-	specialistManager *specialist.Manager,
+	specialistManager *Manager,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,
@@ -67,12 +66,12 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		log:                  log,
 		counter:              event.NewCounter(),
 		numWorkers:           numWorkers,
-		rooms:                make(map[domain.RoomID]*domain.Room),
+		rooms:                make(map[chat.RoomID]*chat.Room),
 		permanentSinks:       nil,
 		supervisor:           supervisor,
 		registry:             registry,
 		telemetryChan:        telemetryChan,
-		globalCommands:       make(chan domain.Command, bufferSize),
+		globalCommands:       make(chan chat.Command, bufferSize),
 		moderationChan:       make(chan event.Event, bufferSize),
 		domainChan:           make(chan event.Event, bufferSize),
 		messageRepository:    messageRepository,
@@ -91,7 +90,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 }
 
 // RegisterRoom creates a dedicated command channel for a Room.
-func (o *Orchestrator) RegisterRoom(room *domain.Room) {
+func (o *Orchestrator) RegisterRoom(room *chat.Room) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if _, ok := o.rooms[room.ID]; ok {
@@ -108,7 +107,7 @@ func (o *Orchestrator) Add(sinks ...contract.EventSink) {
 // PostMessage attempts to buffer a command using a "Wait-and-Fail" backpressure strategy.
 // It allows for a short grace period (o.waitAndFail) to absorb traffic bursts
 // before rejecting the request with errors.ErrServerOverloaded to protect system stability.
-func (o *Orchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
+func (o *Orchestrator) PostMessage(ctx context.Context, cmd chat.PostMessageCommand) error {
 	if len(cmd.Content) > o.maxContentLength {
 		return errors.ErrContentTooLarge
 	}
@@ -127,14 +126,14 @@ func (o *Orchestrator) PostMessage(ctx context.Context, cmd domain.PostMessageCo
 	}
 }
 
-func (o *Orchestrator) GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error) {
+func (o *Orchestrator) GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, *string, error) {
 	messages, cursor, err := o.messageRepository.GetMessages(cmd.Room, cmd.Cursor)
 	return fromDiskMessage(messages), cursor, err
 }
 
-func fromDiskMessage(messages []repositories.DiskMessage) []domain.Message {
-	return lo.Map(messages, func(item repositories.DiskMessage, _ int) domain.Message {
-		return domain.Message{
+func fromDiskMessage(messages []repositories.DiskMessage) []chat.Message {
+	return lo.Map(messages, func(item repositories.DiskMessage, _ int) chat.Message {
+		return chat.Message{
 			ID:        item.ID,
 			SenderID:  item.Author,
 			Content:   item.Content,
@@ -143,13 +142,13 @@ func fromDiskMessage(messages []repositories.DiskMessage) []domain.Message {
 	})
 }
 
-func (o *Orchestrator) RegisterParticipant(pID string, roomID domain.RoomID, sink contract.EventSink) {
+func (o *Orchestrator) RegisterParticipant(pID string, roomID chat.RoomID, sink contract.EventSink) {
 	o.registry.Subscribe(pID, roomID, sink)
 	// Why not send an event UserJoined to notify all members of the room through FanoutWorker
 }
 
 // UnregisterParticipant disconnects a user.
-func (o *Orchestrator) UnregisterParticipant(pID string, roomID domain.RoomID) {
+func (o *Orchestrator) UnregisterParticipant(pID string, roomID chat.RoomID) {
 	o.registry.Unsubscribe(pID, roomID)
 }
 

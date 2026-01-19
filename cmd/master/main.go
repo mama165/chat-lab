@@ -1,8 +1,9 @@
 package main
 
 import (
-	"chat-lab/domain"
 	"chat-lab/domain/event"
+	"chat-lab/domain/specialist"
+
 	"chat-lab/grpc/server"
 	pb2 "chat-lab/proto/account"
 	pb "chat-lab/proto/chat"
@@ -10,7 +11,6 @@ import (
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/services"
-	"chat-lab/specialist"
 	"context"
 	"errors"
 	"fmt"
@@ -97,12 +97,12 @@ func run() (int, error) {
 	// This ensures the Orchestrator has all its analysis "organs" ready.
 	// We use a dedicated timeout to prevent the Master from hanging if a binary
 	// fails to load its resources (like ML models) or if a port is already in use.
-	specialistConfigs := []domain.SpecialistConfig{
-		{ID: domain.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
-		{ID: domain.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
+	specialistConfigs := []specialist.Config{
+		{ID: specialist.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
+		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
 	}
 
-	specialistManager := specialist.NewManager(log)
+	specialistManager := runtime.NewManager(log)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()

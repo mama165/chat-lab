@@ -1,7 +1,7 @@
 package server
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/errors"
 	pb "chat-lab/proto/chat"
@@ -35,7 +35,7 @@ func NewChatServer(log *slog.Logger, chatService services.IChatService,
 }
 
 func (s *ChatServer) GetMessage(_ context.Context, req *pb.GetMessageRequest) (*pb.GetMessageResponse, error) {
-	messages, cursor, err := s.chatService.GetMessages(domain.GetMessageCommand{
+	messages, cursor, err := s.chatService.GetMessages(chat.GetMessageCommand{
 		Room:   int(req.Room),
 		Cursor: req.Cursor,
 	})
@@ -45,8 +45,8 @@ func (s *ChatServer) GetMessage(_ context.Context, req *pb.GetMessageRequest) (*
 	}, err
 }
 
-func toMessageResponse(messages []domain.Message) []*pb.MessageResponse {
-	return lo.Map(messages, func(item domain.Message, _ int) *pb.MessageResponse {
+func toMessageResponse(messages []chat.Message) []*pb.MessageResponse {
+	return lo.Map(messages, func(item chat.Message, _ int) *pb.MessageResponse {
 		return &pb.MessageResponse{
 			MessageId: item.ID.String(),
 			Author:    item.SenderID,
@@ -63,7 +63,7 @@ func toMessageResponse(messages []domain.Message) []*pb.MessageResponse {
 // ensuring a single source of truth for message order, timestamps, and sanitization.
 func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest) (*pb.PostMessageResponse, error) {
 	userID := uuid.NewString() // TODO To be extracted from metadata
-	command := domain.PostMessageCommand{
+	command := chat.PostMessageCommand{
 		Room:      int(req.RoomId),
 		UserID:    userID,
 		Content:   req.Content,
@@ -82,7 +82,7 @@ func (s *ChatServer) PostMessage(ctx context.Context, req *pb.PostMessageRequest
 func (s *ChatServer) Connect(req *pb.ConnectRequest, stream pb.ChatService_ConnectServer) error {
 	sink := sink.NewGrpcSink(s.log, s.connectionBufferSize, s.deliveryTimeout)
 	userID := uuid.NewString() // TODO To be extracted from metadata
-	roomID := domain.RoomID(req.RoomId)
+	roomID := chat.RoomID(req.RoomId)
 	s.chatService.JoinRoom(userID, roomID, sink)
 	defer s.chatService.LeaveRoom(userID, roomID)
 

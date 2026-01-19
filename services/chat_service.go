@@ -2,16 +2,16 @@ package services
 
 import (
 	"chat-lab/contract"
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/runtime"
 	"context"
 )
 
 type IChatService interface {
-	PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error
-	GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error)
-	JoinRoom(userID string, roomID domain.RoomID, sink contract.EventSink)
-	LeaveRoom(userID string, roomID domain.RoomID)
+	PostMessage(ctx context.Context, cmd chat.PostMessageCommand) error
+	GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, *string, error)
+	JoinRoom(userID string, roomID chat.RoomID, sink contract.EventSink)
+	LeaveRoom(userID string, roomID chat.RoomID)
 }
 
 type ChatService struct {
@@ -22,20 +22,20 @@ func NewChatService(o *runtime.Orchestrator) *ChatService {
 	return &ChatService{orchestrator: o}
 }
 
-func (s *ChatService) PostMessage(ctx context.Context, cmd domain.PostMessageCommand) error {
+func (s *ChatService) PostMessage(ctx context.Context, cmd chat.PostMessageCommand) error {
 	return s.orchestrator.PostMessage(ctx, cmd)
 }
 
-func (s *ChatService) GetMessages(cmd domain.GetMessageCommand) ([]domain.Message, *string, error) {
+func (s *ChatService) GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, *string, error) {
 	return s.orchestrator.GetMessages(cmd)
 }
 
-func (s *ChatService) JoinRoom(userID string, roomID domain.RoomID, sink contract.EventSink) {
-	room := domain.NewRoom(roomID)
+func (s *ChatService) JoinRoom(userID string, roomID chat.RoomID, sink contract.EventSink) {
+	room := chat.NewRoom(roomID)
 	s.orchestrator.RegisterRoom(room)
 	s.orchestrator.RegisterParticipant(userID, roomID, sink)
 }
 
-func (s *ChatService) LeaveRoom(userID string, roomID domain.RoomID) {
+func (s *ChatService) LeaveRoom(userID string, roomID chat.RoomID) {
 	s.orchestrator.UnregisterParticipant(userID, roomID)
 }

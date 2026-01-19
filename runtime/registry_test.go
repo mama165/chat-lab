@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"context"
 	"github.com/google/uuid"
@@ -20,7 +20,7 @@ func TestRegistry_Subscribe_One_Room_One_Participant(t *testing.T) {
 	req := require.New(t)
 	registry := NewRegistry()
 	participantID := uuid.NewString()
-	roomID := domain.RoomID(1)
+	roomID := chat.RoomID(1)
 	sink := Sink{}
 
 	// Given no user is connected
@@ -47,7 +47,7 @@ func TestRegistry_Subscribe_One_Room_Multiple_Participants(t *testing.T) {
 	registry := NewRegistry()
 	participantID1 := uuid.NewString()
 	participantID2 := uuid.NewString()
-	roomID := domain.RoomID(1)
+	roomID := chat.RoomID(1)
 	sink1 := Sink{}
 	sink2 := Sink{}
 
@@ -67,7 +67,7 @@ func TestRegistry_UnSubscribe_One_Room_One_Participant(t *testing.T) {
 	req := require.New(t)
 	registry := NewRegistry()
 	participantID := uuid.NewString()
-	roomID := domain.RoomID(1)
+	roomID := chat.RoomID(1)
 	sink := Sink{}
 
 	// Given a participant subscribes a room
@@ -90,7 +90,7 @@ func TestRegistry_UnSubscribe_One_Room_Multiple_Participant(t *testing.T) {
 	registry := NewRegistry()
 	participantID1 := uuid.NewString()
 	participantID2 := uuid.NewString()
-	roomID := domain.RoomID(1)
+	roomID := chat.RoomID(1)
 	sink1 := Sink{}
 	sink2 := Sink{}
 

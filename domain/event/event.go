@@ -1,7 +1,7 @@
 package event
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/chat"
 	"sync"
 	"time"
 
@@ -56,7 +56,7 @@ type Event struct {
 }
 
 type DomainEvent interface {
-	RoomID() domain.RoomID
+	RoomID() chat.RoomID
 }
 
 type MessagePosted struct {
@@ -77,11 +77,11 @@ type SanitizedMessage struct {
 	ToxicityScore float64
 }
 
-func (m MessagePosted) RoomID() domain.RoomID {
-	return domain.RoomID(m.Room)
+func (m MessagePosted) RoomID() chat.RoomID {
+	return chat.RoomID(m.Room)
 }
-func (m SanitizedMessage) RoomID() domain.RoomID {
-	return domain.RoomID(m.Room)
+func (m SanitizedMessage) RoomID() chat.RoomID {
+	return chat.RoomID(m.Room)
 }
 
 // Telemetry

@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/specialist"
 	"context"
 	"flag"
 	"fmt"
@@ -40,7 +40,7 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-3 * time.Hour),
 			Summary:   "First batch item",
-			Scores:    map[domain.AnalysisMetric]float64{domain.MetricToxicity: 0.1},
+			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.1},
 			Payload:   TextContent{Content: "First content"},
 		},
 		{
@@ -49,7 +49,7 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-2 * time.Hour),
 			Summary:   "Second batch item",
-			Scores:    map[domain.AnalysisMetric]float64{domain.MetricToxicity: 0.2},
+			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.2},
 			Payload:   TextContent{Content: "Second content"},
 		},
 		{
@@ -58,7 +58,7 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-1 * time.Hour),
 			Summary:   "Third batch item",
-			Scores:    map[domain.AnalysisMetric]float64{domain.MetricToxicity: 0.3},
+			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.3},
 			Payload:   TextContent{Content: "Third content"},
 		},
 	}
@@ -153,9 +153,9 @@ func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-2 * time.Hour),
 			Summary:   "Low toxicity",
-			Scores: map[domain.AnalysisMetric]float64{
-				domain.MetricToxicity: 0.1,
-				domain.MetricBusiness: 0.9,
+			Scores: map[specialist.Metric]float64{
+				specialist.MetricToxicity: 0.1,
+				specialist.MetricBusiness: 0.9,
 			},
 			Payload: TextContent{Content: "Positive content"},
 		},
@@ -164,9 +164,9 @@ func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 			RoomId:    roomID,
 			At:        time.Now().Add(-1 * time.Hour),
 			Summary:   "High toxicity",
-			Scores: map[domain.AnalysisMetric]float64{
-				domain.MetricToxicity: 0.95,
-				domain.MetricBusiness: 0.1,
+			Scores: map[specialist.Metric]float64{
+				specialist.MetricToxicity: 0.95,
+				specialist.MetricBusiness: 0.1,
 			},
 			Payload: TextContent{Content: "Negative content"},
 		},

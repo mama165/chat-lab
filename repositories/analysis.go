@@ -2,7 +2,7 @@
 package repositories
 
 import (
-	"chat-lab/domain"
+	"chat-lab/domain/specialist"
 	pb "chat-lab/proto/storage"
 	"context"
 	"fmt"
@@ -65,7 +65,7 @@ type Analysis struct {
 	At        time.Time
 	Summary   string
 	Tags      []string
-	Scores    map[domain.AnalysisMetric]float64
+	Scores    map[specialist.Metric]float64
 	Payload   any
 	Version   uuid.UUID
 }
@@ -124,8 +124,8 @@ func (a *AnalysisRepository) Store(analysis Analysis) error {
 // and stores AI specialist scores as numeric fields to enable range-based filtering.
 // This method ensures the search index stays synchronized with the primary BadgerDB storage.
 func (a *AnalysisRepository) upsertSearchIndex(id, content string,
-	metadata map[domain.AnalysisMetric]float64,
-	category domain.DataType, roomID string) error {
+	metadata map[specialist.Metric]float64,
+	category specialist.Category, roomID string) error {
 	doc := bluge.NewDocument(id)
 	// TextField allows full-text search with tokenization (e.g., lowercase, stop words)
 	doc.AddField(bluge.NewTextField("content", content).StoreValue())
@@ -488,7 +488,7 @@ func buildKey(roomID string, at time.Time, messageID uuid.UUID) []byte {
 }
 
 func fromAnalysis(analysis Analysis) *pb.Analysis {
-	scores := lo.MapKeys(analysis.Scores, func(_ float64, key domain.AnalysisMetric) string {
+	scores := lo.MapKeys(analysis.Scores, func(_ float64, key specialist.Metric) string {
 		return string(key)
 	})
 
@@ -502,7 +502,6 @@ func fromAnalysis(analysis Analysis) *pb.Analysis {
 		Scores:    scores,
 	}
 
-	// Gestion robuste des pointeurs pour Protobuf
 	switch p := analysis.Payload.(type) {
 	case TextContent:
 		res.Payload = &pb.Analysis_TextContent{TextContent: &pb.TextContent{Content: p.Content}}
@@ -530,8 +529,8 @@ func toAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 		return Analysis{}, err
 	}
 
-	scores := lo.MapKeys(analysisPb.Scores, func(_ float64, key string) domain.AnalysisMetric {
-		return domain.AnalysisMetric(key)
+	scores := lo.MapKeys(analysisPb.Scores, func(_ float64, key string) specialist.Metric {
+		return specialist.Metric(key)
 	})
 
 	res := Analysis{
@@ -567,47 +566,46 @@ func toAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 // prepareInternalData extracts searchable text and determines the data category
 // from the flexible analysis payload. It handles both value and pointer types
 // to ensure consistency between storage and search indexing.
-func (a *AnalysisRepository) prepareInternalData(analysis Analysis) (string, domain.DataType) {
-	fullText := analysis.Summary
-	category := domain.TextType // Default category
+func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, specialist.Category) {
+	fullText := an.Summary
+	category := specialist.TextType // Default category
 
-	if analysis.Payload == nil {
+	if an.Payload == nil {
 		return fullText, category
 	}
 
-	switch p := analysis.Payload.(type) {
+	switch p := an.Payload.(type) {
 	case TextContent:
 		fullText += " " + p.Content
-		category = domain.TextType
+		category = specialist.TextType
 	case *TextContent:
 		if p != nil {
 			fullText += " " + p.Content
 		}
-		category = domain.TextType
-
+		category = specialist.TextType
 	case AudioDetails:
 		fullText += " " + p.Transcription
-		category = domain.AudioType
+		category = specialist.AudioType
 	case *AudioDetails:
 		if p != nil {
 			fullText += " " + p.Transcription
 		}
-		category = domain.AudioType
+		category = specialist.AudioType
 
 	case FileDetails:
 		fullText += " " + p.Filename
-		category = domain.FileType
+		category = specialist.FileType
 	case *FileDetails:
 		if p != nil {
 			fullText += " " + p.Filename
 		}
-		category = domain.FileType
+		category = specialist.FileType
 
 	default:
 		// Log the exact type to help debugging unexpected AI pipeline outputs [cite: 2026-01-19]
 		a.log.Warn("unknown payload type during data preparation",
-			"message_id", analysis.MessageId,
-			"type", fmt.Sprintf("%T", analysis.Payload))
+			"message_id", an.MessageId,
+			"type", fmt.Sprintf("%T", an.Payload))
 	}
 
 	return fullText, category
