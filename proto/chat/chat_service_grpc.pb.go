@@ -4,7 +4,7 @@
 // - protoc             v6.31.1
 // source: proto/chat/chat_service.proto
 
-package v1
+package pb
 
 import (
 	context "context"
@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ChatService_GetMessage_FullMethodName  = "/chat.v1.ChatService/GetMessage"
-	ChatService_PostMessage_FullMethodName = "/chat.v1.ChatService/PostMessage"
-	ChatService_Connect_FullMethodName     = "/chat.v1.ChatService/Connect"
+	ChatService_GetMessage_FullMethodName  = "/chat.ChatService/GetMessage"
+	ChatService_PostMessage_FullMethodName = "/chat.ChatService/PostMessage"
+	ChatService_Connect_FullMethodName     = "/chat.ChatService/Connect"
 )
 
 // ChatServiceClient is the client API for ChatService service.
@@ -178,7 +178,7 @@ type ChatService_ConnectServer = grpc.ServerStreamingServer[ChatEvent]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ChatService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "chat.v1.ChatService",
+	ServiceName: "chat.ChatService",
 	HandlerType: (*ChatServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

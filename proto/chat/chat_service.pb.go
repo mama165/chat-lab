@@ -4,7 +4,7 @@
 // 	protoc        v6.31.1
 // source: proto/chat/chat_service.proto
 
-package v1
+package pb
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -533,7 +533,7 @@ func (x *MessageEvent) GetCreatedAt() *timestamppb.Timestamp {
 type PresenceEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Type          PresenceEvent_Type     `protobuf:"varint,2,opt,name=type,proto3,enum=chat.v1.PresenceEvent_Type" json:"type,omitempty"`
+	Type          PresenceEvent_Type     `protobuf:"varint,2,opt,name=type,proto3,enum=chat.PresenceEvent_Type" json:"type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -586,13 +586,13 @@ var File_proto_chat_chat_service_proto protoreflect.FileDescriptor
 
 const file_proto_chat_chat_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1dproto/chat/chat_service.proto\x12\achat.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"O\n" +
+	"\x1dproto/chat/chat_service.proto\x12\x04chat\x1a\x1fgoogle/protobuf/timestamp.proto\"O\n" +
 	"\x11GetMessageRequest\x12\x12\n" +
 	"\x04room\x18\x01 \x01(\x03R\x04room\x12\x1b\n" +
 	"\x06cursor\x18\x02 \x01(\tH\x00R\x06cursor\x88\x01\x01B\t\n" +
-	"\a_cursor\"\x81\x01\n" +
-	"\x12GetMessageResponse\x12C\n" +
-	"\x10message_response\x18\x01 \x03(\v2\x18.chat.v1.MessageResponseR\x0fmessageResponse\x12\x1b\n" +
+	"\a_cursor\"~\n" +
+	"\x12GetMessageResponse\x12@\n" +
+	"\x10message_response\x18\x01 \x03(\v2\x15.chat.MessageResponseR\x0fmessageResponse\x12\x1b\n" +
 	"\x06cursor\x18\x02 \x01(\tH\x00R\x06cursor\x88\x01\x01B\t\n" +
 	"\a_cursor\"\x9d\x01\n" +
 	"\x0fMessageResponse\x12\x1d\n" +
@@ -608,10 +608,10 @@ const file_proto_chat_chat_service_proto_rawDesc = "" +
 	"\x13PostMessageResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\")\n" +
 	"\x0eConnectRequest\x12\x17\n" +
-	"\aroom_id\x18\x01 \x01(\x03R\x06roomId\"}\n" +
-	"\tChatEvent\x121\n" +
-	"\amessage\x18\x01 \x01(\v2\x15.chat.v1.MessageEventH\x00R\amessage\x124\n" +
-	"\bpresence\x18\x02 \x01(\v2\x16.chat.v1.PresenceEventH\x00R\bpresenceB\a\n" +
+	"\aroom_id\x18\x01 \x01(\x03R\x06roomId\"w\n" +
+	"\tChatEvent\x12.\n" +
+	"\amessage\x18\x01 \x01(\v2\x12.chat.MessageEventH\x00R\amessage\x121\n" +
+	"\bpresence\x18\x02 \x01(\v2\x13.chat.PresenceEventH\x00R\bpresenceB\a\n" +
 	"\x05event\"\x9a\x01\n" +
 	"\fMessageEvent\x12\x1d\n" +
 	"\n" +
@@ -619,19 +619,19 @@ const file_proto_chat_chat_service_proto_rawDesc = "" +
 	"\x06author\x18\x02 \x01(\tR\x06author\x12\x18\n" +
 	"\acontent\x18\x03 \x01(\tR\acontent\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"w\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"t\n" +
 	"\rPresenceEvent\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12/\n" +
-	"\x04type\x18\x02 \x01(\x0e2\x1b.chat.v1.PresenceEvent.TypeR\x04type\"\x1c\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12,\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x18.chat.PresenceEvent.TypeR\x04type\"\x1c\n" +
 	"\x04Type\x12\n" +
 	"\n" +
 	"\x06JOINED\x10\x00\x12\b\n" +
-	"\x04LEFT\x10\x012\xd8\x01\n" +
-	"\vChatService\x12E\n" +
+	"\x04LEFT\x10\x012\xc6\x01\n" +
+	"\vChatService\x12?\n" +
 	"\n" +
-	"GetMessage\x12\x1a.chat.v1.GetMessageRequest\x1a\x1b.chat.v1.GetMessageResponse\x12H\n" +
-	"\vPostMessage\x12\x1b.chat.v1.PostMessageRequest\x1a\x1c.chat.v1.PostMessageResponse\x128\n" +
-	"\aConnect\x12\x17.chat.v1.ConnectRequest\x1a\x12.chat.v1.ChatEvent0\x01B\x18Z\x16chat-lab/proto/chat/v1b\x06proto3"
+	"GetMessage\x12\x17.chat.GetMessageRequest\x1a\x18.chat.GetMessageResponse\x12B\n" +
+	"\vPostMessage\x12\x18.chat.PostMessageRequest\x1a\x19.chat.PostMessageResponse\x122\n" +
+	"\aConnect\x12\x14.chat.ConnectRequest\x1a\x0f.chat.ChatEvent0\x01B\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_proto_chat_chat_service_proto_rawDescOnce sync.Once
@@ -648,31 +648,31 @@ func file_proto_chat_chat_service_proto_rawDescGZIP() []byte {
 var file_proto_chat_chat_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_proto_chat_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_proto_chat_chat_service_proto_goTypes = []any{
-	(PresenceEvent_Type)(0),       // 0: chat.v1.PresenceEvent.Type
-	(*GetMessageRequest)(nil),     // 1: chat.v1.GetMessageRequest
-	(*GetMessageResponse)(nil),    // 2: chat.v1.GetMessageResponse
-	(*MessageResponse)(nil),       // 3: chat.v1.MessageResponse
-	(*PostMessageRequest)(nil),    // 4: chat.v1.PostMessageRequest
-	(*PostMessageResponse)(nil),   // 5: chat.v1.PostMessageResponse
-	(*ConnectRequest)(nil),        // 6: chat.v1.ConnectRequest
-	(*ChatEvent)(nil),             // 7: chat.v1.ChatEvent
-	(*MessageEvent)(nil),          // 8: chat.v1.MessageEvent
-	(*PresenceEvent)(nil),         // 9: chat.v1.PresenceEvent
+	(PresenceEvent_Type)(0),       // 0: chat.PresenceEvent.Type
+	(*GetMessageRequest)(nil),     // 1: chat.GetMessageRequest
+	(*GetMessageResponse)(nil),    // 2: chat.GetMessageResponse
+	(*MessageResponse)(nil),       // 3: chat.MessageResponse
+	(*PostMessageRequest)(nil),    // 4: chat.PostMessageRequest
+	(*PostMessageResponse)(nil),   // 5: chat.PostMessageResponse
+	(*ConnectRequest)(nil),        // 6: chat.ConnectRequest
+	(*ChatEvent)(nil),             // 7: chat.ChatEvent
+	(*MessageEvent)(nil),          // 8: chat.MessageEvent
+	(*PresenceEvent)(nil),         // 9: chat.PresenceEvent
 	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 }
 var file_proto_chat_chat_service_proto_depIdxs = []int32{
-	3,  // 0: chat.v1.GetMessageResponse.message_response:type_name -> chat.v1.MessageResponse
-	10, // 1: chat.v1.MessageResponse.created_at:type_name -> google.protobuf.Timestamp
-	8,  // 2: chat.v1.ChatEvent.message:type_name -> chat.v1.MessageEvent
-	9,  // 3: chat.v1.ChatEvent.presence:type_name -> chat.v1.PresenceEvent
-	10, // 4: chat.v1.MessageEvent.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 5: chat.v1.PresenceEvent.type:type_name -> chat.v1.PresenceEvent.Type
-	1,  // 6: chat.v1.ChatService.GetMessage:input_type -> chat.v1.GetMessageRequest
-	4,  // 7: chat.v1.ChatService.PostMessage:input_type -> chat.v1.PostMessageRequest
-	6,  // 8: chat.v1.ChatService.Connect:input_type -> chat.v1.ConnectRequest
-	2,  // 9: chat.v1.ChatService.GetMessage:output_type -> chat.v1.GetMessageResponse
-	5,  // 10: chat.v1.ChatService.PostMessage:output_type -> chat.v1.PostMessageResponse
-	7,  // 11: chat.v1.ChatService.Connect:output_type -> chat.v1.ChatEvent
+	3,  // 0: chat.GetMessageResponse.message_response:type_name -> chat.MessageResponse
+	10, // 1: chat.MessageResponse.created_at:type_name -> google.protobuf.Timestamp
+	8,  // 2: chat.ChatEvent.message:type_name -> chat.MessageEvent
+	9,  // 3: chat.ChatEvent.presence:type_name -> chat.PresenceEvent
+	10, // 4: chat.MessageEvent.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 5: chat.PresenceEvent.type:type_name -> chat.PresenceEvent.Type
+	1,  // 6: chat.ChatService.GetMessage:input_type -> chat.GetMessageRequest
+	4,  // 7: chat.ChatService.PostMessage:input_type -> chat.PostMessageRequest
+	6,  // 8: chat.ChatService.Connect:input_type -> chat.ConnectRequest
+	2,  // 9: chat.ChatService.GetMessage:output_type -> chat.GetMessageResponse
+	5,  // 10: chat.ChatService.PostMessage:output_type -> chat.PostMessageResponse
+	7,  // 11: chat.ChatService.Connect:output_type -> chat.ChatEvent
 	9,  // [9:12] is the sub-list for method output_type
 	6,  // [6:9] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name

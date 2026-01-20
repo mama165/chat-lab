@@ -1,8 +1,7 @@
 syntax = "proto3";
 
-package chat.v1;
-
-option go_package = "chat-lab/proto/chat/v1";
+package chat;
+option go_package = "./pb";
 
 import "google/protobuf/timestamp.proto";
 
