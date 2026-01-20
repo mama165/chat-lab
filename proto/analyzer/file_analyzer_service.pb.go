@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.31.1
-// source: proto/ingestion/file_analyzer_service.proto
+// source: proto/analyzer/file_analyzer_service.proto
 
 package pb
 
@@ -58,11 +58,11 @@ func (x SourceType) String() string {
 }
 
 func (SourceType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_ingestion_file_analyzer_service_proto_enumTypes[0].Descriptor()
+	return file_proto_analyzer_file_analyzer_service_proto_enumTypes[0].Descriptor()
 }
 
 func (SourceType) Type() protoreflect.EnumType {
-	return &file_proto_ingestion_file_analyzer_service_proto_enumTypes[0]
+	return &file_proto_analyzer_file_analyzer_service_proto_enumTypes[0]
 }
 
 func (x SourceType) Number() protoreflect.EnumNumber {
@@ -71,7 +71,7 @@ func (x SourceType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SourceType.Descriptor instead.
 func (SourceType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_ingestion_file_analyzer_service_proto_rawDescGZIP(), []int{0}
+	return file_proto_analyzer_file_analyzer_service_proto_rawDescGZIP(), []int{0}
 }
 
 type FileAnalyzerRequest struct {
@@ -81,7 +81,7 @@ type FileAnalyzerRequest struct {
 	// ex: Disk UUID
 	DriveId string `protobuf:"bytes,2,opt,name=drive_id,json=driveId,proto3" json:"drive_id,omitempty"`
 	// System metadata (from syscalls)
-	Size int64 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	Size uint64 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
 	// Bit mask Windows
 	Attributes uint32 `protobuf:"varint,4,opt,name=attributes,proto3" json:"attributes,omitempty"`
 	// Local intelligence (Sniffing)
@@ -97,7 +97,7 @@ type FileAnalyzerRequest struct {
 
 func (x *FileAnalyzerRequest) Reset() {
 	*x = FileAnalyzerRequest{}
-	mi := &file_proto_ingestion_file_analyzer_service_proto_msgTypes[0]
+	mi := &file_proto_analyzer_file_analyzer_service_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -109,7 +109,7 @@ func (x *FileAnalyzerRequest) String() string {
 func (*FileAnalyzerRequest) ProtoMessage() {}
 
 func (x *FileAnalyzerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ingestion_file_analyzer_service_proto_msgTypes[0]
+	mi := &file_proto_analyzer_file_analyzer_service_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -122,7 +122,7 @@ func (x *FileAnalyzerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileAnalyzerRequest.ProtoReflect.Descriptor instead.
 func (*FileAnalyzerRequest) Descriptor() ([]byte, []int) {
-	return file_proto_ingestion_file_analyzer_service_proto_rawDescGZIP(), []int{0}
+	return file_proto_analyzer_file_analyzer_service_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *FileAnalyzerRequest) GetPath() string {
@@ -139,7 +139,7 @@ func (x *FileAnalyzerRequest) GetDriveId() string {
 	return ""
 }
 
-func (x *FileAnalyzerRequest) GetSize() int64 {
+func (x *FileAnalyzerRequest) GetSize() uint64 {
 	if x != nil {
 		return x.Size
 	}
@@ -185,14 +185,14 @@ type FileAnalyzerResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FilesReceived  int64                  `protobuf:"varint,1,opt,name=files_received,json=filesReceived,proto3" json:"files_received,omitempty"`
 	BytesProcessed int64                  `protobuf:"varint,2,opt,name=bytes_processed,json=bytesProcessed,proto3" json:"bytes_processed,omitempty"`
-	Duration       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=duration,proto3" json:"duration,omitempty"`
+	EndedAt        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *FileAnalyzerResponse) Reset() {
 	*x = FileAnalyzerResponse{}
-	mi := &file_proto_ingestion_file_analyzer_service_proto_msgTypes[1]
+	mi := &file_proto_analyzer_file_analyzer_service_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -204,7 +204,7 @@ func (x *FileAnalyzerResponse) String() string {
 func (*FileAnalyzerResponse) ProtoMessage() {}
 
 func (x *FileAnalyzerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ingestion_file_analyzer_service_proto_msgTypes[1]
+	mi := &file_proto_analyzer_file_analyzer_service_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -217,7 +217,7 @@ func (x *FileAnalyzerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileAnalyzerResponse.ProtoReflect.Descriptor instead.
 func (*FileAnalyzerResponse) Descriptor() ([]byte, []int) {
-	return file_proto_ingestion_file_analyzer_service_proto_rawDescGZIP(), []int{1}
+	return file_proto_analyzer_file_analyzer_service_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *FileAnalyzerResponse) GetFilesReceived() int64 {
@@ -234,22 +234,22 @@ func (x *FileAnalyzerResponse) GetBytesProcessed() int64 {
 	return 0
 }
 
-func (x *FileAnalyzerResponse) GetDuration() *timestamppb.Timestamp {
+func (x *FileAnalyzerResponse) GetEndedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.Duration
+		return x.EndedAt
 	}
 	return nil
 }
 
-var File_proto_ingestion_file_analyzer_service_proto protoreflect.FileDescriptor
+var File_proto_analyzer_file_analyzer_service_proto protoreflect.FileDescriptor
 
-const file_proto_ingestion_file_analyzer_service_proto_rawDesc = "" +
+const file_proto_analyzer_file_analyzer_service_proto_rawDesc = "" +
 	"\n" +
-	"+proto/ingestion/file_analyzer_service.proto\x12\tingestion\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa9\x02\n" +
+	"*proto/analyzer/file_analyzer_service.proto\x12\tingestion\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa9\x02\n" +
 	"\x13FileAnalyzerRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
 	"\bdrive_id\x18\x02 \x01(\tR\adriveId\x12\x12\n" +
-	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x1e\n" +
+	"\x04size\x18\x03 \x01(\x04R\x04size\x12\x1e\n" +
 	"\n" +
 	"attributes\x18\x04 \x01(\rR\n" +
 	"attributes\x12\x1b\n" +
@@ -259,11 +259,11 @@ const file_proto_ingestion_file_analyzer_service_proto_rawDesc = "" +
 	"\n" +
 	"scanned_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tscannedAt\x126\n" +
 	"\vsource_type\x18\b \x01(\x0e2\x15.ingestion.SourceTypeR\n" +
-	"sourceType\"\x9e\x01\n" +
+	"sourceType\"\x9d\x01\n" +
 	"\x14FileAnalyzerResponse\x12%\n" +
 	"\x0efiles_received\x18\x01 \x01(\x03R\rfilesReceived\x12'\n" +
-	"\x0fbytes_processed\x18\x02 \x01(\x03R\x0ebytesProcessed\x126\n" +
-	"\bduration\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\bduration*z\n" +
+	"\x0fbytes_processed\x18\x02 \x01(\x03R\x0ebytesProcessed\x125\n" +
+	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt*z\n" +
 	"\n" +
 	"SourceType\x12\x1b\n" +
 	"\x17SOURCE_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
@@ -274,31 +274,31 @@ const file_proto_ingestion_file_analyzer_service_proto_rawDesc = "" +
 	"\aAnalyze\x12\x1e.ingestion.FileAnalyzerRequest\x1a\x1f.ingestion.FileAnalyzerResponse(\x01B\x06Z\x04./pbb\x06proto3"
 
 var (
-	file_proto_ingestion_file_analyzer_service_proto_rawDescOnce sync.Once
-	file_proto_ingestion_file_analyzer_service_proto_rawDescData []byte
+	file_proto_analyzer_file_analyzer_service_proto_rawDescOnce sync.Once
+	file_proto_analyzer_file_analyzer_service_proto_rawDescData []byte
 )
 
-func file_proto_ingestion_file_analyzer_service_proto_rawDescGZIP() []byte {
-	file_proto_ingestion_file_analyzer_service_proto_rawDescOnce.Do(func() {
-		file_proto_ingestion_file_analyzer_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_ingestion_file_analyzer_service_proto_rawDesc), len(file_proto_ingestion_file_analyzer_service_proto_rawDesc)))
+func file_proto_analyzer_file_analyzer_service_proto_rawDescGZIP() []byte {
+	file_proto_analyzer_file_analyzer_service_proto_rawDescOnce.Do(func() {
+		file_proto_analyzer_file_analyzer_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_analyzer_file_analyzer_service_proto_rawDesc), len(file_proto_analyzer_file_analyzer_service_proto_rawDesc)))
 	})
-	return file_proto_ingestion_file_analyzer_service_proto_rawDescData
+	return file_proto_analyzer_file_analyzer_service_proto_rawDescData
 }
 
-var file_proto_ingestion_file_analyzer_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_ingestion_file_analyzer_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_proto_ingestion_file_analyzer_service_proto_goTypes = []any{
+var file_proto_analyzer_file_analyzer_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_analyzer_file_analyzer_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_proto_analyzer_file_analyzer_service_proto_goTypes = []any{
 	(SourceType)(0),               // 0: ingestion.SourceType
 	(*FileAnalyzerRequest)(nil),   // 1: ingestion.FileAnalyzerRequest
 	(*FileAnalyzerResponse)(nil),  // 2: ingestion.FileAnalyzerResponse
 	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
 }
-var file_proto_ingestion_file_analyzer_service_proto_depIdxs = []int32{
+var file_proto_analyzer_file_analyzer_service_proto_depIdxs = []int32{
 	3, // 0: ingestion.FileAnalyzerRequest.scanned_at:type_name -> google.protobuf.Timestamp
 	0, // 1: ingestion.FileAnalyzerRequest.source_type:type_name -> ingestion.SourceType
-	3, // 2: ingestion.FileAnalyzerResponse.duration:type_name -> google.protobuf.Timestamp
-	1, // 3: ingestion.fileAnalyzerService.Analyze:input_type -> ingestion.FileAnalyzerRequest
-	2, // 4: ingestion.fileAnalyzerService.Analyze:output_type -> ingestion.FileAnalyzerResponse
+	3, // 2: ingestion.FileAnalyzerResponse.ended_at:type_name -> google.protobuf.Timestamp
+	1, // 3: ingestion.FileAnalyzerService.Analyze:input_type -> ingestion.FileAnalyzerRequest
+	2, // 4: ingestion.FileAnalyzerService.Analyze:output_type -> ingestion.FileAnalyzerResponse
 	4, // [4:5] is the sub-list for method output_type
 	3, // [3:4] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
@@ -306,27 +306,27 @@ var file_proto_ingestion_file_analyzer_service_proto_depIdxs = []int32{
 	0, // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_proto_ingestion_file_analyzer_service_proto_init() }
-func file_proto_ingestion_file_analyzer_service_proto_init() {
-	if File_proto_ingestion_file_analyzer_service_proto != nil {
+func init() { file_proto_analyzer_file_analyzer_service_proto_init() }
+func file_proto_analyzer_file_analyzer_service_proto_init() {
+	if File_proto_analyzer_file_analyzer_service_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_ingestion_file_analyzer_service_proto_rawDesc), len(file_proto_ingestion_file_analyzer_service_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_analyzer_file_analyzer_service_proto_rawDesc), len(file_proto_analyzer_file_analyzer_service_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_ingestion_file_analyzer_service_proto_goTypes,
-		DependencyIndexes: file_proto_ingestion_file_analyzer_service_proto_depIdxs,
-		EnumInfos:         file_proto_ingestion_file_analyzer_service_proto_enumTypes,
-		MessageInfos:      file_proto_ingestion_file_analyzer_service_proto_msgTypes,
+		GoTypes:           file_proto_analyzer_file_analyzer_service_proto_goTypes,
+		DependencyIndexes: file_proto_analyzer_file_analyzer_service_proto_depIdxs,
+		EnumInfos:         file_proto_analyzer_file_analyzer_service_proto_enumTypes,
+		MessageInfos:      file_proto_analyzer_file_analyzer_service_proto_msgTypes,
 	}.Build()
-	File_proto_ingestion_file_analyzer_service_proto = out.File
-	file_proto_ingestion_file_analyzer_service_proto_goTypes = nil
-	file_proto_ingestion_file_analyzer_service_proto_depIdxs = nil
+	File_proto_analyzer_file_analyzer_service_proto = out.File
+	file_proto_analyzer_file_analyzer_service_proto_goTypes = nil
+	file_proto_analyzer_file_analyzer_service_proto_depIdxs = nil
 }

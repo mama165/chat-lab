@@ -16,7 +16,7 @@ message FileAnalyzerRequest {
   string drive_id = 2;
 
   // System metadata (from syscalls)
-  int64 size = 3;
+  uint64 size = 3;
   // Bit mask Windows
   uint32 attributes = 4;
 
@@ -40,5 +40,5 @@ enum SourceType {
 message FileAnalyzerResponse {
   int64 files_received = 1;
   int64 bytes_processed = 2;
-  google.protobuf.Timestamp duration = 3;
+  google.protobuf.Timestamp ended_at = 3;
 }

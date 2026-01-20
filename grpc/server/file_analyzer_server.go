@@ -1,10 +1,12 @@
 package server
 
 import (
-	pb "chat-lab/proto/ingestion"
+	"chat-lab/domain/analyzer"
+	pb "chat-lab/proto/analyzer"
 	"chat-lab/services"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type FileAnalyzerServer struct {
@@ -19,9 +21,47 @@ func NewFileAnalyzerServer(service services.AnalyzerService) *FileAnalyzerServer
 }
 
 func (s FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAnalyzerRequest, pb.FileAnalyzerResponse]) error {
-	err := s.fileAnalyzerService.Process()
+	request, err := stream.Recv()
+	response, err := s.fileAnalyzerService.Process(toRequest(request))
 	if err != nil {
 		return err
 	}
-	return stream.SendMsg(&pb.FileAnalyzerResponse{})
+	return stream.SendMsg(fromResponse(response))
+}
+
+func toRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
+	return analyzer.FileAnalyzerRequest{
+		Path:       req.Path,
+		DriveID:    req.DriveId,
+		Size:       req.Size,
+		Attributes: req.Attributes,
+		MimeType:   req.MimeType,
+		MagicBytes: req.MagicBytes,
+		ScannedAt:  req.ScannedAt.AsTime(),
+		SourceType: toSourceType(req.SourceType),
+	}
+}
+
+func toSourceType(st pb.SourceType) analyzer.SourceType {
+	switch st {
+	case pb.SourceType_SOURCE_TYPE_UNSPECIFIED:
+		return analyzer.SourceTypeUnspecified
+	case pb.SourceType_SOURCE_TYPE_LOCAL_FIXED:
+		return analyzer.SourceTypeLocalFixed
+	case pb.SourceType_SOURCE_TYPE_REMOVABLE:
+		return analyzer.SourceTypeRemovable
+	case pb.SourceType_SOURCE_TYPE_NETWORK:
+		return analyzer.SourceTypeNetwork
+	default:
+		return analyzer.SourceTypeUnspecified
+	}
+
+}
+
+func fromResponse(resp analyzer.FileAnalyzerResponse) *pb.FileAnalyzerResponse {
+	return &pb.FileAnalyzerResponse{
+		FilesReceived:  resp.FilesReceived,
+		BytesProcessed: resp.BytesProcessed,
+		EndedAt:        timestamppb.New(resp.EndedAt),
+	}
 }

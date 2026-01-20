@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.31.1
-// source: proto/ingestion/file_analyzer_service.proto
+// source: proto/analyzer/file_analyzer_service.proto
 
 package pb
 
@@ -19,10 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FileAnalyzerService_Analyze_FullMethodName = "/ingestion.fileAnalyzerService/Analyze"
+	FileAnalyzerService_Analyze_FullMethodName = "/ingestion.FileAnalyzerService/Analyze"
 )
 
-// FileAnalyzerServiceClient is the client API for fileAnalyzerService service.
+// FileAnalyzerServiceClient is the client API for FileAnalyzerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type FileAnalyzerServiceClient interface {
@@ -50,7 +50,7 @@ func (c *fileAnalyzerServiceClient) Analyze(ctx context.Context, opts ...grpc.Ca
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileAnalyzerService_AnalyzeClient = grpc.ClientStreamingClient[FileAnalyzerRequest, FileAnalyzerResponse]
 
-// FileAnalyzerServiceServer is the server API for fileAnalyzerService service.
+// FileAnalyzerServiceServer is the server API for FileAnalyzerService service.
 // All implementations must embed UnimplementedFileAnalyzerServiceServer
 // for forward compatibility.
 type FileAnalyzerServiceServer interface {
@@ -96,11 +96,11 @@ func _FileAnalyzerService_Analyze_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileAnalyzerService_AnalyzeServer = grpc.ClientStreamingServer[FileAnalyzerRequest, FileAnalyzerResponse]
 
-// FileAnalyzerService_ServiceDesc is the grpc.ServiceDesc for fileAnalyzerService service.
+// FileAnalyzerService_ServiceDesc is the grpc.ServiceDesc for FileAnalyzerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var FileAnalyzerService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "ingestion.fileAnalyzerService",
+	ServiceName: "ingestion.FileAnalyzerService",
 	HandlerType: (*FileAnalyzerServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -110,5 +110,5 @@ var FileAnalyzerService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "proto/ingestion/file_analyzer_service.proto",
+	Metadata: "proto/analyzer/file_analyzer_service.proto",
 }

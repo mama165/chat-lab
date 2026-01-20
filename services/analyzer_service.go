@@ -1,9 +1,12 @@
 package services
 
-import "log/slog"
+import (
+	"chat-lab/domain/analyzer"
+	"log/slog"
+)
 
 type IAnalyzerService interface {
-	Process() error
+	Process(request analyzer.FileAnalyzerRequest) (analyzer.FileAnalyzerResponse, error)
 }
 
 type AnalyzerService struct {
@@ -16,6 +19,6 @@ func NewIngestionService(log *slog.Logger) *AnalyzerService {
 	}
 }
 
-func (s AnalyzerService) Process() error {
-	return nil
+func (s AnalyzerService) Process(request analyzer.FileAnalyzerRequest) (analyzer.FileAnalyzerResponse, error) {
+	return analyzer.FileAnalyzerResponse{}, nil
 }
