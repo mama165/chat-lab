@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.31.1
-// source: proto/analysis/specialist.proto
+// source: proto/analysis/specialist_service.proto
 
 package pb
 
@@ -123,5 +123,5 @@ var SpecialistService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/analysis/specialist.proto",
+	Metadata: "proto/analysis/specialist_service.proto",
 }
