@@ -2,8 +2,10 @@ package services
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/mocks"
 	"github.com/mama165/sdk-go/logs"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"log/slog"
 	"strings"
 	"testing"
@@ -12,7 +14,10 @@ import (
 
 func TestAnalyzerService_Analyze(t *testing.T) {
 	req := require.New(t)
-	service := NewAnalyzerService(logs.GetLoggerFromLevel(slog.LevelDebug))
+	log := logs.GetLoggerFromLevel(slog.LevelDebug)
+	ctrl := gomock.NewController(t)
+	repository := mocks.NewMockIAnalysisRepository(ctrl)
+	service := NewAnalyzerService(log, repository)
 
 	baseRequest := analyzer.FileAnalyzerRequest{
 		Path:       "E:/Photos/vacances.jpg",

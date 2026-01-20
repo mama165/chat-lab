@@ -14,7 +14,7 @@ import (
 	"github.com/blugelabs/bluge"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
-	"github.com/mama165/sdk-go/db"
+	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 )
@@ -25,19 +25,19 @@ import (
 
 func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
-	roomID := "batch-room"
+	Namespace := "batch-room"
 
 	// Given: Multiple analyses to store in batch
 	analyses := []Analysis{
 		{
 			ID:        uuid.New(),
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(-3 * time.Hour),
 			Summary:   "First batch item",
 			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.1},
@@ -45,8 +45,8 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 		},
 		{
 			ID:        uuid.New(),
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(-2 * time.Hour),
 			Summary:   "Second batch item",
 			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.2},
@@ -54,8 +54,8 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 		},
 		{
 			ID:        uuid.New(),
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(-1 * time.Hour),
 			Summary:   "Third batch item",
 			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.3},
@@ -69,15 +69,15 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 
 	// Then: All items should be retrievable from BadgerDB
 	for _, analysis := range analyses {
-		fetched, err := repo.FetchFullByMessageId(roomID, analysis.MessageId)
+		fetched, err := repo.FetchFullByEntityId(Namespace, analysis.EntityId)
 		req.NoError(err)
-		req.Equal(analysis.MessageId, fetched.MessageId)
+		req.Equal(analysis.EntityId, fetched.EntityId)
 		req.Equal(analysis.Summary, fetched.Summary)
 	}
 
 	// And: All items should be searchable in Bluge
 	time.Sleep(50 * time.Millisecond)
-	results, total, err := repo.SearchPaginated(ctx, "content", roomID, 0)
+	results, total, err := repo.SearchPaginated(ctx, "content", Namespace, 0)
 	req.NoError(err)
 	req.Equal(uint64(3), total)
 	req.Len(results, 3)
@@ -85,9 +85,9 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_Empty(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
@@ -100,12 +100,12 @@ func TestAnalysisRepository_StoreBatch_Empty(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_LargeBatch(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(200), 100)
-	roomID := "large-batch-room"
+	Namespace := "large-batch-room"
 
 	// Given: 100 analyses in a single batch
 	const batchSize = 100
@@ -113,8 +113,8 @@ func TestAnalysisRepository_StoreBatch_LargeBatch(t *testing.T) {
 	for i := 0; i < batchSize; i++ {
 		analyses[i] = Analysis{
 			ID:        uuid.New(),
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(time.Duration(i) * time.Second),
 			Summary:   fmt.Sprintf("Batch item %d", i),
 			Payload:   TextContent{Content: fmt.Sprintf("Content %d", i)},
@@ -132,25 +132,25 @@ func TestAnalysisRepository_StoreBatch_LargeBatch(t *testing.T) {
 
 	// And: All items should be retrievable
 	time.Sleep(100 * time.Millisecond)
-	_, total, err := repo.SearchPaginated(ctx, "Content", roomID, 0)
+	_, total, err := repo.SearchPaginated(ctx, "Content", Namespace, 0)
 	req.NoError(err)
 	req.Equal(uint64(batchSize), total)
 }
 
 func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
-	roomID := "batch-scores-room"
+	Namespace := "batch-scores-room"
 
 	// Given: Batch with various scores
 	analyses := []Analysis{
 		{
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(-2 * time.Hour),
 			Summary:   "Low toxicity",
 			Scores: map[specialist.Metric]float64{
@@ -160,8 +160,8 @@ func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 			Payload: TextContent{Content: "Positive content"},
 		},
 		{
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(-1 * time.Hour),
 			Summary:   "High toxicity",
 			Scores: map[specialist.Metric]float64{
@@ -178,12 +178,12 @@ func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Then: Should be searchable by score ranges
-	highToxicity, _, err := repo.SearchByScoreRange(ctx, "toxicity", 0.9, 1.0, roomID)
+	highToxicity, _, err := repo.SearchByScoreRange(ctx, "toxicity", 0.9, 1.0, Namespace)
 	req.NoError(err)
 	req.Len(highToxicity, 1)
 	req.Equal("High toxicity", highToxicity[0].Summary)
 
-	highBusiness, _, err := repo.SearchByScoreRange(ctx, "business", 0.8, 1.0, roomID)
+	highBusiness, _, err := repo.SearchByScoreRange(ctx, "business", 0.8, 1.0, Namespace)
 	req.NoError(err)
 	req.Len(highBusiness, 1)
 	req.Equal("Low toxicity", highBusiness[0].Summary)
@@ -191,31 +191,31 @@ func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_DifferentRooms(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(t.TempDir())
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
 
 	// Given: Batch with items from different rooms
 	analyses := []Analysis{
 		{
-			MessageId: uuid.New(),
-			RoomId:    "room-1",
+			EntityId:  uuid.New(),
+			Namespace: "room-1",
 			At:        time.Now(),
 			Summary:   "Room 1 item",
 			Payload:   TextContent{Content: "Room 1 content"},
 		},
 		{
-			MessageId: uuid.New(),
-			RoomId:    "room-2",
+			EntityId:  uuid.New(),
+			Namespace: "room-2",
 			At:        time.Now(),
 			Summary:   "Room 2 item",
 			Payload:   TextContent{Content: "Room 2 content"},
 		},
 		{
-			MessageId: uuid.New(),
-			RoomId:    "room-1",
+			EntityId:  uuid.New(),
+			Namespace: "room-1",
 			At:        time.Now(),
 			Summary:   "Another room 1 item",
 			Payload:   TextContent{Content: "More room 1 content"},
@@ -232,13 +232,13 @@ func TestAnalysisRepository_StoreBatch_DifferentRooms(t *testing.T) {
 	req.NoError(err)
 	req.Len(room1Results, 2)
 	for _, r := range room1Results {
-		req.Equal("room-1", r.RoomId)
+		req.Equal("room-1", r.Namespace)
 	}
 
 	room2Results, _, err := repo.SearchPaginated(ctx, "content", "room-2", 0)
 	req.NoError(err)
 	req.Len(room2Results, 1)
-	req.Equal("room-2", room2Results[0].RoomId)
+	req.Equal("room-2", room2Results[0].Namespace)
 }
 
 func TestAnalysisRepository_StoreBatch_vs_Store_Performance(t *testing.T) {
@@ -251,17 +251,17 @@ func TestAnalysisRepository_StoreBatch_vs_Store_Performance(t *testing.T) {
 	const itemCount = 100
 
 	// Test StoreBatch
-	_, log1, badgerDB1, blugeWriter1, err := db.SetupBenchmark(t.TempDir())
+	_, log1, badgerDB1, blugeWriter1, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB1, blugeWriter1)
+	defer database.CleanupDB(badgerDB1, blugeWriter1)
 
 	repo1 := NewAnalysisRepository(badgerDB1, blugeWriter1, log1, lo.ToPtr(200), 100)
 
 	analyses := make([]Analysis, itemCount)
 	for i := 0; i < itemCount; i++ {
 		analyses[i] = Analysis{
-			MessageId: uuid.New(),
-			RoomId:    "perf-room",
+			EntityId:  uuid.New(),
+			Namespace: "perf-room",
 			At:        time.Now().Add(time.Duration(i) * time.Second),
 			Summary:   fmt.Sprintf("Item %d", i),
 			Payload:   TextContent{Content: fmt.Sprintf("Content %d", i)},
@@ -274,9 +274,9 @@ func TestAnalysisRepository_StoreBatch_vs_Store_Performance(t *testing.T) {
 	batchDuration := time.Since(startBatch)
 
 	// Test individual Store calls
-	_, log2, badgerDB2, blugeWriter2, err := db.SetupBenchmark(t.TempDir())
+	_, log2, badgerDB2, blugeWriter2, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.CleanupDB(badgerDB2, blugeWriter2)
+	defer database.CleanupDB(badgerDB2, blugeWriter2)
 
 	repo2 := NewAnalysisRepository(badgerDB2, blugeWriter2, log2, lo.ToPtr(200), 100)
 
@@ -306,10 +306,10 @@ func TestAnalysisRepository_StoreBatch_vs_Store_Performance(t *testing.T) {
 
 func TestAnalysisRepository_ConcurrentStores(t *testing.T) {
 	ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(100), 50)
-	roomID := "concurrent-room"
+	Namespace := "concurrent-room"
 
 	const (
 		numGoroutines    = 10
@@ -333,8 +333,8 @@ func TestAnalysisRepository_ConcurrentStores(t *testing.T) {
 				storedIDs[idx] = msgID
 
 				analysis := Analysis{
-					MessageId: msgID,
-					RoomId:    roomID,
+					EntityId:  msgID,
+					Namespace: Namespace,
 					At:        time.Now().UTC(),
 					Summary:   fmt.Sprintf("Routine %d - Message %d", routineID, j),
 					Payload:   TextContent{Content: fmt.Sprintf("Concurrent write test content %d-%d", routineID, j)},
@@ -364,7 +364,7 @@ func TestAnalysisRepository_ConcurrentStores(t *testing.T) {
 
 	validCount := 0
 	for _, msgID := range storedIDs {
-		if _, err := repo.FetchFullByMessageId(roomID, msgID); err == nil {
+		if _, err := repo.FetchFullByEntityId(Namespace, msgID); err == nil {
 			validCount++
 		}
 	}
@@ -372,7 +372,7 @@ func TestAnalysisRepository_ConcurrentStores(t *testing.T) {
 		t.Errorf("Only %d/%d documents retrievable from Badger", validCount, totalWrites)
 	}
 
-	_, total, err := repo.SearchPaginated(ctx, "Concurrent", roomID, 0)
+	_, total, err := repo.SearchPaginated(ctx, "Concurrent", Namespace, 0)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -388,20 +388,20 @@ func TestAnalysisRepository_ConcurrentStores(t *testing.T) {
 
 func BenchmarkAnalysisRepository_Hydration(b *testing.B) {
 	_, _, badgerDB, blugeWriter := initTest(b)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	// On récupère le logger spécifiquement pour le benchmark
 	log := slog.Default()
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(100), 100)
-	roomID := "hydration-bench"
+	Namespace := "hydration-bench"
 
-	messageIDs := make([]uuid.UUID, 1000)
+	EntityIds := make([]uuid.UUID, 1000)
 	for i := 0; i < 1000; i++ {
 		msgID := uuid.New()
-		messageIDs[i] = msgID
+		EntityIds[i] = msgID
 		analysis := Analysis{
-			MessageId: msgID,
-			RoomId:    roomID,
+			EntityId:  msgID,
+			Namespace: Namespace,
 			At:        time.Now().UTC(),
 			Summary:   "Hydration benchmark",
 			Payload:   TextContent{Content: "test content"},
@@ -414,8 +414,8 @@ func BenchmarkAnalysisRepository_Hydration(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		msgID := messageIDs[i%len(messageIDs)]
-		_, err := repo.FetchFullByMessageId(roomID, msgID)
+		msgID := EntityIds[i%len(EntityIds)]
+		_, err := repo.FetchFullByEntityId(Namespace, msgID)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -424,16 +424,16 @@ func BenchmarkAnalysisRepository_Hydration(b *testing.B) {
 
 func BenchmarkAnalysisRepository_Store(b *testing.B) {
 	_, log, badgerDB, blugeWriter := initTest(b)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(100), 100)
-	roomID := "store-bench"
+	Namespace := "store-bench"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		analysis := Analysis{
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().UTC(),
 			Summary:   "Benchmark store",
 			Payload:   TextContent{Content: "benchmark content"},
@@ -460,10 +460,10 @@ func TestAnalysisRepository_Search_100kDocuments(t *testing.T) {
 	}
 
 	ctx, log, badgerDB, blugeWriter := initTest(t)
-	defer db.CleanupDB(badgerDB, blugeWriter)
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(1000), 100)
-	roomID := "large-dataset-room"
+	Namespace := "large-dataset-room"
 
 	const totalDocs = 5000
 	const targetKeyword = "special"
@@ -481,8 +481,8 @@ func TestAnalysisRepository_Search_100kDocuments(t *testing.T) {
 		}
 
 		analysis := Analysis{
-			MessageId: uuid.New(),
-			RoomId:    roomID,
+			EntityId:  uuid.New(),
+			Namespace: Namespace,
 			At:        time.Now().Add(time.Duration(i) * time.Millisecond),
 			Summary:   fmt.Sprintf("Doc %d", i),
 			Payload:   TextContent{Content: content},
@@ -500,7 +500,7 @@ func TestAnalysisRepository_Search_100kDocuments(t *testing.T) {
 
 	t.Log("Searching...")
 	start := time.Now()
-	results, total, err := repo.SearchPaginated(ctx, targetKeyword, roomID, 0)
+	results, total, err := repo.SearchPaginated(ctx, targetKeyword, Namespace, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,9 +519,9 @@ func TestAnalysisRepository_Search_100kDocuments(t *testing.T) {
 // ============================================================================
 
 func initTest(t testing.TB) (context.Context, *slog.Logger, *badger.DB, *bluge.Writer) {
-	path := t.TempDir()
+	path := database.DefaultPath
 	// Usage de ta méthode SDK
-	ctx, log, badgerDB, blugeWriter, err := db.SetupBenchmark(path)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(path)
 	if err != nil {
 		t.Fatalf("Failed to setup test: %v", err)
 	}

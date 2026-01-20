@@ -2,9 +2,9 @@ package services
 
 import (
 	"chat-lab/domain/analyzer"
-	"log/slog"
-
+	"chat-lab/infrastructure/storage"
 	"github.com/go-playground/validator/v10"
+	"log/slog"
 )
 
 type IAnalyzerService interface {
@@ -12,14 +12,16 @@ type IAnalyzerService interface {
 }
 
 type AnalyzerService struct {
-	log       *slog.Logger
-	validator *validator.Validate
+	log        *slog.Logger
+	validator  *validator.Validate
+	repository storage.IAnalysisRepository
 }
 
-func NewAnalyzerService(log *slog.Logger) *AnalyzerService {
+func NewAnalyzerService(log *slog.Logger, repository storage.IAnalysisRepository) *AnalyzerService {
 	return &AnalyzerService{
-		log:       log,
-		validator: validator.New(),
+		log:        log,
+		repository: repository,
+		validator:  validator.New(),
 	}
 }
 

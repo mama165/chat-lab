@@ -5,8 +5,8 @@ import "google/protobuf/timestamp.proto";
 
 message Analysis {
   string id = 1;
-  string message_id = 2;
-  string room_id = 3;
+  string entity_id = 2;
+  string namespace = 3;
   google.protobuf.Timestamp at = 4;
   string summary = 5;
   // Tags (#urgent, #facture...)

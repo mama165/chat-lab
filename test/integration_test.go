@@ -10,6 +10,7 @@ import (
 	"chat-lab/sink"
 	"context"
 	"github.com/blugelabs/bluge"
+	"github.com/mama165/sdk-go/database"
 	"log/slog"
 	"testing"
 	"time"
@@ -26,12 +27,12 @@ func Test_Scenario(t *testing.T) {
 	ctx := context.Background()
 	req := require.New(t)
 	// Reduced to 16 Mo for testing (avoid 20 Go of storage)
-	db, err := badger.Open(badger.DefaultOptions(t.TempDir()).
+	db, err := badger.Open(badger.DefaultOptions(database.DefaultPath).
 		WithLoggingLevel(badger.ERROR).
 		WithValueLogFileSize(16 << 20))
 	req.NoError(err)
 
-	blugeCfg := bluge.DefaultConfig(t.TempDir())
+	blugeCfg := bluge.DefaultConfig(database.DefaultPath)
 	blugeWriter, err := bluge.OpenWriter(blugeCfg)
 	req.NoError(err)
 	defer blugeWriter.Close()

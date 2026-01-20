@@ -25,8 +25,8 @@ const (
 type Analysis struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	MessageId string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	RoomId    string                 `protobuf:"bytes,3,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	EntityId  string                 `protobuf:"bytes,2,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	Namespace string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	At        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=at,proto3" json:"at,omitempty"`
 	Summary   string                 `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
 	// Tags (#urgent, #facture...)
@@ -79,16 +79,16 @@ func (x *Analysis) GetId() string {
 	return ""
 }
 
-func (x *Analysis) GetMessageId() string {
+func (x *Analysis) GetEntityId() string {
 	if x != nil {
-		return x.MessageId
+		return x.EntityId
 	}
 	return ""
 }
 
-func (x *Analysis) GetRoomId() string {
+func (x *Analysis) GetNamespace() string {
 	if x != nil {
-		return x.RoomId
+		return x.Namespace
 	}
 	return ""
 }
@@ -337,12 +337,11 @@ var File_proto_storage_analysis_proto protoreflect.FileDescriptor
 
 const file_proto_storage_analysis_proto_rawDesc = "" +
 	"\n" +
-	"\x1cproto/storage/analysis.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd7\x03\n" +
+	"\x1cproto/storage/analysis.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xda\x03\n" +
 	"\bAnalysis\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
-	"\n" +
-	"message_id\x18\x02 \x01(\tR\tmessageId\x12\x17\n" +
-	"\aroom_id\x18\x03 \x01(\tR\x06roomId\x12*\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tentity_id\x18\x02 \x01(\tR\bentityId\x12\x1c\n" +
+	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12*\n" +
 	"\x02at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x18\n" +
 	"\asummary\x18\x05 \x01(\tR\asummary\x12\x12\n" +
 	"\x04tags\x18\x06 \x03(\tR\x04tags\x12;\n" +

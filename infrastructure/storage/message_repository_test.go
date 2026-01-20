@@ -2,8 +2,8 @@ package storage
 
 import (
 	"fmt"
-	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
+	"github.com/mama165/sdk-go/database"
 	"github.com/stretchr/testify/require"
 	"log/slog"
 	"sort"
@@ -13,13 +13,11 @@ import (
 
 func Test_Record_And_Get_Sorted_Messages(t *testing.T) {
 	req := require.New(t)
-	db, err := badger.Open(badger.DefaultOptions(t.TempDir()).
-		WithLoggingLevel(badger.ERROR).
-		WithValueLogFileSize(16 << 20))
+	_, _, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.Close()
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
-	repository := NewMessageRepository(db, slog.Default(), nil)
+	repository := NewMessageRepository(badgerDB, slog.Default(), nil)
 	room := 1
 	content := "this message will self destruct in 5 seconds"
 	at := time.Now().UTC()
@@ -50,14 +48,12 @@ func Test_Record_And_Get_Sorted_Messages(t *testing.T) {
 
 func Test_Record_Multiple_Message_And_Limit(t *testing.T) {
 	req := require.New(t)
-	db, err := badger.Open(badger.DefaultOptions(t.TempDir()).
-		WithLoggingLevel(badger.ERROR).
-		WithValueLogFileSize(16 << 20))
+	_, _, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.Close()
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	limit := 2
-	repository := NewMessageRepository(db, slog.Default(), &limit)
+	repository := NewMessageRepository(badgerDB, slog.Default(), &limit)
 	room := 1
 	content := "this message will self destruct in 5 seconds"
 	at := time.Now().UTC()
@@ -77,14 +73,12 @@ func Test_Record_Multiple_Message_And_Limit(t *testing.T) {
 
 func Test_MessageRepository_Pagination(t *testing.T) {
 	req := require.New(t)
-	db, err := badger.Open(badger.DefaultOptions(t.TempDir()).
-		WithLoggingLevel(badger.ERROR).
-		WithValueLogFileSize(16 << 20))
+	_, _, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.Close()
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	limit := 4
-	repo := NewMessageRepository(db, slog.Default(), &limit)
+	repo := NewMessageRepository(badgerDB, slog.Default(), &limit)
 	room := 42
 	now := time.Now().UTC()
 

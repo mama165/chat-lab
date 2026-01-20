@@ -2,31 +2,25 @@ package moderation
 
 import (
 	"fmt"
-	"log/slog"
+	"github.com/mama165/sdk-go/database"
 	"testing"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
-	"github.com/mama165/sdk-go/logs"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_Moderation_Benchmark(t *testing.T) {
-	// 1. Setup Badger (Temporary)
 	req := require.New(t)
-	log := logs.GetLoggerFromLevel(slog.LevelDebug)
-	path := t.TempDir()
-	db, err := badger.Open(badger.DefaultOptions(path).
-		WithLoggingLevel(badger.ERROR).
-		WithValueLogFileSize(16 << 20))
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
 	req.NoError(err)
-	defer db.Close()
+	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	wordCount := 100_000
 
 	// --- Phase 1: SEEDING ---
 	startSeed := time.Now()
-	wb := db.NewWriteBatch()
+	wb := badgerDB.NewWriteBatch()
 	for i := 0; i < wordCount; i++ {
 		key := []byte(fmt.Sprintf("blacklist:word_%d", i))
 		_ = wb.Set(key, nil)
@@ -42,7 +36,7 @@ func Test_Moderation_Benchmark(t *testing.T) {
 	// --- Phase 2: LOADING ---
 	startLoad := time.Now()
 	var words []string
-	err = db.View(func(txn *badger.Txn) error {
+	err = badgerDB.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false // Crucial car les mots sont dans les clés
 		it := txn.NewIterator(opts)
