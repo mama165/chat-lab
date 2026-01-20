@@ -31,10 +31,10 @@ message FileAnalyzerRequest {
 }
 
 enum SourceType {
-  SOURCE_TYPE_UNSPECIFIED = 0;
-  SOURCE_TYPE_LOCAL_FIXED = 1;  // SSD/HDD Interne
-  SOURCE_TYPE_REMOVABLE = 2;    // USB / Carte SD
-  SOURCE_TYPE_NETWORK = 3;      // NAS / SMB
+  UNSPECIFIED = 0;
+  LOCAL_FIXED = 1;  // Internal SSD/HDD
+  REMOVABLE = 2;    // USB / Carte SD
+  NETWORK = 3;      // NAS / SMB
 }
 
 message FileAnalyzerResponse {

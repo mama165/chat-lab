@@ -25,25 +25,25 @@ const (
 type SourceType int32
 
 const (
-	SourceType_SOURCE_TYPE_UNSPECIFIED SourceType = 0
-	SourceType_SOURCE_TYPE_LOCAL_FIXED SourceType = 1 // SSD/HDD Interne
-	SourceType_SOURCE_TYPE_REMOVABLE   SourceType = 2 // USB / Carte SD
-	SourceType_SOURCE_TYPE_NETWORK     SourceType = 3 // NAS / SMB
+	SourceType_UNSPECIFIED SourceType = 0
+	SourceType_LOCAL_FIXED SourceType = 1 // Internal SSD/HDD
+	SourceType_REMOVABLE   SourceType = 2 // USB / Carte SD
+	SourceType_NETWORK     SourceType = 3 // NAS / SMB
 )
 
 // Enum value maps for SourceType.
 var (
 	SourceType_name = map[int32]string{
-		0: "SOURCE_TYPE_UNSPECIFIED",
-		1: "SOURCE_TYPE_LOCAL_FIXED",
-		2: "SOURCE_TYPE_REMOVABLE",
-		3: "SOURCE_TYPE_NETWORK",
+		0: "UNSPECIFIED",
+		1: "LOCAL_FIXED",
+		2: "REMOVABLE",
+		3: "NETWORK",
 	}
 	SourceType_value = map[string]int32{
-		"SOURCE_TYPE_UNSPECIFIED": 0,
-		"SOURCE_TYPE_LOCAL_FIXED": 1,
-		"SOURCE_TYPE_REMOVABLE":   2,
-		"SOURCE_TYPE_NETWORK":     3,
+		"UNSPECIFIED": 0,
+		"LOCAL_FIXED": 1,
+		"REMOVABLE":   2,
+		"NETWORK":     3,
 	}
 )
 
@@ -178,7 +178,7 @@ func (x *FileAnalyzerRequest) GetSourceType() SourceType {
 	if x != nil {
 		return x.SourceType
 	}
-	return SourceType_SOURCE_TYPE_UNSPECIFIED
+	return SourceType_UNSPECIFIED
 }
 
 type FileAnalyzerResponse struct {
@@ -263,13 +263,13 @@ const file_proto_analyzer_file_analyzer_service_proto_rawDesc = "" +
 	"\x14FileAnalyzerResponse\x12%\n" +
 	"\x0efiles_received\x18\x01 \x01(\x03R\rfilesReceived\x12'\n" +
 	"\x0fbytes_processed\x18\x02 \x01(\x03R\x0ebytesProcessed\x125\n" +
-	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt*z\n" +
+	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt*J\n" +
 	"\n" +
-	"SourceType\x12\x1b\n" +
-	"\x17SOURCE_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
-	"\x17SOURCE_TYPE_LOCAL_FIXED\x10\x01\x12\x19\n" +
-	"\x15SOURCE_TYPE_REMOVABLE\x10\x02\x12\x17\n" +
-	"\x13SOURCE_TYPE_NETWORK\x10\x032c\n" +
+	"SourceType\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\x0f\n" +
+	"\vLOCAL_FIXED\x10\x01\x12\r\n" +
+	"\tREMOVABLE\x10\x02\x12\v\n" +
+	"\aNETWORK\x10\x032c\n" +
 	"\x13FileAnalyzerService\x12L\n" +
 	"\aAnalyze\x12\x1e.ingestion.FileAnalyzerRequest\x1a\x1f.ingestion.FileAnalyzerResponse(\x01B\x06Z\x04./pbb\x06proto3"
 

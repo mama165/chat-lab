@@ -44,18 +44,17 @@ func toRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
 
 func toSourceType(st pb.SourceType) analyzer.SourceType {
 	switch st {
-	case pb.SourceType_SOURCE_TYPE_UNSPECIFIED:
-		return analyzer.SourceTypeUnspecified
-	case pb.SourceType_SOURCE_TYPE_LOCAL_FIXED:
-		return analyzer.SourceTypeLocalFixed
-	case pb.SourceType_SOURCE_TYPE_REMOVABLE:
-		return analyzer.SourceTypeRemovable
-	case pb.SourceType_SOURCE_TYPE_NETWORK:
-		return analyzer.SourceTypeNetwork
+	case pb.SourceType_UNSPECIFIED:
+		return analyzer.UNSPECIFIED
+	case pb.SourceType_LOCAL_FIXED:
+		return analyzer.LocalFixed
+	case pb.SourceType_REMOVABLE:
+		return analyzer.REMOVABLE
+	case pb.SourceType_NETWORK:
+		return analyzer.NETWORK
 	default:
-		return analyzer.SourceTypeUnspecified
+		return analyzer.UNSPECIFIED
 	}
-
 }
 
 func fromResponse(resp analyzer.FileAnalyzerResponse) *pb.FileAnalyzerResponse {
