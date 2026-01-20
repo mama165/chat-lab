@@ -12,14 +12,14 @@ const (
 )
 
 type FileAnalyzerRequest struct {
-	Path       string
-	DriveID    string
-	Size       uint64
-	Attributes uint32
-	MimeType   string
+	Path       string `validate:"required"`
+	DriveID    string `validate:"required"`
+	Size       uint64 `validate:"required,gte=0"`
+	Attributes uint32 `validate:"required,gte=0"`
+	MimeType   string `validate:"required"`
 	MagicBytes []byte
-	ScannedAt  time.Time
-	SourceType SourceType
+	ScannedAt  time.Time  `validate:"required"`
+	SourceType SourceType `validate:"required"`
 }
 
 type FileAnalyzerResponse struct {

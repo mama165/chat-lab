@@ -22,7 +22,7 @@ func NewFileAnalyzerServer(service services.AnalyzerService) *FileAnalyzerServer
 
 func (s FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAnalyzerRequest, pb.FileAnalyzerResponse]) error {
 	request, err := stream.Recv()
-	response, err := s.fileAnalyzerService.Process(toRequest(request))
+	response, err := s.fileAnalyzerService.Analyze(toRequest(request))
 	if err != nil {
 		return err
 	}
