@@ -6,7 +6,7 @@ type SourceType string
 
 const (
 	UNSPECIFIED SourceType = "UNSPECIFIED"
-	LocalFixed  SourceType = "LOCAL_FIXED"
+	LOCALFIXED  SourceType = "LOCAL_FIXED"
 	REMOVABLE   SourceType = "REMOVABLE"
 	NETWORK     SourceType = "NETWORK"
 )

@@ -47,7 +47,7 @@ func toSourceType(st pb.SourceType) analyzer.SourceType {
 	case pb.SourceType_UNSPECIFIED:
 		return analyzer.UNSPECIFIED
 	case pb.SourceType_LOCAL_FIXED:
-		return analyzer.LocalFixed
+		return analyzer.LOCALFIXED
 	case pb.SourceType_REMOVABLE:
 		return analyzer.REMOVABLE
 	case pb.SourceType_NETWORK:

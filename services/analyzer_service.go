@@ -27,6 +27,5 @@ func (s AnalyzerService) Analyze(request analyzer.FileAnalyzerRequest) (analyzer
 	if err := s.validator.Struct(request); err != nil {
 		return analyzer.FileAnalyzerResponse{}, err
 	}
-
 	return analyzer.FileAnalyzerResponse{}, nil
 }
