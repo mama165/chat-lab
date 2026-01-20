@@ -51,17 +51,21 @@ build-specialists:
 
 ## proto-gen: Generate Go code from .proto files using a containerized environment
 proto-gen:
+	@echo "--- 🧹 Cleaning old generated code ---"
+	@# Remove all generated .pb.go files to avoid stale service definitions
+	@find proto -name "*.pb.go" -type f -delete
 	@echo "--- 🚀 Generating gRPC/Protobuf code ---"
+	@# Run protoc within a Docker container for a consistent build environment
 	@docker run --rm -v "$(PWD):/src" -w /src golang:1.24-alpine sh -c "\
-		apk add --no-cache protobuf-dev protoc && \
-		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
-		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
-		find proto -name '*.proto' -exec sed -i 's/\r//' {} + && \
-		protoc -I. \
-		       -I/usr/include \
-		       --go_out=. --go_opt=paths=source_relative \
-		       --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		       \$$(find proto -name '*.proto')"
+       apk add --no-cache protobuf-dev protoc && \
+       go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+       go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+       find proto -name '*.proto' -exec sed -i 's/\r//' {} + && \
+       protoc -I. \
+              -I/usr/include \
+              --go_out=. --go_opt=paths=source_relative \
+              --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+              \$$(find proto -name '*.proto')"
 	@$(MAKE) fmt
 
 ## ai-gen: Run the AI model generation (Python transpilation) and force formatting
