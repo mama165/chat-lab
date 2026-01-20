@@ -2,8 +2,9 @@ package auth
 
 import (
 	"chat-lab/errors"
-	"github.com/go-playground/validator/v10"
 	"unicode"
+
+	"github.com/go-playground/validator/v10"
 )
 
 var validate = validator.New()
