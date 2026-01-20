@@ -5,17 +5,18 @@ package chat.v1;
 option go_package = "./pb";
 
 message User {
-  string id = 1;         // UUID v4
-  string email = 2;      // Validé par go-playground
-  string password_hash = 3; // Hash Argon2id (jamais en clair !)
+  string id = 1;
+  string email = 2;
+  // Hash Argon2id
+  string password_hash = 3;
 
-  // Conformité CNIL / RGPD
+  // CNIL / RGPD
   int64 created_at = 4;
   int64 updated_at = 5;
   bool terms_accepted = 6;
   int64 last_password_change = 7;
 
-  // Rôles pour le RBAC (Role Based Access Control)
+  // RBAC (Role Based Access Control)
   repeated string roles = 8;
 }
 

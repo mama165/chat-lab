@@ -22,16 +22,17 @@ const (
 )
 
 type User struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                         // UUID v4
-	Email        string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`                                   // Validé par go-playground
-	PasswordHash string                 `protobuf:"bytes,3,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"` // Hash Argon2id (jamais en clair !)
-	// Conformité CNIL / RGPD
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Email string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	// Hash Argon2id
+	PasswordHash string `protobuf:"bytes,3,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"`
+	// CNIL / RGPD
 	CreatedAt          int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt          int64 `protobuf:"varint,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	TermsAccepted      bool  `protobuf:"varint,6,opt,name=terms_accepted,json=termsAccepted,proto3" json:"terms_accepted,omitempty"`
 	LastPasswordChange int64 `protobuf:"varint,7,opt,name=last_password_change,json=lastPasswordChange,proto3" json:"last_password_change,omitempty"`
-	// Rôles pour le RBAC (Role Based Access Control)
+	// RBAC (Role Based Access Control)
 	Roles         []string `protobuf:"bytes,8,rep,name=roles,proto3" json:"roles,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
