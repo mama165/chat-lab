@@ -1,4 +1,4 @@
-//go:generate go run go.uber.org/mock/mockgen -source=message_repository.go -destination=../mocks/mock_message_repository.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen -source=message_repository.go -destination=../../mocks/mock_message_repository.go -package=mocks
 package storage
 
 import (
