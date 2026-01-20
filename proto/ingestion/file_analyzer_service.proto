@@ -5,11 +5,11 @@ option go_package = "./pb";
 
 import "google/protobuf/timestamp.proto";
 
-service IngestionService {
-  rpc IngestFile(stream FileIngestRequest) returns (FileSummaryResponse);
+service FileAnalyzerService {
+  rpc Analyze(stream FileAnalyzerRequest) returns (FileAnalyzerResponse);
 }
 
-message FileIngestRequest {
+message FileAnalyzerRequest {
   // Complet path (ex: E:\Photos\holidays.jpg)
   string path = 1;
   // ex: Disk UUID
@@ -37,7 +37,7 @@ enum SourceType {
   SOURCE_TYPE_NETWORK = 3;      // NAS / SMB
 }
 
-message FileSummaryResponse {
+message FileAnalyzerResponse {
   int64 files_received = 1;
   int64 bytes_processed = 2;
   google.protobuf.Timestamp duration = 3;
