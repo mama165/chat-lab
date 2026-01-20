@@ -1,238 +1,65 @@
-# chat-lab 💬🧪
+# 🚀 Chat-Lab | High-Performance Stream & Analysis Engine
 
-chat-lab is a **learning and experimentation lab** built around a minimal distributed chat system.
-The goal is not to build a “complete” chat application, but to explore core concepts of
-**event-driven systems**, **convergence**, and **state observation**.
+Chat-Lab is a robust, modular messaging and data processing platform built in Go. Beyond simple chat, it is designed as a **resilient data pipeline** capable of ingesting, moderating, and indexing streams of information with advanced congestion control and self-healing capabilities.
 
 ---
 
-## Why this project exists 🚀
+## 🏗️ System Architecture
 
-This project is a direct continuation of a previous exercise involving multiple “robots” 🤖
-communicating with each other to reconstruct a shared state.
+Chat-Lab follows a **Master-Worker-Sidecar** pattern to ensure total isolation between business logic and heavy processing (AI/Indexing).
 
-Here, a chat system is used as a more **concrete and readable medium** to:
 
-* 🌐 Explore distributed systems without strict central coordination
-* 📩 Reason in terms of events rather than mutable shared state
-* 👀 Observe progressive convergence of local views
-* 🧱 Enforce clear separation between domain, runtime, and UI
 
-chat-lab is first and foremost a **learning playground** 🎓.
+### 1. The Orchestrator (The Brain)
+* **Wait-and-Fail Backpressure:** Protects the system from bursts by rejecting messages (`ErrServerOverloaded`) if the internal buffer is full.
+* **Fan-out Distribution:** Dispatches events to multiple Sinks (Storage, Search, Telemetry) in parallel without blocking the main flow.
 
----
+### 2. The Supervisor (The Guardian)
+* **Fault Isolation:** Every worker (Moderation, PoolUnit, Fan-out) is supervised.
+* **Self-Healing:** In case of a `panic`, the Supervisor recovers, logs the failure, and restarts the worker automatically.
 
-## What chat-lab is NOT ❌
-
-* ❌ A production-ready chat application
-* ❌ A system with strong global consistency guarantees
-* ❌ A Slack, Discord, or Matrix clone
-* ❌ A feature-driven or UX-focused project
-* ❌ A complex multi-room messaging system
-
-The objective is **conceptual clarity**, not feature completeness ✨.
+### 3. AI Specialists (The Muscles)
+* **Cross-Language Sidecars:** Advanced analysis (Toxicity, Business Logic) is offloaded to specialized Python/C++ models.
+* **gRPC IPC:** Communication via Protobuf ensures low-latency and strict contract definition between the Go Master and the AI Specialists.
+* **Lead Time Monitoring:** Every analysis measures its own execution time to prevent pipeline congestion.
 
 ---
 
-## High-level overview 🗺️
+## 🛠️ Technical Stack
 
-chat-lab is structured as an **event-driven runtime** around a small, explicit domain core.
-
-```
-┌────────────┐        Commands        ┌──────────────┐
-│   Client   │ ───────────────────▶   │   Runtime    │
-│ (future UI)│                        │(Orchestrator)│
-└────────────┘                        └──────┬───────┘
-                                             │
-                                             │ emits Events
-                                             ▼
-                                      ┌──────────────┐
-                                      │    Domain    │
-                                      │ (pure logic) │
-                                      └──────┬───────┘
-                                             │
-                   ┌─────────────────────────┼─────────────────────────┐
-                   ▼                         ▼                         ▼
-           ┌──────────────┐         ┌────────────────┐        ┌────────────────┐
-           │  Projections │         │   Moderation   │        │   Persistence  │
-           │ (Timelines)  │         │   Pipeline     │        │  (Badger / FS) │
-           └──────────────┘         └────────────────┘        └────────────────┘
-                   │
-                   ▼
-           ┌────────────────┐
-           │ Observers / UI │
-           │ (read-only)    │
-           └────────────────┘
-```
-
-Key ideas:
-
-* 📢 The **domain emits events**, never side effects
-* 🧠 State is derived through **local projections**
-* 🔌 IO, storage, and UI live at the edges
-* 🧱 The runtime wires everything together
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Core Engine** | Go 1.21+ | Concurrency, Goroutines, & High-speed routing |
+| **Key-Value Store** | **BadgerDB** | Persistent storage for raw messages (LSM-tree) |
+| **Search Engine** | **Bluge** | Full-text indexing and multi-criteria querying |
+| **Communication** | **gRPC / Protobuf** | High-performance interface for AI sidecars |
+| **Moderation** | **Aho-Corasick** | O(n) complexity keyword filtering |
+| **Observability** | **Internal Telemetry** | Channel capacity monitoring & Restart health |
 
 ---
 
-## Conceptual model 🧩
+## ⚡ Performance & Resilience
 
-The system is built around a small set of core concepts:
-
-* **Participant** 👤
-  An actor in the system, uniquely identified, that can be active or inactive.
-
-* **Message** ✉️
-  An immutable event emitted by a participant at a given point in time.
-
-* **Timeline** 🕒
-  A local projection of known messages. It may be incomplete, out of order, or temporarily unstable.
-
-* **Presence** ⚡
-  A derived piece of information (active / inactive), itself based on events.
-
-None of these concepts are designed as a globally shared state.
+* **Concurrency-First:** Uses a pool of unit workers to decouple command reception from processing.
+* **Graceful Shutdown:** The Orchestrator ensures all internal channels are drained and repositories flushed before stopping.
+* **Memory Efficiency:** Heavy operations like Aho-Corasick automaton building are done during the "Preparation Phase" to avoid runtime locks.
+* **Modular Sinks:** Adding a new output (Kafka, S3, Webhook) is as simple as implementing the `EventSink` interface.
 
 ---
 
-## Events, not state 📢
+## 📊 Telemetry Channels
 
-chat-lab follows a strict principle:
-
-> **The system produces events.
-> State is a local, reversible projection.**
-
-* 📝 Messages are never modified or deleted
-* 🔄 Timelines are reconstructed from observed events
-* 👥 Multiple projections may coexist
-* ⏳ Global ordering is not guaranteed
-
-This approach allows the system to reason about:
-
-* ⚠️ Message loss
-* 🔁 Duplication
-* ⏱ Delayed delivery
-* 🛠 Reconciliation
+The system exposes 4 critical monitoring axes:
+1.  **Channel Capacity:** Real-time length/capacity ratio of internal Go channels.
+2.  **Censorship Hits:** Statistics on filtered words and moderated content.
+3.  **Supervisor Health:** Tracking `RestartedAfterPanic` events.
+4.  **Processing Latency:** Lead time measurement for gRPC Specialist calls.
 
 ---
 
-## Convergence and uncertainty 🌊
+## 🚀 Getting Started
 
-A participant’s timeline:
-
-* may be incomplete
-* may evolve over time
-* may converge without ever being “final”
-
-The system explicitly embraces:
-
-* ❌ Absence of global ordering
-* ❌ Absence of guaranteed completeness
-* ⚖️ Uncertainty as a normal state
-
-A **quiet period** 💤 (an interval with no newly observed relevant events)
-is used as a heuristic for local stability, never as an absolute truth.
-
----
-
-## Runtime and supervision 🧠🛡️
-
-The runtime is responsible for:
-
-* 🧵 Running concurrent workers
-* 📬 Dispatching commands
-* 📢 Broadcasting events
-* ♻️ Restarting failed components
-
-Supervision is explicit: failures are expected, isolated, and observable.
-
----
-
-## Moderation pipeline 🧹
-
-Incoming messages may pass through a moderation pipeline:
-
-* 🔤 Text normalization
-* 🚫 Pattern matching / filtering
-* ✂️ Censoring or rejection
-
-Moderation **does not mutate past events** — it only affects whether new events are emitted.
-
----
-
-## Persistence and Protobuf 📦
-
-Some parts of the system rely on **Protocol Buffers** for message serialization,
-not as a network contract, but as a **stable and explicit disk representation**.
-
-The Protobuf definitions live under the `proto/` directory.
-
-### Generate Protobuf code
-
+### Load Testing
+To stress the backpressure and throughput:
 ```bash
-docker run --rm -v "$PWD:/defs" protoc-image \
-  -I . \
-  --go_out=paths=source_relative:. \
-  --go-grpc_out=paths=source_relative:. \
-  proto/message.proto
-```
-
-This keeps the environment reproducible and avoids installing protoc locally.
-
----
-
-## Observation and UI 👀🖥️
-
-The user interface (to be introduced later) is treated as:
-
-* 👁 An observer
-* 📡 An event consumer
-* 🚫 Never a decision-maker for the domain
-
-It does not control the system. It reflects a local, potentially imperfect view.
-
-This separation is deliberate and fundamental 🧱.
-
----
-
-## Current project status 🛠️
-
-The project is actively evolving:
-
-* ✅ Domain and runtime implemented
-* ✅ Event flows observable
-* 🧪 Focus on robustness, tests, and invariants
-* 🖥️ UI planned as a thin observational layer
-
----
-
-## Tests 🧪
-
-* Unit tests for registry, pool units, moderation, and fanout workers
-* Integration tests for end-to-end message dispatch
-* Supervisor tests for restart and graceful shutdown
-
----
-
-## Project Layout 📁
-
-```
-chat-lab/
-├─ client/           # UI (future)
-├─ domain/           # pure domain logic
-├─ runtime/          # orchestrator & workers
-├─ repositories/     # message storage & projections
-├─ proto/            # Protobuf definitions
-├─ mocks/            # generated mocks for tests
-├─ test/             # integration tests
-└─ tools.go          # tooling dependencies
-```
-
----
-
-## Inspirations 💡
-
-* 🤖 Distributed “robot” secret reconstruction exercise
-* 🌐 Event-driven systems
-* 📡 Gossip and anti-entropy protocols
-* 🔄 Eventually consistent architectures
-* 👁 Observable and reactive UIs (e.g., TUIs)
+go test -v ./runtime/load_test.go
