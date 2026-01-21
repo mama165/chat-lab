@@ -3,13 +3,14 @@ package services
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/mocks"
-	"github.com/mama165/sdk-go/logs"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 	"log/slog"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mama165/sdk-go/logs"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestAnalyzerService_Analyze(t *testing.T) {
@@ -55,7 +56,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 		{
 			"Should fail if MagicBytes exceeds 512 bytes",
 			func(r *analyzer.FileAnalyzerRequest) {
-				r.MagicBytes = make([]byte, 513)
+				r.MagicBytes = make([]byte, 65)
 			},
 			true,
 		},
