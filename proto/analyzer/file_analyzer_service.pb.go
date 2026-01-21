@@ -183,8 +183,8 @@ func (x *FileAnalyzerRequest) GetSourceType() SourceType {
 
 type FileAnalyzerResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	FilesReceived  int64                  `protobuf:"varint,1,opt,name=files_received,json=filesReceived,proto3" json:"files_received,omitempty"`
-	BytesProcessed int64                  `protobuf:"varint,2,opt,name=bytes_processed,json=bytesProcessed,proto3" json:"bytes_processed,omitempty"`
+	FilesReceived  uint64                 `protobuf:"varint,1,opt,name=files_received,json=filesReceived,proto3" json:"files_received,omitempty"`
+	BytesProcessed uint64                 `protobuf:"varint,2,opt,name=bytes_processed,json=bytesProcessed,proto3" json:"bytes_processed,omitempty"`
 	EndedAt        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -220,14 +220,14 @@ func (*FileAnalyzerResponse) Descriptor() ([]byte, []int) {
 	return file_proto_analyzer_file_analyzer_service_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *FileAnalyzerResponse) GetFilesReceived() int64 {
+func (x *FileAnalyzerResponse) GetFilesReceived() uint64 {
 	if x != nil {
 		return x.FilesReceived
 	}
 	return 0
 }
 
-func (x *FileAnalyzerResponse) GetBytesProcessed() int64 {
+func (x *FileAnalyzerResponse) GetBytesProcessed() uint64 {
 	if x != nil {
 		return x.BytesProcessed
 	}
@@ -261,8 +261,8 @@ const file_proto_analyzer_file_analyzer_service_proto_rawDesc = "" +
 	"\vsource_type\x18\b \x01(\x0e2\x15.ingestion.SourceTypeR\n" +
 	"sourceType\"\x9d\x01\n" +
 	"\x14FileAnalyzerResponse\x12%\n" +
-	"\x0efiles_received\x18\x01 \x01(\x03R\rfilesReceived\x12'\n" +
-	"\x0fbytes_processed\x18\x02 \x01(\x03R\x0ebytesProcessed\x125\n" +
+	"\x0efiles_received\x18\x01 \x01(\x04R\rfilesReceived\x12'\n" +
+	"\x0fbytes_processed\x18\x02 \x01(\x04R\x0ebytesProcessed\x125\n" +
 	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt*J\n" +
 	"\n" +
 	"SourceType\x12\x0f\n" +

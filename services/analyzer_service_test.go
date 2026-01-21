@@ -3,6 +3,7 @@ package services
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/mocks"
+	"context"
 	"log/slog"
 	"strings"
 	"testing"
@@ -15,10 +16,11 @@ import (
 
 func TestAnalyzerService_Analyze(t *testing.T) {
 	req := require.New(t)
+	ctx := context.Background()
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	ctrl := gomock.NewController(t)
 	repository := mocks.NewMockIAnalysisRepository(ctrl)
-	service := NewAnalyzerService(log, repository)
+	service := NewAnalyzerService(log, repository, 1000, &analyzer.CountAnalyzedFiles{})
 
 	baseRequest := analyzer.FileAnalyzerRequest{
 		Path:       "E:/Photos/vacances.jpg",
@@ -83,7 +85,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			tc := baseRequest
 			tt.modify(&tc)
-			_, err := service.Analyze(tc)
+			err := service.Analyze(ctx, analyzer.FileAnalyzerRequest{})
 			req.Equal(tt.wantErr, err != nil, tt.description)
 		})
 	}

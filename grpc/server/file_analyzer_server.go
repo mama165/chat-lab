@@ -4,6 +4,12 @@ import (
 	"chat-lab/domain/analyzer"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/services"
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"sync/atomic"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -12,21 +18,45 @@ import (
 type FileAnalyzerServer struct {
 	pb.UnsafeFileAnalyzerServiceServer
 	fileAnalyzerService services.IAnalyzerService
+	log                 *slog.Logger
+	countAnalyzedFiles  *analyzer.CountAnalyzedFiles
 }
 
-func NewFileAnalyzerServer(service services.AnalyzerService) *FileAnalyzerServer {
+func NewFileAnalyzerServer(
+	service services.IAnalyzerService,
+	log *slog.Logger,
+	countAnalyzedFiles *analyzer.CountAnalyzedFiles) *FileAnalyzerServer {
 	return &FileAnalyzerServer{
 		fileAnalyzerService: service,
+		log:                 log,
+		countAnalyzedFiles:  countAnalyzedFiles,
 	}
 }
 
+// Analyze handles a client-side stream of file metadata from a scanner.
+// It receives messages in a loop until the client closes the stream (io.EOF),
+// then returns a summary including total files received and bytes processed.
+// The statistics are read using atomic operations to ensure consistency across multiple concurrent streams.
 func (s FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAnalyzerRequest, pb.FileAnalyzerResponse]) error {
-	request, err := stream.Recv()
-	response, err := s.fileAnalyzerService.Analyze(toRequest(request))
-	if err != nil {
-		return err
+	for {
+		request, err := stream.Recv()
+		if err == io.EOF {
+			response := pb.FileAnalyzerResponse{
+				FilesReceived:  atomic.LoadUint64(&s.countAnalyzedFiles.FilesReceived),
+				BytesProcessed: atomic.LoadUint64(&s.countAnalyzedFiles.BytesProcessed),
+				EndedAt:        timestamppb.New(time.Now()),
+			}
+			return stream.SendAndClose(&response)
+		}
+		err = s.fileAnalyzerService.Analyze(stream.Context(), toRequest(request))
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			s.log.Error("Context has been canceled")
+			return err
+		}
+		if err != nil {
+			s.log.Error("Error analyzing file", "error", err)
+		}
 	}
-	return stream.SendMsg(fromResponse(response))
 }
 
 func toRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
@@ -54,13 +84,5 @@ func toSourceType(st pb.SourceType) analyzer.SourceType {
 		return analyzer.NETWORK
 	default:
 		return analyzer.UNSPECIFIED
-	}
-}
-
-func fromResponse(resp analyzer.FileAnalyzerResponse) *pb.FileAnalyzerResponse {
-	return &pb.FileAnalyzerResponse{
-		FilesReceived:  resp.FilesReceived,
-		BytesProcessed: resp.BytesProcessed,
-		EndedAt:        timestamppb.New(resp.EndedAt),
 	}
 }

@@ -27,12 +27,15 @@ type FileAnalyzerRequest struct {
 	SourceType SourceType `validate:"required,oneof=UNSPECIFIED LOCAL_FIXED REMOVABLE NETWORK"`
 }
 
-// FileAnalyzerResponse is a summary sent back by the server once the
+// CountAnalyzedFiles is a summary sent back by the server once the
 // gRPC stream is closed by the client. It provides a synchronization
 // checkpoint, confirming how many files were successfully acknowledged
 // and the total volume of data processed during the session.
-type FileAnalyzerResponse struct {
-	FilesReceived  int64
-	BytesProcessed int64
-	EndedAt        time.Time
+type CountAnalyzedFiles struct {
+	FilesReceived  uint64
+	BytesProcessed uint64
+}
+
+func NewCountAnalyzedFiles() CountAnalyzedFiles {
+	return CountAnalyzedFiles{}
 }

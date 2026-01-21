@@ -38,7 +38,7 @@ enum SourceType {
 }
 
 message FileAnalyzerResponse {
-  int64 files_received = 1;
-  int64 bytes_processed = 2;
+  uint64 files_received = 1;
+  uint64 bytes_processed = 2;
   google.protobuf.Timestamp ended_at = 3;
 }
