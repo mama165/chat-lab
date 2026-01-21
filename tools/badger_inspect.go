@@ -21,16 +21,14 @@ func main() {
 	prefix := flag.String("prefix", "analysis:", "Prefix to scan")
 	flag.Parse()
 
-	db, err := badger.Open(badger.DefaultOptions(*dbPath).WithLoggingLevel(badger.ERROR))
+	db, err := openDB(*dbPath)
 	if err != nil {
 		log.Fatal("Error while opening Badger: ", err)
 	}
 	defer db.Close()
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Type", "Timestamp", "Entity ID", "Namespace", "Detail", "Scores"})
-
-	// Style minimaliste et propre
+	table.SetHeader([]string{"Key", "Type", "Timestamp", "Entity ID", "Namespace", "Detail", "Scores"})
 	table.SetAutoWrapText(false)
 	table.SetAutoFormatHeaders(true)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
@@ -94,7 +92,10 @@ func main() {
 					displayID = displayID[:8]
 				}
 
+				rawKey := string(item.Key())
+
 				table.Append([]string{
+					rawKey,
 					payloadType,
 					analysis.At.Format("15:04:05"),
 					displayID,
@@ -116,4 +117,35 @@ func main() {
 	}
 
 	table.Render()
+}
+
+func openDB(path string) (*badger.DB, error) {
+	opts := badger.DefaultOptions(path).
+		WithReadOnly(true).
+		WithLogger(nil).
+		WithBypassLockGuard(true).
+		WithValueLogFileSize(10 * 1024 * 1024)
+
+	db, err := badger.Open(opts)
+	if err != nil {
+		// Si corruption détectée, essaie un open en write pour truncate
+		if strings.Contains(err.Error(), "Log truncate required") {
+			fmt.Println("⚠️  Move breakpoint in .Flush() method ")
+
+			// Open en mode write pour permettre le truncate
+			repairOpts := badger.DefaultOptions(path).
+				WithLogger(nil).WithBypassLockGuard(true)
+
+			db, err = badger.Open(repairOpts)
+			if err != nil {
+				return nil, fmt.Errorf("repair failed: %w", err)
+			}
+
+			// Ferme et réouvre en read-only
+			db.Close()
+			return badger.Open(opts)
+		}
+		return nil, err
+	}
+	return db, nil
 }

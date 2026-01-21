@@ -9,6 +9,10 @@ BENCHMARK_DIR=benchmark
 BENCHMARK_FILE_RESULT=benchmark.pdf
 DOC_COUNT_PROFILING=10000
 
+BINARY=bin/badger_inspect
+SOURCE=tools/badger_inspect.go
+DB_PATH=/tmp/database/debug
+
 # Docker user identifiers to avoid permission issues on host
 D_UID := $(shell id -u)
 D_GID := $(shell id -g)
@@ -102,6 +106,7 @@ clean:
 	@echo "--- 🧹 Cleaning binaries and Docker containers ---"
 	rm -f $(APP_NAME)
 	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR)
 	docker-compose down -v
 
 
@@ -129,3 +134,17 @@ bench-profile:
 	   go tool pprof -pdf -output=/app/$(BENCHMARK_DIR)/$(BENCHMARK_FILE_RESULT) /app/$(BENCHMARK_DIR)/benchmark.out
 
 	@echo "✅ Report  successfully generated : ./$(BENCHMARK_DIR)/$(BENCHMARK_FILE_RESULT)"
+
+# Default prefix if none provided
+prefix ?= analysis:
+
+# Target to run the inspector
+.PHONY: select
+select: $(BINARY)
+	@./$(BINARY) -db $(DB_PATH) -prefix "$(prefix)"
+
+# Build target: only runs if $(SOURCE) is newer than $(BINARY)
+$(BINARY): $(SOURCE)
+	@echo "🔨 Build: $(SOURCE) -> $(BINARY)"
+	@mkdir -p bin
+	@go build -o $(BINARY) $(SOURCE)

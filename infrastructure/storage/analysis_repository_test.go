@@ -2,7 +2,9 @@ package storage
 
 import (
 	"chat-lab/domain/specialist"
+	pb "chat-lab/proto/storage"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 var MetricTest specialist.Metric = "test"
@@ -102,11 +105,11 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
+	namespace := "audio-room"
 
 	// Given: An audio-based analysis
-	namespace := "audio-room"
 	msgID := uuid.New()
-	analysis := Analysis{
+	an := Analysis{
 		ID:        uuid.New(),
 		EntityId:  msgID,
 		Namespace: namespace,
@@ -119,12 +122,11 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 			Duration:      180, // 3 minutes
 		},
 	}
-
+	analysis := an
 	// When: Storing
 	err = repo.Store(analysis)
 	req.NoError(err)
 	req.NoError(repo.Flush())
-	time.Sleep(50 * time.Millisecond)
 
 	// Then: Searchable by transcription content
 	results, _, err := repo.SearchPaginated(ctx, "PostgreSQL", namespace, 0)
@@ -1038,4 +1040,48 @@ func allUnique(ids []uuid.UUID) bool {
 		seen[id] = true
 	}
 	return true
+}
+
+// analysisMapper translates the Protobuf bytes stored in Badger into a format
+// the SDK's DebugServer can display.
+func analysisMapper(key string, val []byte) database.InspectRow {
+	// 1. Start with basic key metadata (Namespace, TS)
+	row := database.DefaultMapper(key, val)
+
+	// 2. Unmarshal the Protobuf data
+	var msg pb.Analysis
+	if err := proto.Unmarshal(val, &msg); err == nil {
+		row.EntityID = msg.Id
+		if len(row.EntityID) > 8 {
+			row.EntityID = row.EntityID[:8]
+		}
+
+		row.Detail = msg.Summary
+
+		// 3. Dynamic Type from oneof payload
+		switch msg.Payload.(type) {
+		case *pb.Analysis_Audio:
+			row.Type = "AUDIO"
+		case *pb.Analysis_TextContent:
+			row.Type = "TEXT"
+		case *pb.Analysis_File:
+			row.Type = "FILE"
+		default:
+			row.Type = "UNKNOWN"
+		}
+
+		// 4. Format scores for the dashboard
+		if len(msg.Scores) > 0 {
+			var s []string
+			for k, v := range msg.Scores {
+				s = append(s, fmt.Sprintf("%s:%.2f", k, v))
+			}
+			row.Scores = strings.Join(s, " ")
+		}
+	} else {
+		row.Type = "ERROR"
+		row.Detail = "Failed to unmarshal Protobuf"
+	}
+
+	return row
 }
