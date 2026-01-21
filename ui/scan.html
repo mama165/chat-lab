@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHAT-LAB // DEEP SCAN & FORENSICS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                        tech: ['"Rajdhani"', 'sans-serif'],
+                    },
+                    colors: {
+                        cyber: {
+                            black: '#050505',
+                            dark: '#0a0b10',
+                            panel: '#111318',
+                            cyan: '#00f3ff',
+                            cyanDim: 'rgba(0, 243, 255, 0.1)',
+                            purple: '#bc13fe',
+                            green: '#0aff60',
+                            red: '#ff003c',
+                            grid: 'rgba(255, 255, 255, 0.03)'
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scanline': 'scanline 8s linear infinite',
+                        'spin-slow': 'spin 12s linear infinite',
+                    },
+                    keyframes: {
+                        scanline: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100%)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #050505;
+            background-image:
+                    linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: #e2e8f0;
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(17, 19, 24, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .neon-text { text-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
+        .neon-purple { text-shadow: 0 0 10px rgba(188, 19, 254, 0.5); }
+        .neon-red { text-shadow: 0 0 10px rgba(255, 0, 60, 0.5); }
+        .neon-green { text-shadow: 0 0 10px rgba(10, 255, 96, 0.5); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0b10; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00f3ff; }
+
+        .circular-chart {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            max-height: 250px;
+        }
+        .circle-bg {
+            fill: none;
+            stroke: #1e293b;
+            stroke-width: 2.5;
+        }
+        .circle {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            animation: progress 1s ease-out forwards;
+        }
+        @keyframes progress {
+            0% { stroke-dasharray: 0 100; }
+        }
+        .percentage {
+            fill: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: bold;
+            font-size: 0.5em;
+            text-anchor: middle;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background: linear-gradient(to bottom, transparent, rgba(0, 243, 255, 0.2), transparent);
+            z-index: 10;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col font-tech">
+
+<header class="h-16 border-b border-gray-800 bg-cyber-dark/90 flex items-center justify-between px-6 z-50">
+    <div class="flex items-center gap-4">
+        <div class="w-8 h-8 rounded bg-cyber-cyan/20 border border-cyber-cyan flex items-center justify-center animate-pulse">
+            <svg class="w-5 h-5 text-cyber-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold tracking-widest text-white">CHAT-LAB <span class="text-cyber-cyan neon-text">FORENSICS</span></h1>
+            <p class="text-xs text-cyber-cyan/60 font-mono tracking-wider">gRPC STREAMING // BADGER DB // AI PIPELINE</p>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-8">
+        <div class="flex flex-col items-end">
+            <span class="text-xs text-gray-400">THROUGHPUT</span>
+            <span class="text-xl font-bold text-cyber-green neon-green" id="throughput">842 MB/s</span>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-xs text-gray-400">ACTIVE WORKERS</span>
+            <span class="text-xl font-bold text-cyber-purple neon-purple">24 / 32</span>
+        </div>
+        <div class="h-8 w-[1px] bg-gray-700"></div>
+        <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-cyber-red animate-ping"></div>
+            <span class="text-cyber-red font-bold tracking-wider">LIVE SCAN</span>
+        </div>
+    </div>
+</header>
+
+<div class="flex-1 p-6 grid grid-cols-12 gap-6 relative">
+
+    <div class="col-span-3 flex flex-col gap-6">
+        <div class="glass-panel p-4 rounded-lg border-l-4 border-cyber-cyan">
+            <h3 class="text-gray-400 text-sm mb-2 font-mono">TARGET DRIVE</h3>
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-xl font-bold">/Volumes/Data_Raid01</span>
+                <span class="text-xs bg-cyber-cyan/20 text-cyber-cyan px-2 py-0.5 rounded">MOUNTED</span>
+            </div>
+            <div class="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div class="bg-cyber-cyan h-full w-[45%] animate-pulse"></div>
+            </div>
+            <div class="flex justify-between text-xs font-mono mt-1 text-gray-500">
+                <span>4.2 TB SCANNED</span>
+                <span>12 TB TOTAL</span>
+            </div>
+        </div>
+
+        <div class="glass-panel rounded-lg flex-1 flex flex-col overflow-hidden relative">
+            <div class="scan-line animate-scanline"></div>
+            <div class="p-3 border-b border-white/10 bg-cyber-dark/50 flex justify-between items-center">
+                <h3 class="font-mono text-sm text-cyber-cyan">>> INGEST_STREAM</h3>
+                <span class="text-[10px] text-gray-500">gRPC:50051</span>
+            </div>
+            <div class="p-4 font-mono text-xs space-y-2 overflow-y-hidden flex-1 relative" id="fileLog">
+            </div>
+        </div>
+    </div>
+
+    <div class="col-span-6 flex flex-col gap-6">
+
+        <div class="glass-panel rounded-lg p-6 relative overflow-hidden h-[400px] flex items-center justify-center">
+            <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#00f3ff 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+            <div class="relative z-10 flex items-center justify-center w-full max-w-2xl">
+
+                <div class="absolute inset-0 flex items-center justify-between px-10">
+                    <div class="flex flex-col items-center gap-2 group">
+                        <div class="w-16 h-16 rounded-full border-2 border-cyber-cyan bg-cyber-cyan/10 flex items-center justify-center shadow-[0_0_15px_rgba(0,243,255,0.3)]">
+                            <span class="text-2xl">📁</span>
+                        </div>
+                        <span class="text-xs font-bold tracking-widest text-cyber-cyan">SCANNER</span>
+                    </div>
+
+                    <div class="flex-1 h-[2px] bg-gray-800 mx-4 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 h-full w-1/3 bg-cyber-cyan blur-[2px] animate-[loading_1.5s_infinite]"></div>
+                    </div>
+
+                    <div class="flex flex-col items-center gap-2 group">
+                        <div class="w-20 h-20 rounded-full border-2 border-cyber-purple bg-cyber-purple/10 flex items-center justify-center shadow-[0_0_20px_rgba(188,19,254,0.4)] animate-pulse">
+                            <span class="text-3xl">🧠</span>
+                        </div>
+                        <span class="text-xs font-bold tracking-widest text-cyber-purple">WHISPER AI</span>
+                        <span class="text-[10px] text-gray-500 font-mono">Pyannote Running</span>
+                    </div>
+
+                    <div class="flex-1 h-[2px] bg-gray-800 mx-4 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 h-full w-1/3 bg-cyber-purple blur-[2px] animate-[loading_1.5s_infinite_0.5s]"></div>
+                    </div>
+
+                    <div class="flex flex-col items-center gap-2 group">
+                        <div class="w-16 h-16 rounded-full border-2 border-cyber-green bg-cyber-green/10 flex items-center justify-center shadow-[0_0_15px_rgba(10,255,96,0.3)]">
+                            <span class="text-2xl">💾</span>
+                        </div>
+                        <span class="text-xs font-bold tracking-widest text-cyber-green">BADGER DB</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 flex-1">
+            <div class="glass-panel rounded-lg p-4 flex items-center justify-between relative overflow-hidden">
+                <div class="z-10">
+                    <h3 class="text-gray-400 text-sm font-mono mb-1">TOXICITY DETECTED</h3>
+                    <p class="text-3xl font-bold text-cyber-red neon-red">14.2%</p>
+                    <p class="text-xs text-red-400 mt-2">HIGH SEVERITY: 245 Files</p>
+                </div>
+                <div class="w-24 h-24">
+                    <svg viewBox="0 0 36 36" class="circular-chart text-cyber-red">
+                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="circle" stroke-dasharray="14, 100" stroke="#ff003c" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-lg p-4 flex items-center justify-between relative overflow-hidden">
+                <div class="z-10">
+                    <h3 class="text-gray-400 text-sm font-mono mb-1">GDPR / PII FLAGS</h3>
+                    <p class="text-3xl font-bold text-yellow-400" style="text-shadow: 0 0 10px rgba(250,204,21,0.5)">8.7%</p>
+                    <p class="text-xs text-yellow-200 mt-2">EMAILS / PHONES / IBAN</p>
+                </div>
+                <div class="w-24 h-24">
+                    <svg viewBox="0 0 36 36" class="circular-chart text-yellow-400">
+                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="circle" stroke-dasharray="8, 100" stroke="#facc15" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-span-3 flex flex-col gap-6">
+
+        <div class="glass-panel p-5 rounded-lg">
+            <h3 class="text-cyber-cyan text-sm font-bold tracking-widest mb-4 flex items-center gap-2">
+                <span class="w-2 h-2 bg-cyber-cyan rounded-full"></span> STORAGE METRICS
+            </h3>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-xs mb-1 font-mono">
+                        <span class="text-gray-400">BADGERDB LSM TREE</span>
+                        <span class="text-white">LEVEL 4</span>
+                    </div>
+                    <div class="w-full bg-gray-800 h-1 rounded overflow-hidden">
+                        <div class="bg-cyber-purple h-full w-[85%]"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1 font-mono">
+                        <span class="text-gray-400">BLUGE INDEX</span>
+                        <span class="text-white">OPTIMIZED</span>
+                    </div>
+                    <div class="w-full bg-gray-800 h-1 rounded overflow-hidden">
+                        <div class="bg-cyber-green h-full w-[92%]"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1 font-mono">
+                        <span class="text-gray-400">WRITE AMPLIFICATION</span>
+                        <span class="text-white">1.2x</span>
+                    </div>
+                    <div class="w-full bg-gray-800 h-1 rounded overflow-hidden">
+                        <div class="bg-blue-500 h-full w-[25%]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-panel p-5 rounded-lg flex-1">
+            <h3 class="text-cyber-red text-sm font-bold tracking-widest mb-4 flex items-center gap-2">
+                <span class="w-2 h-2 bg-cyber-red rounded-full"></span> THREAT DETECTED
+            </h3>
+            <div class="flex flex-wrap gap-2 font-mono text-xs" id="threatCloud">
+                <span class="bg-red-500/10 border border-red-500/30 text-red-400 px-2 py-1 rounded">confidential</span>
+                <span class="bg-red-500/10 border border-red-500/30 text-red-400 px-2 py-1 rounded">salary_2025.pdf</span>
+                <span class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-2 py-1 rounded">password_dump</span>
+            </div>
+        </div>
+
+        <div class="glass-panel p-4 rounded-lg h-40 bg-black font-mono text-[10px] text-green-500 overflow-hidden leading-tight opacity-80">
+            <div id="sysLog">
+                > SYSTEM_INIT: OK<br>
+                > CONNECTING TO SUPERVISOR... OK<br>
+                > WORKER_POOL: STARTED (32 THREADS)<br>
+                > WHISPER_MODEL: LOADED (LARGE-V3)<br>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- SIMULATION DATA ---
+
+    const fileExtensions = ['mp3', 'wav', 'm4a', 'docx', 'pdf', 'go', 'py', 'json', 'log'];
+    const directories = ['/Users/admin/Downloads', '/var/log/app', '/home/data/audio_dumps', '/mnt/shared/meetings'];
+    const threats = ['password', 'secret', 'key', 'token', 'salary', 'confidential', 'admin', 'root'];
+
+    // --- DOM ELEMENTS ---
+    const fileLog = document.getElementById('fileLog');
+    const sysLog = document.getElementById('sysLog');
+    const threatCloud = document.getElementById('threatCloud');
+    const throughputEl = document.getElementById('throughput');
+
+    // --- FUNCTIONS ---
+
+    function randomFile() {
+        const ext = fileExtensions[Math.floor(Math.random() * fileExtensions.length)];
+        const dir = directories[Math.floor(Math.random() * directories.length)];
+        const name = Math.random().toString(36).substring(7);
+        const size = (Math.random() * 10 + 0.1).toFixed(1);
+
+        // Color coding based on type
+        let color = 'text-gray-400';
+        if (['mp3','wav'].includes(ext)) color = 'text-cyber-purple'; // Audio -> AI
+        if (['pdf','docx'].includes(ext)) color = 'text-cyber-cyan';  // Docs -> OCR
+        if (['go','py'].includes(ext)) color = 'text-cyber-green';    // Code
+
+        return `
+                <div class="flex justify-between items-center opacity-0 animate-[fadeIn_0.2s_forwards]">
+                    <span class="${color} truncate w-3/4">${dir}/${name}.${ext}</span>
+                    <span class="text-gray-600">${size}MB</span>
+                </div>
+            `;
+    }
+
+    function addLogLine(text, color = 'text-green-500') {
+        const line = document.createElement('div');
+        line.innerHTML = `> <span class="${color}">${text}</span>`;
+        sysLog.appendChild(line);
+        sysLog.scrollTop = sysLog.scrollHeight;
+        if(sysLog.children.length > 10) sysLog.removeChild(sysLog.firstChild);
+    }
+
+    // --- LOOPS ---
+
+    // 1. Fast File Scanner Loop
+    setInterval(() => {
+        const el = document.createElement('div');
+        el.innerHTML = randomFile();
+        fileLog.prepend(el.firstElementChild);
+        if (fileLog.children.length > 15) {
+            fileLog.removeChild(fileLog.lastChild);
+        }
+    }, 80); // Very fast
+
+    // 2. Throughput Fluctuation
+    setInterval(() => {
+        const val = Math.floor(Math.random() * (950 - 700) + 700);
+        throughputEl.innerText = val + " MB/s";
+    }, 500);
+
+    // 3. System Events / AI Detection
+    setInterval(() => {
+        const rand = Math.random();
+        if (rand > 0.7) {
+            const threat = threats[Math.floor(Math.random() * threats.length)];
+            addLogLine(`ANALYSIS COMPLETE: FOUND "${threat}"`, 'text-cyber-red');
+
+            // Add to tag cloud temporarily
+            const tag = document.createElement('span');
+            tag.className = "bg-red-500/10 border border-red-500/30 text-red-400 px-2 py-1 rounded animate-pulse";
+            tag.innerText = threat;
+            threatCloud.prepend(tag);
+            if (threatCloud.children.length > 15) threatCloud.removeChild(threatCloud.lastChild);
+        } else if (rand > 0.4) {
+            addLogLine("WHISPER: TRANSCRIPTION FINISHED (98% CONFIDENCE)", 'text-cyber-purple');
+        } else {
+            addLogLine("BADGERDB: FLUSHING MEMTABLE...", 'text-gray-400');
+        }
+    }, 1200);
+
+    // Add CSS keyframes for fadeIn dynamically
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateX(-10px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+        `;
+    document.head.appendChild(styleSheet);
+
+</script>
+</body>
+</html>

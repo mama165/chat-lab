@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat-Lab AI Intelligence Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0a0f;
+      color: #e4e4e7;
+      overflow-x: hidden;
+    }
+
+    .code-font { font-family: 'JetBrains Mono', monospace; }
+
+    /* Animated gradient background */
+    .gradient-bg {
+      background: linear-gradient(135deg,
+      rgba(99, 102, 241, 0.1) 0%,
+      rgba(168, 85, 247, 0.1) 50%,
+      rgba(236, 72, 153, 0.1) 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 15s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    /* Glowing cards */
+    .glow-card {
+      background: rgba(17, 17, 27, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      backdrop-filter: blur(20px);
+      transition: all 0.3s ease;
+    }
+
+    .glow-card:hover {
+      border-color: rgba(99, 102, 241, 0.5);
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+      transform: translateY(-2px);
+    }
+
+    /* Pulsating elements */
+    .pulse-glow {
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% {
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        opacity: 1;
+      }
+      50% {
+        box-shadow: 0 0 40px rgba(99, 102, 241, 0.8);
+        opacity: 0.8;
+      }
+    }
+
+    /* Scanning line effect */
+    .scan-line {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg,
+      transparent,
+      rgba(99, 102, 241, 0.8),
+      transparent);
+      animation: scan 3s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+
+    /* Matrix-like text rain */
+    .matrix-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.03;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Circular progress */
+    .circular-progress {
+      transform: rotate(-90deg);
+    }
+
+    .circular-progress circle {
+      transition: stroke-dashoffset 0.5s ease;
+    }
+
+    /* File tree animation */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .file-entry {
+      animation: slideIn 0.3s ease forwards;
+    }
+
+    /* Live metrics */
+    .metric-value {
+      font-variant-numeric: tabular-nums;
+      transition: all 0.2s ease;
+    }
+
+    .metric-spike {
+      animation: spike 0.3s ease;
+    }
+
+    @keyframes spike {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); color: #6366f1; }
+    }
+
+    /* Pipeline stages */
+    .pipeline-stage {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pipeline-stage::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg,
+      transparent,
+      rgba(99, 102, 241, 0.3),
+      transparent);
+      animation: shimmer 2s infinite;
+    }
+
+    .pipeline-stage.active::after {
+      animation: shimmer 1s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    /* GDPR alerts */
+    .gdpr-alert {
+      animation: fadeInOut 3s ease-in-out;
+    }
+
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0; transform: translateY(10px); }
+      10%, 90% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Specialist status lights */
+    .specialist-light {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Loading bars */
+    .loading-bar {
+      height: 3px;
+      background: linear-gradient(90deg,
+      transparent,
+      #6366f1,
+      transparent);
+      animation: loading 1.5s ease-in-out infinite;
+    }
+
+    @keyframes loading {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* Hexagonal grid background */
+    .hex-grid {
+      background-image:
+              linear-gradient(30deg, rgba(99, 102, 241, 0.02) 12%, transparent 12.5%, transparent 87%, rgba(99, 102, 241, 0.02) 87.5%, rgba(99, 102, 241, 0.02)),
+              linear-gradient(150deg, rgba(99, 102, 241, 0.02) 12%, transparent 12.5%, transparent 87%, rgba(99, 102, 241, 0.02) 87.5%, rgba(99, 102, 241, 0.02)),
+              linear-gradient(30deg, rgba(99, 102, 241, 0.02) 12%, transparent 12.5%, transparent 87%, rgba(99, 102, 241, 0.02) 87.5%, rgba(99, 102, 241, 0.02)),
+              linear-gradient(150deg, rgba(99, 102, 241, 0.02) 12%, transparent 12.5%, transparent 87%, rgba(99, 102, 241, 0.02) 87.5%, rgba(99, 102, 241, 0.02));
+      background-size: 80px 140px;
+      background-position: 0 0, 0 0, 40px 70px, 40px 70px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0a0a0f;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.3);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.5);
+    }
+  </style>
+</head>
+<body class="gradient-bg hex-grid">
+<!-- Matrix Background -->
+<canvas class="matrix-bg" id="matrixCanvas"></canvas>
+
+<!-- Header -->
+<header class="border-b border-gray-800 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
+  <div class="container mx-auto px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center pulse-glow">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            Chat-Lab Intelligence
+          </h1>
+          <p class="text-xs text-gray-400 code-font">v2.0.0-alpha | Build 20250121</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2">
+          <div class="specialist-light bg-green-500"></div>
+          <span class="text-sm text-gray-400">All Systems Operational</span>
+        </div>
+        <div class="flex items-center space-x-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+          <span class="text-xs text-indigo-400 code-font" id="liveTime">00:00:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container mx-auto px-6 py-8">
+  <!-- Real-time Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Files Scanned -->
+    <div class="glow-card rounded-xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm text-gray-400 uppercase tracking-wider">Files Scanned</span>
+          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+        </div>
+        <div class="flex items-baseline space-x-2 mb-2">
+          <span class="text-4xl font-bold metric-value code-font" id="filesScanned">0</span>
+          <span class="text-sm text-green-400">+<span id="filesDelta">0</span>/s</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500" id="filesProgress" style="width: 0%"></div>
+          </div>
+          <span class="text-xs text-gray-500 code-font" id="filesPercent">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Processed -->
+    <div class="glow-card rounded-xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm text-gray-400 uppercase tracking-wider">Data Processed</span>
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+          </svg>
+        </div>
+        <div class="flex items-baseline space-x-2 mb-2">
+          <span class="text-4xl font-bold metric-value code-font" id="dataProcessed">0</span>
+          <span class="text-sm text-gray-400">GB</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500" id="dataProgress" style="width: 0%"></div>
+          </div>
+          <span class="text-xs text-gray-500 code-font"><span id="dataRate">0</span> MB/s</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Analyses -->
+    <div class="glow-card rounded-xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full blur-3xl"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm text-gray-400 uppercase tracking-wider">AI Analyses</span>
+          <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+          </svg>
+        </div>
+        <div class="flex items-baseline space-x-2 mb-2">
+          <span class="text-4xl font-bold metric-value code-font" id="aiAnalyses">0</span>
+          <span class="text-sm text-green-400">completed</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-3">
+          <div class="text-center">
+            <div class="text-xs text-gray-500">Toxicity</div>
+            <div class="text-sm font-bold code-font text-red-400" id="toxicityCount">0</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xs text-gray-500">Sentiment</div>
+            <div class="text-sm font-bold code-font text-blue-400" id="sentimentCount">0</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xs text-gray-500">Business</div>
+            <div class="text-sm font-bold code-font text-purple-400" id="businessCount">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GDPR Alerts -->
+    <div class="glow-card rounded-xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-full blur-3xl"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm text-gray-400 uppercase tracking-wider">GDPR Alerts</span>
+          <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <div class="flex items-baseline space-x-2 mb-2">
+          <span class="text-4xl font-bold metric-value code-font" id="gdprAlerts">0</span>
+          <span class="text-sm text-yellow-400">flagged</span>
+        </div>
+        <div class="mt-3 space-y-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-gray-500">PII Detected</span>
+            <span class="code-font text-red-400" id="piiCount">0</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-gray-500">Sensitive Data</span>
+            <span class="code-font text-orange-400" id="sensitiveCount">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Live Scanner -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- File System Scanner -->
+      <div class="glow-card rounded-xl p-6 relative">
+        <div class="scan-line"></div>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-white">File System Scanner</h2>
+          <div class="flex items-center space-x-2">
+            <div class="specialist-light bg-green-500"></div>
+            <span class="text-xs text-gray-400 code-font">SCANNING</span>
+          </div>
+        </div>
+
+        <div class="space-y-3 h-96 overflow-y-auto" id="fileScanner">
+          <!-- Files will be dynamically added here -->
+        </div>
+      </div>
+
+      <!-- AI Pipeline Visualization -->
+      <div class="glow-card rounded-xl p-6">
+        <h2 class="text-xl font-bold text-white mb-6">AI Processing Pipeline</h2>
+
+        <div class="space-y-4">
+          <!-- Ingestion Stage -->
+          <div class="pipeline-stage bg-gray-900/50 rounded-lg p-4 border border-gray-800" id="stage1">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <span class="text-xl">📄</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-white">Stage 1: Ingestion</h3>
+                  <p class="text-xs text-gray-500">File metadata extraction</p>
+                </div>
+              </div>
+              <span class="text-sm code-font text-blue-400" id="stage1Count">0</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-blue-500 rounded-full transition-all duration-300" id="stage1Progress" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Whisper Transcription -->
+          <div class="pipeline-stage bg-gray-900/50 rounded-lg p-4 border border-gray-800" id="stage2">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <span class="text-xl">đŸŽ™ïž</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-white">Stage 2: Whisper AI</h3>
+                  <p class="text-xs text-gray-500">Audio transcription (OpenAI)</p>
+                </div>
+              </div>
+              <span class="text-sm code-font text-purple-400" id="stage2Count">0</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-purple-500 rounded-full transition-all duration-300" id="stage2Progress" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Pyannote Diarization -->
+          <div class="pipeline-stage bg-gray-900/50 rounded-lg p-4 border border-gray-800" id="stage3">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                  <span class="text-xl">đŸ'„</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-white">Stage 3: Pyannote</h3>
+                  <p class="text-xs text-gray-500">Speaker diarization</p>
+                </div>
+              </div>
+              <span class="text-sm code-font text-green-400" id="stage3Count">0</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-green-500 rounded-full transition-all duration-300" id="stage3Progress" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Sentiment Analysis -->
+          <div class="pipeline-stage bg-gray-900/50 rounded-lg p-4 border border-gray-800" id="stage4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                  <span class="text-xl">😊</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-white">Stage 4: Sentiment</h3>
+                  <p class="text-xs text-gray-500">Emotion & tone analysis</p>
+                </div>
+              </div>
+              <span class="text-sm code-font text-yellow-400" id="stage4Count">0</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-yellow-500 rounded-full transition-all duration-300" id="stage4Progress" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Storage -->
+          <div class="pipeline-stage bg-gray-900/50 rounded-lg p-4 border border-gray-800" id="stage5">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                  <span class="text-xl">💟</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-white">Stage 5: Storage</h3>
+                  <p class="text-xs text-gray-500">BadgerDB + Bluge indexing</p>
+                </div>
+              </div>
+              <span class="text-sm code-font text-indigo-400" id="stage5Count">0</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-indigo-500 rounded-full transition-all duration-300" id="stage5Progress" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="space-y-6">
+      <!-- System Health -->
+      <div class="glow-card rounded-xl p-6">
+        <h2 class="text-xl font-bold text-white mb-6">System Health</h2>
+
+        <div class="space-y-6">
+          <!-- CPU Usage -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-400">CPU Usage</span>
+              <span class="text-sm code-font text-white" id="cpuValue">0%</span>
+            </div>
+            <div class="relative w-32 h-32 mx-auto">
+              <svg class="circular-progress w-full h-full" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="54" fill="none" stroke="#1f2937" stroke-width="8"/>
+                <circle id="cpuCircle" cx="60" cy="60" r="54" fill="none" stroke="#6366f1" stroke-width="8"
+                        stroke-dasharray="339.292" stroke-dashoffset="339.292" stroke-linecap="round"/>
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-2xl font-bold code-font" id="cpuPercent">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Memory Usage -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-400">Memory Usage</span>
+              <span class="text-sm code-font text-white" id="memValue">0 GB</span>
+            </div>
+            <div class="relative w-32 h-32 mx-auto">
+              <svg class="circular-progress w-full h-full" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="54" fill="none" stroke="#1f2937" stroke-width="8"/>
+                <circle id="memCircle" cx="60" cy="60" r="54" fill="none" stroke="#a855f7" stroke-width="8"
+                        stroke-dasharray="339.292" stroke-dashoffset="339.292" stroke-linecap="round"/>
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-2xl font-bold code-font" id="memPercent">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Disk I/O -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-400">Disk I/O</span>
+              <span class="text-sm code-font text-white" id="diskValue">0 MB/s</span>
+            </div>
+            <div class="relative w-32 h-32 mx-auto">

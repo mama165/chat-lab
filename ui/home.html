@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat-Lab War Room</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .pulse-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .metric-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        .loading-bar {
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            animation: loading 1.5s ease-in-out infinite;
+        }
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<!-- Header -->
+<header class="gradient-bg text-white shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">🎯</span>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold">Chat-Lab War Room</h1>
+                    <p class="text-sm text-purple-200">Real-time AI Moderation Platform</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <span class="pulse-dot w-3 h-3 bg-green-400 rounded-full"></span>
+                    <span class="text-sm">System Healthy</span>
+                </div>
+                <button class="bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-purple-50 transition">
+                    Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container mx-auto px-6 py-8">
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Messages Processed -->
+        <div class="metric-card rounded-xl p-6 card-hover">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">📨</span>
+                </div>
+                <span class="text-sm font-semibold text-green-600">+12.5%</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium mb-1">Messages Processed</h3>
+            <p class="text-3xl font-bold text-gray-800" id="msgCount">0</p>
+            <div class="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" style="width: 75%"></div>
+            </div>
+        </div>
+
+        <!-- Toxicity Blocked -->
+        <div class="metric-card rounded-xl p-6 card-hover">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">🚫</span>
+                </div>
+                <span class="text-sm font-semibold text-red-600">-8.2%</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium mb-1">Toxic Messages</h3>
+            <p class="text-3xl font-bold text-gray-800" id="toxicCount">0</p>
+            <div class="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-red-500 rounded-full" style="width: 23%"></div>
+            </div>
+        </div>
+
+        <!-- Avg Latency -->
+        <div class="metric-card rounded-xl p-6 card-hover">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">⚡</span>
+                </div>
+                <span class="text-sm font-semibold text-green-600">-15ms</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium mb-1">Avg Latency</h3>
+            <p class="text-3xl font-bold text-gray-800"><span id="latency">0</span>ms</p>
+            <div class="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-yellow-500 rounded-full" style="width: 45%"></div>
+            </div>
+        </div>
+
+        <!-- Active Rooms -->
+        <div class="metric-card rounded-xl p-6 card-hover">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">đŸ›ïž</span>
+                </div>
+                <span class="text-sm font-semibold text-green-600">+3</span>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium mb-1">Active Rooms</h3>
+            <p class="text-3xl font-bold text-gray-800" id="roomCount">0</p>
+            <div class="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-purple-500 rounded-full" style="width: 60%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Specialist Status -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">AI Specialists Status</h2>
+                <div class="space-y-4" id="specialistsList">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Channel Capacity -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">Channel Capacity</h2>
+                <div class="space-y-4" id="channelsList">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity & Search -->
+        <div class="lg:col-span-2">
+            <!-- Search Bar -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <div class="flex items-center space-x-4">
+                    <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Search messages (e.g., 'invoice --business 0.8 --room 12')"
+                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                    <button onclick="performSearch()" class="gradient-bg text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition">
+                        Search
+                    </button>
+                </div>
+            </div>
+
+            <!-- Activity Feed -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Recent Activity</h2>
+                    <button class="text-purple-600 hover:text-purple-700 font-semibold text-sm">View All</button>
+                </div>
+                <div class="space-y-4" id="activityFeed">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Censored Words Stats -->
+    <div class="mt-8 bg-white rounded-xl shadow-sm p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">Top Censored Words (Last 24h)</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" id="censoredWords">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Simulated data structures
+    const specialists = [
+        { id: 'toxicity', name: 'Toxicity Analyzer', port: 50051, status: 'healthy', score: 0.95 },
+        { id: 'sentiment', name: 'Sentiment Analyzer', port: 50052, status: 'healthy', score: 0.88 },
+        { id: 'business', name: 'Business Value', port: 50053, status: 'healthy', score: 0.92 }
+    ];
+
+    const channels = [
+        { name: 'GlobalCommands', capacity: 1000, length: 234 },
+        { name: 'ModerationChan', capacity: 1000, length: 89 },
+        { name: 'DomainChan', capacity: 1000, length: 456 },
+        { name: 'TelemetryChan', capacity: 5000, length: 1234 }
+    ];
+
+    const activities = [
+        { time: '2 min ago', user: 'Alice', action: 'Message moderated', room: 'Room #12', severity: 'warning' },
+        { time: '5 min ago', user: 'Bob', action: 'Clean message', room: 'Room #8', severity: 'success' },
+        { time: '8 min ago', user: 'Clara', action: 'Toxic content blocked', room: 'Room #5', severity: 'danger' },
+        { time: '12 min ago', user: 'David', action: 'Message approved', room: 'Room #3', severity: 'success' }
+    ];
+
+    const censoredWordsData = [
+        { word: 'badger', count: 42 },
+        { word: 'snake', count: 38 },
+        { word: 'idiot', count: 29 },
+        { word: 'loser', count: 21 },
+        { word: 'naze', count: 15 },
+        { word: 'pourriture', count: 12 }
+    ];
+
+    // Render specialists
+    function renderSpecialists() {
+        const container = document.getElementById('specialistsList');
+        container.innerHTML = specialists.map(s => `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-2 h-2 bg-green-500 rounded-full pulse-dot"></div>
+                        <div>
+                            <p class="font-semibold text-gray-800">${s.name}</p>
+                            <p class="text-xs text-gray-500">Port ${s.port}</p>
+                        </div>
+                    </div>
+                    <span class="text-sm font-bold text-green-600">${(s.score * 100).toFixed(0)}%</span>
+                </div>
+            `).join('');
+    }
+
+    // Render channels
+    function renderChannels() {
+        const container = document.getElementById('channelsList');
+        container.innerHTML = channels.map(c => {
+            const percent = (c.length / c.capacity * 100).toFixed(0);
+            const color = percent > 80 ? 'red' : percent > 50 ? 'yellow' : 'green';
+            return `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">${c.name}</span>
+                            <span class="text-xs text-gray-500">${c.length}/${c.capacity}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-${color}-500 h-2 rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+        }).join('');
+    }
+
+    // Render activity feed
+    function renderActivity() {
+        const container = document.getElementById('activityFeed');
+        const severityColors = {
+            success: 'green',
+            warning: 'yellow',
+            danger: 'red'
+        };
+
+        container.innerHTML = activities.map(a => `
+                <div class="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <div class="w-10 h-10 bg-${severityColors[a.severity]}-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span class="text-${severityColors[a.severity]}-600 font-bold">${a.user[0]}</span>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-semibold text-gray-800">${a.user} - ${a.action}</p>
+                        <p class="text-xs text-gray-500">${a.room} · ${a.time}</p>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    // Render censored words
+    function renderCensoredWords() {
+        const container = document.getElementById('censoredWords');
+        container.innerHTML = censoredWordsData.map(w => `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-red-600">${w.count}</p>
+                    <p class="text-sm text-gray-600 font-mono">****${w.word.slice(-2)}</p>
+                </div>
+            `).join('');
+    }
+
+    // Animate counters
+    function animateCounter(id, target, duration = 2000) {
+        const element = document.getElementById(id);
+        const start = 0;
+        const increment = target / (duration / 16);
+        let current = start;
+
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                element.textContent = Math.floor(target).toLocaleString();
+                clearInterval(timer);
+            } else {
+                element.textContent = Math.floor(current).toLocaleString();
+            }
+        }, 16);
+    }
+
+    // Search function
+    function performSearch() {
+        const query = document.getElementById('searchInput').value;
+        console.log('Searching:', query);
+        // Here you would call your Bluge search API
+        alert(`Searching for: "${query}"\n\nThis would query the AnalysisRepository.SearchPaginated() endpoint`);
+    }
+
+    // Initialize dashboard
+    function init() {
+        renderSpecialists();
+        renderChannels();
+        renderActivity();
+        renderCensoredWords();
+
+        // Animate metrics
+        animateCounter('msgCount', 24587);
+        animateCounter('toxicCount', 342);
+        animateCounter('latency', 45);
+        animateCounter('roomCount', 18);
+    }
+
+    // Auto-refresh every 5 seconds
+    setInterval(() => {
+        // Update random metrics to simulate real-time data
+        const msgCount = parseInt(document.getElementById('msgCount').textContent.replace(',', ''));
+        animateCounter('msgCount', msgCount + Math.floor(Math.random() * 10));
+    }, 5000);
+
+    // Run on load
+    init();
+</script>
+</body>
+</html>
