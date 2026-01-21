@@ -3,8 +3,9 @@ package services
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/infrastructure/storage"
-	"github.com/go-playground/validator/v10"
 	"log/slog"
+
+	"github.com/go-playground/validator/v10"
 )
 
 type IAnalyzerService interface {
