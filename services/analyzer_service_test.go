@@ -2,6 +2,7 @@ package services
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"context"
 	"log/slog"
@@ -20,7 +21,8 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	ctrl := gomock.NewController(t)
 	repository := mocks.NewMockIAnalysisRepository(ctrl)
-	service := NewAnalyzerService(log, repository, 1000, &analyzer.CountAnalyzedFiles{})
+	eventChan := make(chan event.Event, 1000)
+	service := NewAnalyzerService(log, repository, eventChan, &analyzer.CountAnalyzedFiles{})
 
 	baseRequest := analyzer.FileAnalyzerRequest{
 		Path:       "E:/Photos/vacances.jpg",

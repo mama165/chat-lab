@@ -3,7 +3,6 @@ package contract
 
 import (
 	"chat-lab/domain/chat"
-	"chat-lab/domain/event"
 	"chat-lab/domain/specialist"
 	"context"
 	"reflect"
@@ -38,12 +37,20 @@ func GetWorkerName(w Worker) string {
 	return t.Name()
 }
 
-type EventSink interface {
-	Consume(ctx context.Context, e event.DomainEvent) error
+type FileAnalyzerEvent interface {
+	Namespace() string
+}
+
+type DomainEvent interface {
+	RoomID() chat.RoomID
+}
+
+type EventSink[E any] interface {
+	Consume(ctx context.Context, e E) error
 }
 type IRegistry interface {
-	GetSinksForRoom(roomID chat.RoomID) []EventSink
-	Subscribe(participantID string, roomID chat.RoomID, sink EventSink)
+	GetSinksForRoom(roomID chat.RoomID) []EventSink[DomainEvent]
+	Subscribe(participantID string, roomID chat.RoomID, sink EventSink[DomainEvent])
 	Unsubscribe(participantID string, roomID chat.RoomID)
 }
 
@@ -51,7 +58,7 @@ type IOrchestrator interface {
 	RegisterRoom(room *chat.Room)
 	PostMessage(ctx context.Context, cmd chat.PostMessageCommand) error
 	GetMessages(cmd chat.GetMessageCommand) ([]chat.Message, *string, error)
-	RegisterParticipant(pID string, roomID chat.RoomID, sink EventSink)
+	RegisterParticipant(pID string, roomID chat.RoomID, sink EventSink[DomainEvent])
 	UnregisterParticipant(pID string, roomID chat.RoomID)
 	Start(ctx context.Context) error
 	Stop()

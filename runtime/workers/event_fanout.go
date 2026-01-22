@@ -19,22 +19,28 @@ import (
 //
 // EventFanoutWorker is safe for concurrent use by multiple goroutines.
 type EventFanoutWorker struct {
-	log            *slog.Logger
-	permanentSinks []contract.EventSink
-	registry       contract.IRegistry
-	event          chan event.Event
-	telemetryChan  chan event.Event
-	sinkTimeout    time.Duration
+	log           *slog.Logger
+	diskSink      contract.EventSink[contract.DomainEvent]
+	analysisSink  contract.EventSink[contract.FileAnalyzerEvent]
+	registry      contract.IRegistry
+	event         chan event.Event
+	telemetryChan chan event.Event
+	sinkTimeout   time.Duration
 }
 
-func NewEventFanoutWorker(log *slog.Logger,
-	permanentSinks []contract.EventSink,
+func NewEventFanoutWorker(
+	log *slog.Logger,
+	diskSink contract.EventSink[contract.DomainEvent],
+	analysisSink contract.EventSink[contract.FileAnalyzerEvent],
 	registry contract.IRegistry,
 	domainEvent, telemetryChan chan event.Event,
 	sinkTimeout time.Duration) *EventFanoutWorker {
 	return &EventFanoutWorker{
-		log: log, permanentSinks: permanentSinks, registry: registry,
-		event: domainEvent, telemetryChan: telemetryChan,
+		log:          log,
+		diskSink:     diskSink,
+		analysisSink: analysisSink,
+		registry:     registry,
+		event:        domainEvent, telemetryChan: telemetryChan,
 		sinkTimeout: sinkTimeout}
 }
 
@@ -45,8 +51,10 @@ func NewEventFanoutWorker(log *slog.Logger,
 func (w *EventFanoutWorker) Run(ctx context.Context) error {
 	for evt := range w.event {
 		switch e := evt.Payload.(type) {
-		case event.DomainEvent:
+		case contract.DomainEvent:
 			w.Fanout(e)
+		case contract.FileAnalyzerEvent:
+			w.handleFileEvent(ctx, e)
 		}
 		select {
 		case <-ctx.Done():
@@ -60,14 +68,22 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 	return nil
 }
 
-// Fanout distributes an event to all relevant sinks (permanent and room-specific).
+func (w *EventFanoutWorker) handleFileEvent(ctx context.Context, evt contract.FileAnalyzerEvent) {
+	w.log.Debug(fmt.Sprintf("Consumed event : %v", evt))
+	if err := w.analysisSink.Consume(ctx, evt); err != nil {
+		w.log.Error("sink failed", "error", err)
+
+	}
+}
+
+// Fanout distributes an event to all relevant sinks (disk and room-specific).
 // Each delivery is executed in its own goroutine to prevent a slow or failing sink
 // from blocking the main worker loop or delaying delivery to other participants.
 // It uses a derived context with a timeout to ensure that every goroutine
 // eventually terminates, protecting the system against resource leaks.
-func (w *EventFanoutWorker) Fanout(evt event.DomainEvent) {
+func (w *EventFanoutWorker) Fanout(evt contract.DomainEvent) {
 	roomSinks := w.registry.GetSinksForRoom(evt.RoomID())
-	allSinks := append(w.permanentSinks, roomSinks...)
+	allSinks := append(roomSinks, w.diskSink)
 
 	for _, sink := range allSinks {
 		// Important : capture variable for the goroutine

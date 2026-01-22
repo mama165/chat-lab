@@ -1,18 +1,19 @@
 package runtime
 
 import (
+	"chat-lab/contract"
 	"chat-lab/domain/chat"
-	"chat-lab/domain/event"
 	"context"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type Sink struct {
 }
 
-func (s Sink) Consume(ctx context.Context, e event.DomainEvent) error {
+func (s Sink) Consume(ctx context.Context, e contract.DomainEvent) error {
 	return nil
 }
 

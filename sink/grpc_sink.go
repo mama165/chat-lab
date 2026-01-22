@@ -1,7 +1,7 @@
 package sink
 
 import (
-	"chat-lab/domain/event"
+	"chat-lab/contract"
 	"context"
 	"log/slog"
 	"time"
@@ -9,13 +9,13 @@ import (
 
 type Sink struct {
 	log                *slog.Logger
-	ConnectedUserEvent chan event.DomainEvent
+	ConnectedUserEvent chan contract.DomainEvent
 	deliveryTimeout    time.Duration
 }
 
 func NewGrpcSink(log *slog.Logger, bufferSize int, deliveryTimeout time.Duration) *Sink {
 	return &Sink{
-		ConnectedUserEvent: make(chan event.DomainEvent, bufferSize),
+		ConnectedUserEvent: make(chan contract.DomainEvent, bufferSize),
 		log:                log,
 		deliveryTimeout:    deliveryTimeout,
 	}
@@ -27,7 +27,7 @@ func NewGrpcSink(log *slog.Logger, bufferSize int, deliveryTimeout time.Duration
 // slow consumer from blocking the entire fan-out pipeline.
 // A very tight timeout (e.g., 5-10ms) is key here to maintain
 // high throughput for other connected users in the same room.
-func (s *Sink) Consume(ctx context.Context, e event.DomainEvent) error {
+func (s *Sink) Consume(ctx context.Context, e contract.DomainEvent) error {
 	t := time.NewTimer(s.deliveryTimeout)
 	defer t.Stop()
 

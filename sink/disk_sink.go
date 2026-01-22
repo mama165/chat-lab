@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"chat-lab/contract"
 	"chat-lab/domain/event"
 	"chat-lab/infrastructure/storage"
 	"context"
@@ -13,11 +14,11 @@ type DiskSink struct {
 	log        *slog.Logger
 }
 
-func NewDiskSink(repository storage.IMessageRepository, log *slog.Logger) DiskSink {
-	return DiskSink{repository: repository, log: log}
+func NewDiskSink(repository storage.IMessageRepository, log *slog.Logger) *DiskSink {
+	return &DiskSink{repository: repository, log: log}
 }
 
-func (d DiskSink) Consume(_ context.Context, e event.DomainEvent) error {
+func (d DiskSink) Consume(_ context.Context, e contract.DomainEvent) error {
 	switch evt := e.(type) {
 	case event.SanitizedMessage:
 		return d.repository.StoreMessage(toDiskMessage(evt))

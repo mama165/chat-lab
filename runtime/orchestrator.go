@@ -32,12 +32,12 @@ type Orchestrator struct {
 	counter              *event.Counter
 	numWorkers           int
 	rooms                map[chat.RoomID]*chat.Room
-	permanentSinks       []contract.EventSink
 	supervisor           contract.ISupervisor
 	registry             contract.IRegistry
 	globalCommands       chan chat.Command
 	moderationChan       chan event.Event
 	domainChan           chan event.Event
+	fileAnalyzeChan      chan event.Event
 	telemetryChan        chan event.Event
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
@@ -67,7 +67,6 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		counter:              event.NewCounter(),
 		numWorkers:           numWorkers,
 		rooms:                make(map[chat.RoomID]*chat.Room),
-		permanentSinks:       nil,
 		supervisor:           supervisor,
 		registry:             registry,
 		telemetryChan:        telemetryChan,
@@ -98,10 +97,6 @@ func (o *Orchestrator) RegisterRoom(room *chat.Room) {
 		return
 	}
 	o.rooms[room.ID] = room
-}
-
-func (o *Orchestrator) Add(sinks ...contract.EventSink) {
-	o.permanentSinks = append(o.permanentSinks, sinks...)
 }
 
 // PostMessage attempts to buffer a command using a "Wait-and-Fail" backpressure strategy.
@@ -142,7 +137,8 @@ func fromDiskMessage(messages []storage.DiskMessage) []chat.Message {
 	})
 }
 
-func (o *Orchestrator) RegisterParticipant(pID string, roomID chat.RoomID, sink contract.EventSink) {
+func (o *Orchestrator) RegisterParticipant(pID string, roomID chat.RoomID,
+	sink contract.EventSink[contract.DomainEvent]) {
 	o.registry.Subscribe(pID, roomID, sink)
 	// Why not send an event UserJoined to notify all members of the room through FanoutWorker
 }
@@ -164,20 +160,19 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 		return err
 	}
 
-	fanoutWorker, newSinks := o.preparePipeline()
-
+	fanoutWorkers := o.PrepareFanouts()
 	channelCapWorker, telemetryWorker := o.prepareTelemetry()
 
 	// 2. Critical Section (Short Lock)
 	// We only lock to update the internal state and the supervisor.
 	o.mu.Lock()
-	o.permanentSinks = append(o.permanentSinks, newSinks...)
 
 	// Registering all workers to the supervisor
 	o.supervisor.Add(
-		moderationWorker, fanoutWorker,
+		moderationWorker,
 		channelCapWorker, telemetryWorker,
 	)
+	o.supervisor.Add(fanoutWorkers...)
 	o.supervisor.Add(poolWorkers...)
 
 	o.mu.Unlock()
@@ -220,28 +215,25 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 	return workers.NewModerationWorker(moderator, o.manager, o.moderationChan, o.domainChan, o.log), nil
 }
 
-// preparePipeline initializes the sinks and the fanout worker.
-func (o *Orchestrator) preparePipeline() (contract.Worker, []contract.EventSink) {
-	// Local sinks that will be added to permanentSinks
-	newSinks := []contract.EventSink{
-		sink.NewTimeline(),
-		sink.NewDiskSink(o.messageRepository, o.log),
-		sink.NewAnalysisSink(o.analysisRepository, o.log, o.minScoring, o.maxScoring),
+// PrepareFanouts initializes the sinks and the fanout workers.
+// Fanout worker handles a lot of events
+func (o *Orchestrator) PrepareFanouts() []contract.Worker {
+	diskSink := sink.NewDiskSink(o.messageRepository, o.log)
+	analysisSink := sink.NewAnalysisSink(o.analysisRepository, o.log, o.minScoring, o.maxScoring)
+
+	var res []contract.Worker
+	for i := 0; i < o.numWorkers; i++ {
+		res = append(res, workers.NewEventFanoutWorker(
+			o.log,
+			diskSink,
+			analysisSink,
+			o.registry,
+			o.domainChan,
+			o.telemetryChan,
+			o.sinkTimeout,
+		))
 	}
-
-	// We prepare the fanout with current permanent sinks + the new ones
-	allSinks := append(o.permanentSinks, newSinks...)
-
-	fanoutWorker := workers.NewEventFanoutWorker(
-		o.log,
-		allSinks,
-		o.registry,
-		o.domainChan,
-		o.telemetryChan,
-		o.sinkTimeout,
-	)
-
-	return fanoutWorker, newSinks
+	return res
 }
 
 func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {

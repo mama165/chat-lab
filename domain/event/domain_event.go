@@ -16,6 +16,7 @@ const (
 	RestartedAfterPanicType Type = "WORKER_RESTARTED_AFTER_PANIC"
 	ChannelCapacityType     Type = "CHANNEL_CAPACITY"
 	MessageSentType         Type = "MESSAGE_SENT"
+	FileAnalyze             Type = "FILE_ANALYZE"
 )
 
 type Counter struct {
@@ -53,10 +54,6 @@ type Event struct {
 	Type      Type
 	CreatedAt time.Time
 	Payload   any
-}
-
-type DomainEvent interface {
-	RoomID() chat.RoomID
 }
 
 type MessagePosted struct {

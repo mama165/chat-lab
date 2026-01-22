@@ -8,15 +8,17 @@ import (
 
 type Set map[string]struct{}
 
+// Registry Store map of participants
+// Track participants per room
 type Registry struct {
 	mu          sync.RWMutex
-	Sessions    map[string]contract.EventSink // map participant -> Sink
-	RoomMembers map[chat.RoomID]Set           // map room to users
+	Sessions    map[string]contract.EventSink[contract.DomainEvent]
+	RoomMembers map[chat.RoomID]Set
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		Sessions:    make(map[string]contract.EventSink),
+		Sessions:    make(map[string]contract.EventSink[contract.DomainEvent]),
 		RoomMembers: make(map[chat.RoomID]Set),
 	}
 }
@@ -29,7 +31,7 @@ func NewRegistry() *Registry {
 // This decoupled approach ensures that even if a user is in multiple rooms,
 // their connection (Sink) is managed in a single place.
 // Returns nil if the room doesn't exist or has no members.
-func (r *Registry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink {
+func (r *Registry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink[contract.DomainEvent] {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -37,7 +39,7 @@ func (r *Registry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink {
 	if !ok {
 		return nil
 	}
-	var activeSinks []contract.EventSink
+	var activeSinks []contract.EventSink[contract.DomainEvent]
 	for participantID := range members {
 		if sink, exists := r.Sessions[participantID]; exists {
 			activeSinks = append(activeSinks, sink)
@@ -49,7 +51,8 @@ func (r *Registry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink {
 // Subscribe registers a participant's active connection and assigns them to a specific room.
 // It ensures thread-safe updates to both the global session directory and the room-specific membership set.
 // If the room does not yet exist in the registry, it is initialized on the fly.
-func (r *Registry) Subscribe(participantID string, roomID chat.RoomID, sink contract.EventSink) {
+func (r *Registry) Subscribe(participantID string,
+	roomID chat.RoomID, sink contract.EventSink[contract.DomainEvent]) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

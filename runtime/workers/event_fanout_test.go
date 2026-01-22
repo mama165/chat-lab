@@ -5,12 +5,13 @@ import (
 	"chat-lab/domain/event"
 	"chat-lab/mocks"
 	"context"
-	"github.com/mama165/sdk-go/logs"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/mama165/sdk-go/logs"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestEventFanoutWorker_Fanout(t *testing.T) {
@@ -20,11 +21,12 @@ func TestEventFanoutWorker_Fanout(t *testing.T) {
 	defer ctrl.Finish()
 	mockRegistry := mocks.NewMockIRegistry(ctrl)
 
-	mockSink := mocks.NewMockEventSink(ctrl)
-	permanentSinks := []contract.EventSink{mockSink, mockSink}
-	roomSinks := []contract.EventSink{mockSink, mockSink}
+	mockSink := mocks.NewMockEventSink[contract.DomainEvent](ctrl)
+	mockSink1 := mocks.NewMockEventSink[contract.FileAnalyzerEvent](ctrl)
+	roomSinks := []contract.EventSink[contract.DomainEvent]{mockSink, mockSink}
 
-	fanoutWorker := NewEventFanoutWorker(log, permanentSinks,
+	fanoutWorker := NewEventFanoutWorker(
+		log, mockSink, mockSink1,
 		mockRegistry, nil, nil, 10*time.Second)
 
 	done := make(chan struct{})
@@ -33,7 +35,7 @@ func TestEventFanoutWorker_Fanout(t *testing.T) {
 	mockRegistry.EXPECT().GetSinksForRoom(gomock.Any()).Return(roomSinks).Times(1)
 	// Given permanentSink and roomSink are consumed
 	mockSink.EXPECT().Consume(gomock.Any(), gomock.Any()).Do(
-		func(ctx context.Context, evt event.DomainEvent) {
+		func(ctx context.Context, evt contract.DomainEvent) {
 			count++
 			if count == 4 {
 				close(done)
@@ -60,11 +62,13 @@ func TestEventFanoutWorker_SinkTimeout(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRegistry := mocks.NewMockIRegistry(ctrl)
-	mockSink := mocks.NewMockEventSink(ctrl)
-	roomSinks := []contract.EventSink{mockSink}
+	mockSink := mocks.NewMockEventSink[contract.DomainEvent](ctrl)
+	mockSink1 := mocks.NewMockEventSink[contract.FileAnalyzerEvent](ctrl)
+	roomSinks := []contract.EventSink[contract.DomainEvent]{mockSink}
 
 	sinkTimeout := 20 * time.Millisecond
-	fanoutWorker := NewEventFanoutWorker(log, nil,
+	fanoutWorker := NewEventFanoutWorker(
+		log, mockSink, mockSink1,
 		mockRegistry, nil, nil, sinkTimeout)
 
 	// Given two sink exist
@@ -72,7 +76,7 @@ func TestEventFanoutWorker_SinkTimeout(t *testing.T) {
 	// Given permanentSink and roomSink are consumed
 	mockSink.EXPECT().Consume(gomock.Any(), gomock.Any()).
 		DoAndReturn(
-			func(ctx context.Context, evt event.DomainEvent) error {
+			func(ctx context.Context, evt contract.DomainEvent) error {
 				<-ctx.Done()     // Waiting for timeout to trigger cancellation
 				return ctx.Err() // Sending back "context deadline exceeded"
 			},

@@ -2,10 +2,12 @@ package services
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/domain/event"
 	"chat-lab/infrastructure/storage"
 	"context"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -18,20 +20,20 @@ type AnalyzerService struct {
 	log                *slog.Logger
 	validator          *validator.Validate
 	repository         storage.IAnalysisRepository
-	fileScanChan       chan analyzer.FileAnalyzerRequest
+	fileAnalyzeChan    chan event.Event
 	countAnalyzedFiles *analyzer.CountAnalyzedFiles
 }
 
 func NewAnalyzerService(
 	log *slog.Logger,
 	repository storage.IAnalysisRepository,
-	bufferSize int,
+	fileAnalyzeChan chan event.Event,
 	countAnalyzedFiles *analyzer.CountAnalyzedFiles) *AnalyzerService {
 	return &AnalyzerService{
 		log:                log,
 		repository:         repository,
 		validator:          validator.New(),
-		fileScanChan:       make(chan analyzer.FileAnalyzerRequest, bufferSize),
+		fileAnalyzeChan:    fileAnalyzeChan,
 		countAnalyzedFiles: countAnalyzedFiles,
 	}
 }
@@ -48,12 +50,30 @@ func (s *AnalyzerService) Analyze(ctx context.Context, request analyzer.FileAnal
 	}
 	select {
 	case <-ctx.Done():
+		s.log.Debug("Context done, skipping file analyzer")
 		return ctx.Err()
-	case s.fileScanChan <- request:
+	case s.fileAnalyzeChan <- toRequest(request):
 		s.log.Debug("Received one file to analyze", "bytes", request.Size)
 		s.increment(request.Size)
 	}
 	return nil
+}
+
+func toRequest(request analyzer.FileAnalyzerRequest) event.Event {
+	return event.Event{
+		Type:      event.FileAnalyze,
+		CreatedAt: time.Now(),
+		Payload: event.FileAnalyse{
+			Path:       request.Path,
+			DriveID:    request.DriveID,
+			Size:       request.Size,
+			Attributes: request.Attributes,
+			MimeType:   request.MimeType,
+			MagicBytes: request.MagicBytes,
+			ScannedAt:  request.ScannedAt,
+			SourceType: string(request.SourceType),
+		},
+	}
 }
 
 // increment performs thread-safe updates to the shared analysis statistics.

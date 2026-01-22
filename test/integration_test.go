@@ -7,13 +7,13 @@ import (
 	"chat-lab/mocks"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
-	"chat-lab/sink"
 	"context"
-	"github.com/blugelabs/bluge"
-	"github.com/mama165/sdk-go/database"
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/blugelabs/bluge"
+	"github.com/mama165/sdk-go/database"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/google/uuid"
@@ -69,10 +69,8 @@ func Test_Scenario(t *testing.T) {
 		Return(nil).
 		Times(1)
 
-	mockTimelineSink := mocks.NewMockEventSink(ctrl)
-	mockTimelineSink.EXPECT().Consume(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	diskSink := sink.NewDiskSink(mockMessageRepository, log)
-	orchestrator.Add(mockTimelineSink, diskSink)
+	w := orchestrator.PrepareFanouts()
+	supervisor.Add(w...)
 
 	id := 1
 	room := chat.NewRoom(chat.RoomID(id))

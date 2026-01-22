@@ -37,5 +37,8 @@ type CountAnalyzedFiles struct {
 }
 
 func NewCountAnalyzedFiles() CountAnalyzedFiles {
-	return CountAnalyzedFiles{}
+	return CountAnalyzedFiles{
+		FilesReceived:  0,
+		BytesProcessed: 0,
+	}
 }

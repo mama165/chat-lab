@@ -12,7 +12,6 @@ package mocks
 import (
 	contract "chat-lab/contract"
 	chat "chat-lab/domain/chat"
-	event "chat-lab/domain/event"
 	specialist "chat-lab/domain/specialist"
 	context "context"
 	reflect "reflect"
@@ -136,32 +135,108 @@ func (mr *MockWorkerMockRecorder) Run(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockWorker)(nil).Run), ctx)
 }
 
-// MockEventSink is a mock of EventSink interface.
-type MockEventSink struct {
+// MockFileAnalyzerEvent is a mock of FileAnalyzerEvent interface.
+type MockFileAnalyzerEvent struct {
 	ctrl     *gomock.Controller
-	recorder *MockEventSinkMockRecorder
+	recorder *MockFileAnalyzerEventMockRecorder
 	isgomock struct{}
 }
 
-// MockEventSinkMockRecorder is the mock recorder for MockEventSink.
-type MockEventSinkMockRecorder struct {
-	mock *MockEventSink
+// MockFileAnalyzerEventMockRecorder is the mock recorder for MockFileAnalyzerEvent.
+type MockFileAnalyzerEventMockRecorder struct {
+	mock *MockFileAnalyzerEvent
 }
 
-// NewMockEventSink creates a new mock instance.
-func NewMockEventSink(ctrl *gomock.Controller) *MockEventSink {
-	mock := &MockEventSink{ctrl: ctrl}
-	mock.recorder = &MockEventSinkMockRecorder{mock}
+// NewMockFileAnalyzerEvent creates a new mock instance.
+func NewMockFileAnalyzerEvent(ctrl *gomock.Controller) *MockFileAnalyzerEvent {
+	mock := &MockFileAnalyzerEvent{ctrl: ctrl}
+	mock.recorder = &MockFileAnalyzerEventMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockEventSink) EXPECT() *MockEventSinkMockRecorder {
+func (m *MockFileAnalyzerEvent) EXPECT() *MockFileAnalyzerEventMockRecorder {
+	return m.recorder
+}
+
+// Namespace mocks base method.
+func (m *MockFileAnalyzerEvent) Namespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Namespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Namespace indicates an expected call of Namespace.
+func (mr *MockFileAnalyzerEventMockRecorder) Namespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Namespace", reflect.TypeOf((*MockFileAnalyzerEvent)(nil).Namespace))
+}
+
+// MockDomainEvent is a mock of DomainEvent interface.
+type MockDomainEvent struct {
+	ctrl     *gomock.Controller
+	recorder *MockDomainEventMockRecorder
+	isgomock struct{}
+}
+
+// MockDomainEventMockRecorder is the mock recorder for MockDomainEvent.
+type MockDomainEventMockRecorder struct {
+	mock *MockDomainEvent
+}
+
+// NewMockDomainEvent creates a new mock instance.
+func NewMockDomainEvent(ctrl *gomock.Controller) *MockDomainEvent {
+	mock := &MockDomainEvent{ctrl: ctrl}
+	mock.recorder = &MockDomainEventMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDomainEvent) EXPECT() *MockDomainEventMockRecorder {
+	return m.recorder
+}
+
+// RoomID mocks base method.
+func (m *MockDomainEvent) RoomID() chat.RoomID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RoomID")
+	ret0, _ := ret[0].(chat.RoomID)
+	return ret0
+}
+
+// RoomID indicates an expected call of RoomID.
+func (mr *MockDomainEventMockRecorder) RoomID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomID", reflect.TypeOf((*MockDomainEvent)(nil).RoomID))
+}
+
+// MockEventSink is a mock of EventSink interface.
+type MockEventSink[E any] struct {
+	ctrl     *gomock.Controller
+	recorder *MockEventSinkMockRecorder[E]
+	isgomock struct{}
+}
+
+// MockEventSinkMockRecorder is the mock recorder for MockEventSink.
+type MockEventSinkMockRecorder[E any] struct {
+	mock *MockEventSink[E]
+}
+
+// NewMockEventSink creates a new mock instance.
+func NewMockEventSink[E any](ctrl *gomock.Controller) *MockEventSink[E] {
+	mock := &MockEventSink[E]{ctrl: ctrl}
+	mock.recorder = &MockEventSinkMockRecorder[E]{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockEventSink[E]) EXPECT() *MockEventSinkMockRecorder[E] {
 	return m.recorder
 }
 
 // Consume mocks base method.
-func (m *MockEventSink) Consume(ctx context.Context, e event.DomainEvent) error {
+func (m *MockEventSink[E]) Consume(ctx context.Context, e E) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Consume", ctx, e)
 	ret0, _ := ret[0].(error)
@@ -169,9 +244,9 @@ func (m *MockEventSink) Consume(ctx context.Context, e event.DomainEvent) error 
 }
 
 // Consume indicates an expected call of Consume.
-func (mr *MockEventSinkMockRecorder) Consume(ctx, e any) *gomock.Call {
+func (mr *MockEventSinkMockRecorder[E]) Consume(ctx, e any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Consume", reflect.TypeOf((*MockEventSink)(nil).Consume), ctx, e)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Consume", reflect.TypeOf((*MockEventSink[E])(nil).Consume), ctx, e)
 }
 
 // MockIRegistry is a mock of IRegistry interface.
@@ -199,10 +274,10 @@ func (m *MockIRegistry) EXPECT() *MockIRegistryMockRecorder {
 }
 
 // GetSinksForRoom mocks base method.
-func (m *MockIRegistry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink {
+func (m *MockIRegistry) GetSinksForRoom(roomID chat.RoomID) []contract.EventSink[contract.DomainEvent] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSinksForRoom", roomID)
-	ret0, _ := ret[0].([]contract.EventSink)
+	ret0, _ := ret[0].([]contract.EventSink[contract.DomainEvent])
 	return ret0
 }
 
@@ -213,7 +288,7 @@ func (mr *MockIRegistryMockRecorder) GetSinksForRoom(roomID any) *gomock.Call {
 }
 
 // Subscribe mocks base method.
-func (m *MockIRegistry) Subscribe(participantID string, roomID chat.RoomID, sink contract.EventSink) {
+func (m *MockIRegistry) Subscribe(participantID string, roomID chat.RoomID, sink contract.EventSink[contract.DomainEvent]) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Subscribe", participantID, roomID, sink)
 }
@@ -291,7 +366,7 @@ func (mr *MockIOrchestratorMockRecorder) PostMessage(ctx, cmd any) *gomock.Call 
 }
 
 // RegisterParticipant mocks base method.
-func (m *MockIOrchestrator) RegisterParticipant(pID string, roomID chat.RoomID, sink contract.EventSink) {
+func (m *MockIOrchestrator) RegisterParticipant(pID string, roomID chat.RoomID, sink contract.EventSink[contract.DomainEvent]) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterParticipant", pID, roomID, sink)
 }

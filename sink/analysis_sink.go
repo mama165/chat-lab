@@ -1,24 +1,28 @@
 package sink
 
 import (
+	"chat-lab/contract"
 	"chat-lab/domain/event"
 	"chat-lab/infrastructure/storage"
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 )
 
 type AnalysisSink struct {
+	mu         sync.Mutex
 	repository storage.IAnalysisRepository
 	log        *slog.Logger
 	minScoring float64
 	maxScoring float64
+	events     []event.FileAnalyse
 }
 
-func NewAnalysisSink(repository storage.IAnalysisRepository,
+func NewAnalysisSink(
+	repository storage.IAnalysisRepository,
 	log *slog.Logger,
-	minScoring float64,
-	maxScoring float64) *AnalysisSink {
+	minScoring, maxScoring float64) *AnalysisSink {
 	return &AnalysisSink{
 		repository: repository,
 		log:        log,
@@ -27,13 +31,12 @@ func NewAnalysisSink(repository storage.IAnalysisRepository,
 	}
 }
 
-func (a AnalysisSink) Consume(_ context.Context, e event.DomainEvent) error {
+func (a *AnalysisSink) Consume(_ context.Context, e contract.FileAnalyzerEvent) error {
 	switch evt := e.(type) {
-	case event.SanitizedMessage:
-		if evt.ToxicityScore > a.minScoring && evt.ToxicityScore < a.maxScoring {
-			a.log.Debug("Toxicity score kept for analysis", "score", evt.ToxicityScore)
-			return a.repository.Store(toAnalysis(evt))
-		}
+	case event.FileAnalyse:
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		a.events = append(a.events, evt)
 		return nil
 	default:
 		a.log.Debug(fmt.Sprintf("Not implemented event : %v", evt))
@@ -41,6 +44,6 @@ func (a AnalysisSink) Consume(_ context.Context, e event.DomainEvent) error {
 	}
 }
 
-func toAnalysis(event event.SanitizedMessage) storage.Analysis {
+func toAnalysis(_ event.SanitizedMessage) storage.Analysis {
 	return storage.Analysis{}
 }

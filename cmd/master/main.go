@@ -15,14 +15,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/blugelabs/bluge"
-	"github.com/samber/lo"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/blugelabs/bluge"
+	"github.com/samber/lo"
 
 	grpc3 "github.com/mama165/sdk-go/grpc"
 
@@ -115,6 +116,7 @@ func run() (int, error) {
 
 	// 3. Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
+	fileAnalyzeChan := make(chan event.Event, config.BufferSize)
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, log, config.LimitMessages)
@@ -164,7 +166,7 @@ func run() (int, error) {
 	chatService := services.NewChatService(orchestrator)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()
-	analyzerService := services.NewAnalyzerService(log, analysisRepository, config.BufferSize, &counter)
+	analyzerService := services.NewAnalyzerService(log, analysisRepository, fileAnalyzeChan, &counter)
 	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, log, &counter)
 	authServer := server.NewAuthServer(authService)
