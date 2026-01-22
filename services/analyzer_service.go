@@ -50,6 +50,7 @@ func (s *AnalyzerService) Analyze(ctx context.Context, request analyzer.FileAnal
 	case <-ctx.Done():
 		return ctx.Err()
 	case s.fileScanChan <- request:
+		s.log.Debug("Received one file to analyze", "bytes", request.Size)
 		s.increment(request.Size)
 	}
 	return nil

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/domain/specialist"
 	"chat-lab/grpc/server"
-	bluge2 "chat-lab/infrastructure/storage"
+	"chat-lab/infrastructure/storage"
 	pb2 "chat-lab/proto/account"
+	pb3 "chat-lab/proto/analyzer"
 	pb "chat-lab/proto/chat"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
@@ -115,8 +117,9 @@ func run() (int, error) {
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
-	messageRepository := bluge2.NewMessageRepository(db, log, config.LimitMessages)
-	analysisRepository := bluge2.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
+	messageRepository := storage.NewMessageRepository(db, log, config.LimitMessages)
+	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
+	userRepository := storage.NewUserRepository(db)
 
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
@@ -159,12 +162,15 @@ func run() (int, error) {
 			server.AuthInterceptor,
 		))
 	chatService := services.NewChatService(orchestrator)
-	userRepository := bluge2.NewUserRepository(db)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
+	counter := analyzer.NewCountAnalyzedFiles()
+	analyzerService := services.NewAnalyzerService(log, analysisRepository, config.BufferSize, &counter)
 	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
+	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, log, &counter)
 	authServer := server.NewAuthServer(authService)
 	pb.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
+	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {

@@ -174,14 +174,12 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	o.permanentSinks = append(o.permanentSinks, newSinks...)
 
 	// Registering all workers to the supervisor
-	o.supervisor.Add(moderationWorker)
-	o.supervisor.Add(fanoutWorker)
-	o.supervisor.Add(channelCapWorker)
-	o.supervisor.Add(telemetryWorker)
+	o.supervisor.Add(
+		moderationWorker, fanoutWorker,
+		channelCapWorker, telemetryWorker,
+	)
+	o.supervisor.Add(poolWorkers...)
 
-	for _, w := range poolWorkers {
-		o.supervisor.Add(w)
-	}
 	o.mu.Unlock()
 
 	// 3. Execution phase (No Lock)
