@@ -1,8 +1,13 @@
 package event
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type FileAnalyse struct {
+	Id         uuid.UUID
 	Path       string
 	DriveID    string
 	Size       uint64

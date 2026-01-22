@@ -51,6 +51,7 @@ type Orchestrator struct {
 	maxContentLength     int
 	minScoring           float64
 	maxScoring           float64
+	maxAnalyzedEvent     int
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
@@ -61,7 +62,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,
-	minScoring, maxScoring float64) *Orchestrator {
+	minScoring, maxScoring float64, maxAnalyzedEvent int) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
 		counter:              event.NewCounter(),
@@ -85,6 +86,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		maxContentLength:     maxContentLength,
 		minScoring:           minScoring,
 		maxScoring:           maxScoring,
+		maxAnalyzedEvent:     maxAnalyzedEvent,
 	}
 }
 
@@ -219,7 +221,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 // Fanout worker handles a lot of events
 func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 	diskSink := sink.NewDiskSink(o.messageRepository, o.log)
-	analysisSink := sink.NewAnalysisSink(o.analysisRepository, o.log, o.minScoring, o.maxScoring)
+	analysisSink := sink.NewAnalysisSink(o.analysisRepository, o.log, o.maxAnalyzedEvent, 5*time.Millisecond)
 
 	var res []contract.Worker
 	for i := 0; i < o.numWorkers; i++ {

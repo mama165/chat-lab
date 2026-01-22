@@ -16,7 +16,7 @@ const (
 	RestartedAfterPanicType Type = "WORKER_RESTARTED_AFTER_PANIC"
 	ChannelCapacityType     Type = "CHANNEL_CAPACITY"
 	MessageSentType         Type = "MESSAGE_SENT"
-	FileAnalyze             Type = "FILE_ANALYZE"
+	FileAnalyzeType         Type = "FILE_ANALYZE"
 )
 
 type Counter struct {

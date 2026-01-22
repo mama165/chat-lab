@@ -133,6 +133,7 @@ func run() (int, error) {
 		config.LowCapacityThreshold,
 		config.MaxContentLength,
 		config.MinScoring, config.MaxScoring,
+		config.MaxAnalyzedEvent,
 	)
 
 	// 4. Context & Signals

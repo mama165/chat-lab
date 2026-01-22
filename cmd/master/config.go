@@ -25,6 +25,7 @@ type Config struct {
 	MaxContentLength          int           `env:"MAX_CONTENT_LENGTH,required=true"`
 	MinScoring                float64       `env:"MIN_SCORING,required=true"`
 	MaxScoring                float64       `env:"MAX_SCORING,required=true"`
+	MaxAnalyzedEvent          int           `env:"MAX_ANALYZED_EVENT,required=true"`
 	Host                      string        `env:"HOST"`
 	Port                      int           `env:"PORT"`
 	MaxSpecialistBootDuration time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION"`

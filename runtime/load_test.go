@@ -57,6 +57,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 		800,
 		500,
 		0.4, 0.6,
+		100,
 	)
 	go func() {
 		if err := o.Start(ctx); err != nil {

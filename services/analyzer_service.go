@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 )
 
 type IAnalyzerService interface {
@@ -52,18 +53,19 @@ func (s *AnalyzerService) Analyze(ctx context.Context, request analyzer.FileAnal
 	case <-ctx.Done():
 		s.log.Debug("Context done, skipping file analyzer")
 		return ctx.Err()
-	case s.fileAnalyzeChan <- toRequest(request):
+	case s.fileAnalyzeChan <- toEvent(request):
 		s.log.Debug("Received one file to analyze", "bytes", request.Size)
 		s.increment(request.Size)
 	}
 	return nil
 }
 
-func toRequest(request analyzer.FileAnalyzerRequest) event.Event {
+func toEvent(request analyzer.FileAnalyzerRequest) event.Event {
 	return event.Event{
-		Type:      event.FileAnalyze,
+		Type:      event.FileAnalyzeType,
 		CreatedAt: time.Now(),
 		Payload: event.FileAnalyse{
+			Id:         uuid.New(),
 			Path:       request.Path,
 			DriveID:    request.DriveID,
 			Size:       request.Size,
