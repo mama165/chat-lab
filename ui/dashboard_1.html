@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat-Lab // Forensics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@heroicons/react@1.0.6/outline/esm/index.js" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0a0a1f',
+                        cardbg: 'rgba(30, 41, 59, 0.7)', // Glassmorphism base
+                        neonpurple: '#a855f7',
+                        neonblue: '#0ea5e9',
+                        neongreen: '#22c55e',
+                        neonpink: '#ec4899',
+                    },
+                    backgroundImage: {
+                        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom CSS pour les effets "vivants" */
+        body {
+            background: rgb(2,0,36);
+            background: radial-gradient(circle, rgba(76,29,149,1) 0%, rgba(15,23,42,1) 60%, rgba(10,10,31,1) 100%);
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-card {
+            background-color: var(--cardbg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .pulse-globe {
+            animation: pulse-glow 4s infinite alternate;
+        }
+        @keyframes pulse-glow {
+            0% { filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.4)); }
+            100% { filter: drop-shadow(0 0 30px rgba(14, 165, 233, 0.7)); }
+        }
+        /* Animation pour les barres de progression */
+        .progress-bar-animated span {
+            height: 100%;
+            display: block;
+            background: linear-gradient(to right, var(--neonpurple), var(--neonblue));
+            background-size: 200% 100%;
+            animation: gradient-shift 2s linear infinite;
+        }
+        @keyframes gradient-shift {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-300 h-screen overflow-hidden flex">
+
+<aside class="w-20 flex flex-col items-center py-8 gap-8 glass-card border-r border-white/5 z-10">
+    <div class="w-10 h-10 bg-gradient-to-br from-neonpurple to-neonblue rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-neonpurple/30">
+        CL
+    </div>
+    <nav class="flex flex-col gap-6 text-slate-500">
+        <button class="text-neonblue hover:text-white transition p-2 rounded-xl bg-white/10"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg></button>
+        <button class="hover:text-neonblue transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg></button>
+        <button class="hover:text-neonblue transition relative">
+            <span class="absolute -top-1 -right-1 w-3 h-3 bg-neonpink rounded-full animate-ping opacity-75"></span>
+            <span class="absolute -top-1 -right-1 w-3 h-3 bg-neonpink rounded-full"></span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+        </button>
+    </nav>
+</aside>
+
+<main class="flex-1 p-6 lg:p-10 overflow-y-auto relative">
+
+    <div class="absolute top-0 left-0 w-full h-full flex justify-center items-center -z-10 pointer-events-none overflow-hidden">
+        <div class="w-[800px] h-[800px] rounded-full bg-gradient-radial from-indigo-500/20 via-transparent to-transparent opacity-40 pulse-globe relative flex items-center justify-center">
+            <div class="absolute w-full h-full rounded-full border border-neonblue/20 animate-[spin_20s_linear_infinite]"></div>
+            <div class="absolute w-[90%] h-[90%] rounded-full border border-neonpurple/20 animate-[spin_15s_linear_reverse_infinite]"></div>
+            <div class="text-neonblue/30 text-9xl font-mono tracking-widest opacity-20 rotate-12">CYBER//SPACE//SCAN</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+        <div class="lg:col-span-8">
+            <h1 class="text-3xl font-bold text-white mb-2">Chat-Lab Overview</h1>
+            <p class="text-slate-400 text-sm mb-6 flex items-center gap-2">
+                <span class="inline-block w-2 h-2 bg-neongreen rounded-full animate-pulse"></span>
+                System Live - Ingestion Active
+            </p>
+
+            <div class="flex flex-col md:flex-row items-start md:items-end gap-8">
+                <div>
+                    <div class="text-sm text-slate-400 mb-1">TOTAL FILES SCANNED</div>
+                    <div id="total-files" class="text-5xl lg:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-neonblue">
+                        7,541,390
+                    </div>
+                </div>
+
+                <div class="w-full max-w-xs">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Current Throughput</span>
+                        <span class="text-neongreen font-bold" id="throughput-val">1.2 GB/s</span>
+                    </div>
+                    <div class="h-3 bg-slate-800 rounded-full overflow-hidden progress-bar-animated">
+                        <span style="width: 85%;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-neonblue"></span>Logs (.txt) <span class="text-white font-bold ml-auto">55%</span></div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-neongreen"></span>Audio (.wav) <span class="text-white font-bold ml-auto">25%</span></div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-neonpurple"></span>Config (.json) <span class="text-white font-bold ml-auto">15%</span></div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-neonpink"></span>Archives (.zip) <span class="text-white font-bold ml-auto">5%</span></div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-4 flex flex-col gap-4">
+            <div class="glass-card rounded-2xl p-5 flex items-center gap-4 relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-32 h-32 bg-neonpink/20 blur-2xl rounded-full"></div>
+                <div class="w-12 h-12 bg-neonpink/20 rounded-xl flex items-center justify-center text-neonpink">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <div>
+                    <div class="text-sm text-slate-400">CRITICAL THREATS (Toxicity)</div>
+                    <div class="text-2xl font-bold text-white flex items-center gap-2">
+                        <span id="threats-count">2,340</span>
+                        <span class="text-xs py-0.5 px-2 bg-neonpink/20 text-neonpink rounded-full">+145 new</span>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-card rounded-2xl p-5 flex items-center gap-4 relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-32 h-32 bg-neonblue/20 blur-2xl rounded-full"></div>
+                <div class="w-12 h-12 bg-neonblue/20 rounded-xl flex items-center justify-center text-neonblue">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                </div>
+                <div>
+                    <div class="text-sm text-slate-400">BADGERDB STORAGE</div>
+                    <div class="text-2xl font-bold text-white">
+                        <span id="storage-size">1,004</span> GB
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <div class="glass-card rounded-2xl p-6 lg:col-span-5">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-white">Scan Velocity</h3>
+                <span class="text-neonpurple font-bold" id="velocity-val">92,980 files/min</span>
+            </div>
+            <div class="h-48">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-6 lg:col-span-3 flex flex-col items-center justify-center relative">
+            <div class="absolute inset-0 bg-gradient-to-tr from-neonpurple/10 to-transparent rounded-2xl pointer-events-none"></div>
+
+            <h3 class="text-lg font-semibold text-white mb-4 z-10">AI Pipeline Load</h3>
+            <div class="relative w-40 h-40 z-10">
+                <svg class="w-full h-full" viewBox="0 0 100 100">
+                    <circle class="text-slate-800 stroke-current" stroke-width="10" cx="50" cy="50" r="40" fill="transparent"></circle>
+                    <circle id="backlog-ring" class="text-neongreen stroke-current" stroke-width="10" stroke-linecap="round" cx="50" cy="50" r="40" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="251.2" transform="rotate(-90 50 50)"></circle>
+                </svg>
+                <div class="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center">
+                    <span class="text-3xl font-bold text-white" id="backlog-pct">23%</span>
+                    <span class="text-xs text-slate-400">CHANNEL LOAD</span>
+                </div>
+            </div>
+            <div class="text-center mt-4 z-10">
+                <div class="text-xl font-bold text-white" id="buffered-items">53,430</div>
+                <div class="text-xs text-slate-400">Buffered Items</div>
+            </div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-6 lg:col-span-4 relative">
+            <div class="absolute top-0 right-0 p-6 opacity-10">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-neonblue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div>
+                <h3 class="text-sm text-slate-400 mb-1">Avg Detection Latency</h3>
+                <div class="text-3xl font-bold text-white mb-1 flex items-center gap-2">
+                    <span id="latency-avg">16.8</span> ms
+                    <span class="text-xs py-0.5 px-2 bg-neongreen/20 text-neongreen rounded-full">â–¼ 10%</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-6">Time from gRPC ingest to DB index</p>
+            </div>
+            <div class="h-32">
+                <canvas id="latencyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card rounded-2xl p-6 mt-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Recent Flushed Batches (BadgerDB)</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-slate-400">
+                <thead class="text-xs uppercase bg-slate-900/50 text-slate-500">
+                <tr>
+                    <th scope="col" class="px-6 py-3 rounded-l-lg">Batch ID</th>
+                    <th scope="col" class="px-6 py-3">Source Path</th>
+                    <th scope="col" class="px-6 py-3">Files Count</th>
+                    <th scope="col" class="px-6 py-3">Status</th>
+                    <th scope="col" class="px-6 py-3 rounded-r-lg">Time</th>
+                </tr>
+                </thead>
+                <tbody id="batch-table-body">
+                <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition">
+                    <td class="px-6 py-4 font-medium text-neonblue">#BATCH-992A</td>
+                    <td>/mnt/data/logs/server-01</td>
+                    <td>2,540</td>
+                    <td><span class="px-2 py-1 bg-neongreen/20 text-neongreen rounded-full text-xs">Indexed</span></td>
+                    <td>10:45:22 AM</td>
+                </tr>
+                <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition">
+                    <td class="px-6 py-4 font-medium text-neonblue">#BATCH-992B</td>
+                    <td>/mnt/data/audio/calls</td>
+                    <td>320</td>
+                    <td><span class="px-2 py-1 bg-neonpurple/20 text-neonpurple rounded-full text-xs">AI Processing</span></td>
+                    <td>10:45:20 AM</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    // --- Configuration Chart.js ---
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = 'Inter, sans-serif';
+
+    // 1. VELOCITY TREND CHART (Line)
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    const gradientPurple = trendCtx.createLinearGradient(0, 0, 0, 400);
+    gradientPurple.addColorStop(0, 'rgba(168, 85, 247, 0.5)'); // Neon purple
+    gradientPurple.addColorStop(1, 'rgba(168, 85, 247, 0)');
+
+    const trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: ['10:40', '10:41', '10:42', '10:43', '10:44', '10:45'],
+            datasets: [{
+                label: 'Files/min',
+                data: [65000, 59000, 80000, 81000, 76000, 92980],
+                borderColor: '#a855f7', // Neon purple
+                backgroundColor: gradientPurple,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 0,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, beginAtZero: true }
+            }
+        }
+    });
+
+    // 2. LATENCY CHART (Bar - Horizontal in image, but vertical fits better here for data)
+    // Let's make it horizontal to match image style
+    const latencyCtx = document.getElementById('latencyChart').getContext('2d');
+    const latencyChart = new Chart(latencyCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Ingest', 'AI Scan', 'DB Index'],
+            datasets: [{
+                label: 'Latency (ms)',
+                data: [4, 15, 2],
+                backgroundColor: ['#0ea5e9', '#a855f7', '#22c55e'], // Blue, Purple, Green
+                borderRadius: 20,
+                barThickness: 15
+            }]
+        },
+        options: {
+            indexAxis: 'y', // Horizontal bars
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, display: false }, // Hide X axis labels
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // --- SIMULATION "VIVANTE" DES DONNÃ‰ES ---
+
+    let totalFiles = 7541390;
+    let threats = 2340;
+    let storage = 1004;
+    let backlogPct = 23;
+
+    // Helper pour formatter les nombres avec virgules
+    const formatNum = (num) => new Intl.NumberFormat('en-US').format(num);
+
+    // Mise Ã  jour de la jauge circulaire (Backlog)
+    function updateBacklogGauge(percent) {
+        const circle = document.getElementById('backlog-ring');
+        const radius = circle.r.baseVal.value;
+        const circumference = radius * 2 * Math.PI;
+        const offset = circumference - (percent / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+        document.getElementById('backlog-pct').innerText = percent + "%";
+
+        // Change color based on load
+        if(percent > 50) circle.classList.replace('text-neongreen', 'text-neonpurple');
+        if(percent > 80) circle.classList.replace('text-neonpurple', 'text-neonpink');
+        if(percent < 50) {
+            circle.classList.remove('text-neonpink', 'text-neonpurple');
+            circle.classList.add('text-neongreen');
+        }
+    }
+    updateBacklogGauge(backlogPct); // Init
+
+    // Boucle de simulation principale (toutes les 2 secondes)
+    setInterval(() => {
+        // 1. IncrÃ©menter les compteurs principaux (Simulation de scan rapide)
+        const newFiles = Math.floor(Math.random() * 500) + 100;
+        totalFiles += newFiles;
+        document.getElementById('total-files').innerText = formatNum(totalFiles);
+
+        // 2. Simuler des menaces trouvÃ©es
+        if(Math.random() > 0.7) {
+            threats += Math.floor(Math.random() * 5);
+            document.getElementById('threats-count').innerText = formatNum(threats);
+        }
+
+        // 3. Faire varier le backlog (la jauge circulaire)
+        backlogPct = Math.min(100, Math.max(5, backlogPct + (Math.random() * 10 - 5))); // Random walk entre 5 et 100
+        updateBacklogGauge(Math.round(backlogPct));
+        document.getElementById('buffered-items').innerText = formatNum(Math.round((backlogPct/100) * 200000));
+
+        // 4. Mettre Ã  jour le graphique de vÃ©locitÃ© (Trend Chart)
+        const newVelocity = Math.floor(Math.random() * 30000) + 60000; // Entre 60k et 90k
+        document.getElementById('velocity-val').innerText = formatNum(newVelocity) + " files/min";
+
+        const now = new Date();
+        const timeLabel = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+
+        trendChart.data.labels.push(timeLabel);
+        trendChart.data.datasets[0].data.push(newVelocity);
+
+        // Garder seulement les 10 derniers points pour que Ã§a bouge
+        if (trendChart.data.labels.length > 10) {
+            trendChart.data.labels.shift();
+            trendChart.data.datasets[0].data.shift();
+        }
+        trendChart.update('none'); // 'none' pour une animation plus fluide
+
+        // 5. Simuler un nouveau batch dans le tableau du bas (occasionnellement)
+        if(Math.random() > 0.8) {
+            const tbody = document.getElementById('batch-table-body');
+            const row = document.createElement('tr');
+            row.className = "border-b border-slate-800/50 hover:bg-slate-800/30 transition animate-pulse"; // Petit flash Ã  l'ajout
+            row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-neonblue">#BATCH-${Math.floor(Math.random()*1000)}X</td>
+                    <td>/mnt/data/live/stream_${Math.floor(Math.random()*99)}</td>
+                    <td>${Math.floor(Math.random()*1000)}</td>
+                    <td><span class="px-2 py-1 bg-neonpurple/20 text-neonpurple rounded-full text-xs">Processing</span></td>
+                    <td>${now.toLocaleTimeString()}</td>
+                `;
+            tbody.prepend(row); // Ajouter en haut
+            if(tbody.children.length > 5) tbody.removeChild(tbody.lastChild); // Garder la liste courte
+            setTimeout(() => row.classList.remove('animate-pulse'), 1000);
+        }
+
+    }, 2000);
+
+</script>
+</body>
+</html>

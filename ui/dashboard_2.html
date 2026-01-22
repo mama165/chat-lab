@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat-Lab // Forensics Investigation Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0a0a1f',
+                        cardbg: 'rgba(30, 41, 59, 0.7)',
+                        neonpurple: '#a855f7',
+                        neonblue: '#0ea5e9',
+                        neongreen: '#22c55e',
+                        neonpink: '#ec4899',
+                        neonorange: '#fb923c',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: radial-gradient(circle at 20% 50%, rgba(76,29,149,0.3) 0%, rgba(15,23,42,1) 40%, rgba(10,10,31,1) 100%);
+            font-family: 'Inter', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 3s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+            100% { box-shadow: 0 0 40px rgba(14, 165, 233, 0.6); }
+        }
+
+        .tab-active {
+            background: linear-gradient(to right, rgba(168, 85, 247, 0.3), rgba(14, 165, 233, 0.3));
+            border-left: 3px solid #a855f7;
+        }
+
+        .search-bar {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .search-bar:focus-within {
+            border-color: #a855f7;
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #0ea5e9;
+            box-shadow: 0 0 10px #0ea5e9;
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 20px;
+            width: 2px;
+            height: calc(100% - 10px);
+            background: linear-gradient(to bottom, #0ea5e9, transparent);
+        }
+
+        .timeline-item:last-child::after {
+            display: none;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
+        }
+
+        .badge-toxic {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .badge-safe {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+
+        .badge-warning {
+            background: rgba(251, 146, 60, 0.2);
+            color: #fb923c;
+            border: 1px solid rgba(251, 146, 60, 0.4);
+        }
+
+        .file-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .chat-message {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .typing-indicator span {
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="text-slate-300 h-screen flex overflow-hidden">
+
+<!-- Sidebar Navigation -->
+<aside class="w-64 glass-card border-r border-white/5 flex flex-col">
+    <!-- Logo -->
+    <div class="p-6 border-b border-white/5">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-neonpurple to-neonblue rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg pulse-glow">
+                CL
+            </div>
+            <div>
+                <h1 class="text-white font-bold text-lg">Chat-Lab</h1>
+                <p class="text-xs text-slate-400">Forensics v2.1</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex-1 p-4 overflow-y-auto scrollbar-hide">
+        <div class="space-y-1">
+            <button onclick="switchTab('overview')" id="tab-overview" class="tab-active w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                </svg>
+                <span>Vue d'ensemble</span>
+            </button>
+
+            <button onclick="switchTab('audio')" id="tab-audio" class="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                </svg>
+                <span>Fichiers Audio</span>
+                <span class="ml-auto text-xs bg-neonblue/20 text-neonblue px-2 py-1 rounded">342</span>
+            </button>
+
+            <button onclick="switchTab('video')" id="tab-video" class="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <span>Fichiers Vidéo</span>
+                <span class="ml-auto text-xs bg-neonpurple/20 text-neonpurple px-2 py-1 rounded">87</span>
+            </button>
+
+            <button onclick="switchTab('documents')" id="tab-documents" class="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Documents</span>
+                <span class="ml-auto text-xs bg-neongreen/20 text-neongreen px-2 py-1 rounded">1.2k</span>
+            </button>
+
+            <button onclick="switchTab('logs')" id="tab-logs" class="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Logs Système</span>
+                <span class="ml-auto text-xs bg-neonorange/20 text-neonorange px-2 py-1 rounded">5.4k</span>
+            </button>
+
+            <button onclick="switchTab('correlations')" id="tab-correlations" class="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span>Recoupements</span>
+                <span class="ml-auto text-xs bg-neonpink/20 text-neonpink px-2 py-1 rounded">23</span>
+            </button>
+
+            <button onclick="switchTab('chat')" id="tab-chat" class="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition hover:bg-white/5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                </svg>
+                <span>Agent RAG</span>
+                <span class="ml-auto w-2 h-2 bg-neongreen rounded-full animate-pulse"></span>
+            </button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="mt-8 pt-6 border-t border-white/5">
+            <p class="text-xs text-slate-500 uppercase tracking-wider mb-3">Actions Rapides</p>
+            <div class="space-y-2">
+                <button class="w-full text-left px-3 py-2 rounded text-sm hover:bg-white/5 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-neonblue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    Nouvelle recherche
+                </button>
+                <button class="w-full text-left px-3 py-2 rounded text-sm hover:bg-white/5 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-neonpurple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
+                    </svg>
+                    Exporter données
+                </button>
+                <button class="w-full text-left px-3 py-2 rounded text-sm hover:bg-white/5 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-neongreen" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Créer rapport
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- System Status -->
+    <div class="p-4 border-t border-white/5">
+        <div class="text-xs space-y-2">
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">BadgerDB</span>
+                <span class="text-neongreen flex items-center gap-1">
+                        <span class="w-2 h-2 bg-neongreen rounded-full animate-pulse"></span>
+                        Online
+                    </span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Bluge Index</span>
+                <span class="text-neongreen flex items-center gap-1">
+                        <span class="w-2 h-2 bg-neongreen rounded-full animate-pulse"></span>
+                        Synced
+                    </span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">gRPC Stream</span>
+                <span class="text-neonblue" id="grpc-throughput">1.2 GB/s</span>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-hidden">
+    <!-- Top Bar with Search -->
+    <div class="glass-card border-b border-white/5 p-4">
+        <div class="flex items-center gap-4">
+            <!-- Global Search Bar -->
+            <div class="flex-1 search-bar rounded-lg px-4 py-3 flex items-center gap-3">
+                <svg class="w-5 h-5 text-neonpurple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input
+                        type="text"
+                        id="global-search"
+                        placeholder="Recherche intelligente : 'tentatives connexion SQL hier soir' ou 'fichiers audio suspects'"
+                        class="flex-1 bg-transparent outline-none text-white placeholder-slate-500"
+                        onkeydown="if(event.key==='Enter') executeSearch()"
+                />
+                <button onclick="executeSearch()" class="px-4 py-1.5 bg-gradient-to-r from-neonpurple to-neonblue rounded text-sm font-medium hover:opacity-80 transition">
+                    Rechercher
+                </button>
+            </div>
+
+            <!-- User Info -->
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <p class="text-sm text-white font-medium">Investigateur #042</p>
+                    <p class="text-xs text-slate-400">Niveau 5 - Accès Total</p>
+                </div>
+                <div class="w-10 h-10 bg-gradient-to-br from-neonpink to-neonorange rounded-full flex items-center justify-center text-white font-bold">
+                    JD
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content Area -->
+    <div class="flex-1 overflow-hidden" id="content-area">
+        <!-- Overview Tab (Default) -->
+        <div id="content-overview" class="h-full overflow-y-auto p-6 space-y-6">
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card rounded-xl p-5 pulse-glow">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-sm text-slate-400">Total Fichiers</p>
+                        <svg class="w-5 h-5 text-neonblue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <p class="text-3xl font-bold text-white" id="stat-total-files">7,541,390</p>
+                    <p class="text-xs text-neongreen mt-1">+2,340 dernière heure</p>
+                </div>
+
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-sm text-slate-400">Analyses En Cours</p>
+                        <svg class="w-5 h-5 text-neonpurple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                        </svg>
+                    </div>
+                    <p class="text-3xl font-bold text-white" id="stat-processing">1,243</p>
+                    <div class="w-full bg-slate-700 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-neonpurple to-neonblue" style="width: 67%" id="processing-bar"></div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-sm text-slate-400">Alertes Critiques</p>
+                        <svg class="w-5 h-5 text-neonpink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <p class="text-3xl font-bold text-white" id="stat-alerts">23</p>
+                    <p class="text-xs text-neonpink mt-1">+5 dernière heure</p>
+                </div>
+
+                <div class="glass-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-sm text-slate-400">Stockage Utilisé</p>
+                        <svg class="w-5 h-5 text-neongreen" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                        </svg>
+                    </div>
+                    <p class="text-3xl font-bold text-white" id="stat-storage">4.2 TB</p>
+                    <p class="text-xs text-slate-400 mt-1">de 12 TB disponibles</p>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Activité d'Ingestion</h3>
+                    <div class="h-64">
+                        <canvas id="ingestionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Répartition par Type</h3>
+                    <div class="h-64">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-neonblue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Activité en Temps Réel
+                </h3>
+                <div class="space-y-3" id="activity-feed">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Tab -->
+        <div id="content-audio" class="h-full overflow-y-auto p-6 space-y-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Fichiers Audio Indexés</h2>
+                <div class="flex gap-2">
+                    <button class="px-4 py-2 bg-neonblue/20 text-neonblue rounded-lg hover:bg-neonblue/30 transition">
+                        Filtrer
+                    </button>
+                    <button class="px-4 py-2 bg-neonpurple/20 text-neonpurple rounded-lg hover:bg-neonpurple/30 transition">
+                        Exporter
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4" id="audio-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Video Tab -->
+        <div id="content-video" class="h-full overflow-y-auto p-6 space-y-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Fichiers Vidéo Indexés</h2>
+                <div class="flex gap-2">
+                    <button class="px-4 py-2 bg-neonblue/20 text-neonblue rounded-lg hover:bg-neonblue/30 transition">
+                        Timeline
+                    </button>
+                    <button class="px-4 py-2 bg-neonpurple/20 text-neonpurple rounded-lg hover:bg-neonpurple/30 transition">
+                        Analyse IA
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="video-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Documents Tab -->
+        <div id="content-documents" class="h-full overflow-y-auto p-6 space-y-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Documents Indexés</h2>
+                <input type="text" placeholder="Filtrer par nom ou type..." class="px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none focus:border-neonblue">
+            </div>
+
+            <div class="glass-card rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-900/50">
+                    <tr class="text-left text-slate-400 uppercase text-xs">
+                        <th class="p-4">Nom</th>
+                        <th class="p-4">Type</th>
+                        <th class="p-4">Taille</th>
+                        <th class="p-4">Analysé</th>
+                        <th class="p-4">Score</th>
+                        <th class="p-4">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="documents-table" class="divide-y divide-slate-800">
+                    <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="content-logs" class="h-full overflow-y-auto p-6 space-y-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Logs Système</h2>
+                <div class="flex gap-2">
+                    <select class="px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none">
+                        <option>Toutes sources</option>
+                        <option>SQL Server</option>
+                        <option>Apache</option>
+                        <option>Kernel</option>
+                    </select>
+                    <select class="px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none">
+                        <option>Tous niveaux</option>
+                        <option>ERROR</option>
+                        <option>WARN</option>
+                        <option>INFO</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-4 font-mono text-xs space-y-1" id="logs-container">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Correlations Tab -->
+        <div id="content-correlations" class="h-full overflow-y-auto p-6 space-y-6 hidden">
+            <div class="mb-4">
+                <h2 class="text-2xl font-bold text-white mb-2">Recoupements Détectés</h2>
+                <p class="text-slate-400">Connexions automatiques entre fichiers audio, vidéo, documents et logs</p>
+            </div>
+
+            <div class="space-y-4" id="correlations-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Chat/RAG Tab -->
+        <div id="content-chat" class="h-full flex flex-col hidden">
+            <div class="p-6 border-b border-white/10">
+                <h2 class="text-2xl font-bold text-white mb-2">Agent RAG Conversationnel</h2>
+                <p class="text-slate-400 text-sm">Posez vos questions en langage naturel sur l'ensemble des données indexées</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="chat-messages">
+                <!-- Welcome message -->
+                <div class="glass-card rounded-xl p-4 max-w-2xl">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-gradient-to-br from-neonpurple to-neonblue rounded-full flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-slate-300">Bonjour ! Je suis votre assistant d'investigation forensique. Je peux vous aider à :</p>
+                            <ul class="mt-2 space-y-1 text-sm text-slate-400">
+                                <li>• Rechercher des fichiers audio/vidéo par contenu transcrit</li>
+                                <li>• Analyser des patterns dans les logs système</li>
+                                <li>• Établir des corrélations temporelles entre événements</li>
+                                <li>• Résumer des documents volumineux</li>
+                            </ul>
+                            <p class="mt-3 text-xs text-slate-500">Exemples de questions : "Y a-t-il eu des tentatives de connexion suspectes hier soir ?" ou "Montre-moi tous les fichiers audio mentionnant le mot 'confidentiel'"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-white/10">
+                <div class="flex gap-3">
+                    <input
+                            type="text"
+                            id="chat-input"
+                            placeholder="Posez votre question à l'agent RAG..."
+                            class="flex-1 px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none focus:border-neonpurple"
+                            onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }"
+                    />
+                    <button onclick="sendChatMessage()" class="px-6 py-3 bg-gradient-to-r from-neonpurple to-neonblue rounded-lg font-medium hover:opacity-80 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // ===== State Management =====
+    let currentTab = 'overview';
+    let simulationInterval;
+    let chatHistory = [];
+
+    // ===== Data Generators =====
+    const fileTypes = ['PDF', 'DOCX', 'TXT', 'XLSX', 'LOG', 'JSON', 'XML', 'CSV'];
+    const audioFormats = ['MP3', 'WAV', 'FLAC', 'M4A', 'OGG'];
+    const videoFormats = ['MP4', 'AVI', 'MKV', 'MOV', 'WEBM'];
+    const sources = ['SQL Server', 'Apache', 'Kernel', 'Auth', 'Network', 'App'];
+    const logLevels = ['INFO', 'WARN', 'ERROR', 'DEBUG'];
+
+    function randomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function randomChoice(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function formatTime(date) {
+        return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ===== Tab Switching =====
+    function switchTab(tabName) {
+        // Update active tab button
+        document.querySelectorAll('[id^="tab-"]').forEach(tab => {
+            tab.classList.remove('tab-active');
+        });
+        document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+
+        // Hide all content
+        document.querySelectorAll('[id^="content-"]').forEach(content => {
+            content.classList.add('hidden');
+        });
+
+        // Show selected content
+        document.getElementById(`content-${tabName}`).classList.remove('hidden');
+        currentTab = tabName;
+
+        // Load tab-specific data
+        loadTabData(tabName);
+    }
+
+    function loadTabData(tabName) {
+        switch(tabName) {
+            case 'audio':
+                populateAudioList();
+                break;
+            case 'video':
+                populateVideoList();
+                break;
+            case 'documents':
+                populateDocumentsTable();
+                break;
+            case 'logs':
+                populateLogsContainer();
+                break;
+            case 'correlations':
+                populateCorrelations();
+                break;
+        }
+    }
+
+    // ===== Audio List =====
+    function populateAudioList() {
+        const container = document.getElementById('audio-list');
+        container.innerHTML = '';
+
+        for (let i = 0; i < 20; i++) {
+            const format = randomChoice(audioFormats);
+            const duration = randomInt(30, 3600);
+            const toxicity = Math.random();
+            const transcriptLength = randomInt(50, 500);
+
+            const badgeClass = toxicity > 0.7 ? 'badge-toxic' : toxicity > 0.4 ? 'badge-warning' : 'badge-safe';
+            const badgeText = toxicity > 0.7 ? 'Suspect' : toxicity > 0.4 ? 'À vérifier' : 'Normal';
+
+            const card = `
+                    <div class="glass-card rounded-xl p-5 hover:bg-white/5 transition slide-in">
+                        <div class="flex items-start gap-4">
+                            <div class="file-icon bg-neonblue/20 text-neonblue">
+                                🎵
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div>
+                                        <h4 class="text-white font-medium">conversation_${randomInt(1000, 9999)}.${format.toLowerCase()}</h4>
+                                        <p class="text-xs text-slate-400 mt-1">Enregistré le ${new Date(Date.now() - randomInt(0, 86400000 * 30)).toLocaleDateString('fr-FR')}</p>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 rounded ${badgeClass}">${badgeText}</span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-4 text-sm mb-3">
+                                    <div>
+                                        <p class="text-slate-500 text-xs">Durée</p>
+                                        <p class="text-white">${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-slate-500 text-xs">Toxicité</p>
+                                        <p class="text-white">${(toxicity * 100).toFixed(1)}%</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-slate-500 text-xs">Transcription</p>
+                                        <p class="text-white">${transcriptLength} mots</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button class="px-3 py-1.5 bg-neonblue/20 text-neonblue rounded text-xs hover:bg-neonblue/30 transition">
+                                        Lire transcription
+                                    </button>
+                                    <button class="px-3 py-1.5 bg-neonpurple/20 text-neonpurple rounded text-xs hover:bg-neonpurple/30 transition">
+                                        Analyser
+                                    </button>
+                                    <button class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition">
+                                        Télécharger
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            container.innerHTML += card;
+        }
+    }
+
+    // ===== Video List =====
+    function populateVideoList() {
+        const container = document.getElementById('video-list');
+        container.innerHTML = '';
+
+        for (let i = 0; i < 12; i++) {
+            const format = randomChoice(videoFormats);
+            const duration = randomInt(60, 7200);
+            const size = randomInt(50, 2000) * 1024 * 1024;
+            const fps = randomChoice([24, 25, 30, 60]);
+            const resolution = randomChoice(['1920x1080', '1280x720', '3840x2160']);
+
+            const card = `
+                    <div class="glass-card rounded-xl p-5 hover:bg-white/5 transition slide-in">
+                        <div class="aspect-video bg-slate-800 rounded-lg mb-3 flex items-center justify-center">
+                            <svg class="w-16 h-16 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <h4 class="text-white font-medium mb-2">surveillance_cam${randomInt(1, 8)}_${randomInt(1000, 9999)}.${format.toLowerCase()}</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+                            <div>
+                                <p class="text-slate-500">Durée</p>
+                                <p class="text-white">${Math.floor(duration / 60)}min</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-500">Taille</p>
+                                <p class="text-white">${formatBytes(size)}</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-500">Résolution</p>
+                                <p class="text-white">${resolution}</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-500">FPS</p>
+                                <p class="text-white">${fps}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 px-3 py-1.5 bg-neonpurple/20 text-neonpurple rounded text-xs hover:bg-neonpurple/30 transition">
+                                Analyser
+                            </button>
+                            <button class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition">
+                                ⬇
+                            </button>
+                        </div>
+                    </div>
+                `;
+            container.innerHTML += card;
+        }
+    }
+
+    // ===== Documents Table =====
+    function populateDocumentsTable() {
+        const tbody = document.getElementById('documents-table');
+        tbody.innerHTML = '';
+
+        for (let i = 0; i < 30; i++) {
+            const fileType = randomChoice(fileTypes);
+            const size = randomInt(1024, 10 * 1024 * 1024);
+            const score = Math.random();
+            const analyzed = Math.random() > 0.2;
+
+            const scoreClass = score > 0.7 ? 'text-neonpink' : score > 0.4 ? 'text-neonorange' : 'text-neongreen';
+
+            const row = `
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <span class="file-icon text-xs ${fileType === 'PDF' ? 'bg-red-500/20 text-red-400' : fileType === 'DOCX' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}">${fileType}</span>
+                                <span class="text-white">document_${randomInt(1000, 9999)}.${fileType.toLowerCase()}</span>
+                            </div>
+                        </td>
+                        <td class="p-4 text-slate-400">${fileType}</td>
+                        <td class="p-4 text-slate-400">${formatBytes(size)}</td>
+                        <td class="p-4">
+                            ${analyzed ? '<span class="text-neongreen text-xs">✓ Analysé</span>' : '<span class="text-slate-500 text-xs">En attente</span>'}
+                        </td>
+                        <td class="p-4 ${scoreClass} font-medium">${analyzed ? (score * 100).toFixed(1) + '%' : '-'}</td>
+                        <td class="p-4">
+                            <button class="text-neonblue hover:text-white transition text-sm">Ouvrir</button>
+                        </td>
+                    </tr>
+                `;
+            tbody.innerHTML += row;
+        }
+    }
+
+    // ===== Logs Container =====
+    function populateLogsContainer() {
+        const container = document.getElementById('logs-container');
+        container.innerHTML = '';
+
+        for (let i = 0; i < 50; i++) {
+            const level = randomChoice(logLevels);
+            const source = randomChoice(sources);
+            const timestamp = new Date(Date.now() - randomInt(0, 86400000));
+
+            const levelColor = {
+                'ERROR': 'text-red-400',
+                'WARN': 'text-yellow-400',
+                'INFO': 'text-blue-400',
+                'DEBUG': 'text-slate-500'
+            }[level];
+
+            const messages = [
+                'Connection attempt from 192.168.1.${randomInt(1, 255)}',
+                'Query execution time: ${randomInt(10, 5000)}ms',
+                'Cache miss for key: user_session_${randomInt(1000, 9999)}',
+                'File access: /var/log/secure.${randomInt(1, 10)}',
+                'Authentication failed for user: admin',
+                'Service restart initiated by systemd',
+                'Memory usage: ${randomInt(50, 95)}%'
+            ];
+
+            const log = `
+                    <div class="flex gap-4 text-slate-400 hover:bg-white/5 px-2 py-1 rounded">
+                        <span class="text-slate-600">${formatTime(timestamp)}</span>
+                        <span class="${levelColor} w-12">${level}</span>
+                        <span class="text-neonblue w-24">${source}</span>
+                        <span class="flex-1">${randomChoice(messages)}</span>
+                    </div>
+                `;
+            container.innerHTML += log;
+        }
+    }
+
+    // ===== Correlations =====
+    function populateCorrelations() {
+        const container = document.getElementById('correlations-list');
+        container.innerHTML = '';
+
+        const correlations = [
+            {
+                title: 'Connexion Audio-Vidéo temporelle',
+                desc: 'Conversation audio coïncide avec enregistrement vidéo',
+                files: ['conversation_2341.mp3', 'surveillance_cam3_5421.mp4'],
+                timestamp: '2026-01-22 14:23:15',
+                confidence: 0.94
+            },
+            {
+                title: 'Logs + Document Access',
+                desc: 'Accès document sensible + logs authentification',
+                files: ['confidential_report.pdf', '/var/log/auth.log'],
+                timestamp: '2026-01-22 03:14:52',
+                confidence: 0.87
+            },
+            {
+                title: 'Pattern réseau suspect',
+                desc: 'Multiple tentatives connexion + transfert fichiers',
+                files: ['network_traffic.pcap', 'firewall.log', 'transfer_5234.zip'],
+                timestamp: '2026-01-21 23:45:33',
+                confidence: 0.78
+            }
+        ];
+
+        correlations.forEach(corr => {
+            const card = `
+                    <div class="glass-card rounded-xl p-6 slide-in border-l-4 ${corr.confidence > 0.9 ? 'border-neonpink' : corr.confidence > 0.8 ? 'border-neonorange' : 'border-neonblue'}">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <h3 class="text-white font-semibold text-lg">${corr.title}</h3>
+                                <p class="text-slate-400 text-sm mt-1">${corr.desc}</p>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-xs font-medium ${corr.confidence > 0.9 ? 'bg-neonpink/20 text-neonpink' : corr.confidence > 0.8 ? 'bg-neonorange/20 text-neonorange' : 'bg-neonblue/20 text-neonblue'}">
+                                ${(corr.confidence * 100).toFixed(0)}% confiance
+                            </span>
+                        </div>
+                        <div class="space-y-2 mb-4">
+                            <p class="text-xs text-slate-500 uppercase tracking-wider">Fichiers liés:</p>
+                            ${corr.files.map(file => `
+                                <div class="flex items-center gap-2 text-sm">
+                                    <svg class="w-4 h-4 text-neonblue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span class="text-slate-300">${file}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="flex items-center justify-between pt-3 border-t border-white/10">
+                            <span class="text-xs text-slate-500">${corr.timestamp}</span>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-1.5 bg-neonpurple/20 text-neonpurple rounded text-xs hover:bg-neonpurple/30 transition">
+                                    Examiner
+                                </button>
+                                <button class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition">
+                                    Créer alerte
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            container.innerHTML += card;
+        });
+    }
+
+    // ===== Search =====
+    function executeSearch() {
+        const query = document.getElementById('global-search').value;
+        if (!query) return;
+
+        // Simulate search - in reality this would query the RAG/Bluge
+        alert(`Recherche lancée pour: "${query}"\n\nCette fonction sera connectée au moteur RAG pour interroger BadgerDB + Bluge.`);
+    }
+
+    // ===== Chat/RAG =====
+    function sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        // Add user message
+        addChatMessage(message, 'user');
+        input.value = '';
+
+        // Show typing indicator
+        showTypingIndicator();
+
+        // Simulate RAG response
+        setTimeout(() => {
+            hideTypingIndicator();
+            const response = generateRAGResponse(message);
+            addChatMessage(response, 'assistant');
+        }, 2000 + Math.random() * 2000);
+    }
+
+    function addChatMessage(text, role) {
+        const container = document.getElementById('chat-messages');
+
+        if (role === 'user') {
+            const msg = `
+                    <div class="flex justify-end chat-message">
+                        <div class="glass-card rounded-xl p-4 max-w-2xl bg-neonpurple/10 border border-neonpurple/20">
+                            <p class="text-sm text-white">${text}</p>
+                        </div>
+                    </div>
+                `;
+            container.innerHTML += msg;
+        } else {
+            const msg = `
+                    <div class="chat-message">
+                        <div class="glass-card rounded-xl p-4 max-w-2xl">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-gradient-to-br from-neonpurple to-neonblue rounded-full flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17
