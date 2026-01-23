@@ -104,13 +104,13 @@ func run() (int, error) {
 		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
 	}
 
-	specialistManager := runtime.NewManager(log)
+	coordinator := runtime.NewCoordinator(log)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
 
 	log.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
-	if err := specialistManager.Init(bootCtx, specialistConfigs); err != nil {
+	if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel); err != nil {
 		return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
 	}
 
@@ -126,7 +126,7 @@ func run() (int, error) {
 	orchestrator := runtime.NewOrchestrator(
 		log, sup, registry, telemetryChan, messageRepository,
 		analysisRepository,
-		specialistManager,
+		coordinator,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		charReplacement,

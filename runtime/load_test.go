@@ -40,7 +40,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	supervisor := workers.NewSupervisor(log, telemetryChan, 100*time.Millisecond)
 	registry := runtime.NewRegistry()
 
-	manager := runtime.NewManager(log)
+	manager := runtime.NewCoordinator(log)
 
 	// Orchestrator avec un buffer de 1000 et une latence de backpressure courte
 	o := runtime.NewOrchestrator(

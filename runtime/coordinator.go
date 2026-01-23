@@ -18,36 +18,36 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Manager handles the lifecycle and coordination of all specialist sidecars.
-type Manager struct {
+// Coordinator handles the lifecycle and coordination of all specialist sidecars.
+type Coordinator struct {
 	mu          sync.RWMutex
 	log         *slog.Logger
 	specialists map[specialist.Metric]*client.SpecialistClient
 }
 
-func NewManager(log *slog.Logger) *Manager {
-	return &Manager{
+func NewCoordinator(log *slog.Logger) *Coordinator {
+	return &Coordinator{
 		log:         log,
 		specialists: make(map[specialist.Metric]*client.SpecialistClient),
 	}
 }
 
 // Add integrates a new specialist (process + grpc client) into the pool.
-func (m *Manager) Add(s *client.SpecialistClient) {
+func (m *Coordinator) Add(s *client.SpecialistClient) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.specialists[s.Id] = s
 }
 
 // Init launches all configured specialists and blocks until they are all ready.
-func (m *Manager) Init(ctx context.Context, configs []specialist.Config) error {
+func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, logLevel string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	for _, cfg := range configs {
 		// Start each specialist using our robust launcher.
 		// If one fails, we return the error to the Master to decide what to do.
-		sClient, err := startSpecialist(ctx, cfg)
+		sClient, err := startSpecialist(ctx, cfg, logLevel)
 		if err != nil {
 			return fmt.Errorf("failed to initialize specialist %s: %w", cfg.ID, err)
 		}
@@ -62,7 +62,7 @@ func (m *Manager) Init(ctx context.Context, configs []specialist.Config) error {
 // It performs a "fail-fast" check on the binary, executes it as a child process
 // linked to the provided context, and ensures the gRPC server is ready before
 // returning a functional specialist client.
-func startSpecialist(ctx context.Context, cfg specialist.Config) (*client.SpecialistClient, error) {
+func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string) (*client.SpecialistClient, error) {
 	// 1. Validate binary existence using our custom error
 	if _, err := os.Stat(cfg.BinPath); err != nil {
 		return nil, fmt.Errorf("%w: %s", errors.ErrSpecialistNotFound, cfg.BinPath)
@@ -75,7 +75,7 @@ func startSpecialist(ctx context.Context, cfg specialist.Config) (*client.Specia
 		"-id", string(cfg.ID),
 		"-port", strconv.Itoa(cfg.Port),
 		"-type", string(cfg.ID), // On utilise l'ID comme type pour l'instant
-		"-level", "INFO",
+		"-level", logLevel,
 	)
 	log.Printf("Specialist binary called : %s", cmd.String())
 	cmd.Stdout = os.Stdout
@@ -118,16 +118,25 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 	return nil, fmt.Errorf("timeout: specialist not responding at %s after retries", addr)
 }
 
-// AnalyzeAll broadcasts the content to all registered specialists in parallel.
-// It implements the Fan-Out pattern to ensure minimum latency
-func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response {
+// Broadcast broadcasts the content to all registered specialists in parallel.
+func (m *Coordinator) Broadcast(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	numSpecs := len(m.specialists)
+	m.mu.RUnlock()
+
+	if numSpecs == 0 {
+		return nil
+	}
 
 	results := make(map[specialist.Metric]specialist.Response)
-	var mu sync.Mutex
+	resChan := make(chan struct {
+		id   specialist.Metric
+		resp specialist.Response
+	}, numSpecs)
+
 	var wg sync.WaitGroup
 
+	m.mu.RLock()
 	for id, spec := range m.specialists {
 		wg.Add(1)
 		go func(id specialist.Metric, s *client.SpecialistClient) {
@@ -142,13 +151,23 @@ func (m *Manager) AnalyzeAll(ctx context.Context, messageID string, content stri
 				m.log.Error("Specialist analysis failed", "id", id, "error", err)
 				return
 			}
-
-			mu.Lock()
-			results[id] = resp
-			mu.Unlock()
+			resChan <- struct {
+				id   specialist.Metric
+				resp specialist.Response
+			}{id, resp}
 		}(id, spec)
 	}
+	m.mu.RUnlock()
 
-	wg.Wait()
+	// Goroutine to close channel once terminated
+	go func() {
+		wg.Wait()
+		close(resChan)
+	}()
+
+	for res := range resChan {
+		results[res.id] = res.resp
+	}
 	return results
+
 }

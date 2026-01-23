@@ -427,42 +427,42 @@ func (mr *MockIOrchestratorMockRecorder) UnregisterParticipant(pID, roomID any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterParticipant", reflect.TypeOf((*MockIOrchestrator)(nil).UnregisterParticipant), pID, roomID)
 }
 
-// MockIAnalyzer is a mock of IAnalyzer interface.
-type MockIAnalyzer struct {
+// MockSpecialistCoordinator is a mock of SpecialistCoordinator interface.
+type MockSpecialistCoordinator struct {
 	ctrl     *gomock.Controller
-	recorder *MockIAnalyzerMockRecorder
+	recorder *MockSpecialistCoordinatorMockRecorder
 	isgomock struct{}
 }
 
-// MockIAnalyzerMockRecorder is the mock recorder for MockIAnalyzer.
-type MockIAnalyzerMockRecorder struct {
-	mock *MockIAnalyzer
+// MockSpecialistCoordinatorMockRecorder is the mock recorder for MockSpecialistCoordinator.
+type MockSpecialistCoordinatorMockRecorder struct {
+	mock *MockSpecialistCoordinator
 }
 
-// NewMockIAnalyzer creates a new mock instance.
-func NewMockIAnalyzer(ctrl *gomock.Controller) *MockIAnalyzer {
-	mock := &MockIAnalyzer{ctrl: ctrl}
-	mock.recorder = &MockIAnalyzerMockRecorder{mock}
+// NewMockSpecialistCoordinator creates a new mock instance.
+func NewMockSpecialistCoordinator(ctrl *gomock.Controller) *MockSpecialistCoordinator {
+	mock := &MockSpecialistCoordinator{ctrl: ctrl}
+	mock.recorder = &MockSpecialistCoordinatorMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIAnalyzer) EXPECT() *MockIAnalyzerMockRecorder {
+func (m *MockSpecialistCoordinator) EXPECT() *MockSpecialistCoordinatorMockRecorder {
 	return m.recorder
 }
 
-// AnalyzeAll mocks base method.
-func (m *MockIAnalyzer) AnalyzeAll(ctx context.Context, messageID, content string) map[specialist.Metric]specialist.Response {
+// Broadcast mocks base method.
+func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, messageID, content string) map[specialist.Metric]specialist.Response {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AnalyzeAll", ctx, messageID, content)
+	ret := m.ctrl.Call(m, "Broadcast", ctx, messageID, content)
 	ret0, _ := ret[0].(map[specialist.Metric]specialist.Response)
 	return ret0
 }
 
-// AnalyzeAll indicates an expected call of AnalyzeAll.
-func (mr *MockIAnalyzerMockRecorder) AnalyzeAll(ctx, messageID, content any) *gomock.Call {
+// Broadcast indicates an expected call of Broadcast.
+func (mr *MockSpecialistCoordinatorMockRecorder) Broadcast(ctx, messageID, content any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AnalyzeAll", reflect.TypeOf((*MockIAnalyzer)(nil).AnalyzeAll), ctx, messageID, content)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockSpecialistCoordinator)(nil).Broadcast), ctx, messageID, content)
 }
 
 // MockISpecialistClient is a mock of ISpecialistClient interface.

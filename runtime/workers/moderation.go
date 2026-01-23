@@ -15,14 +15,14 @@ import (
 
 type ModerationWorker struct {
 	moderator      moderation.Moderator
-	manager        contract.IAnalyzer
+	manager        contract.SpecialistCoordinator
 	moderationChan chan event.Event
 	events         chan event.Event
 	log            *slog.Logger
 }
 
 func NewModerationWorker(moderator moderation.Moderator,
-	manager contract.IAnalyzer,
+	manager contract.SpecialistCoordinator,
 	moderationChan,
 	events chan event.Event, log *slog.Logger) *ModerationWorker {
 	return &ModerationWorker{
@@ -69,7 +69,7 @@ func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.Mess
 	sanitized, foundWords := w.moderator.Censor(evt.Content)
 
 	// Lead time measurement
-	results := w.manager.AnalyzeAll(ctx, evt.ID.String(), evt.Content)
+	results := w.manager.Broadcast(ctx, evt.ID.String(), evt.Content)
 	if len(results) == 0 {
 		w.log.Warn("no specialists available for analysis, message unverified")
 	}

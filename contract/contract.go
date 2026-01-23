@@ -64,8 +64,10 @@ type IOrchestrator interface {
 	Stop()
 }
 
-type IAnalyzer interface {
-	AnalyzeAll(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response
+// SpecialistCoordinator defines the ability to fan-out analysis requests
+// to all available sidecars.
+type SpecialistCoordinator interface {
+	Broadcast(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response
 }
 
 // ISpecialistClient defines the contract for interacting with specialized

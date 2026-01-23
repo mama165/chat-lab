@@ -41,7 +41,7 @@ type Orchestrator struct {
 	telemetryChan        chan event.Event
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
-	manager              *Manager
+	manager              *Coordinator
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
@@ -58,7 +58,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
-	specialistManager *Manager,
+	specialistManager *Coordinator,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,

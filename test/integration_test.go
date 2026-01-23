@@ -45,7 +45,7 @@ func Test_Scenario(t *testing.T) {
 	registry := runtime.NewRegistry()
 	messageRepository := bluge2.NewMessageRepository(db, log, lo.ToPtr(100))
 	analysisRepository := bluge2.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
-	manager := runtime.NewManager(log)
+	manager := runtime.NewCoordinator(log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, messageRepository,
 		analysisRepository,

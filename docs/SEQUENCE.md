@@ -3,7 +3,7 @@ sequenceDiagram
 participant S as Scanner (Client)
 participant G as gRPC Server
 participant O as Orchestrator
-participant C as Coordinator
+participant C as SpecialistCoordinator
 participant P as Python Sidecar
 
     S->>G: 1. Send Meta-data (FileAnalyse)
