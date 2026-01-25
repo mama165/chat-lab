@@ -16,7 +16,7 @@ import (
 )
 
 type FileAnalyzerServer struct {
-	pb.UnsafeFileAnalyzerServiceServer
+	pb.UnimplementedFileAnalyzerServiceServer
 	fileAnalyzerService services.IAnalyzerService
 	log                 *slog.Logger
 	countAnalyzedFiles  *analyzer.CountAnalyzedFiles

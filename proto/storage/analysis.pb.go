@@ -278,6 +278,9 @@ type FileDetails struct {
 	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"`
 	MimeType      string                 `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
 	Size          uint64                 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	Content       string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	Author        string                 `protobuf:"bytes,5,opt,name=author,proto3" json:"author,omitempty"`
+	PageCount     int32                  `protobuf:"varint,6,opt,name=page_count,json=pageCount,proto3" json:"page_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -333,6 +336,27 @@ func (x *FileDetails) GetSize() uint64 {
 	return 0
 }
 
+func (x *FileDetails) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *FileDetails) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *FileDetails) GetPageCount() int32 {
+	if x != nil {
+		return x.PageCount
+	}
+	return 0
+}
+
 var File_proto_storage_analysis_proto protoreflect.FileDescriptor
 
 const file_proto_storage_analysis_proto_rawDesc = "" +
@@ -358,11 +382,15 @@ const file_proto_storage_analysis_proto_rawDesc = "" +
 	"\acontent\x18\x01 \x01(\tR\acontent\"W\n" +
 	"\fAudioDetails\x12$\n" +
 	"\rtranscription\x18\x01 \x01(\tR\rtranscription\x12!\n" +
-	"\fduration_sec\x18\x02 \x01(\rR\vdurationSec\"Z\n" +
+	"\fduration_sec\x18\x02 \x01(\rR\vdurationSec\"\xab\x01\n" +
 	"\vFileDetails\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
-	"\x04size\x18\x03 \x01(\x04R\x04sizeB\x06Z\x04./pbb\x06proto3"
+	"\x04size\x18\x03 \x01(\x04R\x04size\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12\x16\n" +
+	"\x06author\x18\x05 \x01(\tR\x06author\x12\x1d\n" +
+	"\n" +
+	"page_count\x18\x06 \x01(\x05R\tpageCountB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_proto_storage_analysis_proto_rawDescOnce sync.Once

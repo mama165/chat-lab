@@ -116,7 +116,7 @@ func toAnalysis(events []event.FileAnalyse) ([]storage.Analysis, error) {
 				evt.SourceType,
 			},
 			Scores:  make(map[specialist.Metric]float64),
-			Payload: evt, // event brut pour traçabilité
+			Payload: evt,
 			Version: uuid.New(),
 		}
 

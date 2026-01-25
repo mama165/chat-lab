@@ -33,4 +33,7 @@ message FileDetails {
   string filename = 1;
   string mime_type = 2;
   uint64 size = 3;
+  string content = 4;
+  string author = 5;
+  int32 page_count = 6;
 }
