@@ -37,3 +37,10 @@ go.work.sum
 # Editor/IDE
 .idea/
 # .vscode/
+
+# Python virtual environment
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
