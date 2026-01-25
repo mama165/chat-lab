@@ -2,3 +2,4 @@
 - Fix CI-Lint
 - Fix all tests
 - Careful with 500 Mo PDF File (Out ot memory risks)
+- Remove cmd/tester/main.go
