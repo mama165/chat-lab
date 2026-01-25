@@ -99,10 +99,13 @@ func run() (int, error) {
 	// This ensures the Orchestrator has all its analysis "organs" ready.
 	// We use a dedicated timeout to prevent the Master from hanging if a binary
 	// fails to load its resources (like ML models) or if a port is already in use.
-	specialistConfigs := []specialist.Config{
+
+	/*	specialistConfigs := []specialist.Config{
 		{ID: specialist.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
 		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
-	}
+	}*/
+
+	var specialistConfigs []specialist.Config
 
 	coordinator := runtime.NewCoordinator(log)
 

@@ -31,7 +31,7 @@ endif
 DB_PATH ?= $(BADGER_FILEPATH)
 
 # --- Phony Targets Declaration ---
-.PHONY: build build-master build-specialists proto-gen ai-gen clean-db lab dev clean fmt
+.PHONY: build build-master proto-gen ai-gen clean-db lab dev clean fmt
 
 # --- Code Formatting ---
 
@@ -43,19 +43,11 @@ fmt:
 # --- Local Build ---
 
 ## build: Build all local binaries (Master and Specialists)
-build: build-master build-specialists
+build: build-master
 
 build-master:
 	@echo "--- 🛠️ Building Master binary ---"
 	$(GO) build -ldflags="-s -w" -o $(APP_NAME) $(CMD_MASTER)
-
-build-specialists:
-	@echo "--- 🛠️ Building Specialist binaries ---"
-	@mkdir -p $(BIN_DIR)
-	$(GO) build -ldflags="-s -w" -o $(BIN_DIR)/toxicity $(CMD_SPEC)
-	$(GO) build -ldflags="-s -w" -o $(BIN_DIR)/sentiment $(CMD_SPEC)
-
-
 
 # --- Code Generation ---
 
@@ -102,7 +94,7 @@ lab: clean-db fmt
 		@$(MAKE) fmt
 
 ## dev: Run Master locally for fast iteration
-dev: clean-db fmt build-specialists
+dev: clean-db fmt
 	@echo "--- 🛠️ Running Master in local development mode ---"
 	$(GO) run $(CMD_MASTER)
 
