@@ -21,12 +21,13 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Data sent by the Master binary (Chat-Lab)
 type SpecialistRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	MessageId     string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`                                                // Unique identifier for BadgerDB correlation
-	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`                                                                     // Raw text to be processed by the model
-	Tags          map[string]string      `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Metadata for contextual filtering (e.g., room_id)
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Entry:
+	//
+	//	*SpecialistRequest_Metadata
+	//	*SpecialistRequest_Chunk
+	Entry         isSpecialistRequest_Entry `protobuf_oneof:"entry"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,45 +62,122 @@ func (*SpecialistRequest) Descriptor() ([]byte, []int) {
 	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SpecialistRequest) GetMessageId() string {
+func (x *SpecialistRequest) GetEntry() isSpecialistRequest_Entry {
+	if x != nil {
+		return x.Entry
+	}
+	return nil
+}
+
+func (x *SpecialistRequest) GetMetadata() *Metadata {
+	if x != nil {
+		if x, ok := x.Entry.(*SpecialistRequest_Metadata); ok {
+			return x.Metadata
+		}
+	}
+	return nil
+}
+
+func (x *SpecialistRequest) GetChunk() []byte {
+	if x != nil {
+		if x, ok := x.Entry.(*SpecialistRequest_Chunk); ok {
+			return x.Chunk
+		}
+	}
+	return nil
+}
+
+type isSpecialistRequest_Entry interface {
+	isSpecialistRequest_Entry()
+}
+
+type SpecialistRequest_Metadata struct {
+	Metadata *Metadata `protobuf:"bytes,1,opt,name=metadata,proto3,oneof"`
+}
+
+type SpecialistRequest_Chunk struct {
+	Chunk []byte `protobuf:"bytes,2,opt,name=chunk,proto3,oneof"`
+}
+
+func (*SpecialistRequest_Metadata) isSpecialistRequest_Entry() {}
+
+func (*SpecialistRequest_Chunk) isSpecialistRequest_Entry() {}
+
+type Metadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	FileName      string                 `protobuf:"bytes,2,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	MimeType      string                 `protobuf:"bytes,3,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Metadata) Reset() {
+	*x = Metadata{}
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Metadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Metadata) ProtoMessage() {}
+
+func (x *Metadata) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Metadata.ProtoReflect.Descriptor instead.
+func (*Metadata) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Metadata) GetMessageId() string {
 	if x != nil {
 		return x.MessageId
 	}
 	return ""
 }
 
-func (x *SpecialistRequest) GetContent() string {
+func (x *Metadata) GetFileName() string {
 	if x != nil {
-		return x.Content
+		return x.FileName
 	}
 	return ""
 }
 
-func (x *SpecialistRequest) GetTags() map[string]string {
+func (x *Metadata) GetMimeType() string {
 	if x != nil {
-		return x.Tags
+		return x.MimeType
 	}
-	return nil
+	return ""
 }
 
 // Response from the Specialist binary (m2cgen transpiled code)
 type SpecialistResponse struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	Score        float64                `protobuf:"fixed64,1,opt,name=score,proto3" json:"score,omitempty"`                                 // Probability score between 0.0 and 1.0
-	Label        string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`                                   // Human-readable verdict (e.g., "SPAM", "TOXIC")
-	ModelVersion string                 `protobuf:"bytes,3,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"` // Identifier for the specific model version used
-	// Performance metrics for Lead Time monitoring
-	ProcessTimeMs int64 `protobuf:"varint,4,opt,name=process_time_ms,json=processTimeMs,proto3" json:"process_time_ms,omitempty"` // Internal execution time in milliseconds
-	// Health and status tracking
-	Status        string  `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // Status message (e.g., "OK", "ERROR_INFERENCE")
-	OutputContent *string `protobuf:"bytes,6,opt,name=output_content,json=outputContent,proto3,oneof" json:"output_content,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Response:
+	//
+	//	*SpecialistResponse_DocumentData
+	//	*SpecialistResponse_Score
+	Response      isSpecialistResponse_Response `protobuf_oneof:"response"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SpecialistResponse) Reset() {
 	*x = SpecialistResponse{}
-	mi := &file_proto_analysis_specialist_service_proto_msgTypes[1]
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -111,7 +189,7 @@ func (x *SpecialistResponse) String() string {
 func (*SpecialistResponse) ProtoMessage() {}
 
 func (x *SpecialistResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_analysis_specialist_service_proto_msgTypes[1]
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -124,47 +202,226 @@ func (x *SpecialistResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpecialistResponse.ProtoReflect.Descriptor instead.
 func (*SpecialistResponse) Descriptor() ([]byte, []int) {
-	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{1}
+	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *SpecialistResponse) GetScore() float64 {
+func (x *SpecialistResponse) GetResponse() isSpecialistResponse_Response {
+	if x != nil {
+		return x.Response
+	}
+	return nil
+}
+
+func (x *SpecialistResponse) GetDocumentData() *DocumentData {
+	if x != nil {
+		if x, ok := x.Response.(*SpecialistResponse_DocumentData); ok {
+			return x.DocumentData
+		}
+	}
+	return nil
+}
+
+func (x *SpecialistResponse) GetScore() *Score {
+	if x != nil {
+		if x, ok := x.Response.(*SpecialistResponse_Score); ok {
+			return x.Score
+		}
+	}
+	return nil
+}
+
+type isSpecialistResponse_Response interface {
+	isSpecialistResponse_Response()
+}
+
+type SpecialistResponse_DocumentData struct {
+	DocumentData *DocumentData `protobuf:"bytes,1,opt,name=document_data,json=documentData,proto3,oneof"`
+}
+
+type SpecialistResponse_Score struct {
+	Score *Score `protobuf:"bytes,2,opt,name=score,proto3,oneof"`
+}
+
+func (*SpecialistResponse_DocumentData) isSpecialistResponse_Response() {}
+
+func (*SpecialistResponse_Score) isSpecialistResponse_Response() {}
+
+type Score struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Score         float64                `protobuf:"fixed64,1,opt,name=score,proto3" json:"score,omitempty"` // Probability score between 0.0 and 1.0
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`   // Human-readable verdict (e.g., "SPAM", "TOXIC")
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Score) Reset() {
+	*x = Score{}
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Score) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Score) ProtoMessage() {}
+
+func (x *Score) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Score.ProtoReflect.Descriptor instead.
+func (*Score) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Score) GetScore() float64 {
 	if x != nil {
 		return x.Score
 	}
 	return 0
 }
 
-func (x *SpecialistResponse) GetLabel() string {
+func (x *Score) GetLabel() string {
 	if x != nil {
 		return x.Label
 	}
 	return ""
 }
 
-func (x *SpecialistResponse) GetModelVersion() string {
+type DocumentData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	Author        string                 `protobuf:"bytes,2,opt,name=author,proto3" json:"author,omitempty"`
+	PageCount     int32                  `protobuf:"varint,3,opt,name=page_count,json=pageCount,proto3" json:"page_count,omitempty"`
+	Language      string                 `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
+	Pages         []*Page                `protobuf:"bytes,5,rep,name=pages,proto3" json:"pages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DocumentData) Reset() {
+	*x = DocumentData{}
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DocumentData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DocumentData) ProtoMessage() {}
+
+func (x *DocumentData) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[4]
 	if x != nil {
-		return x.ModelVersion
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DocumentData.ProtoReflect.Descriptor instead.
+func (*DocumentData) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DocumentData) GetTitle() string {
+	if x != nil {
+		return x.Title
 	}
 	return ""
 }
 
-func (x *SpecialistResponse) GetProcessTimeMs() int64 {
+func (x *DocumentData) GetAuthor() string {
 	if x != nil {
-		return x.ProcessTimeMs
+		return x.Author
+	}
+	return ""
+}
+
+func (x *DocumentData) GetPageCount() int32 {
+	if x != nil {
+		return x.PageCount
 	}
 	return 0
 }
 
-func (x *SpecialistResponse) GetStatus() string {
+func (x *DocumentData) GetLanguage() string {
 	if x != nil {
-		return x.Status
+		return x.Language
 	}
 	return ""
 }
 
-func (x *SpecialistResponse) GetOutputContent() string {
-	if x != nil && x.OutputContent != nil {
-		return *x.OutputContent
+func (x *DocumentData) GetPages() []*Page {
+	if x != nil {
+		return x.Pages
+	}
+	return nil
+}
+
+type Page struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Number        int32                  `protobuf:"varint,1,opt,name=number,proto3" json:"number,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Page) Reset() {
+	*x = Page{}
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Page) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Page) ProtoMessage() {}
+
+func (x *Page) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_specialist_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Page.ProtoReflect.Descriptor instead.
+func (*Page) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_specialist_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Page) GetNumber() int32 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+func (x *Page) GetContent() string {
+	if x != nil {
+		return x.Content
 	}
 	return ""
 }
@@ -174,25 +431,36 @@ var File_proto_analysis_specialist_service_proto protoreflect.FileDescriptor
 const file_proto_analysis_specialist_service_proto_rawDesc = "" +
 	"\n" +
 	"'proto/analysis/specialist_service.proto\x12\n" +
-	"specialist\"\xc2\x01\n" +
-	"\x11SpecialistRequest\x12\x1d\n" +
+	"specialist\"h\n" +
+	"\x11SpecialistRequest\x122\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x14.specialist.MetadataH\x00R\bmetadata\x12\x16\n" +
+	"\x05chunk\x18\x02 \x01(\fH\x00R\x05chunkB\a\n" +
+	"\x05entry\"c\n" +
+	"\bMetadata\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\x12;\n" +
-	"\x04tags\x18\x03 \x03(\v2'.specialist.SpecialistRequest.TagsEntryR\x04tags\x1a7\n" +
-	"\tTagsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe4\x01\n" +
-	"\x12SpecialistResponse\x12\x14\n" +
+	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x1b\n" +
+	"\tfile_name\x18\x02 \x01(\tR\bfileName\x12\x1b\n" +
+	"\tmime_type\x18\x03 \x01(\tR\bmimeType\"\x8c\x01\n" +
+	"\x12SpecialistResponse\x12?\n" +
+	"\rdocument_data\x18\x01 \x01(\v2\x18.specialist.DocumentDataH\x00R\fdocumentData\x12)\n" +
+	"\x05score\x18\x02 \x01(\v2\x11.specialist.ScoreH\x00R\x05scoreB\n" +
+	"\n" +
+	"\bresponse\"3\n" +
+	"\x05Score\x12\x14\n" +
 	"\x05score\x18\x01 \x01(\x01R\x05score\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12#\n" +
-	"\rmodel_version\x18\x03 \x01(\tR\fmodelVersion\x12&\n" +
-	"\x0fprocess_time_ms\x18\x04 \x01(\x03R\rprocessTimeMs\x12\x16\n" +
-	"\x06status\x18\x05 \x01(\tR\x06status\x12*\n" +
-	"\x0eoutput_content\x18\x06 \x01(\tH\x00R\routputContent\x88\x01\x01B\x11\n" +
-	"\x0f_output_content2]\n" +
-	"\x11SpecialistService\x12H\n" +
-	"\aAnalyze\x12\x1d.specialist.SpecialistRequest\x1a\x1e.specialist.SpecialistResponseB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
+	"\x05label\x18\x02 \x01(\tR\x05label\"\x9f\x01\n" +
+	"\fDocumentData\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12\x16\n" +
+	"\x06author\x18\x02 \x01(\tR\x06author\x12\x1d\n" +
+	"\n" +
+	"page_count\x18\x03 \x01(\x05R\tpageCount\x12\x1a\n" +
+	"\blanguage\x18\x04 \x01(\tR\blanguage\x12&\n" +
+	"\x05pages\x18\x05 \x03(\v2\x10.specialist.PageR\x05pages\"8\n" +
+	"\x04Page\x12\x16\n" +
+	"\x06number\x18\x01 \x01(\x05R\x06number\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent2e\n" +
+	"\x11SpecialistService\x12P\n" +
+	"\rAnalyzeStream\x12\x1d.specialist.SpecialistRequest\x1a\x1e.specialist.SpecialistResponse(\x01B\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_proto_analysis_specialist_service_proto_rawDescOnce sync.Once
@@ -206,21 +474,27 @@ func file_proto_analysis_specialist_service_proto_rawDescGZIP() []byte {
 	return file_proto_analysis_specialist_service_proto_rawDescData
 }
 
-var file_proto_analysis_specialist_service_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_proto_analysis_specialist_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_analysis_specialist_service_proto_goTypes = []any{
 	(*SpecialistRequest)(nil),  // 0: specialist.SpecialistRequest
-	(*SpecialistResponse)(nil), // 1: specialist.SpecialistResponse
-	nil,                        // 2: specialist.SpecialistRequest.TagsEntry
+	(*Metadata)(nil),           // 1: specialist.Metadata
+	(*SpecialistResponse)(nil), // 2: specialist.SpecialistResponse
+	(*Score)(nil),              // 3: specialist.Score
+	(*DocumentData)(nil),       // 4: specialist.DocumentData
+	(*Page)(nil),               // 5: specialist.Page
 }
 var file_proto_analysis_specialist_service_proto_depIdxs = []int32{
-	2, // 0: specialist.SpecialistRequest.tags:type_name -> specialist.SpecialistRequest.TagsEntry
-	0, // 1: specialist.SpecialistService.Analyze:input_type -> specialist.SpecialistRequest
-	1, // 2: specialist.SpecialistService.Analyze:output_type -> specialist.SpecialistResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 0: specialist.SpecialistRequest.metadata:type_name -> specialist.Metadata
+	4, // 1: specialist.SpecialistResponse.document_data:type_name -> specialist.DocumentData
+	3, // 2: specialist.SpecialistResponse.score:type_name -> specialist.Score
+	5, // 3: specialist.DocumentData.pages:type_name -> specialist.Page
+	0, // 4: specialist.SpecialistService.AnalyzeStream:input_type -> specialist.SpecialistRequest
+	2, // 5: specialist.SpecialistService.AnalyzeStream:output_type -> specialist.SpecialistResponse
+	5, // [5:6] is the sub-list for method output_type
+	4, // [4:5] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_proto_analysis_specialist_service_proto_init() }
@@ -228,14 +502,21 @@ func file_proto_analysis_specialist_service_proto_init() {
 	if File_proto_analysis_specialist_service_proto != nil {
 		return
 	}
-	file_proto_analysis_specialist_service_proto_msgTypes[1].OneofWrappers = []any{}
+	file_proto_analysis_specialist_service_proto_msgTypes[0].OneofWrappers = []any{
+		(*SpecialistRequest_Metadata)(nil),
+		(*SpecialistRequest_Chunk)(nil),
+	}
+	file_proto_analysis_specialist_service_proto_msgTypes[2].OneofWrappers = []any{
+		(*SpecialistResponse_DocumentData)(nil),
+		(*SpecialistResponse_Score)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_analysis_specialist_service_proto_rawDesc), len(file_proto_analysis_specialist_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

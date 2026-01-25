@@ -117,7 +117,7 @@ const file_proto_storage_message_proto_rawDesc = "" +
 	"\x06author\x18\x03 \x01(\tR\x06author\x12\x18\n" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12*\n" +
 	"\x02at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
-	"\x0etoxicity_score\x18\x06 \x01(\x01R\rtoxicityScoreB\x19Z\x17messages/proto/pb-go;pbb\x06proto3"
+	"\x0etoxicity_score\x18\x06 \x01(\x01R\rtoxicityScoreB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_proto_storage_message_proto_rawDescOnce sync.Once

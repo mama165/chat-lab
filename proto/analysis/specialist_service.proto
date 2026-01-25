@@ -2,29 +2,47 @@ syntax = "proto3";
 
 package specialist;
 
-option go_package = "analysis/proto/pb-go;pb";
+option go_package = "./pb";
 
-// Universal service for all specialized detectors (Toxicity, Business, etc.)
 service SpecialistService {
-  // Analyzes message content and returns a score-based verdict
-  rpc Analyze (SpecialistRequest) returns (SpecialistResponse);
+  rpc AnalyzeStream (stream SpecialistRequest) returns (SpecialistResponse);
 }
 
-// Data sent by the Master binary (Chat-Lab)
 message SpecialistRequest {
-  string message_id = 1;      // Unique identifier for BadgerDB correlation
-  string content = 2;         // Raw text to be processed by the model
-  map<string, string> tags = 3; // Metadata for contextual filtering (e.g., room_id)
+  oneof entry {
+    Metadata metadata = 1;
+    bytes chunk = 2;
+  }
+}
+
+message Metadata {
+    string message_id =1;
+    string file_name = 2;
+    string mime_type = 3;
 }
 
 // Response from the Specialist binary (m2cgen transpiled code)
 message SpecialistResponse {
+  oneof response {
+  DocumentData document_data = 1;
+  Score score = 2;
+  }
+}
+
+message Score {
   double score = 1;            // Probability score between 0.0 and 1.0
   string label = 2;           // Human-readable verdict (e.g., "SPAM", "TOXIC")
-  string model_version = 3;   // Identifier for the specific model version used
-  // Performance metrics for Lead Time monitoring
-  int64 process_time_ms = 4;  // Internal execution time in milliseconds
-  // Health and status tracking
-  string status = 5;          // Status message (e.g., "OK", "ERROR_INFERENCE")
-  optional string output_content = 6;
+}
+
+message DocumentData {
+  string title = 1;
+  string author = 2;
+  int32 page_count = 3;
+  string language = 4;
+  repeated Page pages = 5;
+}
+
+message Page {
+  int32 number = 1;
+  string content = 2;
 }

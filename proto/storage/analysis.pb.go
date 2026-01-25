@@ -362,7 +362,7 @@ const file_proto_storage_analysis_proto_rawDesc = "" +
 	"\vFileDetails\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
-	"\x04size\x18\x03 \x01(\x04R\x04sizeB\x19Z\x17analysis/proto/pb-go;pbb\x06proto3"
+	"\x04size\x18\x03 \x01(\x04R\x04sizeB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_proto_storage_analysis_proto_rawDescOnce sync.Once

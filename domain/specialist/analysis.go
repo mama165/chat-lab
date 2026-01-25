@@ -9,15 +9,34 @@ const (
 )
 
 type Request struct {
+	Metadata *Metadata
+	Chunk    []byte
+}
+
+type Metadata struct {
 	MessageID string
-	Content   string
-	Tags      map[string]string
+	FileName  string
+	MimeType  string
 }
 
 type Response struct {
-	Score            float64
-	Label            string
-	Version          string
-	ProcessingTimeMs int
-	Status           string
+	OneOf any
+}
+
+type DocumentData struct {
+	Title     string
+	Author    string
+	PageCount int32
+	Language  string
+	Pages     []Page
+}
+
+type Page struct {
+	Number  int32
+	Content string
+}
+
+type Score struct {
+	Score float64
+	Label string
 }

@@ -13,6 +13,10 @@ BINARY=bin/badger_inspect
 SOURCE=tools/badger_inspect.go
 DB_PATH=/tmp/database/debug
 
+PY_SPEC_DIR=./proto
+
+PROTO_ROOT := proto
+
 # Docker user identifiers to avoid permission issues on host
 D_UID := $(shell id -u)
 D_GID := $(shell id -g)
@@ -51,25 +55,26 @@ build-specialists:
 	$(GO) build -ldflags="-s -w" -o $(BIN_DIR)/toxicity $(CMD_SPEC)
 	$(GO) build -ldflags="-s -w" -o $(BIN_DIR)/sentiment $(CMD_SPEC)
 
+
+
 # --- Code Generation ---
 
-## proto-gen: Generate Go code from .proto files using a containerized environment
+## proto-gen: Generate Go and Python code from .proto files recursively
 proto-gen:
 	@echo "--- 🧹 Cleaning old generated code ---"
-	@# Remove all generated .pb.go files to avoid stale service definitions
 	@find proto -name "*.pb.go" -type f -delete
-	@echo "--- 🚀 Generating gRPC/Protobuf code ---"
-	@# Run protoc within a Docker container for a consistent build environment
+	@find proto -name "*_pb2.py" -type f -delete
+	@find proto -name "*_pb2_grpc.py" -type f -delete
+	@echo "--- 🚀 Generating gRPC/Protobuf code for all contracts ---"
 	@docker run --rm -v "$(PWD):/src" -w /src golang:1.24-alpine sh -c "\
-       apk add --no-cache protobuf-dev protoc && \
+       apk add --no-cache protobuf-dev protoc python3 py3-pip && \
+       pip install grpcio-tools --break-system-packages && \
        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
-       find proto -name '*.proto' -exec sed -i 's/\r//' {} + && \
-       protoc -I. \
-              -I/usr/include \
-              --go_out=. --go_opt=paths=source_relative \
-              --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-              \$$(find proto -name '*.proto')"
+       export PATH=\"\$$PATH:\$$(go env GOPATH)/bin\" && \
+       protoc -I. --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative \$$(find proto -name '*.proto') && \
+       python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. \$$(find proto -name '*.proto') && \
+       find proto -type d -exec touch {}/__init__.py \;"
 	@$(MAKE) fmt
 
 ## ai-gen: Run the AI model generation (Python transpilation) and force formatting

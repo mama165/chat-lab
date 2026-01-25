@@ -119,7 +119,7 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 }
 
 // Broadcast broadcasts the content to all registered specialists in parallel.
-func (m *Coordinator) Broadcast(ctx context.Context, messageID string, content string) map[specialist.Metric]specialist.Response {
+func (m *Coordinator) Broadcast(ctx context.Context, messageID string, filename string) map[specialist.Metric]specialist.Response {
 	m.mu.RLock()
 	numSpecs := len(m.specialists)
 	m.mu.RUnlock()
@@ -143,8 +143,11 @@ func (m *Coordinator) Broadcast(ctx context.Context, messageID string, content s
 			defer wg.Done()
 
 			resp, err := s.Analyze(ctx, specialist.Request{
-				MessageID: messageID,
-				Content:   content,
+				Metadata: &specialist.Metadata{
+					MessageID: messageID,
+					FileName:  filename,
+					MimeType:  "text/plain",
+				},
 			})
 
 			if err != nil {

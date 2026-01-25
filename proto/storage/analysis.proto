@@ -1,6 +1,6 @@
 syntax = "proto3";
 package message.proto;
-option go_package = "analysis/proto/pb-go;pb";
+option go_package = "./pb";
 import "google/protobuf/timestamp.proto";
 
 message Analysis {

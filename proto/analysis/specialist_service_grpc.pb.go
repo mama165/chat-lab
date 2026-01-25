@@ -19,17 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SpecialistService_Analyze_FullMethodName = "/specialist.SpecialistService/Analyze"
+	SpecialistService_AnalyzeStream_FullMethodName = "/specialist.SpecialistService/AnalyzeStream"
 )
 
 // SpecialistServiceClient is the client API for SpecialistService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// Universal service for all specialized detectors (Toxicity, Business, etc.)
 type SpecialistServiceClient interface {
-	// Analyzes message content and returns a score-based verdict
-	Analyze(ctx context.Context, in *SpecialistRequest, opts ...grpc.CallOption) (*SpecialistResponse, error)
+	AnalyzeStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[SpecialistRequest, SpecialistResponse], error)
 }
 
 type specialistServiceClient struct {
@@ -40,24 +37,24 @@ func NewSpecialistServiceClient(cc grpc.ClientConnInterface) SpecialistServiceCl
 	return &specialistServiceClient{cc}
 }
 
-func (c *specialistServiceClient) Analyze(ctx context.Context, in *SpecialistRequest, opts ...grpc.CallOption) (*SpecialistResponse, error) {
+func (c *specialistServiceClient) AnalyzeStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[SpecialistRequest, SpecialistResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SpecialistResponse)
-	err := c.cc.Invoke(ctx, SpecialistService_Analyze_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &SpecialistService_ServiceDesc.Streams[0], SpecialistService_AnalyzeStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[SpecialistRequest, SpecialistResponse]{ClientStream: stream}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type SpecialistService_AnalyzeStreamClient = grpc.ClientStreamingClient[SpecialistRequest, SpecialistResponse]
 
 // SpecialistServiceServer is the server API for SpecialistService service.
 // All implementations must embed UnimplementedSpecialistServiceServer
 // for forward compatibility.
-//
-// Universal service for all specialized detectors (Toxicity, Business, etc.)
 type SpecialistServiceServer interface {
-	// Analyzes message content and returns a score-based verdict
-	Analyze(context.Context, *SpecialistRequest) (*SpecialistResponse, error)
+	AnalyzeStream(grpc.ClientStreamingServer[SpecialistRequest, SpecialistResponse]) error
 	mustEmbedUnimplementedSpecialistServiceServer()
 }
 
@@ -68,8 +65,8 @@ type SpecialistServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSpecialistServiceServer struct{}
 
-func (UnimplementedSpecialistServiceServer) Analyze(context.Context, *SpecialistRequest) (*SpecialistResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Analyze not implemented")
+func (UnimplementedSpecialistServiceServer) AnalyzeStream(grpc.ClientStreamingServer[SpecialistRequest, SpecialistResponse]) error {
+	return status.Error(codes.Unimplemented, "method AnalyzeStream not implemented")
 }
 func (UnimplementedSpecialistServiceServer) mustEmbedUnimplementedSpecialistServiceServer() {}
 func (UnimplementedSpecialistServiceServer) testEmbeddedByValue()                           {}
@@ -92,23 +89,12 @@ func RegisterSpecialistServiceServer(s grpc.ServiceRegistrar, srv SpecialistServ
 	s.RegisterService(&SpecialistService_ServiceDesc, srv)
 }
 
-func _SpecialistService_Analyze_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SpecialistRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SpecialistServiceServer).Analyze(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SpecialistService_Analyze_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SpecialistServiceServer).Analyze(ctx, req.(*SpecialistRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+func _SpecialistService_AnalyzeStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(SpecialistServiceServer).AnalyzeStream(&grpc.GenericServerStream[SpecialistRequest, SpecialistResponse]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type SpecialistService_AnalyzeStreamServer = grpc.ClientStreamingServer[SpecialistRequest, SpecialistResponse]
 
 // SpecialistService_ServiceDesc is the grpc.ServiceDesc for SpecialistService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -116,12 +102,13 @@ func _SpecialistService_Analyze_Handler(srv interface{}, ctx context.Context, de
 var SpecialistService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "specialist.SpecialistService",
 	HandlerType: (*SpecialistServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "Analyze",
-			Handler:    _SpecialistService_Analyze_Handler,
+			StreamName:    "AnalyzeStream",
+			Handler:       _SpecialistService_AnalyzeStream_Handler,
+			ClientStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/analysis/specialist_service.proto",
 }

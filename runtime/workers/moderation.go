@@ -75,10 +75,12 @@ func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.Mess
 	}
 
 	for specialistID, res := range results {
-		w.log.Warn("specialist alert",
-			"id", specialistID,
-			"score", res.Score,
-			"latency_ms", res.ProcessingTimeMs)
+		if score, ok := (res.OneOf).(specialist.Score); ok {
+			w.log.Warn("specialist alert",
+				"id", specialistID,
+				"score", score.Score,
+			)
+		}
 	}
 
 	return event.Event{
