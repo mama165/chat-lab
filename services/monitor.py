@@ -1,4 +1,5 @@
 import grpc
+import fitz  # PyMuPDF
 from concurrent import futures
 import traceback
 from proto.analysis import specialist_service_pb2 as pb
@@ -7,49 +8,67 @@ from proto.analysis import specialist_service_pb2_grpc as pb_grpc
 class MonitorService(pb_grpc.SpecialistServiceServicer):
 
     def AnalyzeStream(self, request_iterator, context):
-        total_bytes = 0
-        chunks_count = 0
+        # Buffer to accumulate PDF binary data from stream
+        pdf_data = bytearray()
+        file_metadata = {"message_id": "N/A", "file_name": "unknown"}
+
         try:
-            print("--- 📥 Requête reçue du Master Go ---")
+            print("--- 📥 Stream received from Go Master ---")
 
             for request in request_iterator:
+                # Identify which field of the 'entry' oneof is set
                 field = request.WhichOneof('entry')
 
-                print(f"DEBUG: Champ reçu = '{field}'") # <--- LANCE ET REGARDE CE LOG
-
                 if field == 'metadata':
-                    # Utilisons getattr pour être sûrs de ne pas crasher si le nom varie
-                    m_id = getattr(request.metadata, 'message_id', 'N/A')
-                    f_name = getattr(request.metadata, 'file_name', 'unknown')
-                    print(f"📄 Metadata reçue -> ID: {m_id}, Fichier: {f_name}")
+                    file_metadata["message_id"] = getattr(request.metadata, 'message_id', 'N/A')
+                    file_metadata["file_name"] = getattr(request.metadata, 'file_name', 'unknown')
+                    print(f"📄 Processing document: {file_metadata['file_name']}")
 
                 elif field == 'chunk':
-                    # Vérifie si le champ s'appelle 'Chunk' ou 'chunk' dans ton proto
-                    chunk_data = request.chunk
-                    total_bytes += len(chunk_data)
-                    chunks_count += 1
-                    if chunks_count % 10 == 0: # Évite de polluer si trop de chunks
-                        print(f"📥 Reçu {chunks_count} chunks...")
+                    # Append incoming bytes to our buffer
+                    pdf_data.extend(request.chunk)
 
-            print(f"✅ Stream terminé. Total: {total_bytes} octets, {chunks_count} chunks.")
+            # Once the stream is closed, process the complete PDF from memory
+            print(f"⚙️ Extracting data from PDF ({len(pdf_data)} bytes)...")
 
-            return pb.SpecialistResponse(
-                score=pb.Score(
-                    score=0.95,
-                    label=f"Analyse réussie ({total_bytes} octets)"
+            # Open PDF using stream instead of a physical file
+            with fitz.open(stream=pdf_data, filetype="pdf") as doc:
+                pages_list = []
+
+                # Extract text from the first 5 pages for testing purposes
+                for i in range(min(len(doc), 5)):
+                    page = doc.load_page(i)
+                    pages_list.append(pb.Page(
+                        number=i + 1,
+                        content=page.get_text()
+                    ))
+
+                print(f"✅ Successfully extracted {len(doc)} pages.")
+
+                # Return DocumentData matching your Go ToResponse expectations
+                return pb.SpecialistResponse(
+                    document_data=pb.DocumentData(
+                        title=doc.metadata.get('title') or file_metadata["file_name"],
+                        author=doc.metadata.get('author') or "Unknown",
+                        page_count=len(doc),
+                        language="fr",
+                        pages=pages_list
+                    )
                 )
-            )
 
         except Exception as e:
-            print(f"❌ ERREUR CRITIQUE : {e}")
+            print(f"❌ CRITICAL ERROR: {e}")
             traceback.print_exc()
+            # Propagate gRPC error to the client
             context.abort(grpc.StatusCode.INTERNAL, str(e))
 
 def serve():
+    # Initialize gRPC server with a thread pool
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb_grpc.add_SpecialistServiceServicer_to_server(MonitorService(), server)
+
     server.add_insecure_port('[::]:50051')
-    print("🚀 Spécialiste Python prêt sur le port 50051")
+    print("🚀 Python PDF Specialist ready on port 50051")
     server.start()
     server.wait_for_termination()
 

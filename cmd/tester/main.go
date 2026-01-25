@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
+	"os"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,62 +24,72 @@ func main() {
 
 	client := pb.NewSpecialistServiceClient(conn)
 
-	// 2. Initialisation du stream gRPC
 	stream, err := client.AnalyzeStream(context.Background())
 	if err != nil {
 		log.Fatalf("Erreur ouverture stream: %v", err)
 	}
 
-	// 3. Envoi des métadonnées (Entry: Metadata)
+	// 1. Lire le fichier PDF (mets un petit PDF dans ton dossier root pour tester)
+	fileContent, err := os.ReadFile("mon_test.pdf")
+	if err != nil {
+		log.Fatalf("Impossible de lire le PDF: %v", err)
+	}
+
+	// 2. Envoyer les metadata d'abord
 	err = stream.Send(&pb.SpecialistRequest{
 		Entry: &pb.SpecialistRequest_Metadata{
-			Metadata: &pb.Metadata{
-				MessageId: "msg-123",
-				FileName:  "test_performance.txt",
-				MimeType:  "text/plain",
-			},
+			Metadata: &pb.Metadata{FileName: "mon_test.pdf"},
 		},
 	})
 	if err != nil {
-		log.Fatalf("Erreur envoi metadata: %v", err)
+		log.Fatalf("Error : %v", err)
 	}
 
-	// 4. Envoi de chunks de simulation (Entry: Chunk)
-	for i := 1; i <= 3; i++ {
-		fmt.Printf("Envoi du chunk %d...\n", i)
+	// 3. Envoyer le contenu par chunks de 32KB
+	const chunkSize = 32 * 1024
+	for i := 0; i < len(fileContent); i += chunkSize {
+		end := i + chunkSize
+		if end > len(fileContent) {
+			end = len(fileContent)
+		}
+
 		err = stream.Send(&pb.SpecialistRequest{
 			Entry: &pb.SpecialistRequest_Chunk{
-				Chunk: []byte(fmt.Sprintf("Contenu du morceau numéro %d. ", i)),
+				Chunk: fileContent[i:end],
 			},
 		})
 		if err != nil {
-			log.Fatalf("Erreur envoi chunk: %v", err)
+			log.Fatalf("Error : %v", err)
 		}
-		time.Sleep(200 * time.Millisecond)
 	}
 
-	// 5. Fermeture du stream et récupération de la réponse brute
-	reply, err := stream.CloseAndRecv()
-	if err != nil {
-		log.Fatalf("Erreur réception résultat: %v", err)
-	}
+	// 4. Récupérer la réponse et l'afficher
+	reply, _ := stream.CloseAndRecv()
+	res := client2.ToResponse(reply)
 
-	// 6. Conversion vers ton modèle de domaine (utilisant ToResponse de ton package client)
-	finalResponse := client2.ToResponse(reply)
+	fmt.Printf("\n--- 🔍 [Extraction Results] ---\n")
 
-	// 7. Affichage propre selon le type reçu (Pattern Matching sur le OneOf)
-	fmt.Printf("\n--- [Résultat du Spécialiste] ---\n")
-
-	switch res := finalResponse.OneOf.(type) {
-	case specialist.Score:
-		fmt.Printf("Type: SCORE\n")
-		fmt.Printf("Label: %s\n", res.Label)
-		fmt.Printf("Score: %.2f/1.0\n", res.Score)
+	switch res := res.OneOf.(type) {
 	case specialist.DocumentData:
-		fmt.Printf("Type: DOCUMENT\n")
-		fmt.Printf("Titre: %s | Auteur: %s | Langue: %s\n", res.Title, res.Author, res.Language)
-		fmt.Printf("Nombre de pages: %d\n", res.PageCount)
+		fmt.Printf("📂 Filename: %s\n", res.Title)
+		fmt.Printf("👤 Author:   %s\n", res.Author)
+		fmt.Printf("📄 Pages:    %d\n", res.PageCount)
+		fmt.Printf("🌍 Lang:     %s\n", res.Language)
+
+		if len(res.Pages) > 0 {
+			fmt.Println("\n--- 📝 [First Page Preview] ---")
+			content := res.Pages[0].Content
+			if len(content) > 300 {
+				fmt.Printf("%s [...]\n", content[:300])
+			} else {
+				fmt.Println(content)
+			}
+		}
+
+	case specialist.Score:
+		fmt.Printf("📊 Score: %.2f | Label: %s\n", res.Score, res.Label)
+
 	default:
-		fmt.Printf("Type de réponse inconnu ou vide\n")
+		fmt.Println("⚠️ Unknown response type received")
 	}
 }
