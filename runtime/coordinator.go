@@ -3,7 +3,7 @@ package runtime
 import (
 	"chat-lab/domain/specialist"
 	"chat-lab/errors"
-	"chat-lab/grpc/client"
+	"chat-lab/infrastructure/grpc/client"
 	pb "chat-lab/proto/analysis"
 	"context"
 	"fmt"

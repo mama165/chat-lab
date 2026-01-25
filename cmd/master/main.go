@@ -4,7 +4,7 @@ import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/domain/specialist"
-	"chat-lab/grpc/server"
+	server2 "chat-lab/infrastructure/grpc/server"
 	"chat-lab/infrastructure/storage"
 	pb2 "chat-lab/proto/account"
 	pb3 "chat-lab/proto/analyzer"
@@ -165,15 +165,15 @@ func run() (int, error) {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc3.UnaryLoggingInterceptor(log),
-			server.AuthInterceptor,
+			server2.AuthInterceptor,
 		))
 	chatService := services.NewChatService(orchestrator)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()
 	analyzerService := services.NewAnalyzerService(log, analysisRepository, fileAnalyzeChan, &counter)
-	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
-	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, log, &counter)
-	authServer := server.NewAuthServer(authService)
+	chatServer := server2.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
+	fileAnalyzerServer := server2.NewFileAnalyzerServer(analyzerService, log, &counter)
+	authServer := server2.NewAuthServer(authService)
 	pb.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)

@@ -2,7 +2,7 @@ package auth_test
 
 import (
 	"chat-lab/auth"
-	"chat-lab/grpc/server"
+	"chat-lab/infrastructure/grpc/server"
 	pb "chat-lab/proto/account"
 	pb2 "chat-lab/proto/chat"
 	"context"

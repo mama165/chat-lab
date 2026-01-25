@@ -2,7 +2,7 @@ package main
 
 import (
 	"chat-lab/domain/specialist"
-	client2 "chat-lab/grpc/client"
+	client2 "chat-lab/infrastructure/grpc/client"
 	pb "chat-lab/proto/analysis"
 	"context"
 	"fmt"
