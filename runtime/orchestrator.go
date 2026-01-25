@@ -244,6 +244,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 		event.NewCensoredHandler(o.log, o.counter),
 		event.NewLatencyHandler(o.log, o.latencyThreshold),
 		event.NewMessageSentHandler(o.log, o.counter),
+		event.NewWorkerRestartedAfterPanicHandler(o.log, o.counter),
 	}
 	channels := []workers.NamedChannel{
 		{Name: "DomainChan", Channel: o.domainChan},
