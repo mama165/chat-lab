@@ -1,0 +1,3 @@
+- Add checksum to oneOf gRPC endpoint
+- Fix CI-Lint
+- Fix all tests
