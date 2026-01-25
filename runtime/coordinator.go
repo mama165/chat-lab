@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -118,59 +119,72 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 	return nil, fmt.Errorf("timeout: specialist not responding at %s after retries", addr)
 }
 
-// Broadcast broadcasts the content to all registered specialists in parallel.
-func (m *Coordinator) Broadcast(ctx context.Context, messageID string, filename string) map[specialist.Metric]specialist.Response {
+// Broadcast orchestrates the analysis of a file by streaming its content to all registered
+// specialists in parallel. It reads the file from the provided path, dispatches analysis
+// requests concurrently, and aggregates the results into an AnalysisResponse.
+func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequest) (specialist.AnalysisResponse, error) {
+	data, err := os.ReadFile(req.Path)
+	if err != nil {
+		return specialist.AnalysisResponse{}, fmt.Errorf("failed to read file %s: %w", req.Path, err)
+	}
+
 	m.mu.RLock()
 	numSpecs := len(m.specialists)
 	m.mu.RUnlock()
 
 	if numSpecs == 0 {
-		return nil
+		return specialist.AnalysisResponse{Results: make(map[specialist.Metric]specialist.Response)}, nil
 	}
 
 	results := make(map[specialist.Metric]specialist.Response)
-	resChan := make(chan struct {
+
+	// On utilise une structure interne pour le channel afin de capturer l'ID et la réponse
+	type specResult struct {
 		id   specialist.Metric
 		resp specialist.Response
-	}, numSpecs)
-
+		err  error
+	}
+	resChan := make(chan specResult, numSpecs)
 	var wg sync.WaitGroup
 
+	// 3. Lancement des analyses en parallèle
 	m.mu.RLock()
 	for id, spec := range m.specialists {
 		wg.Add(1)
 		go func(id specialist.Metric, s *client.SpecialistClient) {
 			defer wg.Done()
 
-			resp, err := s.Analyze(ctx, specialist.Request{
+			domainReq := specialist.Request{
 				Metadata: &specialist.Metadata{
-					MessageID: messageID,
-					FileName:  filename,
-					MimeType:  "text/plain",
+					MessageID: uuid.New().String(),
+					FileName:  req.Path,
+					MimeType:  req.MimeType,
 				},
-			})
+				Chunk: data,
+			}
 
+			resp, err := s.Analyze(ctx, domainReq)
 			if err != nil {
-				m.log.Error("Specialist analysis failed", "id", id, "error", err)
+				m.log.Error("Specialist analysis failed", "id", id, "path", req.Path, "error", err)
+				resChan <- specResult{id: id, err: err}
 				return
 			}
-			resChan <- struct {
-				id   specialist.Metric
-				resp specialist.Response
-			}{id, resp}
+
+			resChan <- specResult{id: id, resp: resp}
 		}(id, spec)
 	}
 	m.mu.RUnlock()
 
-	// Goroutine to close channel once terminated
 	go func() {
 		wg.Wait()
 		close(resChan)
 	}()
 
 	for res := range resChan {
-		results[res.id] = res.resp
+		if res.err == nil {
+			results[res.id] = res.resp
+		}
 	}
-	return results
 
+	return specialist.AnalysisResponse{Results: results}, nil
 }

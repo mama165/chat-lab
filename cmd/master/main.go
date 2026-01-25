@@ -62,9 +62,9 @@ func run() (int, error) {
 		return exitConfig, fmt.Errorf("config error: %w", err)
 	}
 
-	charReplacement, err := config.CharacterRune()
+	charReplacement, err := characterRune(config.CharReplacement)
 	if err != nil {
-		return exitRuntime, err
+		return exitConfig, err
 	}
 
 	log := logs.GetLoggerFromString(config.LogLevel)

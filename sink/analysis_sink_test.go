@@ -2,6 +2,8 @@ package sink_test
 
 import (
 	"chat-lab/domain/event"
+	"chat-lab/domain/mimetypes"
+	"chat-lab/domain/specialist"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/mocks"
 	"chat-lab/sink"
@@ -16,105 +18,135 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestAnalysisSink_Consume(t *testing.T) {
+func setupSink(ctrl *gomock.Controller, maxSize int, timeout time.Duration) (*sink.AnalysisSink, *mocks.MockIAnalysisRepository, *mocks.MockSpecialistCoordinator) {
+	mockRepo := mocks.NewMockIAnalysisRepository(ctrl)
+	mockCoordinator := mocks.NewMockSpecialistCoordinator(ctrl)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	s := sink.NewAnalysisSink(mockCoordinator, mockRepo, logger, maxSize, timeout)
+	return s, mockRepo, mockCoordinator
+}
+
+func TestFlushTriggeredBySizeLimit(t *testing.T) {
 	req := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockIAnalysisRepository(ctrl)
-	// Silencing logs for clean test output
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	ctx := context.Background()
-	driveID := uuid.New().String()
+	maxSize := 3
+	s, mockRepo, _ := setupSink(ctrl, maxSize, 1*time.Hour)
 
-	t.Run("Flush triggered by size limit", func(t *testing.T) {
-		maxSize := 3
-		s := sink.NewAnalysisSink(mockRepo, logger, maxSize, 10*time.Second)
+	mockRepo.EXPECT().
+		StoreBatch(gomock.Any()).
+		DoAndReturn(func(analyses []storage.Analysis) error {
+			req.Equal(maxSize, len(analyses))
+			return nil
+		}).Times(1)
 
-		// Expect exactly one batch call with 3 items
-		mockRepo.EXPECT().
-			StoreBatch(gomock.Any()).
-			DoAndReturn(func(analyses []storage.Analysis) error {
-				req.Equal(maxSize, len(analyses))
-				return nil
-			}).Times(1)
-
-		for i := 0; i < maxSize; i++ {
-			err := s.Consume(ctx, event.FileAnalyse{
-				Id:      uuid.New(),
-				DriveID: driveID,
-				Path:    "/tmp/test.txt",
-			})
-			req.NoError(err)
-		}
-	})
-
-	t.Run("Flush triggered by timeout (asynchronous)", func(t *testing.T) {
-		timeout := 50 * time.Millisecond
-		s := sink.NewAnalysisSink(mockRepo, logger, 100, timeout)
-
-		// We send only 1 event, so size-based flush won't trigger.
-		// The StoreBatch must be called by the timer.
-		mockRepo.EXPECT().
-			StoreBatch(gomock.Any()).
-			DoAndReturn(func(analyses []storage.Analysis) error {
-				req.Equal(1, len(analyses))
-				return nil
-			}).Times(1)
-
-		err := s.Consume(ctx, event.FileAnalyse{
+	for i := 0; i < maxSize; i++ {
+		err := s.Consume(context.Background(), event.FileAnalyse{
 			Id:      uuid.New(),
-			DriveID: driveID,
+			DriveID: uuid.New().String(),
+			Path:    "/tmp/test.txt",
 		})
 		req.NoError(err)
+	}
+}
 
-		// Wait slightly more than the timeout to allow the goroutine to run
-		time.Sleep(timeout + 30*time.Millisecond)
+func TestFlushTriggeredByTimeout(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	timeout := 50 * time.Millisecond
+	s, mockRepo, _ := setupSink(ctrl, 100, timeout)
+
+	mockRepo.EXPECT().StoreBatch(gomock.Any()).Times(1)
+
+	err := s.Consume(context.Background(), event.FileAnalyse{
+		Id:      uuid.New(),
+		DriveID: uuid.New().String(),
+	})
+	req.NoError(err)
+
+	time.Sleep(timeout + 50*time.Millisecond)
+}
+
+func TestBroadcastOnlyForPDFOrFileSource(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Use maxSize 1 to trigger flush immediately on each Consume
+	s, mockRepo, mockCoordinator := setupSink(ctrl, 1, 1*time.Hour)
+
+	// SCENARIO 1: PDF File -> Should Broadcast
+	mockCoordinator.EXPECT().Broadcast(gomock.Any(), gomock.Any()).Return(specialist.AnalysisResponse{}, nil).Times(1)
+	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
+
+	err := s.Consume(context.Background(), event.FileAnalyse{
+		Id:         uuid.New(),
+		DriveID:    uuid.New().String(),
+		MimeType:   string(mimetypes.ApplicationPDF),
+		SourceType: "file",
+	})
+	req.NoError(err)
+
+	// SCENARIO 2: Generic TXT without "file" source -> Should NOT Broadcast
+	// (Note: no call to mockCoordinator.EXPECT() means it should fail if called)
+	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
+
+	err = s.Consume(context.Background(), event.FileAnalyse{
+		Id:         uuid.New(),
+		DriveID:    uuid.New().String(),
+		MimeType:   string(mimetypes.TextPlain),
+		SourceType: "random_source",
+	})
+	req.NoError(err)
+}
+
+func TestConcurrentAccessSafety(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	numWorkers := 10
+	eventsPerWorker := 10
+	totalEvents := numWorkers * eventsPerWorker
+	s, mockRepo, _ := setupSink(ctrl, totalEvents, 1*time.Hour)
+
+	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
+
+	done := make(chan bool, numWorkers)
+	for w := 0; w < numWorkers; w++ {
+		go func() {
+			for i := 0; i < eventsPerWorker; i++ {
+				err := s.Consume(context.Background(), event.FileAnalyse{
+					Id:      uuid.New(),
+					DriveID: uuid.New().String(),
+				})
+				req.NoError(err)
+			}
+			done <- true
+		}()
+	}
+
+	for w := 0; w < numWorkers; w++ {
+		<-done
+	}
+}
+
+func TestErrorInvalidDriveID(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	s, _, _ := setupSink(ctrl, 1, 1*time.Hour)
+
+	err := s.Consume(context.Background(), event.FileAnalyse{
+		Id:      uuid.New(),
+		DriveID: "not-a-uuid",
 	})
 
-	t.Run("Concurrent access safety", func(t *testing.T) {
-		numWorkers := 10
-		eventsPerWorker := 10
-		totalEvents := numWorkers * eventsPerWorker
-
-		// Set maxSize to totalEvents to trigger a single flush at the end
-		s := sink.NewAnalysisSink(mockRepo, logger, totalEvents, 2*time.Second)
-
-		mockRepo.EXPECT().
-			StoreBatch(gomock.Any()).
-			Return(nil).
-			Times(1)
-
-		// Using a wait group or a channel to wait for all goroutines
-		done := make(chan bool, numWorkers)
-		for w := 0; w < numWorkers; w++ {
-			go func() {
-				for i := 0; i < eventsPerWorker; i++ {
-					_ = s.Consume(ctx, event.FileAnalyse{
-						Id:      uuid.New(),
-						DriveID: driveID,
-					})
-				}
-				done <- true
-			}()
-		}
-
-		for w := 0; w < numWorkers; w++ {
-			<-done
-		}
-	})
-
-	t.Run("Error handling: invalid DriveID", func(t *testing.T) {
-		// If maxSize is 1, it flushes immediately
-		s := sink.NewAnalysisSink(mockRepo, logger, 1, 1*time.Second)
-
-		err := s.Consume(ctx, event.FileAnalyse{
-			Id:      uuid.New(),
-			DriveID: "invalid-uuid-format",
-		})
-
-		// Should fail during uuid.Parse in toAnalysis
-		req.Error(err)
-		req.Contains(err.Error(), "invalid DriveID")
-	})
+	req.Error(err)
+	req.Contains(err.Error(), "invalid DriveID")
 }

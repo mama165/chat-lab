@@ -41,7 +41,7 @@ type Orchestrator struct {
 	telemetryChan        chan event.Event
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
-	manager              *Coordinator
+	coordinator          contract.SpecialistCoordinator
 	sinkTimeout          time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
@@ -58,7 +58,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan chan event.Event,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
-	specialistManager *Coordinator,
+	specialistCoordinator contract.SpecialistCoordinator,
 	numWorkers, bufferSize int, sinkTimeout,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,
@@ -76,7 +76,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		domainChan:           make(chan event.Event, bufferSize),
 		messageRepository:    messageRepository,
 		analysisRepository:   analysisRepository,
-		manager:              specialistManager,
+		coordinator:          specialistCoordinator,
 		sinkTimeout:          sinkTimeout,
 		metricInterval:       metricInterval,
 		latencyThreshold:     latencyThreshold,
@@ -214,14 +214,15 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 	o.log.Info("Loading AI analyzer", "vector size", ai.VectorSize)
 	o.log.Info("AI ambiguous scoring between", "min", o.minScoring, "max", o.maxScoring)
 
-	return workers.NewModerationWorker(moderator, o.manager, o.moderationChan, o.domainChan, o.log), nil
+	return workers.NewModerationWorker(moderator, o.coordinator, o.moderationChan, o.domainChan, o.log), nil
 }
 
 // PrepareFanouts initializes the sinks and the fanout workers.
 // Fanout worker handles a lot of events
 func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 	diskSink := sink.NewDiskSink(o.messageRepository, o.log)
-	analysisSink := sink.NewAnalysisSink(o.analysisRepository, o.log, o.maxAnalyzedEvent, 5*time.Millisecond)
+	analysisSink := sink.NewAnalysisSink(o.coordinator,
+		o.analysisRepository, o.log, o.maxAnalyzedEvent, 5*time.Millisecond)
 
 	var res []contract.Worker
 	for i := 0; i < o.numWorkers; i++ {

@@ -3,7 +3,6 @@ package workers
 import (
 	"chat-lab/contract"
 	"chat-lab/domain/event"
-	"chat-lab/domain/specialist"
 	"chat-lab/moderation"
 	"context"
 	"log/slog"
@@ -15,19 +14,19 @@ import (
 
 type ModerationWorker struct {
 	moderator      moderation.Moderator
-	manager        contract.SpecialistCoordinator
+	coordinator    contract.SpecialistCoordinator
 	moderationChan chan event.Event
 	events         chan event.Event
 	log            *slog.Logger
 }
 
 func NewModerationWorker(moderator moderation.Moderator,
-	manager contract.SpecialistCoordinator,
+	coordinator contract.SpecialistCoordinator,
 	moderationChan,
 	events chan event.Event, log *slog.Logger) *ModerationWorker {
 	return &ModerationWorker{
 		moderator:      moderator,
-		manager:        manager,
+		coordinator:    coordinator,
 		moderationChan: moderationChan, events: events, log: log,
 	}
 }
@@ -68,21 +67,6 @@ func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.Mess
 
 	sanitized, foundWords := w.moderator.Censor(evt.Content)
 
-	// Lead time measurement
-	results := w.manager.Broadcast(ctx, evt.ID.String(), evt.Content)
-	if len(results) == 0 {
-		w.log.Warn("no specialists available for analysis, message unverified")
-	}
-
-	for specialistID, res := range results {
-		if score, ok := (res.OneOf).(specialist.Score); ok {
-			w.log.Warn("specialist alert",
-				"id", specialistID,
-				"score", score.Score,
-			)
-		}
-	}
-
 	return event.Event{
 		Type:      event.DomainType,
 		CreatedAt: time.Now().UTC(),
@@ -92,13 +76,13 @@ func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.Mess
 			Content:       sanitized,
 			CensoredWords: foundWords,
 			At:            evt.At,
-			ToxicityScore: decide(results),
+			ToxicityScore: decide(),
 		}}
 }
 
 // decide decides if the message should be dropped or forwarded
 // Completely random right now
 // Supposed to aggregate all scores from AI
-func decide(_ map[specialist.Metric]specialist.Response) float64 {
+func decide() float64 {
 	return 0.4 + rand.Float64()*(0.6-0.4)
 }

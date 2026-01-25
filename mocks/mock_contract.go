@@ -452,17 +452,18 @@ func (m *MockSpecialistCoordinator) EXPECT() *MockSpecialistCoordinatorMockRecor
 }
 
 // Broadcast mocks base method.
-func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, messageID, content string) map[specialist.Metric]specialist.Response {
+func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequest) (specialist.AnalysisResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Broadcast", ctx, messageID, content)
-	ret0, _ := ret[0].(map[specialist.Metric]specialist.Response)
-	return ret0
+	ret := m.ctrl.Call(m, "Broadcast", ctx, req)
+	ret0, _ := ret[0].(specialist.AnalysisResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Broadcast indicates an expected call of Broadcast.
-func (mr *MockSpecialistCoordinatorMockRecorder) Broadcast(ctx, messageID, content any) *gomock.Call {
+func (mr *MockSpecialistCoordinatorMockRecorder) Broadcast(ctx, req any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockSpecialistCoordinator)(nil).Broadcast), ctx, messageID, content)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockSpecialistCoordinator)(nil).Broadcast), ctx, req)
 }
 
 // MockISpecialistClient is a mock of ISpecialistClient interface.

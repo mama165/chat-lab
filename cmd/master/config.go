@@ -33,14 +33,15 @@ type Config struct {
 	ToxicityPort              int           `env:"TOXICITY_PORT"`
 	SentimentBinPath          string        `env:"SENTIMENT_BIN_PATH"`
 	SentimentPort             int           `env:"SENTIMENT_PORT"`
+	StreamChunkSize           string        `env:"STREAM_CHUNK_SIZE"`
 }
 
-func (c Config) CharacterRune() (rune, error) {
-	r := []rune(c.CharReplacement)
+func characterRune(str string) (rune, error) {
+	r := []rune(str)
 	if len(r) != 1 {
 		return 0, fmt.Errorf(
 			"CHARACTER_REPLACEMENT must be a single character, got %q",
-			c.CharReplacement,
+			str,
 		)
 	}
 	return r[0], nil

@@ -51,3 +51,12 @@ type Score struct {
 	Score float64
 	Label string
 }
+
+type AnalysisRequest struct {
+	Path     string
+	MimeType string
+}
+
+type AnalysisResponse struct {
+	Results map[Metric]Response
+}
