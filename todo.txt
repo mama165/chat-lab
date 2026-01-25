@@ -1,3 +1,4 @@
 - Add checksum to oneOf gRPC endpoint
 - Fix CI-Lint
 - Fix all tests
+- Careful with 500 Mo PDF File (Out ot memory risks)
