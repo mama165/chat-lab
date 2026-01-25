@@ -75,10 +75,10 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request specialist.Reque
 		return specialist.Response{}, err
 	}
 
-	return toResponse(response), nil
+	return ToResponse(response), nil
 }
 
-func toResponse(response *pb.SpecialistResponse) specialist.Response {
+func ToResponse(response *pb.SpecialistResponse) specialist.Response {
 	switch resp := (response.Response).(type) {
 	case *pb.SpecialistResponse_DocumentData:
 		return specialist.Response{
