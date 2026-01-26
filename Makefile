@@ -1,6 +1,6 @@
 APP_NAME    := chatlab
 GO          := go
-CONF        := cmd/master/chat.conf
+CONF        := cmd/master/local.conf
 CMD_MASTER  := ./cmd/master
 CMD_SPEC    := ./cmd/specialist
 BIN_DIR     := ./bin
@@ -11,7 +11,7 @@ DOC_COUNT_PROFILING=10000
 
 BINARY=bin/badger_inspect
 SOURCE=tools/badger_inspect.go
-DB_PATH=/tmp/database/debug
+DB_PATH=/tmp/database/badger/dev
 
 PY_SPEC_DIR=./proto
 

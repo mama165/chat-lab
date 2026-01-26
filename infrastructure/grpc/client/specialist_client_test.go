@@ -3,7 +3,7 @@ package client
 import (
 	"chat-lab/domain/mimetypes"
 	"chat-lab/domain/specialist"
-	pb "chat-lab/proto/analysis"
+	pb "chat-lab/proto/specialist"
 	"context"
 	"errors"
 	"testing"

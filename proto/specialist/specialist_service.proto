@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package specialist;
+package analysis;
 
 option go_package = "./pb";
 

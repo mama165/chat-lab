@@ -8,6 +8,8 @@ const (
 	MetricToxicity  Metric = "toxicity"
 	MetricSentiment Metric = "sentiment"
 	MetricBusiness  Metric = "business"
+	MetricPDF       Metric = "pdf"
+	MetricAudio     Metric = "audio"
 )
 
 type Config struct {

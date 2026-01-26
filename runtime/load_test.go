@@ -35,6 +35,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	mockAnalysisRepository.EXPECT().Store(gomock.Any()).Return(nil).AnyTimes()
 
 	telemetryChan := make(chan event.Event, 5000)
+	fileAnalyzeChan := make(chan event.Event, 5000)
 	log := slog.New(slog.DiscardHandler) // On désactive les logs pour la perf
 
 	supervisor := workers.NewSupervisor(log, telemetryChan, 100*time.Millisecond)
@@ -44,7 +45,8 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 
 	// Orchestrator avec un buffer de 1000 et une latence de backpressure courte
 	o := runtime.NewOrchestrator(
-		log, supervisor, registry, telemetryChan, mockMessageRepo,
+		log, supervisor, registry, telemetryChan, fileAnalyzeChan,
+		mockMessageRepo,
 		mockAnalysisRepository,
 		manager,
 		2,                    // numWorkers (on monte à 50 pour encaisser)

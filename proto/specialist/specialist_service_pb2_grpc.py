@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from proto.analysis import specialist_service_pb2 as proto_dot_analysis_dot_specialist__service__pb2
+from proto.specialist import specialist_service_pb2 as proto_dot_specialist_dot_specialist__service__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in proto/analysis/specialist_service_pb2_grpc.py depends on'
+        + ' but the generated code in proto/specialist/specialist_service_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -35,9 +35,9 @@ class SpecialistServiceStub(object):
             channel: A grpc.Channel.
         """
         self.AnalyzeStream = channel.stream_unary(
-                '/specialist.SpecialistService/AnalyzeStream',
-                request_serializer=proto_dot_analysis_dot_specialist__service__pb2.SpecialistRequest.SerializeToString,
-                response_deserializer=proto_dot_analysis_dot_specialist__service__pb2.SpecialistResponse.FromString,
+                '/analysis.SpecialistService/AnalyzeStream',
+                request_serializer=proto_dot_specialist_dot_specialist__service__pb2.SpecialistRequest.SerializeToString,
+                response_deserializer=proto_dot_specialist_dot_specialist__service__pb2.SpecialistResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,14 +55,14 @@ def add_SpecialistServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'AnalyzeStream': grpc.stream_unary_rpc_method_handler(
                     servicer.AnalyzeStream,
-                    request_deserializer=proto_dot_analysis_dot_specialist__service__pb2.SpecialistRequest.FromString,
-                    response_serializer=proto_dot_analysis_dot_specialist__service__pb2.SpecialistResponse.SerializeToString,
+                    request_deserializer=proto_dot_specialist_dot_specialist__service__pb2.SpecialistRequest.FromString,
+                    response_serializer=proto_dot_specialist_dot_specialist__service__pb2.SpecialistResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'specialist.SpecialistService', rpc_method_handlers)
+            'analysis.SpecialistService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('specialist.SpecialistService', rpc_method_handlers)
+    server.add_registered_method_handlers('analysis.SpecialistService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -83,9 +83,9 @@ class SpecialistService(object):
         return grpc.experimental.stream_unary(
             request_iterator,
             target,
-            '/specialist.SpecialistService/AnalyzeStream',
-            proto_dot_analysis_dot_specialist__service__pb2.SpecialistRequest.SerializeToString,
-            proto_dot_analysis_dot_specialist__service__pb2.SpecialistResponse.FromString,
+            '/analysis.SpecialistService/AnalyzeStream',
+            proto_dot_specialist_dot_specialist__service__pb2.SpecialistRequest.SerializeToString,
+            proto_dot_specialist_dot_specialist__service__pb2.SpecialistResponse.FromString,
             options,
             channel_credentials,
             insecure,

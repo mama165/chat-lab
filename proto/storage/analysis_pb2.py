@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1cproto/storage/analysis.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x80\x03\n\x08\x41nalysis\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tentity_id\x18\x02 \x01(\t\x12\x11\n\tnamespace\x18\x03 \x01(\t\x12&\n\x02\x61t\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07summary\x18\x05 \x01(\t\x12\x0c\n\x04tags\x18\x06 \x03(\t\x12\x33\n\x06scores\x18\x07 \x03(\x0b\x32#.message.proto.Analysis.ScoresEntry\x12\x32\n\x0ctext_content\x18\x08 \x01(\x0b\x32\x1a.message.proto.TextContentH\x00\x12,\n\x05\x61udio\x18\t \x01(\x0b\x32\x1b.message.proto.AudioDetailsH\x00\x12*\n\x04\x66ile\x18\n \x01(\x0b\x32\x1a.message.proto.FileDetailsH\x00\x1a-\n\x0bScoresEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x42\t\n\x07payload\"\x1e\n\x0bTextContent\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\";\n\x0c\x41udioDetails\x12\x15\n\rtranscription\x18\x01 \x01(\t\x12\x14\n\x0c\x64uration_sec\x18\x02 \x01(\r\"u\n\x0b\x46ileDetails\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x11\n\tmime_type\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x04\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x0e\n\x06\x61uthor\x18\x05 \x01(\t\x12\x12\n\npage_count\x18\x06 \x01(\x05\x42\x06Z\x04./pbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1cproto/storage/analysis.proto\x12\x07storage\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe8\x02\n\x08\x41nalysis\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tentity_id\x18\x02 \x01(\t\x12\x11\n\tnamespace\x18\x03 \x01(\t\x12&\n\x02\x61t\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07summary\x18\x05 \x01(\t\x12\x0c\n\x04tags\x18\x06 \x03(\t\x12-\n\x06scores\x18\x07 \x03(\x0b\x32\x1d.storage.Analysis.ScoresEntry\x12,\n\x0ctext_content\x18\x08 \x01(\x0b\x32\x14.storage.TextContentH\x00\x12&\n\x05\x61udio\x18\t \x01(\x0b\x32\x15.storage.AudioDetailsH\x00\x12$\n\x04\x66ile\x18\n \x01(\x0b\x32\x14.storage.FileDetailsH\x00\x1a-\n\x0bScoresEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x42\t\n\x07payload\"\x1e\n\x0bTextContent\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\";\n\x0c\x41udioDetails\x12\x15\n\rtranscription\x18\x01 \x01(\t\x12\x14\n\x0c\x64uration_sec\x18\x02 \x01(\r\"u\n\x0b\x46ileDetails\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x11\n\tmime_type\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x04\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x0e\n\x06\x61uthor\x18\x05 \x01(\t\x12\x12\n\npage_count\x18\x06 \x01(\x05\x42\x06Z\x04./pbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,14 +35,14 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'Z\004./pb'
   _globals['_ANALYSIS_SCORESENTRY']._loaded_options = None
   _globals['_ANALYSIS_SCORESENTRY']._serialized_options = b'8\001'
-  _globals['_ANALYSIS']._serialized_start=81
-  _globals['_ANALYSIS']._serialized_end=465
-  _globals['_ANALYSIS_SCORESENTRY']._serialized_start=409
-  _globals['_ANALYSIS_SCORESENTRY']._serialized_end=454
-  _globals['_TEXTCONTENT']._serialized_start=467
-  _globals['_TEXTCONTENT']._serialized_end=497
-  _globals['_AUDIODETAILS']._serialized_start=499
-  _globals['_AUDIODETAILS']._serialized_end=558
-  _globals['_FILEDETAILS']._serialized_start=560
-  _globals['_FILEDETAILS']._serialized_end=677
+  _globals['_ANALYSIS']._serialized_start=75
+  _globals['_ANALYSIS']._serialized_end=435
+  _globals['_ANALYSIS_SCORESENTRY']._serialized_start=379
+  _globals['_ANALYSIS_SCORESENTRY']._serialized_end=424
+  _globals['_TEXTCONTENT']._serialized_start=437
+  _globals['_TEXTCONTENT']._serialized_end=467
+  _globals['_AUDIODETAILS']._serialized_start=469
+  _globals['_AUDIODETAILS']._serialized_end=528
+  _globals['_FILEDETAILS']._serialized_start=530
+  _globals['_FILEDETAILS']._serialized_end=647
 # @@protoc_insertion_point(module_scope)

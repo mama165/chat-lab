@@ -28,6 +28,14 @@ func TestMatches(t *testing.T) {
 		{"JPEG", "image/jpeg", ImageJPEG, true},
 		{"GIF", "image/gif", ImageGIF, true},
 
+		// audio types
+		{"MPEG4", "audio/mpeg", AudioMPEG, true},
+		{"WAV", "audio/wav", AudioWAV, true},
+		{"XAIFF", "audio/x-aiff", AudioXAIFF, true},
+
+		// video types
+		{"MPEG4", "video/mp4", VideoMP4, true},
+
 		// Fallback / mismatch
 		{"Mismatch", "text/plain; charset=utf-8", ApplicationJSON, false},
 		{"Unknown type", "application/octet-stream", TextPlain, false},

@@ -2,8 +2,10 @@ import grpc
 import fitz  # PyMuPDF
 from concurrent import futures
 import traceback
-from proto.analysis import specialist_service_pb2 as pb
-from proto.analysis import specialist_service_pb2_grpc as pb_grpc
+
+# Import generated files
+from proto.specialist import specialist_service_pb2 as pb
+from proto.specialist import specialist_service_pb2_grpc as pb_grpc
 
 class MonitorService(pb_grpc.SpecialistServiceServicer):
 
@@ -67,8 +69,8 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb_grpc.add_SpecialistServiceServicer_to_server(MonitorService(), server)
 
-    server.add_insecure_port('[::]:50051')
-    print("🚀 Python PDF Specialist ready on port 50051")
+    server.add_insecure_port('[::]:50055')
+    print("🚀 Python PDF Specialist ready on port 50055")
     server.start()
     server.wait_for_termination()
 

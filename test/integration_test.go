@@ -41,13 +41,15 @@ func Test_Scenario(t *testing.T) {
 	done := make(chan struct{})
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	telemetryChan := make(chan event.Event)
+	fileAnalyzeChan := make(chan event.Event)
 	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := bluge2.NewMessageRepository(db, log, lo.ToPtr(100))
 	analysisRepository := bluge2.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
 	manager := runtime.NewCoordinator(log)
 	orchestrator := runtime.NewOrchestrator(
-		log, supervisor, registry, telemetryChan, messageRepository,
+		log, supervisor, registry, telemetryChan, fileAnalyzeChan,
+		messageRepository,
 		analysisRepository,
 		manager,
 		10, 1000, 3*time.Second,

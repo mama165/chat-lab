@@ -2,6 +2,7 @@ package server
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/domain/mimetypes"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/services"
 	"context"
@@ -9,7 +10,6 @@ import (
 	"io"
 	"log/slog"
 	"sync/atomic"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -37,16 +37,23 @@ func NewFileAnalyzerServer(
 // It receives messages in a loop until the client closes the stream (io.EOF),
 // then returns a summary including total files received and bytes processed.
 // The statistics are read using atomic operations to ensure consistency across multiple concurrent streams.
-func (s FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAnalyzerRequest, pb.FileAnalyzerResponse]) error {
+func (s *FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAnalyzerRequest, pb.FileAnalyzerResponse]) error {
 	for {
 		request, err := stream.Recv()
 		if err == io.EOF {
 			response := pb.FileAnalyzerResponse{
 				FilesReceived:  atomic.LoadUint64(&s.countAnalyzedFiles.FilesReceived),
 				BytesProcessed: atomic.LoadUint64(&s.countAnalyzedFiles.BytesProcessed),
-				EndedAt:        timestamppb.New(time.Now()),
+				EndedAt:        timestamppb.Now(),
 			}
 			return stream.SendAndClose(&response)
+		}
+		if err != nil {
+			s.log.Error("Stream reception error", "error", err)
+			return err
+		}
+		if request == nil {
+			continue
 		}
 		err = s.fileAnalyzerService.Analyze(stream.Context(), toRequest(request))
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -65,7 +72,7 @@ func toRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
 		DriveID:    req.DriveId,
 		Size:       req.Size,
 		Attributes: req.Attributes,
-		MimeType:   req.MimeType,
+		MimeType:   mimetypes.MIME(req.MimeType),
 		MagicBytes: req.MagicBytes,
 		ScannedAt:  req.ScannedAt.AsTime(),
 		SourceType: toSourceType(req.SourceType),

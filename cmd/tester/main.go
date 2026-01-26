@@ -1,95 +1,74 @@
 package main
 
 import (
-	"chat-lab/domain/specialist"
-	client2 "chat-lab/infrastructure/grpc/client"
-	pb "chat-lab/proto/analysis"
+	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func main() {
-	// 1. Connexion au serveur Python (port 50051)
-	// On utilise insecure car on n'a pas encore configuré TLS/Certificats
-	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial("localhost:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Impossible de se connecter: %v", err)
+		log.Fatalf("Échec connexion Master: %v", err)
 	}
 	defer conn.Close()
 
-	client := pb.NewSpecialistServiceClient(conn)
+	client := pb.NewFileAnalyzerServiceClient(conn)
 
-	stream, err := client.AnalyzeStream(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	stream, err := client.Analyze(ctx)
 	if err != nil {
-		log.Fatalf("Erreur ouverture stream: %v", err)
+		log.Fatalf("Impossible d'ouvrir le stream: %v", err)
 	}
 
-	// 1. Lire le fichier PDF (mets un petit PDF dans ton dossier root pour tester)
-	fileContent, err := os.ReadFile("mon_test.pdf")
+	filePath := "/Users/maelnana/Desktop/develop/mama165/chat-lab/test_audio.aiff"
+	info, err := os.Stat(filePath)
 	if err != nil {
-		log.Fatalf("Impossible de lire le PDF: %v", err)
+		log.Fatalf("Fichier introuvable: %v", err)
 	}
 
-	// 2. Envoyer les metadata d'abord
-	err = stream.Send(&pb.SpecialistRequest{
-		Entry: &pb.SpecialistRequest_Metadata{
-			Metadata: &pb.Metadata{FileName: "mon_test.pdf"},
-		},
-	})
+	// Optionnel: lire les premiers octets pour les magic_bytes (sniffing)
+	f, _ := os.Open(filePath)
+	magic := make([]byte, 64)
+	_, _ = f.Read(magic)
+	f.Close()
+
+	// 4. Envoi de la requête dans le stream
+	fmt.Printf("🚀 Envoi de %s via le stream gRPC...\n", filePath)
+
+	req := &pb.FileAnalyzerRequest{
+		Path:       filePath,
+		DriveId:    "USB-DRIVE-001",
+		Size:       uint64(info.Size()),
+		MimeType:   "audio/mpeg",
+		MagicBytes: magic,
+		ScannedAt:  timestamppb.Now(),
+		SourceType: pb.SourceType_LOCAL_FIXED,
+	}
+
+	fmt.Println("Appel de :", pb.FileAnalyzerService_Analyze_FullMethodName)
+
+	if err := stream.Send(req); err != nil {
+		log.Fatalf("Échec de l'envoi du message: %v", err)
+	}
+
+	// 5. Fermeture du flux et récupération de la réponse globale
+	reply, err := stream.CloseAndRecv()
 	if err != nil {
-		log.Fatalf("Error : %v", err)
+		log.Fatalf("Erreur lors de la réception du résumé: %v", err)
 	}
 
-	// 3. Envoyer le contenu par chunks de 32KB
-	const chunkSize = 32 * 1024
-	for i := 0; i < len(fileContent); i += chunkSize {
-		end := i + chunkSize
-		if end > len(fileContent) {
-			end = len(fileContent)
-		}
-
-		err = stream.Send(&pb.SpecialistRequest{
-			Entry: &pb.SpecialistRequest_Chunk{
-				Chunk: fileContent[i:end],
-			},
-		})
-		if err != nil {
-			log.Fatalf("Error : %v", err)
-		}
-	}
-
-	// 4. Récupérer la réponse et l'afficher
-	reply, _ := stream.CloseAndRecv()
-	res := client2.ToResponse(reply)
-
-	fmt.Printf("\n--- 🔍 [Extraction Results] ---\n")
-
-	switch res := res.OneOf.(type) {
-	case specialist.DocumentData:
-		fmt.Printf("📂 Filename: %s\n", res.Title)
-		fmt.Printf("👤 Author:   %s\n", res.Author)
-		fmt.Printf("📄 Pages:    %d\n", res.PageCount)
-		fmt.Printf("🌍 Lang:     %s\n", res.Language)
-
-		if len(res.Pages) > 0 {
-			fmt.Println("\n--- 📝 [First Page Preview] ---")
-			content := res.Pages[0].Content
-			if len(content) > 300 {
-				fmt.Printf("%s [...]\n", content[:300])
-			} else {
-				fmt.Println(content)
-			}
-		}
-
-	case specialist.Score:
-		fmt.Printf("📊 Score: %.2f | Label: %s\n", res.Score, res.Label)
-
-	default:
-		fmt.Println("⚠️ Unknown response type received")
-	}
+	fmt.Println("\n--- ✅ Rapport du Master ---")
+	fmt.Printf("Fichiers reçus : %d\n", reply.FilesReceived)
+	fmt.Printf("Total octets : %d\n", reply.BytesProcessed)
+	fmt.Printf("Terminé à : %s\n", reply.EndedAt.AsTime().Format(time.RFC850))
 }

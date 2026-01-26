@@ -3,12 +3,14 @@ package main
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
+	"chat-lab/domain/mimetypes"
 	"chat-lab/domain/specialist"
-	server2 "chat-lab/infrastructure/grpc/server"
+	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/infrastructure/storage"
 	pb2 "chat-lab/proto/account"
 	pb3 "chat-lab/proto/analyzer"
-	pb "chat-lab/proto/chat"
+	pb1 "chat-lab/proto/chat"
+	pb4 "chat-lab/proto/storage"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/services"
@@ -23,7 +25,9 @@ import (
 	"time"
 
 	"github.com/blugelabs/bluge"
+	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
+	"google.golang.org/protobuf/proto"
 
 	grpc3 "github.com/mama165/sdk-go/grpc"
 
@@ -78,8 +82,16 @@ func run() (int, error) {
 	if err != nil {
 		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
 	}
-	// Defer ensures the database lock is released and buffers are flushed before the function returns.
+
+	if log.Enabled(ctx, slog.LevelDebug) {
+		debugPort := 8081
+		url := fmt.Sprintf("http://localhost:%d/inspect", debugPort)
+		log.Info("Debug Badger inspector available", "url", url)
+		database.StartDebugServer(db, debugPort, AnalysisMapper)
+	}
+
 	defer func() {
+		// Defer ensures the database lock is released and buffers are flushed before the function returns.
 		log.Info("Closing BadgerDB...")
 		_ = db.Close()
 	}()
@@ -105,8 +117,26 @@ func run() (int, error) {
 		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
 	}*/
 
-	var specialistConfigs []specialist.Config
-
+	specialistConfigs := []specialist.Config{
+		{
+			ID:           specialist.MetricPDF,
+			BinPath:      "./services/pdf_specialist.py",
+			Host:         "localhost",
+			Port:         50055, // 👈 Change ici (au lieu de 50051)
+			Capabilities: []mimetypes.MIME{mimetypes.ApplicationPDF},
+		},
+		{
+			ID:      "audio-transcriber",
+			BinPath: "./services/audio_specialist.py",
+			Host:    "localhost",
+			Port:    50056, // 👈 Change ici (au lieu de 50052 pour être large)
+			Capabilities: []mimetypes.MIME{
+				mimetypes.AudioMPEG,
+				mimetypes.AudioWAV,
+				mimetypes.AudioXAIFF,
+			},
+		},
+	}
 	coordinator := runtime.NewCoordinator(log)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
@@ -119,7 +149,7 @@ func run() (int, error) {
 
 	// 3. Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
-	fileAnalyzeChan := make(chan event.Event, config.BufferSize)
+	eventChan := make(chan event.Event, config.BufferSize)
 	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, log, config.LimitMessages)
@@ -127,7 +157,8 @@ func run() (int, error) {
 	userRepository := storage.NewUserRepository(db)
 
 	orchestrator := runtime.NewOrchestrator(
-		log, sup, registry, telemetryChan, messageRepository,
+		log, sup, registry, telemetryChan, eventChan,
+		messageRepository,
 		analysisRepository,
 		coordinator,
 		config.NumberOfWorkers, config.BufferSize,
@@ -165,22 +196,25 @@ func run() (int, error) {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc3.UnaryLoggingInterceptor(log),
-			server2.AuthInterceptor,
+			server.AuthInterceptor,
 		))
 	chatService := services.NewChatService(orchestrator)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()
-	analyzerService := services.NewAnalyzerService(log, analysisRepository, fileAnalyzeChan, &counter)
-	chatServer := server2.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
-	fileAnalyzerServer := server2.NewFileAnalyzerServer(analyzerService, log, &counter)
-	authServer := server2.NewAuthServer(authService)
-	pb.RegisterChatServiceServer(s, chatServer)
+	analyzerService := services.NewAnalyzerService(log, analysisRepository, eventChan, &counter)
+	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
+	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, log, &counter)
+	authServer := server.NewAuthServer(authService)
+	pb1.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
 		log.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
+		for serviceName := range s.GetServiceInfo() {
+			log.Info("📡 Service réellement exposé", "name", serviceName)
+		}
 		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errChan <- fmt.Errorf("gRPC server error: %w", err)
 		}
@@ -216,4 +250,34 @@ func buildBadgerOpts(config Config, log *slog.Logger, ctx context.Context) badge
 	}
 
 	return options
+}
+
+func AnalysisMapper(key string, val []byte) database.InspectRow {
+	row := database.DefaultMapper(key, val)
+
+	var p pb4.Analysis
+	if err := proto.Unmarshal(val, &p); err != nil {
+		row.Detail = "Error: unmarshal failed"
+		return row
+	}
+
+	analysis, err := storage.ToAnalysis(&p)
+	if err != nil {
+		return row
+	}
+
+	row.Type = "FILE"
+	if _, ok := analysis.Payload.(storage.AudioDetails); ok {
+		row.Type = "AUDIO"
+	}
+
+	row.Detail = analysis.Summary
+
+	scores := ""
+	for k, v := range analysis.Scores {
+		scores += fmt.Sprintf("%s:%.2f ", k, v)
+	}
+	row.Scores = scores
+
+	return row
 }

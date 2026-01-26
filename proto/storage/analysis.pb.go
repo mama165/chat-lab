@@ -361,19 +361,19 @@ var File_proto_storage_analysis_proto protoreflect.FileDescriptor
 
 const file_proto_storage_analysis_proto_rawDesc = "" +
 	"\n" +
-	"\x1cproto/storage/analysis.proto\x12\rmessage.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xda\x03\n" +
+	"\x1cproto/storage/analysis.proto\x12\astorage\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc2\x03\n" +
 	"\bAnalysis\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tentity_id\x18\x02 \x01(\tR\bentityId\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12*\n" +
 	"\x02at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x18\n" +
 	"\asummary\x18\x05 \x01(\tR\asummary\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tags\x12;\n" +
-	"\x06scores\x18\a \x03(\v2#.message.proto.Analysis.ScoresEntryR\x06scores\x12?\n" +
-	"\ftext_content\x18\b \x01(\v2\x1a.message.proto.TextContentH\x00R\vtextContent\x123\n" +
-	"\x05audio\x18\t \x01(\v2\x1b.message.proto.AudioDetailsH\x00R\x05audio\x120\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x125\n" +
+	"\x06scores\x18\a \x03(\v2\x1d.storage.Analysis.ScoresEntryR\x06scores\x129\n" +
+	"\ftext_content\x18\b \x01(\v2\x14.storage.TextContentH\x00R\vtextContent\x12-\n" +
+	"\x05audio\x18\t \x01(\v2\x15.storage.AudioDetailsH\x00R\x05audio\x12*\n" +
 	"\x04file\x18\n" +
-	" \x01(\v2\x1a.message.proto.FileDetailsH\x00R\x04file\x1a9\n" +
+	" \x01(\v2\x14.storage.FileDetailsH\x00R\x04file\x1a9\n" +
 	"\vScoresEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01B\t\n" +
@@ -406,19 +406,19 @@ func file_proto_storage_analysis_proto_rawDescGZIP() []byte {
 
 var file_proto_storage_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_proto_storage_analysis_proto_goTypes = []any{
-	(*Analysis)(nil),              // 0: message.proto.Analysis
-	(*TextContent)(nil),           // 1: message.proto.TextContent
-	(*AudioDetails)(nil),          // 2: message.proto.AudioDetails
-	(*FileDetails)(nil),           // 3: message.proto.FileDetails
-	nil,                           // 4: message.proto.Analysis.ScoresEntry
+	(*Analysis)(nil),              // 0: storage.Analysis
+	(*TextContent)(nil),           // 1: storage.TextContent
+	(*AudioDetails)(nil),          // 2: storage.AudioDetails
+	(*FileDetails)(nil),           // 3: storage.FileDetails
+	nil,                           // 4: storage.Analysis.ScoresEntry
 	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_proto_storage_analysis_proto_depIdxs = []int32{
-	5, // 0: message.proto.Analysis.at:type_name -> google.protobuf.Timestamp
-	4, // 1: message.proto.Analysis.scores:type_name -> message.proto.Analysis.ScoresEntry
-	1, // 2: message.proto.Analysis.text_content:type_name -> message.proto.TextContent
-	2, // 3: message.proto.Analysis.audio:type_name -> message.proto.AudioDetails
-	3, // 4: message.proto.Analysis.file:type_name -> message.proto.FileDetails
+	5, // 0: storage.Analysis.at:type_name -> google.protobuf.Timestamp
+	4, // 1: storage.Analysis.scores:type_name -> storage.Analysis.ScoresEntry
+	1, // 2: storage.Analysis.text_content:type_name -> storage.TextContent
+	2, // 3: storage.Analysis.audio:type_name -> storage.AudioDetails
+	3, // 4: storage.Analysis.file:type_name -> storage.FileDetails
 	5, // [5:5] is the sub-list for method output_type
 	5, // [5:5] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name

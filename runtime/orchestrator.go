@@ -36,7 +36,7 @@ type Orchestrator struct {
 	registry             contract.IRegistry
 	globalCommands       chan chat.Command
 	moderationChan       chan event.Event
-	domainChan           chan event.Event
+	eventChan            chan event.Event
 	fileAnalyzeChan      chan event.Event
 	telemetryChan        chan event.Event
 	messageRepository    storage.IMessageRepository
@@ -55,7 +55,7 @@ type Orchestrator struct {
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
-	registry *Registry, telemetryChan chan event.Event,
+	registry *Registry, telemetryChan, eventChan chan event.Event,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
 	specialistCoordinator contract.SpecialistCoordinator,
@@ -73,7 +73,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		telemetryChan:        telemetryChan,
 		globalCommands:       make(chan chat.Command, bufferSize),
 		moderationChan:       make(chan event.Event, bufferSize),
-		domainChan:           make(chan event.Event, bufferSize),
+		eventChan:            eventChan,
 		messageRepository:    messageRepository,
 		analysisRepository:   analysisRepository,
 		coordinator:          specialistCoordinator,
@@ -214,7 +214,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 	o.log.Info("Loading AI analyzer", "vector size", ai.VectorSize)
 	o.log.Info("AI ambiguous scoring between", "min", o.minScoring, "max", o.maxScoring)
 
-	return workers.NewModerationWorker(moderator, o.coordinator, o.moderationChan, o.domainChan, o.log), nil
+	return workers.NewModerationWorker(moderator, o.coordinator, o.moderationChan, o.eventChan, o.log), nil
 }
 
 // PrepareFanouts initializes the sinks and the fanout workers.
@@ -231,7 +231,7 @@ func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 			diskSink,
 			analysisSink,
 			o.registry,
-			o.domainChan,
+			o.eventChan,
 			o.telemetryChan,
 			o.sinkTimeout,
 		))
@@ -248,7 +248,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 		event.NewWorkerRestartedAfterPanicHandler(o.log, o.counter),
 	}
 	channels := []workers.NamedChannel{
-		{Name: "DomainChan", Channel: o.domainChan},
+		{Name: "EventChan", Channel: o.eventChan},
 		{Name: "ModerationChan", Channel: o.moderationChan},
 		{Name: "TelemetryChan", Channel: o.telemetryChan},
 		{Name: "GlobalCommands", Channel: o.globalCommands},
@@ -271,7 +271,7 @@ func (o *Orchestrator) Stop() {
 
 	close(o.globalCommands)
 	close(o.moderationChan)
-	close(o.domainChan)
+	close(o.eventChan)
 
 	o.log.Debug("Orchestrator internal channels closed")
 }

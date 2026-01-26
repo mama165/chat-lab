@@ -4,7 +4,7 @@ import (
 	"chat-lab/domain/specialist"
 	"chat-lab/errors"
 	"chat-lab/infrastructure/grpc/client"
-	pb "chat-lab/proto/analysis"
+	pb "chat-lab/proto/specialist"
 	"context"
 	"fmt"
 	"log"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 )
 
 // Coordinator handles the lifecycle and coordination of all specialist sidecars.
@@ -42,9 +43,6 @@ func (m *Coordinator) Add(s *client.SpecialistClient) {
 
 // Init launches all configured specialists and blocks until they are all ready.
 func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, logLevel string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	for _, cfg := range configs {
 		// Start each specialist using our robust launcher.
 		// If one fails, we return the error to the Master to decide what to do.
@@ -64,28 +62,34 @@ func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, log
 // linked to the provided context, and ensures the gRPC server is ready before
 // returning a functional specialist client.
 func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string) (*client.SpecialistClient, error) {
-	// 1. Validate binary existence using our custom error
 	if _, err := os.Stat(cfg.BinPath); err != nil {
 		return nil, fmt.Errorf("%w: %s", errors.ErrSpecialistNotFound, cfg.BinPath)
 	}
 
-	// 2. Prepare the execution command
-	// We pass the port to the specialist so it knows where to listen.
-	//cmd := exec.CommandContext(ctx, cfg.BinPath, "--port", strconv.Itoa(cfg.Port))
-	cmd := exec.CommandContext(ctx, cfg.BinPath,
+	// On WSL/Linux : venv/bin/python
+	// On Windows : venv/Scripts/python.exe
+	pythonInterpreter := "./venv/bin/python3"
+
+	// Préparer l'exécution : python3 path/to/script.py -id ...
+	cmd := exec.CommandContext(ctx, pythonInterpreter, cfg.BinPath,
 		"-id", string(cfg.ID),
 		"-port", strconv.Itoa(cfg.Port),
-		"-type", string(cfg.ID), // On utilise l'ID comme type pour l'instant
+		"-type", string(cfg.ID),
 		"-level", logLevel,
 	)
+
+	// Inject environment variables if necessary
+	cmd.Env = append(os.Environ(),
+		"PYTHONPATH=.",
+		"PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
+	)
+
 	log.Printf("Specialist binary called : %s", cmd.String())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: %v", errors.ErrSpecialistStartFailed, err)
 	}
-
-	time.Sleep(500 * time.Millisecond)
 
 	conn, err := dialWithRetry(ctx, cfg.Host, cfg.Port)
 	if err != nil {
@@ -108,16 +112,34 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 // dialWithRetry Retry connection to the specialist to handle container startup latency
 func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
-	// Try for 10 seconds, every 500ms
-	for i := 0; i < 20; i++ {
-		// Use insecure for now as per your modular chat plan
-		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock())
-		if err == nil {
+
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+
+	conn, err := grpc.DialContext(ctx, addr, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial: %w", err)
+	}
+
+	// On attend que l'état passe à "Ready" avec un petit timeout
+	for i := 0; i < 60; i++ {
+		state := conn.GetState()
+		if state == connectivity.Ready {
 			return conn, nil
 		}
+
+		// Si l'état est en échec, on tente de reconnecter
+		if state == connectivity.TransientFailure || state == connectivity.Shutdown {
+			conn.ResetConnectBackoff()
+		}
+
 		time.Sleep(500 * time.Millisecond)
 	}
-	return nil, fmt.Errorf("timeout: specialist not responding at %s after retries", addr)
+
+	err = conn.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to close connection: %w", err)
+	}
+	return nil, fmt.Errorf("timeout: specialist at %s stay in state %s", addr, conn.GetState())
 }
 
 // Broadcast orchestrates the analysis of a file by streaming its content to relevant

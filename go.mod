@@ -2,6 +2,8 @@ module chat-lab
 
 go 1.24.0
 
+replace github.com/mama165/sdk-go v1.0.9 => ../sdk-go
+
 require (
 	github.com/Netflix/go-env v0.1.2
 	github.com/abadojack/whatlanggo v1.0.1

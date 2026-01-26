@@ -26,7 +26,7 @@ func (h ChannelCapacityHandler) Handle(event Event) {
 			h.log.Error(errors.ErrInvalidPayload.Error())
 			return
 		}
-		h.log.Debug(fmt.Sprintf("Channel usage: %d / %d", payload.Length, payload.Capacity))
+		h.log.Debug(fmt.Sprintf("Channel %s usage: %d / %d", payload.ChannelName, payload.Length, payload.Capacity))
 		if payload.Capacity <= 0 {
 			// In case of unbuffered channel
 			return

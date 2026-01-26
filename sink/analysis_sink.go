@@ -52,12 +52,6 @@ func (a *AnalysisSink) Consume(ctx context.Context, e contract.FileAnalyzerEvent
 		return nil
 	}
 
-	// 1. Immediate validation: we fail fast if the data is corrupted
-	// to avoid polluting the buffer with invalid records.
-	if _, err := uuid.Parse(evt.DriveID); err != nil {
-		return fmt.Errorf("invalid DriveID %q: %w", evt.DriveID, err)
-	}
-
 	a.mu.Lock()
 	// 2. State update: Append the event to the current slice
 	a.events = append(a.events, evt)
@@ -183,11 +177,9 @@ func (a *AnalysisSink) processAndStore(ctx context.Context, events []event.FileA
 // It acts as a decorator that enriches the initial metadata (path, mimetype)
 // with deeper insights like extracted titles, authors, or sentiment/toxicity scores.
 func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist.AnalysisResponse) storage.Analysis {
-	driveId, _ := uuid.Parse(evt.DriveID)
-
 	analysis := storage.Analysis{
 		ID:        evt.Id,
-		EntityId:  driveId,
+		EntityId:  evt.Id,
 		Namespace: "file-room",
 		At:        evt.ScannedAt,
 		Summary:   evt.Path,
@@ -195,8 +187,12 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist
 			evt.MimeType,
 			evt.SourceType,
 		},
-		Scores:  make(map[specialist.Metric]float64),
-		Payload: evt,
+		Scores: make(map[specialist.Metric]float64),
+		Payload: storage.FileDetails{
+			Filename: evt.Path,
+			MimeType: evt.MimeType,
+			Size:     evt.Size,
+		},
 		Version: uuid.New(),
 	}
 

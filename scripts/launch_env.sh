@@ -1,8 +1,15 @@
+#!/usr/bin/env bash
 source venv/bin/activate
 
-export PYTHONPATH=.
+export PYTHONPATH=$PYTHONPATH:.
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
-export TEMPORARY_GLOO_PATCH_DISABLE_RUNTIME_VERSION_CHECK=1
 
-python3 services/monitor.py
-python3 -c "import fitz; print('✅ PyMuPDF (fitz) import successful!')"
+echo "--- 🚀 Launching Sidecar Specialists ---"
+
+# Start PDF specialist
+python3 services/pdf_specialist.py -id "pdf" -port 50051 -type "pdf" -level "info" &
+
+python3 services/audio_specialist.py -id "audio" -port 50052 -type "audio" -level "info" &
+
+#  Keep script alive to view logs
+wait

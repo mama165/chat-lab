@@ -35,7 +35,7 @@ class FileAnalyzerServiceStub(object):
             channel: A grpc.Channel.
         """
         self.Analyze = channel.stream_unary(
-                '/ingestion.FileAnalyzerService/Analyze',
+                '/analyzer.FileAnalyzerService/Analyze',
                 request_serializer=proto_dot_analyzer_dot_file__analyzer__service__pb2.FileAnalyzerRequest.SerializeToString,
                 response_deserializer=proto_dot_analyzer_dot_file__analyzer__service__pb2.FileAnalyzerResponse.FromString,
                 _registered_method=True)
@@ -60,9 +60,9 @@ def add_FileAnalyzerServiceServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'ingestion.FileAnalyzerService', rpc_method_handlers)
+            'analyzer.FileAnalyzerService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('ingestion.FileAnalyzerService', rpc_method_handlers)
+    server.add_registered_method_handlers('analyzer.FileAnalyzerService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -83,7 +83,7 @@ class FileAnalyzerService(object):
         return grpc.experimental.stream_unary(
             request_iterator,
             target,
-            '/ingestion.FileAnalyzerService/Analyze',
+            '/analyzer.FileAnalyzerService/Analyze',
             proto_dot_analyzer_dot_file__analyzer__service__pb2.FileAnalyzerRequest.SerializeToString,
             proto_dot_analyzer_dot_file__analyzer__service__pb2.FileAnalyzerResponse.FromString,
             options,

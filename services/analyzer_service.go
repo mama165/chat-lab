@@ -21,20 +21,20 @@ type AnalyzerService struct {
 	log                *slog.Logger
 	validator          *validator.Validate
 	repository         storage.IAnalysisRepository
-	fileAnalyzeChan    chan event.Event
+	eventChan          chan event.Event
 	countAnalyzedFiles *analyzer.CountAnalyzedFiles
 }
 
 func NewAnalyzerService(
 	log *slog.Logger,
 	repository storage.IAnalysisRepository,
-	fileAnalyzeChan chan event.Event,
+	eventChan chan event.Event,
 	countAnalyzedFiles *analyzer.CountAnalyzedFiles) *AnalyzerService {
 	return &AnalyzerService{
 		log:                log,
 		repository:         repository,
 		validator:          validator.New(),
-		fileAnalyzeChan:    fileAnalyzeChan,
+		eventChan:          eventChan,
 		countAnalyzedFiles: countAnalyzedFiles,
 	}
 }
@@ -53,7 +53,7 @@ func (s *AnalyzerService) Analyze(ctx context.Context, request analyzer.FileAnal
 	case <-ctx.Done():
 		s.log.Debug("Context done, skipping file analyzer")
 		return ctx.Err()
-	case s.fileAnalyzeChan <- toEvent(request):
+	case s.eventChan <- toEvent(request):
 		s.log.Debug("Received one file to analyze", "bytes", request.Size)
 		s.increment(request.Size)
 	}
@@ -63,14 +63,14 @@ func (s *AnalyzerService) Analyze(ctx context.Context, request analyzer.FileAnal
 func toEvent(request analyzer.FileAnalyzerRequest) event.Event {
 	return event.Event{
 		Type:      event.FileAnalyzeType,
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now().UTC(),
 		Payload: event.FileAnalyse{
 			Id:         uuid.New(),
 			Path:       request.Path,
 			DriveID:    request.DriveID,
 			Size:       request.Size,
 			Attributes: request.Attributes,
-			MimeType:   request.MimeType,
+			MimeType:   string(request.MimeType),
 			MagicBytes: request.MagicBytes,
 			ScannedAt:  request.ScannedAt,
 			SourceType: string(request.SourceType),

@@ -128,7 +128,7 @@ var File_proto_account_user_proto protoreflect.FileDescriptor
 
 const file_proto_account_user_proto_rawDesc = "" +
 	"\n" +
-	"\x18proto/account/user.proto\x12\achat.v1\"\xfe\x01\n" +
+	"\x18proto/account/user.proto\x12\aaccount\"\xfe\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12#\n" +
@@ -155,7 +155,7 @@ func file_proto_account_user_proto_rawDescGZIP() []byte {
 
 var file_proto_account_user_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_proto_account_user_proto_goTypes = []any{
-	(*User)(nil), // 0: chat.v1.User
+	(*User)(nil), // 0: account.User
 }
 var file_proto_account_user_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type

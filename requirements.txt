@@ -1,4 +1,12 @@
+# --- Infrastructure gRPC ---
 grpcio
 grpcio-tools
 protobuf
+# --- Specialist: PDF ---
 pymupdf
+# --- Specialist: Audio & Video ---
+faster-whisper
+
+# --- Utilities ---
+# Optional but useful for monitoring if needed
+psutil

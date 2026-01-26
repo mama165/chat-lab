@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.31.1
-// source: proto/analysis/specialist_service.proto
+// source: proto/specialist/specialist_service.proto
 
 package pb
 
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SpecialistService_AnalyzeStream_FullMethodName = "/specialist.SpecialistService/AnalyzeStream"
+	SpecialistService_AnalyzeStream_FullMethodName = "/analysis.SpecialistService/AnalyzeStream"
 )
 
 // SpecialistServiceClient is the client API for SpecialistService service.
@@ -100,7 +100,7 @@ type SpecialistService_AnalyzeStreamServer = grpc.ClientStreamingServer[Speciali
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var SpecialistService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "specialist.SpecialistService",
+	ServiceName: "analysis.SpecialistService",
 	HandlerType: (*SpecialistServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -110,5 +110,5 @@ var SpecialistService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "proto/analysis/specialist_service.proto",
+	Metadata: "proto/specialist/specialist_service.proto",
 }

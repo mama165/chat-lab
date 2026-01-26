@@ -17,6 +17,12 @@ const (
 	ImagePNG  MIME = "image/png"
 	ImageJPEG MIME = "image/jpeg"
 	ImageGIF  MIME = "image/gif"
+
+	AudioMPEG  MIME = "audio/mpeg"
+	AudioWAV   MIME = "audio/wav"
+	AudioXAIFF MIME = "audio/x-aiff"
+
+	VideoMP4 MIME = "video/mp4"
 )
 
 func Matches(detected string, expected MIME) (MIME, bool) {
