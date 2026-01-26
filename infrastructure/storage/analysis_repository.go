@@ -85,6 +85,12 @@ type FileDetails struct {
 	Size     uint64
 }
 
+const (
+	CONTENT   = "content"
+	NAMESPACE = "namespace"
+	TYPE      = "type"
+)
+
 // Store persists the analysis in BadgerDB and indexes its content in Bluge.
 // This dual-write approach ensures that the data is both durable (Source of Truth)
 // and searchable in real-time. The method dynamically selects the most relevant
@@ -120,18 +126,18 @@ func (a *AnalysisRepository) Store(analysis Analysis) error {
 }
 
 // upsertSearchIndex maps and persists analysis metadata into the Bluge search engine.
-// It handles text tokenization for the content, exact matching for identifiers (room_id, type),
+// It handles text tokenization for the content, exact matching for identifiers (namespace, type),
 // and stores AI specialist scores as numeric fields to enable range-based filtering.
 // This method ensures the search index stays synchronized with the primary BadgerDB storage.
 func (a *AnalysisRepository) upsertSearchIndex(id, content string,
 	metadata map[specialist.Metric]float64,
-	category specialist.Category, Namespace string) error {
+	category specialist.Category, namespace string) error {
 	doc := bluge.NewDocument(id)
 	// TextField allows full-text search with tokenization (e.g., lowercase, stop words)
-	doc.AddField(bluge.NewTextField("content", content).StoreValue())
+	doc.AddField(bluge.NewTextField(CONTENT, content).StoreValue())
 	// KeywordField stores strings as-is for exact matching (IDs, enums)
-	doc.AddField(bluge.NewKeywordField("room_id", Namespace).StoreValue())
-	doc.AddField(bluge.NewKeywordField("type", string(category)).StoreValue())
+	doc.AddField(bluge.NewKeywordField(NAMESPACE, namespace).StoreValue())
+	doc.AddField(bluge.NewKeywordField(TYPE, string(category)).StoreValue())
 
 	// NumericField allows optimized range queries (e.g., toxicity > 0.8)
 	for name, score := range metadata {
@@ -190,9 +196,9 @@ func (a *AnalysisRepository) StoreBatch(analyses []Analysis) error {
 		fullSearchableText, category := a.prepareInternalData(analysis)
 
 		doc := bluge.NewDocument(analysis.EntityId.String())
-		doc.AddField(bluge.NewTextField("content", fullSearchableText).StoreValue())
-		doc.AddField(bluge.NewKeywordField("room_id", analysis.Namespace).StoreValue())
-		doc.AddField(bluge.NewKeywordField("type", string(category)).StoreValue())
+		doc.AddField(bluge.NewTextField(CONTENT, fullSearchableText).StoreValue())
+		doc.AddField(bluge.NewKeywordField(NAMESPACE, analysis.Namespace).StoreValue())
+		doc.AddField(bluge.NewKeywordField(TYPE, string(category)).StoreValue())
 
 		for name, score := range analysis.Scores {
 			fieldName := strings.ToLower(string(name))
@@ -296,24 +302,24 @@ func (a *AnalysisRepository) ScanAnalysesByRoom(Namespace string, cursor *string
 //
 //	Even though the UUID lookup is global, the method validates that the retrieved
 //	record belongs to the requested Namespace to ensure data isolation. [cite: 2026-01-19]
-func (a *AnalysisRepository) FetchFullByEntityId(Namespace string, EntityId uuid.UUID) (Analysis, error) {
+func (a *AnalysisRepository) FetchFullByEntityId(namespace string, entityID uuid.UUID) (Analysis, error) {
 	var result Analysis
 
 	// The secondary index key acts as a "shortcut" to the real data location.
-	indexKey := []byte(fmt.Sprintf("idx:msg:%s", EntityId.String()))
+	indexKey := []byte(fmt.Sprintf("idx:msg:%s", entityID.String()))
 
 	err := a.db.View(func(txn *badger.Txn) error {
 		// STEP 1: Retrieve the pointer (the main key) from the secondary index.
 		itemIdx, err := txn.Get(indexKey)
 		if err != nil {
-			return fmt.Errorf("analysis index not found for message %s: %w", EntityId, err)
+			return fmt.Errorf("analysis index not found for message %s: %w", entityID, err)
 		}
 
 		return itemIdx.Value(func(mainKey []byte) error {
 			// STEP 2: Retrieve the actual Protobuf payload using the main key pointer.
 			itemData, err := txn.Get(mainKey)
 			if err != nil {
-				return fmt.Errorf("analysis data not found for message %s: %w", EntityId, err)
+				return fmt.Errorf("analysis data not found for message %s: %w", entityID, err)
 			}
 
 			return itemData.Value(func(v []byte) error {
@@ -329,8 +335,8 @@ func (a *AnalysisRepository) FetchFullByEntityId(Namespace string, EntityId uuid
 				}
 
 				// STEP 3: Security Check. Verify the record belongs to the requested room.
-				if res.Namespace != Namespace {
-					return fmt.Errorf("security violation: message %s does not belong to room %s", EntityId, Namespace)
+				if res.Namespace != namespace {
+					return fmt.Errorf("security violation: message %s does not belong to room %s", entityID, namespace)
 				}
 
 				result = res
@@ -342,17 +348,17 @@ func (a *AnalysisRepository) FetchFullByEntityId(Namespace string, EntityId uuid
 	return result, err
 }
 
-// SearchPaginated performs a full-text search on the 'content' field, filtered by Namespace.
+// SearchPaginated performs a full-text search on the 'content' field, filtered by namespace.
 // It uses a MatchQuery for the content to handle tokenization and a TermQuery
-// for the Namespace to ensure an exact match on the KeywordField.
-func (a *AnalysisRepository) SearchPaginated(ctx context.Context, query string, Namespace string, offset int) ([]Analysis, uint64, error) {
-	contentQuery := bluge.NewMatchQuery(query).SetField("content")
+// for the namespace to ensure an exact match on the KeywordField.
+func (a *AnalysisRepository) SearchPaginated(ctx context.Context, query string, namespace string, offset int) ([]Analysis, uint64, error) {
+	contentQuery := bluge.NewMatchQuery(query).SetField(CONTENT)
 
 	var finalQuery bluge.Query
-	if Namespace != "" {
+	if namespace != "" {
 		bq := bluge.NewBooleanQuery()
 		bq.AddMust(contentQuery)
-		bq.AddMust(bluge.NewTermQuery(Namespace).SetField("room_id"))
+		bq.AddMust(bluge.NewTermQuery(namespace).SetField(NAMESPACE))
 		finalQuery = bq
 	} else {
 		finalQuery = contentQuery
@@ -361,7 +367,7 @@ func (a *AnalysisRepository) SearchPaginated(ctx context.Context, query string, 
 	request := bluge.NewTopNSearch(a.blugeLimit, finalQuery).SetFrom(offset)
 
 	// Pass the query to searchAndHydrate for counting
-	return a.searchAndHydrate(ctx, request, finalQuery, Namespace)
+	return a.searchAndHydrate(ctx, request, finalQuery, namespace)
 }
 
 // SearchByScoreRange allows filtering messages based on AI specialist metrics (e.g., toxicity > 0.8).
@@ -374,7 +380,7 @@ func (a *AnalysisRepository) SearchByScoreRange(ctx context.Context,
 	bq := bluge.NewBooleanQuery()
 	bq.AddMust(query)
 	if Namespace != "" {
-		bq.AddMust(bluge.NewTermQuery(Namespace).SetField("room_id"))
+		bq.AddMust(bluge.NewTermQuery(Namespace).SetField(NAMESPACE))
 	}
 
 	request := bluge.NewTopNSearch(a.blugeLimit, bq)
