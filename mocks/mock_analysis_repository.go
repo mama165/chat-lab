@@ -42,20 +42,6 @@ func (m *MockIAnalysisRepository) EXPECT() *MockIAnalysisRepositoryMockRecorder 
 	return m.recorder
 }
 
-// DeleteByEntityId mocks base method.
-func (m *MockIAnalysisRepository) DeleteByEntityId(Namespace string, EntityId uuid.UUID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteByEntityId", Namespace, EntityId)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteByEntityId indicates an expected call of DeleteByEntityId.
-func (mr *MockIAnalysisRepositoryMockRecorder) DeleteByEntityId(Namespace, EntityId any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByEntityId", reflect.TypeOf((*MockIAnalysisRepository)(nil).DeleteByEntityId), Namespace, EntityId)
-}
-
 // FetchFullByEntityId mocks base method.
 func (m *MockIAnalysisRepository) FetchFullByEntityId(Namespace string, EntityId uuid.UUID) (storage.Analysis, error) {
 	m.ctrl.T.Helper()

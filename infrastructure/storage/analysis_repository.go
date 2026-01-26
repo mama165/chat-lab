@@ -21,11 +21,10 @@ import (
 type IAnalysisRepository interface {
 	Store(analysis Analysis) error
 	StoreBatch(analyses []Analysis) error
-	ScanAnalysesByRoom(Namespace string, cursor *string) ([]Analysis, *string, error)
-	FetchFullByEntityId(Namespace string, EntityId uuid.UUID) (Analysis, error)
-	SearchPaginated(ctx context.Context, query string, Namespace string, offset int) ([]Analysis, uint64, error)
-	SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, Namespace string) ([]Analysis, uint64, error)
-	DeleteByEntityId(Namespace string, EntityId uuid.UUID) error
+	ScanAnalysesByRoom(namespace string, cursor *string) ([]Analysis, *string, error)
+	FetchFullByEntityId(namespace string, entityID uuid.UUID) (Analysis, error)
+	SearchPaginated(ctx context.Context, query string, namespace string, offset int) ([]Analysis, uint64, error)
+	SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, namespace string) ([]Analysis, uint64, error)
 	Flush() error
 }
 
@@ -382,13 +381,6 @@ func (a *AnalysisRepository) SearchByScoreRange(ctx context.Context,
 
 	// Pass the query to searchAndHydrate for counting
 	return a.searchAndHydrate(ctx, request, bq, Namespace)
-}
-
-// DeleteByEntityId removes an analysis record.
-// Implementation should handle both BadgerDB and Bluge index removal.
-func (a *AnalysisRepository) DeleteByEntityId(Namespace string, EntityId uuid.UUID) error {
-	// TODO: Implement dual-delete
-	return nil
 }
 
 // Flush A batch operation in Bluge triggers a physical write/commit
