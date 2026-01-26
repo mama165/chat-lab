@@ -1,5 +1,7 @@
 package specialist
 
+import "chat-lab/domain/mimetypes"
+
 type Metric string
 
 const (
@@ -9,8 +11,19 @@ const (
 )
 
 type Config struct {
-	ID      Metric
-	BinPath string
-	Host    string
-	Port    int
+	ID           Metric
+	BinPath      string
+	Host         string
+	Port         int
+	Capabilities []mimetypes.MIME // ex: ["application/pdf", "audio/mpeg", "video/mp4"]
+}
+
+func NewConfig(ID Metric, BinPath string, Host string, Port int, Capabilities []mimetypes.MIME) Config {
+	return Config{
+		ID:           ID,
+		BinPath:      BinPath,
+		Host:         Host,
+		Port:         Port,
+		Capabilities: Capabilities,
+	}
 }

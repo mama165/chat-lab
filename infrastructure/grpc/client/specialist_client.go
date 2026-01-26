@@ -1,6 +1,7 @@
 package client
 
 import (
+	"chat-lab/domain/mimetypes"
 	"chat-lab/domain/specialist"
 	pb "chat-lab/proto/analysis"
 	"context"
@@ -11,20 +12,23 @@ import (
 )
 
 type SpecialistClient struct {
-	Id         specialist.Metric
-	Client     pb.SpecialistServiceClient
-	Process    *os.Process
-	Port       int
-	LastHealth time.Time
+	Id           specialist.Metric
+	Client       pb.SpecialistServiceClient
+	Process      *os.Process
+	Port         int
+	LastHealth   time.Time
+	Capabilities []mimetypes.MIME
 }
 
 func NewSpecialistClient(id specialist.Metric,
 	client pb.SpecialistServiceClient,
 	process *os.Process, port int, lastHealth time.Time,
+	capabilities []mimetypes.MIME,
 ) *SpecialistClient {
 	return &SpecialistClient{
 		Id: id, Client: client, Process: process, Port: port,
-		LastHealth: lastHealth,
+		LastHealth:   lastHealth,
+		Capabilities: capabilities,
 	}
 }
 
@@ -44,7 +48,7 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request specialist.Reque
 				Metadata: &pb.Metadata{
 					MessageId: request.Metadata.MessageID,
 					FileName:  request.Metadata.FileName,
-					MimeType:  request.Metadata.MimeType,
+					MimeType:  string(request.Metadata.MimeType),
 				},
 			},
 		})
@@ -76,6 +80,10 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request specialist.Reque
 	}
 
 	return ToResponse(response), nil
+}
+
+func (s *SpecialistClient) CanHandle(mimeType mimetypes.MIME) bool {
+	return lo.Contains(s.Capabilities, mimeType)
 }
 
 func ToResponse(response *pb.SpecialistResponse) specialist.Response {

@@ -1,5 +1,7 @@
 package specialist
 
+import "chat-lab/domain/mimetypes"
+
 // Category defines the type of content being processed by a specialist.
 type Category string
 
@@ -22,7 +24,7 @@ type Request struct {
 type Metadata struct {
 	MessageID string
 	FileName  string
-	MimeType  string
+	MimeType  mimetypes.MIME
 }
 
 // Response is a container for the specialist's output.
@@ -54,7 +56,7 @@ type Score struct {
 
 type AnalysisRequest struct {
 	Path     string
-	MimeType string
+	MimeType mimetypes.MIME
 }
 
 type AnalysisResponse struct {

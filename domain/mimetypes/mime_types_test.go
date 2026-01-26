@@ -36,9 +36,9 @@ func TestMatches(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Matches(tt.detected, tt.expected)
-			if got != tt.want {
-				t.Errorf("Matches(%q, %q) = %v; want %v", tt.detected, tt.expected, got, tt.want)
+			got, ok := Matches(tt.detected, tt.expected)
+			if ok != tt.want && got != tt.expected {
+				t.Errorf("Matches(%q, %q) = %v; want %v", tt.detected, tt.expected, ok, tt.want)
 			}
 		})
 	}

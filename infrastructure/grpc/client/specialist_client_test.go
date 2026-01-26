@@ -1,6 +1,7 @@
 package client
 
 import (
+	"chat-lab/domain/mimetypes"
 	"chat-lab/domain/specialist"
 	pb "chat-lab/proto/analysis"
 	"context"
@@ -60,7 +61,7 @@ func TestSpecialistClient_Analyze_Chunking(t *testing.T) {
 	ass := assert.New(t)
 	mockStream := newMockSpecialistStream()
 	mockClient := &mockServiceClient{stream: mockStream}
-	sClient := NewSpecialistClient("test-id", mockClient, nil, 50051, time.Now())
+	sClient := NewSpecialistClient("test-id", mockClient, nil, 50051, time.Now(), []mimetypes.MIME{mimetypes.ApplicationPDF})
 
 	// Given a large chunk (100 KB) to trigger chunking logic (32KB * 3 + leftover)
 	part := 100
@@ -107,7 +108,7 @@ func TestSpecialistClient_Analyze_NetworkErrorDuringChunks(t *testing.T) {
 	ass := assert.New(t)
 	mockStream := newMockSpecialistStream()
 	mockClient := &mockServiceClient{stream: mockStream}
-	sClient := NewSpecialistClient("test-id", mockClient, nil, 50051, time.Now())
+	sClient := NewSpecialistClient("test-id", mockClient, nil, 50051, time.Now(), []mimetypes.MIME{mimetypes.ApplicationPDF})
 
 	// Given two chunks of 64KB
 	data := make([]byte, 64*1024)
@@ -136,4 +137,24 @@ func TestSpecialistClient_Analyze_NetworkErrorDuringChunks(t *testing.T) {
 
 	// And only two calls have been done  => 1 metadata (success) + 1 chunk (failure)
 	ass.Equal(2, sendCount)
+}
+
+func TestSpecialist_Can_Handle_Mime_Type(t *testing.T) {
+	ass := assert.New(t)
+	mockStream := newMockSpecialistStream()
+	mockClient := &mockServiceClient{stream: mockStream}
+	sClient1 := NewSpecialistClient("test-id", mockClient, nil, 50051, time.Now(), []mimetypes.MIME{mimetypes.ApplicationPDF})
+	sClient2 := NewSpecialistClient("test-id", mockClient, nil, 50051, time.Now(), []mimetypes.MIME{mimetypes.ImageJPEG, mimetypes.TextHTML})
+
+	ok := sClient1.CanHandle(mimetypes.ApplicationPDF)
+	ass.True(ok)
+	ok = sClient1.CanHandle(mimetypes.ApplicationJSON)
+	ass.False(ok)
+
+	ok = sClient2.CanHandle(mimetypes.ImageJPEG)
+	ass.True(ok)
+	ok = sClient2.CanHandle(mimetypes.TextHTML)
+	ass.True(ok)
+	ok = sClient2.CanHandle(mimetypes.TextCSS)
+	ass.False(ok)
 }

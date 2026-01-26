@@ -5,6 +5,7 @@ import "mime"
 type MIME string
 
 const (
+	Unknown   MIME = "unknown"
 	TextPlain MIME = "text/plain"
 	TextHTML  MIME = "text/html"
 	TextCSS   MIME = "text/css"
@@ -18,10 +19,10 @@ const (
 	ImageGIF  MIME = "image/gif"
 )
 
-func Matches(detected string, expected MIME) bool {
+func Matches(detected string, expected MIME) (MIME, bool) {
 	mt, _, err := mime.ParseMediaType(detected)
 	if err != nil {
-		return false
+		return Unknown, false
 	}
-	return mt == string(expected)
+	return expected, mt == string(expected)
 }

@@ -80,7 +80,10 @@ func TestBroadcastOnlyForPDFOrFileSource(t *testing.T) {
 	s, mockRepo, mockCoordinator := setupSink(ctrl, 1, 1*time.Hour)
 
 	// SCENARIO 1: PDF File -> Should Broadcast
-	mockCoordinator.EXPECT().Broadcast(gomock.Any(), gomock.Any()).Return(specialist.AnalysisResponse{}, nil).Times(1)
+	mockRequest := specialist.AnalysisRequest{
+		MimeType: mimetypes.ApplicationPDF,
+	}
+	mockCoordinator.EXPECT().Broadcast(gomock.Any(), mockRequest).Return(specialist.AnalysisResponse{}, nil).Times(1)
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
 
 	err := s.Consume(context.Background(), event.FileAnalyse{

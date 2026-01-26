@@ -100,7 +100,8 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 		pb.NewSpecialistServiceClient(conn),
 		cmd.Process,
 		cfg.Port,
-		time.Now())
+		time.Now(),
+		cfg.Capabilities)
 	return specialistClient, nil
 }
 
@@ -119,39 +120,42 @@ func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn
 	return nil, fmt.Errorf("timeout: specialist not responding at %s after retries", addr)
 }
 
-// Broadcast orchestrates the analysis of a file by streaming its content to all registered
-// specialists in parallel. It reads the file from the provided path, dispatches analysis
-// requests concurrently, and aggregates the results into an AnalysisResponse.
+// Broadcast orchestrates the analysis of a file by streaming its content to relevant
+// specialists in parallel based on their capabilities (MIME types).
 func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequest) (specialist.AnalysisResponse, error) {
+	// 1. Read file content once to share it across specialists
 	data, err := os.ReadFile(req.Path)
 	if err != nil {
 		return specialist.AnalysisResponse{}, fmt.Errorf("failed to read file %s: %w", req.Path, err)
 	}
 
 	m.mu.RLock()
-	numSpecs := len(m.specialists)
-	m.mu.RUnlock()
+	defer m.mu.RUnlock()
 
-	if numSpecs == 0 {
+	var targets []*client.SpecialistClient
+	for _, spec := range m.specialists {
+		if spec.CanHandle(req.MimeType) {
+			targets = append(targets, spec)
+		}
+	}
+
+	if len(targets) == 0 {
+		m.log.Warn("No specialist found for MIME type", "mime", req.MimeType, "path", req.Path)
 		return specialist.AnalysisResponse{Results: make(map[specialist.Metric]specialist.Response)}, nil
 	}
 
-	results := make(map[specialist.Metric]specialist.Response)
-
-	// On utilise une structure interne pour le channel afin de capturer l'ID et la réponse
 	type specResult struct {
 		id   specialist.Metric
 		resp specialist.Response
 		err  error
 	}
-	resChan := make(chan specResult, numSpecs)
+
+	resChan := make(chan specResult, len(targets))
 	var wg sync.WaitGroup
 
-	// 3. Lancement des analyses en parallèle
-	m.mu.RLock()
-	for id, spec := range m.specialists {
+	for _, spec := range targets {
 		wg.Add(1)
-		go func(id specialist.Metric, s *client.SpecialistClient) {
+		go func(s *client.SpecialistClient) {
 			defer wg.Done()
 
 			domainReq := specialist.Request{
@@ -163,23 +167,30 @@ func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequ
 				Chunk: data,
 			}
 
+			// Call gRPC Analyze (stream or unary depending on your client impl)
 			resp, err := s.Analyze(ctx, domainReq)
 			if err != nil {
-				m.log.Error("Specialist analysis failed", "id", id, "path", req.Path, "error", err)
-				resChan <- specResult{id: id, err: err}
+				m.log.Error("Specialist analysis failed",
+					"id", s.Id,
+					"mime", req.MimeType,
+					"error", err,
+				)
+				resChan <- specResult{id: s.Id, err: err}
 				return
 			}
 
-			resChan <- specResult{id: id, resp: resp}
-		}(id, spec)
+			resChan <- specResult{id: s.Id, resp: resp}
+		}(spec)
 	}
-	m.mu.RUnlock()
 
+	// 5. Close results channel once all specialists have responded or failed
 	go func() {
 		wg.Wait()
 		close(resChan)
 	}()
 
+	// 6. Aggregate results into the final response map
+	results := make(map[specialist.Metric]specialist.Response)
 	for res := range resChan {
 		if res.err == nil {
 			results[res.id] = res.resp

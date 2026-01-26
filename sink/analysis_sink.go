@@ -138,10 +138,10 @@ func (a *AnalysisSink) processAndStore(ctx context.Context, events []event.FileA
 			var err error
 
 			// Only trigger specialized analysis if the file type requires it.
-			if mimetypes.Matches(e.MimeType, mimetypes.ApplicationPDF) || e.SourceType == "file" {
+			if mimeType, ok := mimetypes.Matches(e.MimeType, mimetypes.ApplicationPDF); ok || e.SourceType == "file" {
 				resp, err = a.coordinator.Broadcast(ctx, specialist.AnalysisRequest{
 					Path:     e.Path,
-					MimeType: e.MimeType,
+					MimeType: mimeType,
 				})
 			}
 
