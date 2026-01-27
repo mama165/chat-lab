@@ -76,13 +76,14 @@ type TextContent struct {
 
 type AudioDetails struct {
 	Transcription string
-	Duration      uint32
+	Duration      float64
 }
 
 type FileDetails struct {
 	Filename string
 	MimeType string
 	Size     uint64
+	Content  string
 }
 
 const (
@@ -184,6 +185,11 @@ func (a *AnalysisRepository) StoreBatch(analyses []Analysis) error {
 		mainKey := buildKey(analysis.Namespace, analysis.At, analysis.EntityId)
 		// Pointer key for O(1) lookup: idx:msg:{uuid} -> mainKey
 		indexKey := []byte(fmt.Sprintf("idx:msg:%s", analysis.EntityId.String()))
+
+		a.log.Debug("💾 WRITING TO BADGER",
+			"key", string(mainKey),
+			"entity_id", analysis.EntityId.String(),
+			"namespace", analysis.Namespace)
 
 		// Store both the data and the pointer in the same batch
 		if err := wb.Set(mainKey, bytes); err != nil {
@@ -503,38 +509,75 @@ func fromAnalysis(analysis Analysis) *pb.Analysis {
 
 	switch p := analysis.Payload.(type) {
 	case TextContent:
-		res.Payload = &pb.Analysis_TextContent{TextContent: &pb.TextContent{Content: p.Content}}
+		res.Payload = &pb.Analysis_TextContent{
+			TextContent: &pb.TextContent{
+				Content: p.Content,
+			},
+		}
 	case *TextContent:
-		res.Payload = &pb.Analysis_TextContent{TextContent: &pb.TextContent{Content: p.Content}}
+		res.Payload = &pb.Analysis_TextContent{
+			TextContent: &pb.TextContent{
+				Content: p.Content,
+			},
+		}
 	case AudioDetails:
-		res.Payload = &pb.Analysis_Audio{Audio: &pb.AudioDetails{Transcription: p.Transcription, DurationSec: p.Duration}}
+		res.Payload = &pb.Analysis_Audio{
+			Audio: &pb.AudioDetails{
+				Transcription: p.Transcription,
+				DurationSec:   p.Duration,
+			},
+		}
 	case *AudioDetails:
-		res.Payload = &pb.Analysis_Audio{Audio: &pb.AudioDetails{Transcription: p.Transcription, DurationSec: p.Duration}}
+		res.Payload = &pb.Analysis_Audio{
+			Audio: &pb.AudioDetails{
+				Transcription: p.Transcription, DurationSec: p.Duration,
+			},
+		}
 	case FileDetails:
-		res.Payload = &pb.Analysis_File{File: &pb.FileDetails{Filename: p.Filename, MimeType: p.MimeType, Size: p.Size}}
+		res.Payload = &pb.Analysis_File{
+			File: &pb.FileDetails{
+				Filename: p.Filename,
+				MimeType: p.MimeType,
+				Size:     p.Size,
+				Content:  p.Content,
+			},
+		}
 	case *FileDetails:
-		res.Payload = &pb.Analysis_File{File: &pb.FileDetails{Filename: p.Filename, MimeType: p.MimeType, Size: p.Size}}
+		res.Payload = &pb.Analysis_File{
+			File: &pb.FileDetails{
+				Filename: p.Filename,
+				MimeType: p.MimeType,
+				Size:     p.Size,
+				Content:  p.Content,
+			},
+		}
 	}
 	return res
 }
 
+// ToAnalysis converts a Protobuf Analysis message to a domain Analysis struct.
+// It handles UUID parsing and maps the polymorphic payload (Text, Audio, File).
 func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
+	// 1. Parse Identifiers
 	id, err := uuid.Parse(analysisPb.Id)
 	if err != nil {
-		return Analysis{}, err
+		return Analysis{}, fmt.Errorf("invalid analysis id: %w", err)
 	}
-	EntityId, err := uuid.Parse(analysisPb.EntityId)
+	entityId, err := uuid.Parse(analysisPb.EntityId)
 	if err != nil {
-		return Analysis{}, err
+		return Analysis{}, fmt.Errorf("invalid entity id: %w", err)
 	}
 
+	// 2. Map Scores using lo
+	// English: Map string keys to domain Metric type
 	scores := lo.MapKeys(analysisPb.Scores, func(_ float64, key string) specialist.Metric {
 		return specialist.Metric(key)
 	})
 
+	// 3. Initialize Base Structure
 	res := Analysis{
 		ID:        id,
-		EntityId:  EntityId,
+		EntityId:  entityId,
 		Namespace: analysisPb.Namespace,
 		At:        analysisPb.At.AsTime(),
 		Summary:   analysisPb.Summary,
@@ -542,23 +585,42 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 		Scores:    scores,
 	}
 
+	// 4. Map Polymorphic Payload
 	if analysisPb.Payload != nil {
+		// English: Log the concrete type of the protobuf oneof for debugging purposes
+		// Français: Log du type concret pour vérifier l'aiguillage gRPC
+		fmt.Printf("🔍 [DEBUG MAPPER] Protobuf Payload Type: %T\n", analysisPb.Payload)
+
 		switch p := analysisPb.Payload.(type) {
 		case *pb.Analysis_TextContent:
-			res.Payload = TextContent{Content: p.TextContent.Content}
+			res.Payload = TextContent{
+				Content: p.TextContent.Content,
+			}
+
 		case *pb.Analysis_Audio:
 			res.Payload = AudioDetails{
 				Transcription: p.Audio.Transcription,
 				Duration:      p.Audio.DurationSec,
 			}
+
 		case *pb.Analysis_File:
 			res.Payload = FileDetails{
 				Filename: p.File.Filename,
 				MimeType: p.File.MimeType,
 				Size:     p.File.Size,
+				Content:  p.File.Content, // Assure-toi que Content est bien dans ta struct Go
 			}
+
+			// English: Even if it's a file, let's see what's inside the proto object
+			// Français: Même si c'est un fichier, on regarde ce qu'il y a dans l'objet proto
+			fmt.Printf("📂 [DEBUG FILE] Content size: %d bytes\n", len(p.File.Content))
+			fmt.Printf("📂 [DEBUG FILE] Raw Content: %s\n", p.File.Content)
+
+		default:
+			fmt.Printf("⚠️ [DEBUG MAPPER] Unknown payload type: %T\n", p)
 		}
 	}
+
 	return res, nil
 }
 
@@ -593,10 +655,16 @@ func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, specialis
 
 	case FileDetails:
 		fullText += " " + p.Filename
+		if p.Content != "" {
+			fullText += " " + p.Content
+		}
 		category = specialist.FileType
 	case *FileDetails:
 		if p != nil {
 			fullText += " " + p.Filename
+			if p.Content != "" {
+				fullText += " " + p.Content
+			}
 		}
 		category = specialist.FileType
 

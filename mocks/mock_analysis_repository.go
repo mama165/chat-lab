@@ -43,18 +43,18 @@ func (m *MockIAnalysisRepository) EXPECT() *MockIAnalysisRepositoryMockRecorder 
 }
 
 // FetchFullByEntityId mocks base method.
-func (m *MockIAnalysisRepository) FetchFullByEntityId(Namespace string, EntityId uuid.UUID) (storage.Analysis, error) {
+func (m *MockIAnalysisRepository) FetchFullByEntityId(namespace string, entityID uuid.UUID) (storage.Analysis, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FetchFullByEntityId", Namespace, EntityId)
+	ret := m.ctrl.Call(m, "FetchFullByEntityId", namespace, entityID)
 	ret0, _ := ret[0].(storage.Analysis)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FetchFullByEntityId indicates an expected call of FetchFullByEntityId.
-func (mr *MockIAnalysisRepositoryMockRecorder) FetchFullByEntityId(Namespace, EntityId any) *gomock.Call {
+func (mr *MockIAnalysisRepositoryMockRecorder) FetchFullByEntityId(namespace, entityID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchFullByEntityId", reflect.TypeOf((*MockIAnalysisRepository)(nil).FetchFullByEntityId), Namespace, EntityId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchFullByEntityId", reflect.TypeOf((*MockIAnalysisRepository)(nil).FetchFullByEntityId), namespace, entityID)
 }
 
 // Flush mocks base method.
@@ -72,9 +72,9 @@ func (mr *MockIAnalysisRepositoryMockRecorder) Flush() *gomock.Call {
 }
 
 // ScanAnalysesByRoom mocks base method.
-func (m *MockIAnalysisRepository) ScanAnalysesByRoom(Namespace string, cursor *string) ([]storage.Analysis, *string, error) {
+func (m *MockIAnalysisRepository) ScanAnalysesByRoom(namespace string, cursor *string) ([]storage.Analysis, *string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ScanAnalysesByRoom", Namespace, cursor)
+	ret := m.ctrl.Call(m, "ScanAnalysesByRoom", namespace, cursor)
 	ret0, _ := ret[0].([]storage.Analysis)
 	ret1, _ := ret[1].(*string)
 	ret2, _ := ret[2].(error)
@@ -82,15 +82,15 @@ func (m *MockIAnalysisRepository) ScanAnalysesByRoom(Namespace string, cursor *s
 }
 
 // ScanAnalysesByRoom indicates an expected call of ScanAnalysesByRoom.
-func (mr *MockIAnalysisRepositoryMockRecorder) ScanAnalysesByRoom(Namespace, cursor any) *gomock.Call {
+func (mr *MockIAnalysisRepositoryMockRecorder) ScanAnalysesByRoom(namespace, cursor any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanAnalysesByRoom", reflect.TypeOf((*MockIAnalysisRepository)(nil).ScanAnalysesByRoom), Namespace, cursor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScanAnalysesByRoom", reflect.TypeOf((*MockIAnalysisRepository)(nil).ScanAnalysesByRoom), namespace, cursor)
 }
 
 // SearchByScoreRange mocks base method.
-func (m *MockIAnalysisRepository) SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, Namespace string) ([]storage.Analysis, uint64, error) {
+func (m *MockIAnalysisRepository) SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, namespace string) ([]storage.Analysis, uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SearchByScoreRange", ctx, scoreName, min, max, Namespace)
+	ret := m.ctrl.Call(m, "SearchByScoreRange", ctx, scoreName, min, max, namespace)
 	ret0, _ := ret[0].([]storage.Analysis)
 	ret1, _ := ret[1].(uint64)
 	ret2, _ := ret[2].(error)
@@ -98,15 +98,15 @@ func (m *MockIAnalysisRepository) SearchByScoreRange(ctx context.Context, scoreN
 }
 
 // SearchByScoreRange indicates an expected call of SearchByScoreRange.
-func (mr *MockIAnalysisRepositoryMockRecorder) SearchByScoreRange(ctx, scoreName, min, max, Namespace any) *gomock.Call {
+func (mr *MockIAnalysisRepositoryMockRecorder) SearchByScoreRange(ctx, scoreName, min, max, namespace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchByScoreRange", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchByScoreRange), ctx, scoreName, min, max, Namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchByScoreRange", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchByScoreRange), ctx, scoreName, min, max, namespace)
 }
 
 // SearchPaginated mocks base method.
-func (m *MockIAnalysisRepository) SearchPaginated(ctx context.Context, query, Namespace string, offset int) ([]storage.Analysis, uint64, error) {
+func (m *MockIAnalysisRepository) SearchPaginated(ctx context.Context, query, namespace string, offset int) ([]storage.Analysis, uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SearchPaginated", ctx, query, Namespace, offset)
+	ret := m.ctrl.Call(m, "SearchPaginated", ctx, query, namespace, offset)
 	ret0, _ := ret[0].([]storage.Analysis)
 	ret1, _ := ret[1].(uint64)
 	ret2, _ := ret[2].(error)
@@ -114,9 +114,9 @@ func (m *MockIAnalysisRepository) SearchPaginated(ctx context.Context, query, Na
 }
 
 // SearchPaginated indicates an expected call of SearchPaginated.
-func (mr *MockIAnalysisRepositoryMockRecorder) SearchPaginated(ctx, query, Namespace, offset any) *gomock.Call {
+func (mr *MockIAnalysisRepositoryMockRecorder) SearchPaginated(ctx, query, namespace, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchPaginated", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchPaginated), ctx, query, Namespace, offset)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchPaginated", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchPaginated), ctx, query, namespace, offset)
 }
 
 // Store mocks base method.

@@ -22,6 +22,6 @@ services:
       - /tmp/badger:/tmp/badger
     user: "${D_UID}:${D_GID}"
     env_file:
-      - cmd/master/local.conf
+      - internal/local.conf
     ports:
       - "8080:8080"

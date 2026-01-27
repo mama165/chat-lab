@@ -38,10 +38,9 @@ class AudioSpecialist(pb_grpc.SpecialistServiceServicer):
 
             #  Return the result as DocumentData (Pages) which is understandable for Go
             return pb.SpecialistResponse(
-                document_data=pb.DocumentData(
-                    title=metadata.file_name if metadata else "audio_file",
-                    pages=[pb.Page(number=1, content=full_text.strip())],
-                    language=info.language
+                audio=pb.AudioDetails(
+                    transcription=full_text.strip(),
+                    duration_sec=0 # ou la vraie durée si tu l'as
                 )
             )
         finally:

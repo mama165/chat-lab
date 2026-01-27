@@ -43,6 +43,8 @@ type Orchestrator struct {
 	analysisRepository   storage.IAnalysisRepository
 	coordinator          contract.SpecialistCoordinator
 	sinkTimeout          time.Duration
+	bufferTimeout        time.Duration
+	specialistTimeout    time.Duration
 	metricInterval       time.Duration
 	latencyThreshold     time.Duration
 	waitAndFail          time.Duration
@@ -59,7 +61,8 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
 	specialistCoordinator contract.SpecialistCoordinator,
-	numWorkers, bufferSize int, sinkTimeout,
+	numWorkers, bufferSize int,
+	sinkTimeout, bufferTimeout, specialistTimeout time.Duration,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,
 	minScoring, maxScoring float64, maxAnalyzedEvent int) *Orchestrator {
@@ -78,6 +81,8 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		analysisRepository:   analysisRepository,
 		coordinator:          specialistCoordinator,
 		sinkTimeout:          sinkTimeout,
+		bufferTimeout:        bufferTimeout,
+		specialistTimeout:    specialistTimeout,
 		metricInterval:       metricInterval,
 		latencyThreshold:     latencyThreshold,
 		waitAndFail:          waitAndFail,
@@ -222,7 +227,7 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 	diskSink := sink.NewDiskSink(o.messageRepository, o.log)
 	analysisSink := sink.NewAnalysisSink(o.coordinator,
-		o.analysisRepository, o.log, o.maxAnalyzedEvent, 5*time.Millisecond)
+		o.analysisRepository, o.log, o.maxAnalyzedEvent, o.bufferTimeout, o.specialistTimeout)
 
 	var res []contract.Worker
 	for i := 0; i < o.numWorkers; i++ {

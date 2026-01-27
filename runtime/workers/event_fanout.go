@@ -23,7 +23,7 @@ type EventFanoutWorker struct {
 	diskSink      contract.EventSink[contract.DomainEvent]
 	analysisSink  contract.EventSink[contract.FileAnalyzerEvent]
 	registry      contract.IRegistry
-	event         chan event.Event
+	eventChan     chan event.Event
 	telemetryChan chan event.Event
 	sinkTimeout   time.Duration
 }
@@ -33,23 +33,23 @@ func NewEventFanoutWorker(
 	diskSink contract.EventSink[contract.DomainEvent],
 	analysisSink contract.EventSink[contract.FileAnalyzerEvent],
 	registry contract.IRegistry,
-	domainEvent, telemetryChan chan event.Event,
+	eventChan, telemetryChan chan event.Event,
 	sinkTimeout time.Duration) *EventFanoutWorker {
 	return &EventFanoutWorker{
 		log:          log,
 		diskSink:     diskSink,
 		analysisSink: analysisSink,
 		registry:     registry,
-		event:        domainEvent, telemetryChan: telemetryChan,
+		eventChan:    eventChan, telemetryChan: telemetryChan,
 		sinkTimeout: sinkTimeout}
 }
 
-// Run starts the event distribution loop.
+// Run starts the eventChan distribution loop.
 // It dispatches DomainEvents to rooms/sinks and forwards all moderationChan
 // to the telemetry channel for observability.
 // The range loop ensures all buffered moderationChan are processed before shutdown.
 func (w *EventFanoutWorker) Run(ctx context.Context) error {
-	for evt := range w.event {
+	for evt := range w.eventChan {
 		switch e := evt.Payload.(type) {
 		case contract.DomainEvent:
 			w.Fanout(e)
@@ -61,7 +61,7 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 			w.log.Debug("Context done, skipping telemetry")
 		case w.telemetryChan <- evt:
 		default:
-			w.log.Debug("Observability telemetry event lost")
+			w.log.Debug("Observability telemetry eventChan lost")
 		}
 	}
 	w.log.Info("EventFanoutWorker: domainEvent channel drained and closed. Shutting down.")
@@ -69,14 +69,14 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 }
 
 func (w *EventFanoutWorker) handleFileEvent(ctx context.Context, evt contract.FileAnalyzerEvent) {
-	w.log.Debug(fmt.Sprintf("Consumed event : %v", evt))
+	w.log.Debug(fmt.Sprintf("Consumed eventChan : %v", evt))
 	if err := w.analysisSink.Consume(ctx, evt); err != nil {
 		w.log.Error("sink failed", "error", err)
 
 	}
 }
 
-// Fanout distributes an event to all relevant sinks (disk and room-specific).
+// Fanout distributes an eventChan to all relevant sinks (disk and room-specific).
 // Each delivery is executed in its own goroutine to prevent a slow or failing sink
 // from blocking the main worker loop or delaying delivery to other participants.
 // It uses a derived context with a timeout to ensure that every goroutine
@@ -91,7 +91,7 @@ func (w *EventFanoutWorker) Fanout(evt contract.DomainEvent) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), w.sinkTimeout)
 			defer cancel()
-			w.log.Debug(fmt.Sprintf("Consumed event : %v", evt))
+			w.log.Debug(fmt.Sprintf("Consumed eventChan : %v", evt))
 			if err := s.Consume(ctx, evt); err != nil {
 				w.log.Error("sink failed", "error", err)
 			}

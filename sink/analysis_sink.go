@@ -16,14 +16,15 @@ import (
 )
 
 type AnalysisSink struct {
-	mu               sync.Mutex
-	timer            *time.Timer
-	coordinator      contract.SpecialistCoordinator
-	repository       storage.IAnalysisRepository
-	log              *slog.Logger
-	events           []event.FileAnalyse
-	maxAnalyzedEvent int
-	deliveryTimeout  time.Duration
+	mu                sync.Mutex
+	timer             *time.Timer
+	coordinator       contract.SpecialistCoordinator
+	repository        storage.IAnalysisRepository
+	log               *slog.Logger
+	events            []event.FileAnalyse
+	maxAnalyzedEvent  int
+	bufferTimeout     time.Duration
+	specialistTimeout time.Duration
 }
 
 func NewAnalysisSink(
@@ -31,14 +32,16 @@ func NewAnalysisSink(
 	repository storage.IAnalysisRepository,
 	log *slog.Logger,
 	maxAnalyzedEvent int,
-	deliveryTimeout time.Duration,
+	bufferTimeout time.Duration,
+	specialistTimeout time.Duration,
 ) *AnalysisSink {
 	return &AnalysisSink{
-		coordinator:      coordinator,
-		repository:       repository,
-		log:              log,
-		maxAnalyzedEvent: maxAnalyzedEvent,
-		deliveryTimeout:  deliveryTimeout,
+		coordinator:       coordinator,
+		repository:        repository,
+		log:               log,
+		maxAnalyzedEvent:  maxAnalyzedEvent,
+		bufferTimeout:     bufferTimeout,
+		specialistTimeout: specialistTimeout,
 	}
 }
 
@@ -60,7 +63,8 @@ func (a *AnalysisSink) Consume(ctx context.Context, e contract.FileAnalyzerEvent
 	// start a background timer to ensure data is not stuck if the throughput is low.
 	// We only start it if no other timer is currently running (timer == nil).
 	if len(a.events) == 1 && a.timer == nil {
-		a.timer = time.AfterFunc(a.deliveryTimeout, func() {
+		a.timer = time.AfterFunc(a.bufferTimeout, func() {
+			a.log.Debug("Flushing events", "events size", len(a.events))
 			if err := a.flush(ctx); err != nil {
 				a.log.Error("Batching: Timeout flush failed", "error", err)
 			}
@@ -105,7 +109,7 @@ func (a *AnalysisSink) flush(ctx context.Context) error {
 
 	// Create a dedicated context for this batch to prevent long-running sidecars
 	// from blocking the entire pipeline.
-	batchCtx, cancel := context.WithTimeout(ctx, a.deliveryTimeout)
+	batchCtx, cancel := context.WithTimeout(ctx, a.specialistTimeout)
 	defer cancel()
 
 	return a.processAndStore(batchCtx, batchEvents)
@@ -131,11 +135,15 @@ func (a *AnalysisSink) processAndStore(ctx context.Context, events []event.FileA
 			var resp specialist.AnalysisResponse
 			var err error
 
-			// Only trigger specialized analysis if the file type requires it.
-			if mimeType, ok := mimetypes.Matches(e.MimeType, mimetypes.ApplicationPDF); ok || e.SourceType == "file" {
+			// English: Trigger analysis for both PDF and Audio types
+			// Français: Déclenche l'analyse pour le PDF ET l'Audio
+			isAudio := mimetypes.IsAudio(e.MimeType)
+			isPDF := mimetypes.IsPDF(e.MimeType)
+
+			if isPDF || isAudio || e.SourceType == "file" {
 				resp, err = a.coordinator.Broadcast(ctx, specialist.AnalysisRequest{
 					Path:     e.Path,
-					MimeType: mimeType,
+					MimeType: mimetypes.MIME(e.MimeType),
 				})
 			}
 
@@ -177,27 +185,33 @@ func (a *AnalysisSink) processAndStore(ctx context.Context, events []event.FileA
 // It acts as a decorator that enriches the initial metadata (path, mimetype)
 // with deeper insights like extracted titles, authors, or sentiment/toxicity scores.
 func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist.AnalysisResponse) storage.Analysis {
+	// 1. Initialisation
 	analysis := storage.Analysis{
 		ID:        evt.Id,
 		EntityId:  evt.Id,
 		Namespace: "file-room",
 		At:        evt.ScannedAt,
 		Summary:   evt.Path,
-		Tags: []string{
-			evt.MimeType,
-			evt.SourceType,
-		},
-		Scores: make(map[specialist.Metric]float64),
-		Payload: storage.FileDetails{
-			Filename: evt.Path,
-			MimeType: evt.MimeType,
-			Size:     evt.Size,
-		},
-		Version: uuid.New(),
+		Tags:      []string{evt.MimeType, evt.SourceType},
+		Scores:    make(map[specialist.Metric]float64),
+		Version:   uuid.New(),
 	}
 
+	// 2. Préparation du payload (vide pour l'instant)
+	payload := storage.FileDetails{
+		Filename: evt.Path,
+		MimeType: evt.MimeType,
+		Size:     evt.Size,
+	}
+
+	// 3. Enrichissement
 	for metric, res := range resp.Results {
 		switch data := res.OneOf.(type) {
+
+		case specialist.AudioData:
+			// English: Assign the transcription to the file content
+			payload.Content = data.Transcription
+			analysis.Summary = "Audio Transcription"
 		case specialist.DocumentData:
 			if data.Title != "" {
 				analysis.Summary = data.Title
@@ -205,11 +219,27 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist
 			if data.Author != "" {
 				analysis.Tags = append(analysis.Tags, "author:"+data.Author)
 			}
+
+			// ✅ CORRECTION ICI : Extraction du contenu
+			// English: Extract content from the first page (or merge all pages)
+			if len(data.Pages) > 0 {
+				payload.Content = data.Pages[0].Content
+				// Optional debug log
+				// a.log.Debug("Content extracted", "length", len(payload.Content))
+			}
+
 		case specialist.Score:
 			analysis.Scores[metric] = data.Score
 			analysis.Tags = append(analysis.Tags, data.Label)
+
+			// (Optionnel) Si tu as implémenté AudioData
+			// case specialist.AudioData:
+			//    payload.Content = data.Transcription
 		}
 	}
+
+	// 4. Assignation finale
+	analysis.Payload = payload
 
 	return analysis
 }

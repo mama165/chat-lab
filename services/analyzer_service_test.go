@@ -3,6 +3,7 @@ package services
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
+	"chat-lab/domain/mimetypes"
 	"chat-lab/mocks"
 	"context"
 	"log/slog"
@@ -29,7 +30,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 		DriveID:    "UUID-999",
 		Size:       2048,
 		Attributes: 32,
-		MimeType:   "image/jpeg",
+		MimeType:   mimetypes.ImageJPEG,
 		MagicBytes: []byte{0xFF, 0xD8},
 		ScannedAt:  time.Now(),
 		SourceType: analyzer.LOCALFIXED,
@@ -58,7 +59,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 			true,
 		},
 		{
-			"Should fail if MagicBytes exceeds 512 bytes",
+			"Should fail if MagicBytes exceeds 64 bytes",
 			func(r *analyzer.FileAnalyzerRequest) {
 				r.MagicBytes = make([]byte, 65)
 			},
@@ -67,7 +68,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 		{
 			"Should fail if SourceType is invalid",
 			func(r *analyzer.FileAnalyzerRequest) {
-				r.SourceType = "CLOUD_STORAGE"
+				r.SourceType = "CLOUD_STORAGE_DOES_NOT_EXIST"
 			},
 			true,
 		},
@@ -87,7 +88,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			tc := baseRequest
 			tt.modify(&tc)
-			err := service.Analyze(ctx, analyzer.FileAnalyzerRequest{})
+			err := service.Analyze(ctx, tc)
 			req.Equal(tt.wantErr, err != nil, tt.description)
 		})
 	}

@@ -28,7 +28,7 @@ message TextContent {
 
 message AudioDetails {
   string transcription = 1;
-  uint32 duration_sec = 2;
+  double duration_sec = 2;
 }
 
 message FileDetails {

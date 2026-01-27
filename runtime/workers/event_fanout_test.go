@@ -45,7 +45,7 @@ func TestEventFanoutWorker_Fanout(t *testing.T) {
 
 	evt := event.SanitizedMessage{}
 
-	// When an event is received and handled by worker
+	// When an eventChan is received and handled by worker
 	fanoutWorker.Fanout(evt)
 
 	//Then success happens
@@ -85,7 +85,7 @@ func TestEventFanoutWorker_SinkTimeout(t *testing.T) {
 
 	evt := event.SanitizedMessage{}
 
-	// When an event is received and handled by worker
+	// When an eventChan is received and handled by worker
 	fanoutWorker.Fanout(evt)
 
 	//Then no sink were consumed

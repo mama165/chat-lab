@@ -55,11 +55,11 @@ func (w ModerationWorker) Run(ctx context.Context) error {
 	}
 }
 
-// processAndSanitize handles the transformation of a raw message into a sanitized event.
+// processAndSanitize handles the transformation of a raw message into a sanitized eventChan.
 // It combines fast local operations (language detection, keyword filtering) with
 // asynchronous gRPC calls to external specialists for advanced scoring (Topic 4).
 // It aggregates specialist verdicts to determine the final toxicity score
-// and business flags before routing the event to the domain pipeline.
+// and business flags before routing the eventChan to the domain pipeline.
 func (w ModerationWorker) processAndSanitize(ctx context.Context, evt event.MessagePosted) event.Event {
 	info := whatlanggo.Detect(evt.Content)
 	lang := info.Lang.Iso6391()

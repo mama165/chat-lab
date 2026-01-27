@@ -143,6 +143,6 @@ func (s *Supervisor) sendRestartEvent(ctx context.Context, workerName string) {
 		},
 	}:
 	default:
-		s.log.Debug("Observability telemetry event lost")
+		s.log.Debug("Observability telemetry eventChan lost")
 	}
 }

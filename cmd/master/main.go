@@ -7,6 +7,7 @@ import (
 	"chat-lab/domain/specialist"
 	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/infrastructure/storage"
+	"chat-lab/internal"
 	pb2 "chat-lab/proto/account"
 	pb3 "chat-lab/proto/analyzer"
 	pb1 "chat-lab/proto/chat"
@@ -17,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -61,12 +63,12 @@ func main() {
 // 3. It provides a structured way to handle graceful shutdowns for gRPC and background workers.
 func run() (int, error) {
 	// 1. Configuration & Logger
-	var config Config
+	var config internal.Config
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
 		return exitConfig, fmt.Errorf("config error: %w", err)
 	}
 
-	charReplacement, err := characterRune(config.CharReplacement)
+	charReplacement, err := internal.CharacterRune(config.CharReplacement)
 	if err != nil {
 		return exitConfig, err
 	}
@@ -85,9 +87,10 @@ func run() (int, error) {
 
 	if log.Enabled(ctx, slog.LevelDebug) {
 		debugPort := 8081
-		url := fmt.Sprintf("http://localhost:%d/inspect", debugPort)
+		endpoint := "/inspect"
+		url := fmt.Sprintf("http://localhost:%d%s", debugPort, endpoint)
 		log.Info("Debug Badger inspector available", "url", url)
-		database.StartDebugServer(db, debugPort, AnalysisMapper)
+		database.StartDebugServer(db, debugPort, endpoint, AnalysisMapper)
 	}
 
 	defer func() {
@@ -162,7 +165,7 @@ func run() (int, error) {
 		analysisRepository,
 		coordinator,
 		config.NumberOfWorkers, config.BufferSize,
-		config.SinkTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
+		config.SinkTimeout, config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		charReplacement,
 		config.LowCapacityThreshold,
 		config.MaxContentLength,
@@ -202,7 +205,7 @@ func run() (int, error) {
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()
 	analyzerService := services.NewAnalyzerService(log, analysisRepository, eventChan, &counter)
-	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.DeliveryTimeout)
+	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.BufferTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, log, &counter)
 	authServer := server.NewAuthServer(authService)
 	pb1.RegisterChatServiceServer(s, chatServer)
@@ -239,7 +242,7 @@ func run() (int, error) {
 	return exitOK, nil
 }
 
-func buildBadgerOpts(config Config, log *slog.Logger, ctx context.Context) badger.Options {
+func buildBadgerOpts(config internal.Config, log *slog.Logger, ctx context.Context) badger.Options {
 	options := badger.DefaultOptions(config.BadgerFilepath)
 
 	if log.Enabled(ctx, slog.LevelDebug) {
@@ -266,13 +269,59 @@ func AnalysisMapper(key string, val []byte) database.InspectRow {
 		return row
 	}
 
-	row.Type = "FILE"
-	if _, ok := analysis.Payload.(storage.AudioDetails); ok {
-		row.Type = "AUDIO"
+	// Initialisation par défaut
+	row.Detail = analysis.Summary
+	row.Type = "BASE"
+
+	if analysis.Payload != nil {
+		switch payload := analysis.Payload.(type) {
+
+		// Cas 1 : C'est bien identifié comme de l'audio
+		case storage.AudioDetails, *storage.AudioDetails:
+			row.Type = "AUDIO"
+			var transcription string
+
+			// Extraction sécurisée (Pointeur ou Valeur)
+			if a, ok := payload.(storage.AudioDetails); ok {
+				transcription = a.Transcription
+			} else if aPtr, ok := payload.(*storage.AudioDetails); ok {
+				transcription = aPtr.Transcription
+			}
+
+			row.Detail = transcription
+			log.Printf("🎤 [DEBUG] Transcription trouvée : %s", transcription)
+
+		// Cas 2 : C'est identifié comme un fichier (cas actuel de tes logs)
+		case storage.FileDetails, *storage.FileDetails:
+			row.Type = "FILE"
+			var content string
+
+			if f, ok := payload.(storage.FileDetails); ok {
+				content = f.Content
+			} else if fPtr, ok := payload.(*storage.FileDetails); ok {
+				content = fPtr.Content
+			}
+
+			// Si le contenu est vide, on garde le summary, sinon on affiche le texte
+			if content != "" {
+				row.Detail = content
+				log.Printf("📄 [DEBUG] Texte extrait du fichier : %s", content)
+			} else {
+				log.Printf("📄 [DEBUG] Fichier standard sans contenu textuel")
+			}
+
+		// Cas 3 : Texte brut (Chat)
+		case storage.TextContent, *storage.TextContent:
+			row.Type = "CHAT"
+			if t, ok := payload.(storage.TextContent); ok {
+				row.Detail = t.Content
+			} else if tPtr, ok := payload.(*storage.TextContent); ok {
+				row.Detail = tPtr.Content
+			}
+		}
 	}
 
-	row.Detail = analysis.Summary
-
+	// Gestion des scores pour l'affichage
 	scores := ""
 	for k, v := range analysis.Scores {
 		scores += fmt.Sprintf("%s:%.2f ", k, v)

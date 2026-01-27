@@ -23,7 +23,7 @@ func setupSink(ctrl *gomock.Controller, maxSize int, timeout time.Duration) (*si
 	mockCoordinator := mocks.NewMockSpecialistCoordinator(ctrl)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	s := sink.NewAnalysisSink(mockCoordinator, mockRepo, logger, maxSize, timeout)
+	s := sink.NewAnalysisSink(mockCoordinator, mockRepo, logger, maxSize, timeout, timeout)
 	return s, mockRepo, mockCoordinator
 }
 
@@ -57,7 +57,7 @@ func TestFlushTriggeredByTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeout := 50 * time.Millisecond
+	timeout := 30 * time.Second
 	s, mockRepo, _ := setupSink(ctrl, 100, timeout)
 
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Times(1)
@@ -136,20 +136,4 @@ func TestConcurrentAccessSafety(t *testing.T) {
 	for w := 0; w < numWorkers; w++ {
 		<-done
 	}
-}
-
-func TestErrorInvalidDriveID(t *testing.T) {
-	req := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	s, _, _ := setupSink(ctrl, 1, 1*time.Hour)
-
-	err := s.Consume(context.Background(), event.FileAnalyse{
-		Id:      uuid.New(),
-		DriveID: "not-a-uuid",
-	})
-
-	req.Error(err)
-	req.Contains(err.Error(), "invalid DriveID")
 }

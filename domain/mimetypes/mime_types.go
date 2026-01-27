@@ -32,3 +32,25 @@ func Matches(detected string, expected MIME) (MIME, bool) {
 	}
 	return expected, mt == string(expected)
 }
+
+func IsPDF(detected string) bool {
+	_, ok := Matches(detected, ApplicationPDF)
+	return ok
+}
+
+func IsImage(detected MIME) bool {
+	return detected == ImagePNG ||
+		detected == ImageJPEG ||
+		detected == ImageGIF
+}
+
+func IsAudio(detected string) bool {
+	_, ok1 := Matches(detected, AudioMPEG)
+	_, ok2 := Matches(detected, AudioWAV)
+	_, ok3 := Matches(detected, AudioXAIFF)
+	return ok1 || ok2 || ok3
+}
+
+func IsVideo(detected MIME) bool {
+	return detected == VideoMP4
+}

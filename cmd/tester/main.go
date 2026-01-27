@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chat-lab/domain/mimetypes"
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
@@ -49,13 +50,11 @@ func main() {
 		Path:       filePath,
 		DriveId:    "USB-DRIVE-001",
 		Size:       uint64(info.Size()),
-		MimeType:   "audio/mpeg",
+		MimeType:   string(mimetypes.AudioXAIFF),
 		MagicBytes: magic,
 		ScannedAt:  timestamppb.Now(),
 		SourceType: pb.SourceType_LOCAL_FIXED,
 	}
-
-	fmt.Println("Appel de :", pb.FileAnalyzerService_Analyze_FullMethodName)
 
 	if err := stream.Send(req); err != nil {
 		log.Fatalf("Échec de l'envoi du message: %v", err)

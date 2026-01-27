@@ -224,7 +224,7 @@ func (x *TextContent) GetContent() string {
 type AudioDetails struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Transcription string                 `protobuf:"bytes,1,opt,name=transcription,proto3" json:"transcription,omitempty"`
-	DurationSec   uint32                 `protobuf:"varint,2,opt,name=duration_sec,json=durationSec,proto3" json:"duration_sec,omitempty"`
+	DurationSec   float64                `protobuf:"fixed64,2,opt,name=duration_sec,json=durationSec,proto3" json:"duration_sec,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -266,7 +266,7 @@ func (x *AudioDetails) GetTranscription() string {
 	return ""
 }
 
-func (x *AudioDetails) GetDurationSec() uint32 {
+func (x *AudioDetails) GetDurationSec() float64 {
 	if x != nil {
 		return x.DurationSec
 	}
@@ -382,7 +382,7 @@ const file_proto_storage_analysis_proto_rawDesc = "" +
 	"\acontent\x18\x01 \x01(\tR\acontent\"W\n" +
 	"\fAudioDetails\x12$\n" +
 	"\rtranscription\x18\x01 \x01(\tR\rtranscription\x12!\n" +
-	"\fduration_sec\x18\x02 \x01(\rR\vdurationSec\"\xab\x01\n" +
+	"\fduration_sec\x18\x02 \x01(\x01R\vdurationSec\"\xab\x01\n" +
 	"\vFileDetails\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +

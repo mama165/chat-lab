@@ -28,9 +28,16 @@ type Metadata struct {
 }
 
 // Response is a container for the specialist's output.
-// OneOf can hold different result types (e.g., Score, DocumentData).
+// OneOf can hold different result types (e.g., Score, DocumentData, AudioData).
 type Response struct {
 	OneOf any
+}
+
+// AudioData holds information extracted from an audio file.
+type AudioData struct {
+	Transcription string
+	Duration      float64
+	Language      string
 }
 
 // DocumentData holds structured information extracted from a document.

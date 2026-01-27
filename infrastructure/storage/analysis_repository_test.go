@@ -119,7 +119,7 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 			specialist.MetricSentiment: 0.75},
 		Payload: AudioDetails{
 			Transcription: "We decided to migrate to PostgreSQL for better scalability",
-			Duration:      180, // 3 minutes
+			Duration:      180,
 		},
 	}
 	analysis := an
@@ -137,7 +137,7 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 	fetched := results[0]
 	audio, ok := fetched.Payload.(AudioDetails)
 	req.True(ok, "Payload should be AudioDetails")
-	req.Equal(uint32(180), audio.Duration)
+	req.Equal(float64(180), audio.Duration)
 	req.Contains(audio.Transcription, "PostgreSQL")
 }
 

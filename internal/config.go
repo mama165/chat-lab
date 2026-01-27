@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -6,15 +6,18 @@ import (
 )
 
 type Config struct {
-	BufferSize                int           `env:"BUFFER_SIZE,required=true"`
-	ConnectionBufferSize      int           `env:"CONNECTION_BUFFER_SIZE,required=true"`
-	NumberOfWorkers           int           `env:"NUMBER_OF_WORKERS,required=true"`
-	CharReplacement           string        `env:"CHARACTER_REPLACEMENT,required=true"`
-	LimitMessages             *int          `env:"LIMIT_MESSAGES"`
-	SinkTimeout               time.Duration `env:"SINK_TIMEOUT,required=true"`
-	MetricInterval            time.Duration `env:"METRIC_INTERVAL,required=true"`
-	IngestionTimeout          time.Duration `env:"INGESTION_TIMEOUT,required=true"`
-	DeliveryTimeout           time.Duration `env:"DELIVERY_TIMEOUT,required=true"`
+	BufferSize           int           `env:"BUFFER_SIZE,required=true"`
+	ConnectionBufferSize int           `env:"CONNECTION_BUFFER_SIZE,required=true"`
+	NumberOfWorkers      int           `env:"NUMBER_OF_WORKERS,required=true"`
+	CharReplacement      string        `env:"CHARACTER_REPLACEMENT,required=true"`
+	LimitMessages        *int          `env:"LIMIT_MESSAGES"`
+	SinkTimeout          time.Duration `env:"SINK_TIMEOUT,required=true"`
+	MetricInterval       time.Duration `env:"METRIC_INTERVAL,required=true"`
+	IngestionTimeout     time.Duration `env:"INGESTION_TIMEOUT,required=true"`
+
+	BufferTimeout     time.Duration `env:"BUFFER_TIMEOUT,required=true"`
+	SpecialistTimeout time.Duration `env:"SPECIALIST_TIMEOUT,required=true"`
+
 	LatencyThreshold          time.Duration `env:"LATENCY_THRESHOLD,required=true"`
 	RestartInterval           time.Duration `env:"RESTART_INTERVAL,required=true"`
 	AuthTokenDuration         time.Duration `env:"AUTH_TOKEN_DURATION,required=true"`
@@ -36,7 +39,7 @@ type Config struct {
 	StreamChunkSize           string        `env:"STREAM_CHUNK_SIZE"`
 }
 
-func characterRune(str string) (rune, error) {
+func CharacterRune(str string) (rune, error) {
 	r := []rune(str)
 	if len(r) != 1 {
 		return 0, fmt.Errorf(

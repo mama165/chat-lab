@@ -58,7 +58,7 @@ func (w ChannelCapacityWorker) Run(ctx context.Context) error {
 					return nil
 				case w.telemetryChan <- toCapacityEvent(nc.Name, capacity, length):
 				default:
-					w.log.Debug("Observability telemetry event lost")
+					w.log.Debug("Observability telemetry eventChan lost")
 				}
 			}
 		}

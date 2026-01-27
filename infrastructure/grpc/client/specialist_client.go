@@ -105,6 +105,14 @@ func ToResponse(response *pb.SpecialistResponse) specialist.Response {
 				Label: resp.Score.Label,
 			},
 		}
+	case *pb.SpecialistResponse_Audio:
+		return specialist.Response{
+			OneOf: specialist.AudioData{
+				Transcription: resp.Audio.Transcription,
+				Duration:      resp.Audio.DurationSec,
+				Language:      resp.Audio.Language,
+			},
+		}
 	default:
 		return specialist.Response{}
 	}

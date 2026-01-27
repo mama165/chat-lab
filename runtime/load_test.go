@@ -52,9 +52,11 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 		2,                    // numWorkers (on monte à 50 pour encaisser)
 		1000,                 // bufferSize
 		100*time.Millisecond, // sinkTimeout
-		1*time.Second,        // metricInterval
-		500*time.Millisecond, // latencyThreshold
-		50*time.Millisecond,  // waitAndFail (seuil de déclenchement agressif)
+		500*time.Second,      // buffer timeout
+		500*time.Millisecond, // Specialist timeout
+		50*time.Millisecond,  // metric interval
+		50*time.Millisecond,  // latency threshold
+		50*time.Millisecond,  // wait and fail
 		'*',
 		800,
 		500,

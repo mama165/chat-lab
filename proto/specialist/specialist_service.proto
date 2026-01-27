@@ -26,7 +26,14 @@ message SpecialistResponse {
   oneof response {
   DocumentData document_data = 1;
   Score score = 2;
+    AudioDetails audio = 3;
   }
+}
+
+message AudioDetails {
+  string transcription = 1;
+  double duration_sec = 2;
+  string language = 3;
 }
 
 message Score {
