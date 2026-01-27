@@ -38,10 +38,11 @@ func IsPDF(detected string) bool {
 	return ok
 }
 
-func IsImage(detected MIME) bool {
-	return detected == ImagePNG ||
-		detected == ImageJPEG ||
-		detected == ImageGIF
+func IsImage(detected string) bool {
+	_, ok1 := Matches(detected, ImagePNG)
+	_, ok2 := Matches(detected, ImageJPEG)
+	_, ok3 := Matches(detected, ImageGIF)
+	return ok1 || ok2 || ok3
 }
 
 func IsAudio(detected string) bool {

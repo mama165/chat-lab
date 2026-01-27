@@ -2,6 +2,8 @@ package mimetypes
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMatches(t *testing.T) {
@@ -48,6 +50,46 @@ func TestMatches(t *testing.T) {
 			if ok != tt.want && got != tt.expected {
 				t.Errorf("Matches(%q, %q) = %v; want %v", tt.detected, tt.expected, ok, tt.want)
 			}
+		})
+	}
+}
+
+func TestIsAudio(t *testing.T) {
+	req := require.New(t)
+	tests := []struct {
+		name     string
+		detected string
+		expected MIME
+		want     bool
+	}{
+		{"MPEG4", "audio/mpeg", AudioMPEG, true},
+		{"WAV", "audio/wav", AudioWAV, true},
+		{"XAIFF", "audio/x-aiff", AudioXAIFF, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req.Equal(tt.want, IsAudio(tt.detected))
+		})
+	}
+}
+
+func TestIsImage(t *testing.T) {
+	req := require.New(t)
+	tests := []struct {
+		name     string
+		detected string
+		expected MIME
+		want     bool
+	}{
+		{"PNG", "image/png", ImagePNG, true},
+		{"JPEG", "image/jpeg", ImageJPEG, true},
+		{"GIF", "image/gif", ImageGIF, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req.Equal(tt.want, IsImage(tt.detected))
 		})
 	}
 }
