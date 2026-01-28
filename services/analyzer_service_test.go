@@ -30,7 +30,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 		DriveID:    "UUID-999",
 		Size:       2048,
 		Attributes: 32,
-		MimeType:   mimetypes.ImageJPEG,
+		MimeType:   string(mimetypes.ImageJPEG),
 		MagicBytes: []byte{0xFF, 0xD8},
 		ScannedAt:  time.Now(),
 		SourceType: analyzer.LOCALFIXED,

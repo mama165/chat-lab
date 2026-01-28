@@ -51,7 +51,7 @@ func main() {
 	// Its only responsibility is to call run() and handle the OS exit code.
 	code, err := run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Chat-Lab terminated with error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Master terminated with error: %v\n", err)
 	}
 	os.Exit(code)
 }
@@ -73,29 +73,29 @@ func run() (int, error) {
 		return exitConfig, err
 	}
 
-	log := logs.GetLoggerFromString(config.LogLevel)
+	logger := logs.GetLoggerFromString(config.LogLevel)
 
 	ctx := context.Background()
 
 	// 2. Database (BadgerDB)
-	options := buildBadgerOpts(config, log, ctx)
+	options := buildBadgerOpts(config, logger, ctx)
 
 	db, err := badger.Open(options)
 	if err != nil {
 		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
 	}
 
-	if log.Enabled(ctx, slog.LevelDebug) {
+	if logger.Enabled(ctx, slog.LevelDebug) {
 		debugPort := 8081
 		endpoint := "/inspect"
 		url := fmt.Sprintf("http://localhost:%d%s", debugPort, endpoint)
-		log.Info("Debug Badger inspector available", "url", url)
+		logger.Info("Debug Badger inspector available", "url", url)
 		database.StartDebugServer(db, debugPort, endpoint, AnalysisMapper)
 	}
 
 	defer func() {
 		// Defer ensures the database lock is released and buffers are flushed before the function returns.
-		log.Info("Closing BadgerDB...")
+		logger.Info("Closing BadgerDB...")
 		_ = db.Close()
 	}()
 
@@ -105,7 +105,7 @@ func run() (int, error) {
 		return exitRuntime, fmt.Errorf("failed to open bluge writer: %w", err)
 	}
 	defer func() {
-		log.Info("Closing Bluge...")
+		logger.Info("Closing Bluge...")
 		_ = blugeWriter.Close()
 	}()
 
@@ -140,12 +140,12 @@ func run() (int, error) {
 			},
 		},
 	}
-	coordinator := runtime.NewCoordinator(log)
+	coordinator := runtime.NewCoordinator(logger)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
 
-	log.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
+	logger.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
 	if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel); err != nil {
 		return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
 	}
@@ -153,14 +153,14 @@ func run() (int, error) {
 	// 3. Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
-	sup := workers.NewSupervisor(log, telemetryChan, config.RestartInterval)
+	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
-	messageRepository := storage.NewMessageRepository(db, log, config.LimitMessages)
-	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
+	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
+	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
 	userRepository := storage.NewUserRepository(db)
 
 	orchestrator := runtime.NewOrchestrator(
-		log, sup, registry, telemetryChan, eventChan,
+		logger, sup, registry, telemetryChan, eventChan,
 		messageRepository,
 		analysisRepository,
 		coordinator,
@@ -183,7 +183,7 @@ func run() (int, error) {
 
 	// 5. Start the Engine (Workers and Fanout)
 	go func() {
-		log.Info("Starting orchestrator...")
+		logger.Info("Starting orchestrator...")
 		if err := orchestrator.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("orchestrator error: %w", err)
 		}
@@ -198,15 +198,15 @@ func run() (int, error) {
 
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			grpc3.UnaryLoggingInterceptor(log),
+			grpc3.UnaryLoggingInterceptor(logger),
 			server.AuthInterceptor,
 		))
 	chatService := services.NewChatService(orchestrator)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()
-	analyzerService := services.NewAnalyzerService(log, analysisRepository, eventChan, &counter)
-	chatServer := server.NewChatServer(log, chatService, config.ConnectionBufferSize, config.BufferTimeout)
-	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, log, &counter)
+	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
+	chatServer := server.NewChatServer(logger, chatService, config.ConnectionBufferSize, config.BufferTimeout)
+	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
 	authServer := server.NewAuthServer(authService)
 	pb1.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
@@ -214,9 +214,9 @@ func run() (int, error) {
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
-		log.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
+		logger.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
 		for serviceName := range s.GetServiceInfo() {
-			log.Info("📡 Service réellement exposé", "name", serviceName)
+			logger.Debug("📡 gRPC exposed services", "name", serviceName)
 		}
 		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errChan <- fmt.Errorf("gRPC server error: %w", err)
@@ -227,25 +227,25 @@ func run() (int, error) {
 	// The execution blocks here until either a signal is received or the server crashes.
 	select {
 	case <-ctx.Done():
-		log.Info("Shutdown signal received")
+		logger.Info("Shutdown signal received")
 	case err := <-errChan:
 		return exitRuntime, err
 	}
 
 	// 8. Final Cleanup (Graceful Shutdown)
 	// We allow active gRPC streams to finish and workers to drain their channels.
-	log.Info("Shutting down gracefully...")
+	logger.Info("Shutting down gracefully...")
 	s.GracefulStop()
 	orchestrator.Stop()
-	log.Info("Program stopped cleanly")
+	logger.Info("Program stopped cleanly")
 
 	return exitOK, nil
 }
 
-func buildBadgerOpts(config internal.Config, log *slog.Logger, ctx context.Context) badger.Options {
+func buildBadgerOpts(config internal.Config, logger *slog.Logger, ctx context.Context) badger.Options {
 	options := badger.DefaultOptions(config.BadgerFilepath)
 
-	if log.Enabled(ctx, slog.LevelDebug) {
+	if logger.Enabled(ctx, slog.LevelDebug) {
 		options = options.WithLoggingLevel(badger.DEBUG).
 			WithBypassLockGuard(true)
 	} else {

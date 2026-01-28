@@ -2,7 +2,6 @@ package server
 
 import (
 	"chat-lab/domain/analyzer"
-	"chat-lab/domain/mimetypes"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/services"
 	"context"
@@ -72,7 +71,7 @@ func toRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
 		DriveID:    req.DriveId,
 		Size:       req.Size,
 		Attributes: req.Attributes,
-		MimeType:   mimetypes.MIME(req.MimeType),
+		MimeType:   req.MimeType,
 		MagicBytes: req.MagicBytes,
 		ScannedAt:  req.ScannedAt.AsTime(),
 		SourceType: toSourceType(req.SourceType),
