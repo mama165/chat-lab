@@ -1,7 +1,6 @@
 package analyzer
 
 import (
-	"chat-lab/domain/mimetypes"
 	"time"
 )
 
@@ -20,14 +19,14 @@ const (
 // priority of a file without transferring its entire content.
 // MagicBytes 64 bytes is enough
 type FileAnalyzerRequest struct {
-	Path       string         `validate:"required,max=1024"`
-	DriveID    string         `validate:"required"`
-	Size       uint64         `validate:"gte=0"`
-	Attributes uint32         `validate:"gte=0"`
-	MimeType   mimetypes.MIME `validate:"required,max=128"`
-	MagicBytes []byte         `validate:"required,max=64"`
-	ScannedAt  time.Time      `validate:"required"`
-	SourceType SourceType     `validate:"required,oneof=UNSPECIFIED LOCAL_FIXED REMOVABLE NETWORK"`
+	Path       string     `validate:"required,max=1024"`
+	DriveID    string     `validate:"required"`
+	Size       uint64     `validate:"gte=0"`
+	Attributes uint32     `validate:"gte=0"`
+	MimeType   string     `validate:"required,max=128"`
+	MagicBytes []byte     `validate:"required,max=64"`
+	ScannedAt  time.Time  `validate:"required"`
+	SourceType SourceType `validate:"required,oneof=UNSPECIFIED LOCAL_FIXED REMOVABLE NETWORK"`
 }
 
 // CountAnalyzedFiles is a summary sent back by the server once the

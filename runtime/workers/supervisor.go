@@ -51,7 +51,7 @@ func (s *Supervisor) Run(ctx context.Context) {
 	copy(workersToStart, s.workers)
 	s.mu.RUnlock()
 
-	for _, worker := range s.workers {
+	for _, worker := range workersToStart {
 		s.Start(supervisedCtx, worker)
 	}
 	s.wg.Wait()
