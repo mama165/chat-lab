@@ -3,3 +3,9 @@
 - Fix all tests
 - Careful with 500 Mo PDF File (Out ot memory risks)
 - Remove cmd/tester/main.go
+- Remove test_audio.aiff
+- Add E2E tests
+- Remove all french comments
+- Use variable everywhere for FILE, AUDIO, PDF...
+- Add a validator for MIMETYPES (for now it's just required)
+- Spit events in FanoutWorker into ChatEvent, FileEvent, Technical event
