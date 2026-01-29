@@ -146,8 +146,10 @@ func run() (int, error) {
 	defer cancelBoot()
 
 	logger.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
-	if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel); err != nil {
-		return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
+	if config.EnableSpecialists {
+		if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel); err != nil {
+			return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
+		}
 	}
 
 	// 3. Setup Supervision & Orchestration
@@ -190,7 +192,7 @@ func run() (int, error) {
 	}()
 
 	// 6. gRPC Server Setup
-	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
+	address := fmt.Sprintf("0.0.0.0:%d", config.Port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", address, err)

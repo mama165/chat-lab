@@ -5,10 +5,10 @@ import (
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -33,36 +33,74 @@ func NewFileSenderWorker(
 // Run opens a gRPC stream and listens to the fileChan to forward metadata to the analyzer server.
 // It automatically handles conversion from domain models to protobuf messages.
 func (w FileSenderWorker) Run(ctx context.Context) error {
-	stream, err := w.client.Analyze(ctx)
-	if err != nil {
-		return fmt.Errorf(" Unable to open the stream to analyze files : %w", err)
-	}
-	defer w.handleResponse(stream)
+	// Créer un contexte avec timeout pour éviter les blocages infinis
+	streamCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancel()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case req, ok := <-w.fileChan:
-			if !ok {
-				w.log.Info("file scanner directory channel closed")
-				return nil
+	stream, err := w.client.Analyze(streamCtx)
+	if err != nil {
+		return fmt.Errorf("unable to open the stream to analyze files: %w", err)
+	}
+
+	// Canal pour signaler quand on a fini d'envoyer
+	sendDone := make(chan error, 1)
+
+	// Goroutine pour envoyer les fichiers
+	go func() {
+		defer func() {
+			// Toujours fermer l'envoi quand on a fini
+			if err := stream.CloseSend(); err != nil && err != io.EOF {
+				w.log.Debug("Error closing send", "error", err)
 			}
-			w.log.Debug("Sending file scann to analyzer", "event", req.Path)
-			if err := stream.Send(toPbFileAnalyzerRequest(req)); err != nil {
-				w.log.Debug("Failed to send file to analyzer", "event", req.Path, "error", err)
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				sendDone <- ctx.Err()
+				return
+
+			case req, ok := <-w.fileChan:
+				if !ok {
+					// Canal fermé, on a fini d'envoyer
+					w.log.Info("file scanner channel closed, finishing send")
+					sendDone <- nil
+					return
+				}
+
+				w.log.Debug("Sending file scan to analyzer", "event", req.Path)
+				if err := stream.Send(toPbFileAnalyzerRequest(req)); err != nil {
+					w.log.Warn("Failed to send file to analyzer", "path", req.Path, "error", err)
+					sendDone <- fmt.Errorf("send error: %w", err)
+					return
+				}
 			}
 		}
+	}()
+
+	// Attendre que l'envoi soit terminé
+	sendErr := <-sendDone
+	if sendErr != nil && sendErr != context.Canceled {
+		w.log.Warn("Send goroutine finished with error", "error", sendErr)
 	}
-}
-func (w FileSenderWorker) handleResponse(stream grpc.ClientStreamingClient[pb.FileAnalyzerRequest, pb.FileAnalyzerResponse]) {
+
+	// Maintenant qu'on a fermé l'envoi, on peut recevoir la réponse finale
 	response, err := stream.CloseAndRecv()
 	if err != nil {
-		w.log.Info("Error while closing stream", "error", err)
+		if err == io.EOF || sendErr == context.Canceled {
+			w.log.Info("Stream closed normally")
+			return sendErr
+		}
+		return fmt.Errorf("error receiving final response: %w", err)
 	}
-	w.log.Info("File received", "files_received", response.FilesReceived)
-	w.log.Info("Bytes processed", "bytes_processed", response.BytesProcessed)
-	w.log.Info("Remote file processing terminated at", "ended_at", response.EndedAt.AsTime().Format(time.RFC3339))
+
+	w.log.Info("File transfer complete",
+		"files_received", response.FilesReceived,
+		"bytes_processed", response.BytesProcessed,
+		"ended_at", response.EndedAt.AsTime().Format(time.RFC3339),
+	)
+
+	return sendErr
 }
 
 func toPbFileAnalyzerRequest(req *analyzer.FileAnalyzerRequest) *pb.FileAnalyzerRequest {

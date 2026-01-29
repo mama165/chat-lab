@@ -29,14 +29,14 @@ type Config struct {
 	MinScoring                float64       `env:"MIN_SCORING,required=true"`
 	MaxScoring                float64       `env:"MAX_SCORING,required=true"`
 	MaxAnalyzedEvent          int           `env:"MAX_ANALYZED_EVENT,required=true"`
-	Host                      string        `env:"HOST"`
-	Port                      int           `env:"PORT"`
-	MaxSpecialistBootDuration time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION"`
-	ToxicityBinPath           string        `env:"TOXICITY_BIN_PATH"`
-	ToxicityPort              int           `env:"TOXICITY_PORT"`
-	SentimentBinPath          string        `env:"SENTIMENT_BIN_PATH"`
-	SentimentPort             int           `env:"SENTIMENT_PORT"`
-	StreamChunkSize           string        `env:"STREAM_CHUNK_SIZE"`
+	Host                      string        `env:"HOST,required=true"`
+	Port                      int           `env:"PORT,required=true"`
+	MaxSpecialistBootDuration time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION,required=true"`
+	ToxicityBinPath           string        `env:"TOXICITY_BIN_PATH,required=true"`
+	ToxicityPort              int           `env:"TOXICITY_PORT,required=true"`
+	SentimentBinPath          string        `env:"SENTIMENT_BIN_PATH,required=true"`
+	SentimentPort             int           `env:"SENTIMENT_PORT,required=true"`
+	EnableSpecialists         bool          `env:"ENABLE_SPECIALISTS,required=true"`
 }
 
 func CharacterRune(str string) (rune, error) {

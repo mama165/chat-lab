@@ -94,6 +94,7 @@ func NewFileScannerWorker(
 // Run executes the worker's main loop, consuming directory paths from dirChan and feeding subdirectories
 // back into it while processing regular files. It exits when the context is canceled or dirChan is closed.
 func (w *FileScannerWorker) Run(ctx context.Context) error {
+
 	defer w.workersWG.Done()
 	for {
 		select {

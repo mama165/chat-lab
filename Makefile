@@ -1,6 +1,6 @@
 APP_NAME    := chatlab
 GO          := go
-CONF        := cmd/master/local.conf
+CONF        := internal/local.conf
 CMD_MASTER  := ./cmd/master
 CMD_SPEC    := ./cmd/specialist
 BIN_DIR     := ./bin

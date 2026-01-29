@@ -4,16 +4,18 @@ import (
 	"chat-lab/contract"
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
-	"chat-lab/internal"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
 	"context"
 	"flag"
 	"log"
+	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
+	"time"
 
-	"github.com/Netflix/go-env"
 	"github.com/mama165/sdk-go/logs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,7 +24,7 @@ import (
 func main() {
 	// 1. Parsing des options (root, server addr, parallel)
 	rootDir := flag.String("root", ".", "target directory")
-	address := flag.String("address", "localhost:50051", "gRPC listen address")
+	address := flag.String("address", "localhost:8080", "gRPC listen address")
 	goroutineNbr := flag.Int("parallel", runtime.NumCPU(), "number of concurrent goroutines")
 	driveID := flag.String("driveID", "os-main", "disk identifier for Badger")
 	flag.Parse()
@@ -33,12 +35,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU() / 2)
 	}
 
-	var config internal.Config
-	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
-		log.Fatalf("config loading failed %v", err)
-	}
-
-	logger := logs.GetLoggerFromString(config.LogLevel)
+	logger := logs.GetLoggerFromString("DEBUG")
 
 	conn, err := grpc.Dial(*address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -49,12 +46,15 @@ func main() {
 	client := pb.NewFileAnalyzerServiceClient(conn)
 
 	ctx := context.Background()
+	// 2. Setup context to handle termination signals (Ctrl+C).
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	telemetryChan := make(chan event.Event, config.BufferSize)
-	supervisor := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
+	telemetryChan := make(chan event.Event, 1000)
+	supervisor := workers.NewSupervisor(logger, telemetryChan, 5*time.Second)
 	counter := workers.NewCounterFileScanner()
-	dirChan := make(chan string, config.BufferSize)
-	fileChan := make(chan *analyzer.FileAnalyzerRequest, config.BufferSize)
+	dirChan := make(chan string, 1000)
+	fileChan := make(chan *analyzer.FileAnalyzerRequest, 1000)
 
 	var scanWG sync.WaitGroup
 	var workersWG sync.WaitGroup
