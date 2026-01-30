@@ -2,24 +2,24 @@ package workers
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/infrastructure/grpc/client"
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"log/slog"
 	"time"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type FileSenderWorker struct {
-	client   pb.FileAnalyzerServiceClient
+	client   client.FileAnalyzerClient
 	log      *slog.Logger
 	fileChan chan *analyzer.FileAnalyzerRequest
 }
 
 func NewFileSenderWorker(
-	client pb.FileAnalyzerServiceClient,
+	client client.FileAnalyzerClient,
 	log *slog.Logger,
 	fileChan chan *analyzer.FileAnalyzerRequest,
 ) *FileSenderWorker {
@@ -31,73 +31,113 @@ func NewFileSenderWorker(
 }
 
 // Run opens a gRPC stream and listens to the fileChan to forward metadata to the analyzer server.
-// It automatically handles conversion from domain models to protobuf messages.
+// It implements backpressure via a semaphore and ensures a graceful shutdown by handling
+// context cancellation and proper gRPC stream closure.
 func (w FileSenderWorker) Run(ctx context.Context) error {
-	// Créer un contexte avec timeout pour éviter les blocages infinis
-	streamCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
-	defer cancel()
+	w.log.Info("🚀 FileSenderWorker starting")
 
-	stream, err := w.client.Analyze(streamCtx)
+	// Open the gRPC stream using the supervisor's context.
+	stream, err := w.client.Analyze(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to open the stream to analyze files: %w", err)
 	}
+	w.log.Info("📡 gRPC stream opened successfully")
 
-	// Canal pour signaler quand on a fini d'envoyer
-	sendDone := make(chan error, 1)
+	// Backpressure: Limit the number of concurrent messages in flight to 100.
+	const maxInFlight = 100
+	inFlightSemaphore := make(chan struct{}, maxInFlight)
 
-	// Goroutine pour envoyer les fichiers
+	sendErrChan := make(chan error, 1)
+	fileCount := 0
+
+	// Launch the sending goroutine.
 	go func() {
 		defer func() {
-			// Toujours fermer l'envoi quand on a fini
+			w.log.Info("🔒 Closing send stream", "total_files_sent", fileCount)
+			// Signal the server that the client has finished sending data.
 			if err := stream.CloseSend(); err != nil && err != io.EOF {
 				w.log.Debug("Error closing send", "error", err)
 			}
 		}()
 
+		// Progress monitoring: Log transfer status every 10 seconds.
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
+			case <-ticker.C:
+				w.log.Info("📊 Progress",
+					"files_sent", fileCount,
+					"in_flight", len(inFlightSemaphore),
+				)
+
 			case <-ctx.Done():
-				sendDone <- ctx.Err()
+				// Stop requested by the supervisor or user interruption.
+				sendErrChan <- ctx.Err()
 				return
 
 			case req, ok := <-w.fileChan:
 				if !ok {
-					// Canal fermé, on a fini d'envoyer
-					w.log.Info("file scanner channel closed, finishing send")
-					sendDone <- nil
+					// Input channel closed: normal end of scanning process.
+					w.log.Info("📪 fileChan closed, finishing transfer")
+					sendErrChan <- nil
 					return
 				}
 
-				//w.log.Debug("Sending file scan to analyzer", "event", req.Path)
-				if err := stream.Send(toPbFileAnalyzerRequest(req)); err != nil {
-					w.log.Warn("Failed to send file to analyzer", "path", req.Path, "error", err)
-					sendDone <- fmt.Errorf("send error: %w", err)
+				// Backpressure: Wait for an available slot before sending.
+				select {
+				case inFlightSemaphore <- struct{}{}:
+					// Slot acquired.
+				case <-ctx.Done():
+					sendErrChan <- ctx.Err()
 					return
 				}
+
+				// Forward the metadata to the Master server.
+				if err := stream.Send(toPbFileAnalyzerRequest(req)); err != nil {
+					<-inFlightSemaphore // Release slot on failure.
+					w.log.Warn("❌ Failed to send file", "path", req.Path, "error", err)
+					sendErrChan <- fmt.Errorf("send error: %w", err)
+					return
+				}
+
+				fileCount++
+
+				// Release slot: stream.Send blocks if gRPC internal buffers are full.
+				<-inFlightSemaphore
 			}
 		}
 	}()
 
-	// Attendre que l'envoi soit terminé
-	sendErr := <-sendDone
+	// Wait for the sending goroutine to finish or encounter an error.
+	sendErr := <-sendErrChan
+
+	// Log technical errors, but ignore simple context cancellations for cleaner logs.
 	if sendErr != nil && sendErr != context.Canceled {
-		w.log.Warn("Send goroutine finished with error", "error", sendErr)
+		w.log.Warn("⚠️ Send goroutine finished with error", "error", sendErr)
 	}
 
-	// Maintenant qu'on a fermé l'envoi, on peut recevoir la réponse finale
+	// Finalization: Wait for the server to process all data and send the summary.
+	w.log.Info("📥 Waiting for server final response...")
 	response, err := stream.CloseAndRecv()
 	if err != nil {
+		// Prioritize returning the send error if it exists.
+		if sendErr != nil && sendErr != context.Canceled {
+			return sendErr
+		}
+		// Handle normal closure scenarios.
 		if err == io.EOF || sendErr == context.Canceled {
-			w.log.Info("Stream closed normally")
 			return sendErr
 		}
 		return fmt.Errorf("error receiving final response: %w", err)
 	}
 
-	w.log.Info("File transfer complete",
+	// Final success log with server-side statistics.
+	w.log.Info("🎉 Transfer complete",
 		"files_received", response.FilesReceived,
 		"bytes_processed", response.BytesProcessed,
-		"ended_at", response.EndedAt.AsTime().Format(time.RFC3339),
+		"server_ended_at", response.EndedAt.AsTime().Format(time.RFC3339),
 	)
 
 	return sendErr

@@ -4,8 +4,8 @@ import (
 	"chat-lab/contract"
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
+	"chat-lab/infrastructure/grpc/client"
 	"chat-lab/internal"
-	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
 	"context"
 	"fmt"
@@ -51,7 +51,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := pb.NewFileAnalyzerServiceClient(conn)
+	grpcClient := client.NewFileAnalyzerClient(conn)
 
 	ctx := context.Background()
 	// 2. Setup context to handle termination signals (Ctrl+C).
@@ -74,7 +74,7 @@ func main() {
 		buildFileWorkers(
 			config,
 			&workersWG, &scanWG, logger, counter, dirChan,
-			fileChan, client)
+			fileChan, grpcClient)
 	supervisor.
 		Add(telemetryWorkers, channelCapWorker).
 		Add(fileScannerWorkers...).
@@ -145,7 +145,7 @@ func buildFileWorkers(config internal.Config,
 	logger *slog.Logger,
 	counter *workers.CounterFileScanner,
 	dirChan chan string, fileChan chan *analyzer.FileAnalyzerRequest,
-	client pb.FileAnalyzerServiceClient) ([]contract.Worker, contract.Worker) {
+	client client.FileAnalyzerClient) ([]contract.Worker, contract.Worker) {
 
 	var allWorkers = make([]contract.Worker, 0, config.ScannerWorkerNb)
 	for i := 0; i < config.ScannerWorkerNb; i++ {
@@ -157,6 +157,8 @@ func buildFileWorkers(config internal.Config,
 				dirChan, fileChan,
 				scanWG,
 				workersWG,
+				config.ScannerBackpressureLowThreshold,
+				config.ScannerBackpressureHardThreshold,
 			),
 		)
 	}

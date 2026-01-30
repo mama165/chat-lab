@@ -64,9 +64,11 @@ type FileScannerWorker struct {
 	dirChan chan string
 	// fileChan is the outbound pipeline where discovered file metadata is sent
 	// as pointers to be consumed by the gRPC streaming sender.
-	fileChan  chan *analyzer.FileAnalyzerRequest
-	scanWG    *sync.WaitGroup
-	workersWG *sync.WaitGroup
+	fileChan                         chan *analyzer.FileAnalyzerRequest
+	scanWG                           *sync.WaitGroup
+	workersWG                        *sync.WaitGroup
+	scannerBackpressureLowThreshold  int
+	scannerBackpressureHardThreshold int
 }
 
 func NewFileScannerWorker(
@@ -78,23 +80,26 @@ func NewFileScannerWorker(
 	fileChan chan *analyzer.FileAnalyzerRequest,
 	scanWG *sync.WaitGroup,
 	workersWG *sync.WaitGroup,
+	scannerBackpressureLowThreshold int,
+	scannerBackpressureHardThreshold int,
 ) *FileScannerWorker {
 	return &FileScannerWorker{
-		log:          log,
-		rootDir:      rootDir,
-		driveID:      driveID,
-		countScanner: countScanner,
-		dirChan:      dirChan,
-		fileChan:     fileChan,
-		scanWG:       scanWG,
-		workersWG:    workersWG,
+		log:                              log,
+		rootDir:                          rootDir,
+		driveID:                          driveID,
+		countScanner:                     countScanner,
+		dirChan:                          dirChan,
+		fileChan:                         fileChan,
+		scanWG:                           scanWG,
+		workersWG:                        workersWG,
+		scannerBackpressureLowThreshold:  scannerBackpressureLowThreshold,
+		scannerBackpressureHardThreshold: scannerBackpressureHardThreshold,
 	}
 }
 
 // Run executes the worker's main loop, consuming directory paths from dirChan and feeding subdirectories
 // back into it while processing regular files. It exits when the context is canceled or dirChan is closed.
 func (w *FileScannerWorker) Run(ctx context.Context) error {
-
 	defer w.workersWG.Done()
 	for {
 		select {
@@ -104,9 +109,37 @@ func (w *FileScannerWorker) Run(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			// Checking pressure before each directory
+			if err := w.throttle(ctx); err != nil {
+				return err
+			}
 			w.handleDirectory(ctx, currentDir)
 		}
 	}
+}
+
+// throttle Use a select with time.After to ensure the worker remains
+// responsive to context cancellation even during backpressure pauses.
+func (w *FileScannerWorker) throttle(ctx context.Context) error {
+	usage := len(w.fileChan)
+	softLimit := buildBackPressureLimit(w.fileChan, w.scannerBackpressureLowThreshold)
+	hardLimit := buildBackPressureLimit(w.fileChan, w.scannerBackpressureHardThreshold)
+
+	var pause time.Duration
+	if usage > hardLimit {
+		pause = 200 * time.Millisecond
+	} else if usage > softLimit {
+		pause = 20 * time.Millisecond
+	}
+
+	if pause > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pause):
+		}
+	}
+	return nil
 }
 
 func (w *FileScannerWorker) handleDirectory(ctx context.Context, currentDir string) {
@@ -143,6 +176,10 @@ func (w *FileScannerWorker) handleDirectory(ctx context.Context, currentDir stri
 			w.countScanner.IncrSkippedItems()
 		}
 	}
+}
+
+func buildBackPressureLimit(fileChan chan *analyzer.FileAnalyzerRequest, limit int) int {
+	return int(float64(cap(fileChan)) * float64(limit) / 100.0)
 }
 
 // processFile extracts metadata, detects MIME types via magic bytes sniffing,
