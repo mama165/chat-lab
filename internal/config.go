@@ -37,6 +37,9 @@ type Config struct {
 	SentimentBinPath          string        `env:"SENTIMENT_BIN_PATH,required=true"`
 	SentimentPort             int           `env:"SENTIMENT_PORT,required=true"`
 	EnableSpecialists         bool          `env:"ENABLE_SPECIALISTS,required=true"`
+	RootDir                   string        `env:"ROOT_DIR,required=true"`
+	ScannerWorkerNb           int           `env:"SCANNER_WORKER_NB,required=true"`
+	DriveID                   string        `env:"DRIVE_ID,required=true"`
 }
 
 func CharacterRune(str string) (rune, error) {
