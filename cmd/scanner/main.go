@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -35,13 +36,15 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
+	logger := logs.GetLoggerFromString(config.LogLevel)
+
+	logger.Info("Parallelism", "workers", config.ScannerWorkerNb, "numCPU", runtime.NumCPU())
+
 	if config.ScannerWorkerNb < runtime.NumCPU() {
 		runtime.GOMAXPROCS(config.ScannerWorkerNb)
 	} else {
 		runtime.GOMAXPROCS(runtime.NumCPU() / 2)
 	}
-
-	logger := logs.GetLoggerFromString(config.LogLevel)
 
 	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
 
@@ -58,17 +61,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	telemetryChan := make(chan event.Event, 1000)
+	telemetryChan := make(chan event.Event, config.BufferSize)
 	supervisor := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
-	counter := workers.NewCounterFileScanner()
+	counter := analyzer.NewCounterFileScanner()
 	dirChan := make(chan string, config.BufferSize)
 	fileChan := make(chan *analyzer.FileAnalyzerRequest, config.BufferSize)
 
 	var scanWG sync.WaitGroup
 	var workersWG sync.WaitGroup
 
-	telemetryWorkers, channelCapWorker :=
-		buildTelemetryWorkers(config, logger, fileChan, dirChan, telemetryChan)
+	telemetryWorkers, channelCapWorker, reporterWorker :=
+		buildTelemetryWorkers(config, logger, &workersWG, fileChan, dirChan, telemetryChan, counter)
 
 	fileScannerWorkers, fileSenderWorker :=
 		buildFileWorkers(
@@ -76,7 +79,7 @@ func main() {
 			&workersWG, &scanWG, logger, counter, dirChan,
 			fileChan, grpcClient)
 	supervisor.
-		Add(telemetryWorkers, channelCapWorker).
+		Add(telemetryWorkers, channelCapWorker, reporterWorker).
 		Add(fileScannerWorkers...).
 		Add(fileSenderWorker)
 
@@ -121,9 +124,12 @@ func main() {
 func buildTelemetryWorkers(
 	config internal.Config,
 	logger *slog.Logger,
+	workersWG *sync.WaitGroup,
 	fileChan chan *analyzer.FileAnalyzerRequest,
 	dirChan chan string,
-	telemetryChan chan event.Event) (contract.Worker, contract.Worker) {
+	telemetryChan chan event.Event,
+	counter *analyzer.CounterFileScanner,
+) (contract.Worker, contract.Worker, contract.Worker) {
 	channelCapacityHandler := event.NewChannelCapacityHandler(logger, config.LowCapacityThreshold)
 	telemetryWorker := workers.NewTelemetryWorker(
 		logger, config.MetricInterval, telemetryChan,
@@ -137,13 +143,15 @@ func buildTelemetryWorkers(
 	channelCapacityWorker := workers.NewChannelCapacityWorker(
 		logger, channelsToMonitor, telemetryChan, config.MetricInterval)
 
-	return telemetryWorker, channelCapacityWorker
+	reporterWorker := workers.NewReporterWorker(counter, 2*time.Second, workersWG)
+
+	return telemetryWorker, channelCapacityWorker, reporterWorker
 }
 
 func buildFileWorkers(config internal.Config,
 	workersWG, scanWG *sync.WaitGroup,
 	logger *slog.Logger,
-	counter *workers.CounterFileScanner,
+	counter *analyzer.CounterFileScanner,
 	dirChan chan string, fileChan chan *analyzer.FileAnalyzerRequest,
 	client client.FileAnalyzerClient) ([]contract.Worker, contract.Worker) {
 

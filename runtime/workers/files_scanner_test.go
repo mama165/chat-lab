@@ -33,7 +33,7 @@ func TestFileScannerWorker_Run(t *testing.T) {
 	t.Run("Full scan execution", func(t *testing.T) {
 		// Initialize all dependencies for the concurrent worker.
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-		counter := NewCounterFileScanner()
+		counter := analyzer.NewCounterFileScanner()
 
 		// Use buffered channels to avoid deadlocks during the test
 		dirChan := make(chan string, 10)
@@ -108,7 +108,7 @@ func TestFileScannerWorker_Run(t *testing.T) {
 			logger,
 			"root",
 			"id",
-			NewCounterFileScanner(),
+			analyzer.NewCounterFileScanner(),
 			nil, fileChan, nil, nil,
 			70,
 			90)

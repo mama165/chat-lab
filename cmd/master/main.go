@@ -73,7 +73,7 @@ func run() (int, error) {
 		return exitConfig, err
 	}
 
-	logger := logs.GetLoggerFromString(config.LogLevel)
+	logger := logs.GetLoggerFromString("INFO")
 
 	ctx := context.Background()
 
