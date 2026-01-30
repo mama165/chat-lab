@@ -68,7 +68,7 @@ func (w FileSenderWorker) Run(ctx context.Context) error {
 					return
 				}
 
-				w.log.Debug("Sending file scan to analyzer", "event", req.Path)
+				//w.log.Debug("Sending file scan to analyzer", "event", req.Path)
 				if err := stream.Send(toPbFileAnalyzerRequest(req)); err != nil {
 					w.log.Warn("Failed to send file to analyzer", "path", req.Path, "error", err)
 					sendDone <- fmt.Errorf("send error: %w", err)

@@ -66,36 +66,48 @@ func main() {
 
 	var scanWG sync.WaitGroup
 	var workersWG sync.WaitGroup
+
+	telemetryWorkers, channelCapWorker :=
+		buildTelemetryWorkers(config, logger, fileChan, dirChan, telemetryChan)
+
+	fileScannerWorkers, fileSenderWorker :=
+		buildFileWorkers(
+			config,
+			&workersWG, &scanWG, logger, counter, dirChan,
+			fileChan, client)
+	supervisor.
+		Add(telemetryWorkers, channelCapWorker).
+		Add(fileScannerWorkers...).
+		Add(fileSenderWorker)
+
+	go func() {
+		logger.Info("Starting supervisor and all workers")
+		supervisor.Run(ctx)
+	}()
+
 	scanWG.Add(1)
 	dirChan <- config.RootDir
 
+	scanDone := make(chan struct{})
 	go func() {
-		// Waiting for no directories left
+		logger.Info("Waiting for scan to complete...")
 		scanWG.Wait()
+		close(scanDone)
 		logger.Info("Logic: No more directories to scan. Closing dirChan.")
-		close(dirChan)
-
-		// Waiting for all scanner workers to stop
-		workersWG.Wait()
-		logger.Info("Technical: All scanner workers exited. Closing fileChan.")
-		close(fileChan)
 	}()
 
-	var allWorkers = make([]contract.Worker, 0)
-	telemetryWorkers, channelCapWorker :=
-		buildTelemetryWorkers(config, logger, fileChan, dirChan, telemetryChan)
-	allWorkers = append(allWorkers, telemetryWorkers, channelCapWorker)
+	logger.Info("Scan still alive... (Ctrl+C to stop)")
 
-	allWorkers, fileSenderWorker := buildFileWorkers(config,
-		&workersWG, &scanWG, allWorkers, logger, counter, dirChan,
-		fileChan, client)
-	allWorkers = append(allWorkers, fileSenderWorker)
+	select {
+	case <-ctx.Done():
+		logger.Warn("Scan interrupted...")
+	case <-scanDone:
+		logger.Info("Scan terminated gracefully")
+		close(dirChan)
+	}
 
-	allWorkers = append(allWorkers, fileSenderWorker)
-	supervisor.Add(allWorkers...)
-
-	logger.Info("Starting supervisor and all workers")
-	supervisor.Run(ctx)
+	workersWG.Wait()
+	close(fileChan)
 
 	logger.Info("Scan Summary",
 		"Files", counter.FilesScanned,
@@ -130,11 +142,12 @@ func buildTelemetryWorkers(
 
 func buildFileWorkers(config internal.Config,
 	workersWG, scanWG *sync.WaitGroup,
-	allWorkers []contract.Worker, logger *slog.Logger,
+	logger *slog.Logger,
 	counter *workers.CounterFileScanner,
 	dirChan chan string, fileChan chan *analyzer.FileAnalyzerRequest,
-	client pb.FileAnalyzerServiceClient,
-) ([]contract.Worker, *workers.FileSenderWorker) {
+	client pb.FileAnalyzerServiceClient) ([]contract.Worker, contract.Worker) {
+
+	var allWorkers = make([]contract.Worker, 0, config.ScannerWorkerNb)
 	for i := 0; i < config.ScannerWorkerNb; i++ {
 		workersWG.Add(1)
 		allWorkers = append(allWorkers,
