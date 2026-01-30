@@ -24,7 +24,7 @@ type FileAnalyzerRequest struct {
 	Size       uint64     `validate:"gte=0"`
 	Attributes uint32     `validate:"gte=0"`
 	MimeType   string     `validate:"required,max=128"`
-	MagicBytes []byte     `validate:"required,max=64"`
+	MagicBytes []byte     `validate:"max=64"`
 	ScannedAt  time.Time  `validate:"required"`
 	SourceType SourceType `validate:"required,oneof=UNSPECIFIED LOCAL_FIXED REMOVABLE NETWORK"`
 }
