@@ -4,7 +4,7 @@
 // 	protoc        v6.31.1
 // source: proto/analyzer/file_analyzer_service.proto
 
-package analyzer
+package pb
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -76,7 +76,7 @@ func (SourceType) EnumDescriptor() ([]byte, []int) {
 
 type FileAnalyzerRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Complet path (ex: E:\Photos\holidays.jpg)
+	// Complete path (ex: E:\Photos\holidays.jpg)
 	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	// ex: Disk UUID
 	DriveId string `protobuf:"bytes,2,opt,name=drive_id,json=driveId,proto3" json:"drive_id,omitempty"`
@@ -271,7 +271,7 @@ const file_proto_analyzer_file_analyzer_service_proto_rawDesc = "" +
 	"\tREMOVABLE\x10\x02\x12\v\n" +
 	"\aNETWORK\x10\x032a\n" +
 	"\x13FileAnalyzerService\x12J\n" +
-	"\aAnalyze\x12\x1d.analyzer.FileAnalyzerRequest\x1a\x1e.analyzer.FileAnalyzerResponse(\x01B\x19Z\x17chat-lab/proto/analyzerb\x06proto3"
+	"\aAnalyze\x12\x1d.analyzer.FileAnalyzerRequest\x1a\x1e.analyzer.FileAnalyzerResponse(\x01B\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_proto_analyzer_file_analyzer_service_proto_rawDescOnce sync.Once

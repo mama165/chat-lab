@@ -2,11 +2,13 @@ package main
 
 import (
 	"chat-lab/contract"
+	"chat-lab/domain"
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/infrastructure/grpc/client"
 	"chat-lab/internal"
 	"chat-lab/runtime/workers"
+	"chat-lab/services"
 	"context"
 	"fmt"
 	"github.com/Netflix/go-env"
@@ -38,13 +40,13 @@ func main() {
 
 	logger := logs.GetLoggerFromString(config.LogLevel)
 
-	logger.Info("Parallelism", "workers", config.ScannerWorkerNb, "numCPU", runtime.NumCPU())
-
-	if config.ScannerWorkerNb < runtime.NumCPU() {
-		runtime.GOMAXPROCS(config.ScannerWorkerNb)
-	} else {
-		runtime.GOMAXPROCS(runtime.NumCPU() / 2)
-	}
+	numCPU := runtime.NumCPU()
+	runtime.GOMAXPROCS(numCPU)
+	logger.Info("Parallelism",
+		"scan_workers_nb", config.ScannerWorkerNb,
+		"downloader_workers_nb", config.DownloaderWorkerNb,
+		"numCPU", numCPU,
+	)
 
 	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
 
@@ -66,22 +68,26 @@ func main() {
 	counter := analyzer.NewCounterFileScanner()
 	dirChan := make(chan string, config.BufferSize)
 	fileChan := make(chan *analyzer.FileAnalyzerRequest, config.BufferSize)
-
+	requestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
+	responseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
 	var scanWG sync.WaitGroup
 	var workersWG sync.WaitGroup
 
 	telemetryWorkers, channelCapWorker, reporterWorker :=
 		buildTelemetryWorkers(config, logger, &workersWG, fileChan, dirChan, telemetryChan, counter)
 
-	fileScannerWorkers, fileSenderWorker :=
+	fileScannerWorkers, fileDownloaderWorker, fileSenderWorker :=
 		buildFileWorkers(
 			config,
 			&workersWG, &scanWG, logger, counter, dirChan,
-			fileChan, grpcClient)
+			fileChan, requestChan, responseChan, grpcClient,
+			config.ChunkSizeKb, config.MaxFileSizeMb,
+		)
 	supervisor.
 		Add(telemetryWorkers, channelCapWorker, reporterWorker).
 		Add(fileScannerWorkers...).
-		Add(fileSenderWorker)
+		Add(fileSenderWorker).
+		Add(fileDownloaderWorker...)
 
 	go func() {
 		logger.Info("Starting supervisor and all workers")
@@ -153,12 +159,15 @@ func buildFileWorkers(config internal.Config,
 	logger *slog.Logger,
 	counter *analyzer.CounterFileScanner,
 	dirChan chan string, fileChan chan *analyzer.FileAnalyzerRequest,
-	client client.FileAnalyzerClient) ([]contract.Worker, contract.Worker) {
+	requestChan chan domain.FileDownloaderRequest,
+	responseChan chan domain.FileDownloaderResponse,
+	client client.FileAnalyzerClient,
+	chunkSizeKb, maxFileSizeMb int) ([]contract.Worker, []contract.Worker, contract.Worker) {
 
-	var allWorkers = make([]contract.Worker, 0, config.ScannerWorkerNb)
+	var allFileScannerWorkers = make([]contract.Worker, 0, config.ScannerWorkerNb)
 	for i := 0; i < config.ScannerWorkerNb; i++ {
 		workersWG.Add(1)
-		allWorkers = append(allWorkers,
+		allFileScannerWorkers = append(allFileScannerWorkers,
 			workers.NewFileScannerWorker(
 				logger,
 				config.RootDir, config.DriveID, counter,
@@ -170,6 +179,20 @@ func buildFileWorkers(config internal.Config,
 			),
 		)
 	}
+
+	var allFileDownloaderWorkers = make([]contract.Worker, 0, config.DownloaderWorkerNb)
+	for i := 0; i < config.DownloaderWorkerNb; i++ {
+		allFileDownloaderWorkers = append(allFileDownloaderWorkers,
+			services.NewFileDownloaderWorker(
+				logger,
+				requestChan,
+				responseChan,
+				chunkSizeKb,
+				maxFileSizeMb,
+			))
+	}
+
 	fileSenderWorker := workers.NewFileSenderWorker(client, logger, fileChan)
-	return allWorkers, fileSenderWorker
+
+	return allFileScannerWorkers, allFileDownloaderWorkers, fileSenderWorker
 }

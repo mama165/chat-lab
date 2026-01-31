@@ -39,9 +39,12 @@ type Config struct {
 	EnableSpecialists                bool          `env:"ENABLE_SPECIALISTS,required=true"`
 	RootDir                          string        `env:"ROOT_DIR,required=true"`
 	ScannerWorkerNb                  int           `env:"SCANNER_WORKER_NB,required=true"`
+	DownloaderWorkerNb               int           `env:"DOWNLOADER_WORKER_NB,required=true"`
 	DriveID                          string        `env:"DRIVE_ID,required=true"`
 	ScannerBackpressureLowThreshold  int           `env:"SCANNER_BACKPRESSURE_LOW_THRESHOLD_PERCENT,required=true"`
 	ScannerBackpressureHardThreshold int           `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`
+	ChunkSizeKb                      int           `env:"CHUNK_SIZE_KB,required=true"`
+	MaxFileSizeMb                    int           `env:"MAX_FILE_SIZE_MB,required=true"`
 }
 
 func CharacterRune(str string) (rune, error) {

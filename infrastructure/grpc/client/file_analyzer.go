@@ -24,11 +24,11 @@ type gRPCAnalyzerClient struct {
 	client pb.FileAnalyzerServiceClient
 }
 
+func NewFileAnalyzerClient(cc grpc.ClientConnInterface) FileAnalyzerClient {
+	return &gRPCAnalyzerClient{client: pb.NewFileAnalyzerServiceClient(cc)}
+}
+
 // Analyze Call the generated gRPC client.
 func (g *gRPCAnalyzerClient) Analyze(ctx context.Context) (FileAnalyzerStream, error) {
 	return g.client.Analyze(ctx)
-}
-
-func NewFileAnalyzerClient(cc grpc.ClientConnInterface) FileAnalyzerClient {
-	return &gRPCAnalyzerClient{client: pb.NewFileAnalyzerServiceClient(cc)}
 }

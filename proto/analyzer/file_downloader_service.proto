@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package analyzer;
+option go_package = "./pb";
+
+service FileDownloaderService {
+  // Bidirectional stream for high-performance multiplexed transfers
+  rpc Download(stream FileDownloaderRequest) returns (stream FileDownloaderResponse);
+}
+
+message FileDownloaderRequest {
+  string file_id = 1; // Better than path for security (obfuscation)
+  string path = 2;    // The actual path on the scanner's disk
+}
+
+message FileDownloaderResponse {
+  oneof control {
+    FileMetadata metadata = 1; // Sent once at the start of a file
+    FileChunk chunk = 2;       // Sent multiple times
+    FileSignature signature = 3;       // Sent once
+    FileError error = 4;       // In case the scanner detects an issue
+  }
+}
+
+message FileMetadata {
+  string mime_type = 2;   // To check against the expected type
+  uint64 size = 3;        // To prevent "Zip Bombs" or overflow
+}
+
+message FileChunk {
+  bytes data = 1;
+}
+
+message FileSignature {
+  string sha256 = 1;      // To be verified by the Master at the end
+}
+
+message FileError {
+  string message = 1;
+  ErrorCode code = 2;
+}
+
+enum ErrorCode {
+  INVALID_FILE_PATH = 0;
+  NOT_FOUND = 1;
+  ACCESS_DENIED = 2;
+  NOT_FILE = 3;
+  FILE_TOO_LARGE = 4;
+  CHECKSUM_MISMATCH = 5;
+}

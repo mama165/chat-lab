@@ -4,7 +4,7 @@
 // - protoc             v6.31.1
 // source: proto/analyzer/file_analyzer_service.proto
 
-package analyzer
+package pb
 
 import (
 	context "context"
