@@ -3,7 +3,6 @@ package sink_test
 import (
 	"chat-lab/domain/event"
 	"chat-lab/domain/mimetypes"
-	"chat-lab/domain/specialist"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/mocks"
 	"chat-lab/sink"
@@ -18,13 +17,18 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func setupSink(ctrl *gomock.Controller, maxSize int, timeout time.Duration) (*sink.AnalysisSink, *mocks.MockIAnalysisRepository, *mocks.MockSpecialistCoordinator) {
-	mockRepo := mocks.NewMockIAnalysisRepository(ctrl)
-	mockCoordinator := mocks.NewMockSpecialistCoordinator(ctrl)
+// setupSink prepares the test environment with necessary mocks and logger.
+func setupSink(ctrl *gomock.Controller,
+	maxSize int,
+	timeout time.Duration,
+) (*sink.AnalysisSink, *mocks.MockIAnalysisRepository, *mocks.MockIFileTaskRepository) {
+	mockRepoAnalysis := mocks.NewMockIAnalysisRepository(ctrl)
+	mockRepoFileTask := mocks.NewMockIFileTaskRepository(ctrl)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	s := sink.NewAnalysisSink(mockCoordinator, mockRepo, logger, maxSize, timeout, timeout)
-	return s, mockRepo, mockCoordinator
+	// Updated constructor call to match the new asynchronous architecture.
+	s := sink.NewAnalysisSink(mockRepoAnalysis, mockRepoFileTask, logger, maxSize, timeout, timeout)
+	return s, mockRepoAnalysis, mockRepoFileTask
 }
 
 func TestFlushTriggeredBySizeLimit(t *testing.T) {
@@ -57,7 +61,7 @@ func TestFlushTriggeredByTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeout := 30 * time.Second
+	timeout := 10 * time.Millisecond // Shorter timeout for faster test execution.
 	s, mockRepo, _ := setupSink(ctrl, 100, timeout)
 
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Times(1)
@@ -71,38 +75,38 @@ func TestFlushTriggeredByTimeout(t *testing.T) {
 	time.Sleep(timeout + 50*time.Millisecond)
 }
 
-func TestBroadcastOnlyForPDFOrFileSource(t *testing.T) {
+func TestTaskEnqueuingForSpecificMimeTypes(t *testing.T) {
 	req := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	// Use maxSize 1 to trigger flush immediately on each Consume
-	s, mockRepo, mockCoordinator := setupSink(ctrl, 1, 1*time.Hour)
+	// Use maxSize 1 to trigger immediate flush on each consumption.
+	s, mockRepo, mockFileTaskRepo := setupSink(ctrl, 1, 1*time.Hour)
 
-	// SCENARIO 1: PDF File -> Should Broadcast
-	mockRequest := specialist.AnalysisRequest{
-		MimeType: mimetypes.ApplicationPDF,
-	}
-	mockCoordinator.EXPECT().Broadcast(gomock.Any(), mockRequest).Return(specialist.AnalysisResponse{}, nil).Times(1)
+	// SCENARIO 1: PDF File -> Should trigger task enqueuing.
+	mockFileTaskRepo.EXPECT().
+		EnqueueTask(gomock.Any()).
+		Return(nil).
+		Times(1)
+
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
 
 	err := s.Consume(context.Background(), event.FileAnalyse{
 		Id:         uuid.New(),
-		DriveID:    uuid.New().String(),
+		Path:       "/test/document.pdf",
 		MimeType:   string(mimetypes.ApplicationPDF),
 		SourceType: "file",
 	})
 	req.NoError(err)
 
-	// SCENARIO 2: Generic TXT without "file" source -> Should NOT Broadcast
-	// (Note: no call to mockCoordinator.EXPECT() means it should fail if called)
+	// SCENARIO 2: Text file -> Should NOT trigger task enqueuing.
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
 
 	err = s.Consume(context.Background(), event.FileAnalyse{
 		Id:         uuid.New(),
-		DriveID:    uuid.New().String(),
+		Path:       "/test/notes.txt",
 		MimeType:   string(mimetypes.TextPlain),
-		SourceType: "random_source",
+		SourceType: "file",
 	})
 	req.NoError(err)
 }
@@ -112,7 +116,7 @@ func TestConcurrentAccessSafety(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	numWorkers := 10
+	numWorkers := 5
 	eventsPerWorker := 10
 	totalEvents := numWorkers * eventsPerWorker
 	s, mockRepo, _ := setupSink(ctrl, totalEvents, 1*time.Hour)

@@ -26,6 +26,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockMessageRepo := mocks.NewMockIMessageRepository(ctrl)
 	mockAnalysisRepository := mocks.NewMockIAnalysisRepository(ctrl)
+	mockFileTaskRepository := mocks.NewMockIFileTaskRepository(ctrl)
 	mockMessageRepo.EXPECT().StoreMessage(gomock.Any()).Do(
 		func(_ storage.DiskMessage) {
 			time.Sleep(2 * time.Millisecond)
@@ -43,13 +44,13 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 
 	manager := runtime.NewCoordinator(log)
 
-	// Orchestrator avec un buffer de 1000 et une latence de backpressure courte
 	o := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, fileAnalyzeChan,
 		mockMessageRepo,
 		mockAnalysisRepository,
+		mockFileTaskRepository,
 		manager,
-		2,                    // numWorkers (on monte à 50 pour encaisser)
+		2,                    // numWorkers
 		1000,                 // bufferSize
 		100*time.Millisecond, // sinkTimeout
 		500*time.Second,      // buffer timeout

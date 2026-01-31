@@ -41,6 +41,7 @@ type Orchestrator struct {
 	telemetryChan        chan event.Event
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
+	fileTaskRepository   storage.IFileTaskRepository
 	coordinator          contract.SpecialistCoordinator
 	sinkTimeout          time.Duration
 	bufferTimeout        time.Duration
@@ -60,6 +61,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan, eventChan chan event.Event,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
+	fileTaskRepository storage.IFileTaskRepository,
 	specialistCoordinator contract.SpecialistCoordinator,
 	numWorkers, bufferSize int,
 	sinkTimeout, bufferTimeout, specialistTimeout time.Duration,
@@ -79,6 +81,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		eventChan:            eventChan,
 		messageRepository:    messageRepository,
 		analysisRepository:   analysisRepository,
+		fileTaskRepository:   fileTaskRepository,
 		coordinator:          specialistCoordinator,
 		sinkTimeout:          sinkTimeout,
 		bufferTimeout:        bufferTimeout,
@@ -226,8 +229,9 @@ func (o *Orchestrator) prepareModeration(path string, charReplacement rune) (con
 // Fanout worker handles a lot of events
 func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 	diskSink := sink.NewDiskSink(o.messageRepository, o.log)
-	analysisSink := sink.NewAnalysisSink(o.coordinator,
-		o.analysisRepository, o.log, o.maxAnalyzedEvent, o.bufferTimeout, o.specialistTimeout)
+	analysisSink := sink.NewAnalysisSink(
+		o.analysisRepository, o.fileTaskRepository, o.log,
+		o.maxAnalyzedEvent, o.bufferTimeout, o.specialistTimeout)
 
 	var res []contract.Worker
 	for i := 0; i < o.numWorkers; i++ {

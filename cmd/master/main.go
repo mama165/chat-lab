@@ -159,12 +159,14 @@ func run() (int, error) {
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
 	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
+	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
 	userRepository := storage.NewUserRepository(db)
 
 	orchestrator := runtime.NewOrchestrator(
 		logger, sup, registry, telemetryChan, eventChan,
 		messageRepository,
 		analysisRepository,
+		fileTaskRepository,
 		coordinator,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,

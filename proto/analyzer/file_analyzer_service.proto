@@ -10,7 +10,7 @@ service FileAnalyzerService {
 }
 
 message FileAnalyzerRequest {
-  // Complet path (ex: E:\Photos\holidays.jpg)
+  // Complete path (ex: E:\Photos\holidays.jpg)
   string path = 1;
   // ex: Disk UUID
   string drive_id = 2;
@@ -31,7 +31,7 @@ message FileAnalyzerRequest {
 }
 
 enum SourceType {
-  <UNSPECIFIED> = 0;
+  UNSPECIFIED= 0;
   LOCAL_FIXED = 1;  // Internal SSD/HDD
   REMOVABLE = 2;    // USB / Carte SD
   NETWORK = 3;      // NAS / SMB

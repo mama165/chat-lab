@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package storage;
+option go_package = "./pb";
+
+import "google/protobuf/timestamp.proto";
+
+message FileTask {
+  string id = 1;
+  string path = 2;
+  string mime_type = 3;
+  uint64 size = 4;
+  Priority prior = 5;
+  google.protobuf.Timestamp created_at = 6;
+  int32 retry_count = 7;
+}
+
+enum Priority {
+  HIGH = 0;
+  NORMAL = 1;
+}

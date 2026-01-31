@@ -3,16 +3,16 @@ package test
 import (
 	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
-	bluge2 "chat-lab/infrastructure/storage"
+	"chat-lab/infrastructure/storage"
 	"chat-lab/mocks"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"context"
+	"github.com/blugelabs/bluge"
 	"log/slog"
 	"testing"
 	"time"
 
-	"github.com/blugelabs/bluge"
 	"github.com/mama165/sdk-go/database"
 
 	"github.com/dgraph-io/badger/v4"
@@ -44,13 +44,15 @@ func Test_Scenario(t *testing.T) {
 	fileAnalyzeChan := make(chan event.Event)
 	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
-	messageRepository := bluge2.NewMessageRepository(db, log, lo.ToPtr(100))
-	analysisRepository := bluge2.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
+	messageRepository := storage.NewMessageRepository(db, log, lo.ToPtr(100))
+	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, log, lo.ToPtr(50), 50)
+	fileTaskRepository := storage.NewFileTaskRepository(db, log)
 	manager := runtime.NewCoordinator(log)
 	orchestrator := runtime.NewOrchestrator(
 		log, supervisor, registry, telemetryChan, fileAnalyzeChan,
 		messageRepository,
 		analysisRepository,
+		fileTaskRepository,
 		manager,
 		10, 1000,
 		3*time.Second,

@@ -568,8 +568,7 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 		return Analysis{}, fmt.Errorf("invalid entity id: %w", err)
 	}
 
-	// 2. Map Scores using lo
-	// English: Map string keys to domain Metric type
+	// Map string keys to domain Metric type
 	scores := lo.MapKeys(analysisPb.Scores, func(_ float64, key string) specialist.Metric {
 		return specialist.Metric(key)
 	})
@@ -587,8 +586,7 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 
 	// 4. Map Polymorphic Payload
 	if analysisPb.Payload != nil {
-		// English: Log the concrete type of the protobuf oneof for debugging purposes
-		// Français: Log du type concret pour vérifier l'aiguillage gRPC
+		// Log the concrete type of the protobuf oneof for debugging purposes
 		fmt.Printf("🔍 [DEBUG MAPPER] Protobuf Payload Type: %T\n", analysisPb.Payload)
 
 		switch p := analysisPb.Payload.(type) {
@@ -608,11 +606,10 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 				Filename: p.File.Filename,
 				MimeType: p.File.MimeType,
 				Size:     p.File.Size,
-				Content:  p.File.Content, // Assure-toi que Content est bien dans ta struct Go
+				Content:  p.File.Content,
 			}
 
-			// English: Even if it's a file, let's see what's inside the proto object
-			// Français: Même si c'est un fichier, on regarde ce qu'il y a dans l'objet proto
+			// Even if it's a file, let's see what's inside the proto object
 			fmt.Printf("📂 [DEBUG FILE] Content size: %d bytes\n", len(p.File.Content))
 			fmt.Printf("📂 [DEBUG FILE] Raw Content: %s\n", p.File.Content)
 
