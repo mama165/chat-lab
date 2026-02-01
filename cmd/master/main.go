@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/domain/mimetypes"
@@ -155,6 +156,8 @@ func run() (int, error) {
 	// 3. Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
+	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
+	fileDownloaderResponseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
 	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
@@ -211,10 +214,13 @@ func run() (int, error) {
 	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
 	chatServer := server.NewChatServer(logger, chatService, config.ConnectionBufferSize, config.BufferTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
+	fileDownloaderServer := server.NewFileDownloaderServer(logger, fileDownloaderRequestChan, fileDownloaderResponseChan)
+
 	authServer := server.NewAuthServer(authService)
 	pb1.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
+	pb3.RegisterFileDownloaderServiceServer(s, fileDownloaderServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
