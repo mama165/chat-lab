@@ -68,7 +68,7 @@ func (s *FileDownloaderServer) Download(stream grpc.BidiStreamingServer[pb.FileD
 
 func fromPbRequest(req *pb.FileDownloaderRequest) domain.FileDownloaderRequest {
 	return domain.FileDownloaderRequest{
-		FileID: req.FileId,
+		FileID: domain.FileID(req.FileId),
 		Path:   req.Path,
 	}
 }

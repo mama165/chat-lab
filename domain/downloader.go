@@ -1,11 +1,14 @@
 package domain
 
+type FileID string
+
 type FileDownloaderRequest struct {
-	FileID string `validate:"required,max=1024"`
+	FileID FileID `validate:"required,max=1024"`
 	Path   string `validate:"required,max=1024"`
 }
 
 type FileDownloaderResponse struct {
+	FileID        FileID
 	FileMetadata  *FileMetadata
 	FileChunk     *FileChunk
 	FileSignature *FileSignature
