@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/infrastructure/storage"
@@ -37,6 +38,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 
 	telemetryChan := make(chan event.Event, 5000)
 	fileAnalyzeChan := make(chan event.Event, 5000)
+	fileRequestChan := make(chan<- domain.FileDownloaderRequest, 5000)
 	log := slog.New(slog.DiscardHandler) // On désactive les logs pour la perf
 
 	supervisor := workers.NewSupervisor(log, telemetryChan, 100*time.Millisecond)
@@ -45,7 +47,7 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 	manager := runtime.NewCoordinator(log)
 
 	o := runtime.NewOrchestrator(
-		log, supervisor, registry, telemetryChan, fileAnalyzeChan,
+		log, supervisor, registry, telemetryChan, fileAnalyzeChan, fileRequestChan,
 		mockMessageRepo,
 		mockAnalysisRepository,
 		mockFileTaskRepository,
@@ -63,6 +65,8 @@ func TestOrchestrator_LoadTest(t *testing.T) {
 		500,
 		0.4, 0.6,
 		100,
+		30*time.Second,
+		5,
 	)
 	go func() {
 		if err := o.Start(ctx); err != nil {

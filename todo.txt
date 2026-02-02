@@ -11,3 +11,4 @@
 - Spit events in FanoutWorker into ChatEvent, FileEvent, Technical event
 - Init specialists with NewConfig
 - Check mimetypes before sending files from file_downloader_service
+- Mutualize setupDB everywhere (use WithInMemory for BadgerDB)

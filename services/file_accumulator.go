@@ -44,13 +44,13 @@ func (a *FileAccumulator) ProcessResponse(resp domain.FileDownloaderResponse) er
 			return fmt.Errorf("failed to create temp file for %s: %w", fileID, err)
 		}
 
-		a.buffers[fileID] = &domain.FileBuffer{Handle: f}
+		a.buffers[fileID] = &domain.FileBuffer{File: f}
 		a.hash[fileID] = sha256.New()
 		return nil
 	case resp.FileChunk != nil:
 		// Read lock is sufficient to retrieve existing handles and hashers
 		a.mu.RLock()
-		buf, bufOk := a.buffers[fileID]
+		fileBuffer, bufOk := a.buffers[fileID]
 		h, hashOk := a.hash[fileID]
 		a.mu.RUnlock()
 
@@ -60,7 +60,7 @@ func (a *FileAccumulator) ProcessResponse(resp domain.FileDownloaderResponse) er
 
 		// Write data to the file and update the rolling hash
 		// Note: os.File.Write is thread-safe at the OS level for separate file handles
-		if _, err := buf.Handle.Write(resp.FileChunk.Chunk); err != nil {
+		if _, err := fileBuffer.File.Write(resp.FileChunk.Chunk); err != nil {
 			return fmt.Errorf("failed to write chunk for %s: %w", fileID, err)
 		}
 		h.Write(resp.FileChunk.Chunk)
@@ -77,7 +77,9 @@ func (a *FileAccumulator) ProcessResponse(resp domain.FileDownloaderResponse) er
 func (a *FileAccumulator) finalize(fileID domain.FileID, expectedSha string) error {
 	// Exclusive lock required to remove entries from the maps
 	a.mu.Lock()
-	buf, ok := a.buffers[fileID]
+	fileBuffer, ok := a.buffers[fileID]
+
+	// Get accumulated hash (sha256)
 	h := a.hash[fileID]
 
 	// Cleanup maps immediately to prevent memory leaks, even if verification fails
@@ -90,10 +92,11 @@ func (a *FileAccumulator) finalize(fileID domain.FileID, expectedSha string) err
 	}
 
 	// Ensure the file handle is closed
-	defer buf.Handle.Close()
+	defer fileBuffer.File.Close()
 
+	signature := h.Sum(nil)
 	// Compare calculated hash with the expected signature
-	actualSha := fmt.Sprintf("%x", h.Sum(nil))
+	actualSha := fmt.Sprintf("%x", signature)
 	if actualSha != expectedSha {
 		return fmt.Errorf("integrity check failed for %s: got %s, want %s", fileID, actualSha, expectedSha)
 	}

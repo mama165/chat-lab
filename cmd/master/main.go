@@ -87,7 +87,7 @@ func run() (int, error) {
 	}
 
 	if logger.Enabled(ctx, slog.LevelDebug) {
-		debugPort := 8081
+		debugPort := config.DebugPort
 		endpoint := "/inspect"
 		url := fmt.Sprintf("http://localhost:%d%s", debugPort, endpoint)
 		logger.Info("Debug Badger inspector available", "url", url)
@@ -117,8 +117,8 @@ func run() (int, error) {
 	// fails to load its resources (like ML models) or if a port is already in use.
 
 	/*	specialistConfigs := []specialist.Config{
-		{ID: specialist.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, Port: config.ToxicityPort},
-		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, Port: config.SentimentPort},
+		{ID: specialist.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, MasterPort: config.ToxicityPort},
+		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, MasterPort: config.SentimentPort},
 	}*/
 
 	specialistConfigs := []specialist.Config{
@@ -157,7 +157,6 @@ func run() (int, error) {
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
 	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
-	fileDownloaderResponseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
 	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
@@ -167,6 +166,7 @@ func run() (int, error) {
 
 	orchestrator := runtime.NewOrchestrator(
 		logger, sup, registry, telemetryChan, eventChan,
+		fileDownloaderRequestChan,
 		messageRepository,
 		analysisRepository,
 		fileTaskRepository,
@@ -178,6 +178,8 @@ func run() (int, error) {
 		config.MaxContentLength,
 		config.MinScoring, config.MaxScoring,
 		config.MaxAnalyzedEvent,
+		config.FileTransferInterval,
+		config.PendingFileBatchSize,
 	)
 
 	// 4. Context & Signals
@@ -197,7 +199,7 @@ func run() (int, error) {
 	}()
 
 	// 6. gRPC Server Setup
-	address := fmt.Sprintf("0.0.0.0:%d", config.Port)
+	address := fmt.Sprintf("0.0.0.0:%d", config.MasterPort)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", address, err)
@@ -214,13 +216,11 @@ func run() (int, error) {
 	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
 	chatServer := server.NewChatServer(logger, chatService, config.ConnectionBufferSize, config.BufferTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
-	fileDownloaderServer := server.NewFileDownloaderServer(logger, fileDownloaderRequestChan, fileDownloaderResponseChan)
 
 	authServer := server.NewAuthServer(authService)
 	pb1.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
-	pb3.RegisterFileDownloaderServiceServer(s, fileDownloaderServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {

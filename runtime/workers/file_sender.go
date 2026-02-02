@@ -6,10 +6,11 @@ import (
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"log/slog"
 	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type FileSenderWorker struct {
@@ -126,7 +127,7 @@ func (w FileSenderWorker) Run(ctx context.Context) error {
 		if sendErr != nil && sendErr != context.Canceled {
 			return sendErr
 		}
-		// Handle normal closure scenarios.
+		// File normal closure scenarios.
 		if err == io.EOF || sendErr == context.Canceled {
 			return sendErr
 		}

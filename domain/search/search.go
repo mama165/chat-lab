@@ -30,7 +30,7 @@ func NewSearchQuery(input string) *Query {
 	for i := 0; i < len(parts); i++ {
 		part := parts[i]
 
-		// Handle flags like --business 0.8 or --room 4
+		// File flags like --business 0.8 or --room 4
 		if strings.HasPrefix(part, "--") && i+1 < len(parts) {
 			key := strings.TrimPrefix(part, "--")
 			val := parts[i+1]

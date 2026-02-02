@@ -11,7 +11,7 @@ package mocks
 
 import (
 	client "chat-lab/infrastructure/grpc/client"
-	analyzer "chat-lab/proto/analyzer"
+	pb "chat-lab/proto/analyzer"
 	context "context"
 	reflect "reflect"
 
@@ -82,10 +82,10 @@ func (m *MockFileAnalyzerStream) EXPECT() *MockFileAnalyzerStreamMockRecorder {
 }
 
 // CloseAndRecv mocks base method.
-func (m *MockFileAnalyzerStream) CloseAndRecv() (*analyzer.FileAnalyzerResponse, error) {
+func (m *MockFileAnalyzerStream) CloseAndRecv() (*pb.FileAnalyzerResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CloseAndRecv")
-	ret0, _ := ret[0].(*analyzer.FileAnalyzerResponse)
+	ret0, _ := ret[0].(*pb.FileAnalyzerResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -111,7 +111,7 @@ func (mr *MockFileAnalyzerStreamMockRecorder) CloseSend() *gomock.Call {
 }
 
 // Send mocks base method.
-func (m *MockFileAnalyzerStream) Send(arg0 *analyzer.FileAnalyzerRequest) error {
+func (m *MockFileAnalyzerStream) Send(arg0 *pb.FileAnalyzerRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Send", arg0)
 	ret0, _ := ret[0].(error)

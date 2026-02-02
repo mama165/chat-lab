@@ -23,6 +23,6 @@ const (
 
 // Internal representation for the accumulator
 type FileBuffer struct {
-	Handle *os.File
+	File   *os.File
 	Target *FileTransfer
 }

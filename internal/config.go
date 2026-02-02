@@ -30,7 +30,9 @@ type Config struct {
 	MaxScoring                       float64       `env:"MAX_SCORING,required=true"`
 	MaxAnalyzedEvent                 int           `env:"MAX_ANALYZED_EVENT,required=true"`
 	Host                             string        `env:"HOST,required=true"`
-	Port                             int           `env:"PORT,required=true"`
+	MasterPort                       int           `env:"MASTER_PORT,required=true"`
+	ScannerPort                      int           `env:"SCANNER_PORT,required=true"`
+	DebugPort                        int           `env:"DEBUG_PORT,required=true"`
 	MaxSpecialistBootDuration        time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION,required=true"`
 	ToxicityBinPath                  string        `env:"TOXICITY_BIN_PATH,required=true"`
 	ToxicityPort                     int           `env:"TOXICITY_PORT,required=true"`
@@ -40,6 +42,8 @@ type Config struct {
 	RootDir                          string        `env:"ROOT_DIR,required=true"`
 	ScannerWorkerNb                  int           `env:"SCANNER_WORKER_NB,required=true"`
 	DownloaderWorkerNb               int           `env:"DOWNLOADER_WORKER_NB,required=true"`
+	FileTransferInterval             time.Duration `env:"FILE_TRANSFER_INTERVAL,required=true"`
+	PendingFileBatchSize             int           `env:"PENDING_FILE_BATCH_SIZE,required=true"`
 	DriveID                          string        `env:"DRIVE_ID,required=true"`
 	ScannerBackpressureLowThreshold  int           `env:"SCANNER_BACKPRESSURE_LOW_THRESHOLD_PERCENT,required=true"`
 	ScannerBackpressureHardThreshold int           `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`

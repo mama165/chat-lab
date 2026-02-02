@@ -1,6 +1,7 @@
 package test
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/infrastructure/storage"
@@ -8,10 +9,11 @@ import (
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"context"
-	"github.com/blugelabs/bluge"
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/blugelabs/bluge"
 
 	"github.com/mama165/sdk-go/database"
 
@@ -42,6 +44,7 @@ func Test_Scenario(t *testing.T) {
 	log := logs.GetLoggerFromLevel(slog.LevelDebug)
 	telemetryChan := make(chan event.Event)
 	fileAnalyzeChan := make(chan event.Event)
+	fileRequestChan := make(chan<- domain.FileDownloaderRequest, 5000)
 	supervisor := workers.NewSupervisor(log, telemetryChan, 200*time.Millisecond)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, log, lo.ToPtr(100))
@@ -49,7 +52,7 @@ func Test_Scenario(t *testing.T) {
 	fileTaskRepository := storage.NewFileTaskRepository(db, log)
 	manager := runtime.NewCoordinator(log)
 	orchestrator := runtime.NewOrchestrator(
-		log, supervisor, registry, telemetryChan, fileAnalyzeChan,
+		log, supervisor, registry, telemetryChan, fileAnalyzeChan, fileRequestChan,
 		messageRepository,
 		analysisRepository,
 		fileTaskRepository,
@@ -66,6 +69,8 @@ func Test_Scenario(t *testing.T) {
 		300,
 		0.4, 0.6,
 		100,
+		30*time.Second,
+		5,
 	)
 	ctrl := gomock.NewController(t)
 	mockMessageRepository := mocks.NewMockIMessageRepository(ctrl)

@@ -6,23 +6,28 @@ import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/infrastructure/grpc/client"
+	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/internal"
+	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
-	"chat-lab/services"
 	"context"
+	"errors"
 	"fmt"
-	"github.com/Netflix/go-env"
-	"github.com/mama165/sdk-go/logs"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/Netflix/go-env"
+	grpc2 "github.com/mama165/sdk-go/grpc"
+	"github.com/mama165/sdk-go/logs"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -48,7 +53,7 @@ func main() {
 		"numCPU", numCPU,
 	)
 
-	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
+	address := fmt.Sprintf("%s:%d", config.Host, config.MasterPort)
 
 	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -57,6 +62,36 @@ func main() {
 	defer conn.Close()
 
 	grpcClient := client.NewFileAnalyzerClient(conn)
+
+	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
+	fileDownloaderResponseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
+	fileDownloaderServer := server.NewFileDownloaderServer(logger, fileDownloaderRequestChan, fileDownloaderResponseChan)
+
+	errChan := make(chan error, 1)
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", address, err)
+	}
+
+	s := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpc2.UnaryLoggingInterceptor(logger),
+			server.AuthInterceptor,
+		))
+
+	pb.RegisterFileDownloaderServiceServer(s, fileDownloaderServer)
+
+	// Use an error channel to capture Serve() issues asynchronously.
+	go func() {
+		logger.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
+		for serviceName := range s.GetServiceInfo() {
+			logger.Debug("📡 gRPC exposed services", "name", serviceName)
+		}
+		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			errChan <- fmt.Errorf("gRPC server error: %w", err)
+		}
+	}()
 
 	ctx := context.Background()
 	// 2. Setup context to handle termination signals (Ctrl+C).
@@ -183,7 +218,7 @@ func buildFileWorkers(config internal.Config,
 	var allFileDownloaderWorkers = make([]contract.Worker, 0, config.DownloaderWorkerNb)
 	for i := 0; i < config.DownloaderWorkerNb; i++ {
 		allFileDownloaderWorkers = append(allFileDownloaderWorkers,
-			services.NewFileDownloaderWorker(
+			workers.NewFileDownloaderWorker(
 				logger,
 				requestChan,
 				responseChan,

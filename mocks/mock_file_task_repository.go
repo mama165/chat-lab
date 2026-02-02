@@ -53,3 +53,32 @@ func (mr *MockIFileTaskRepositoryMockRecorder) EnqueueTask(task any) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnqueueTask", reflect.TypeOf((*MockIFileTaskRepository)(nil).EnqueueTask), task)
 }
+
+// GetNextBatch mocks base method.
+func (m *MockIFileTaskRepository) GetNextBatch(i int) ([]storage.FileTask, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextBatch", i)
+	ret0, _ := ret[0].([]storage.FileTask)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNextBatch indicates an expected call of GetNextBatch.
+func (mr *MockIFileTaskRepositoryMockRecorder) GetNextBatch(i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextBatch", reflect.TypeOf((*MockIFileTaskRepository)(nil).GetNextBatch), i)
+}
+
+// MarkAsProcessing mocks base method.
+func (m *MockIFileTaskRepository) MarkAsProcessing(task storage.FileTask) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkAsProcessing", task)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkAsProcessing indicates an expected call of MarkAsProcessing.
+func (mr *MockIFileTaskRepositoryMockRecorder) MarkAsProcessing(task any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAsProcessing", reflect.TypeOf((*MockIFileTaskRepository)(nil).MarkAsProcessing), task)
+}

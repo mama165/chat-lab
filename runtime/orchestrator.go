@@ -5,6 +5,7 @@ package runtime
 import (
 	"chat-lab/ai"
 	"chat-lab/contract"
+	"chat-lab/domain"
 	"chat-lab/domain/chat"
 	"chat-lab/domain/event"
 	"chat-lab/errors"
@@ -37,8 +38,8 @@ type Orchestrator struct {
 	globalCommands       chan chat.Command
 	moderationChan       chan event.Event
 	eventChan            chan event.Event
-	fileAnalyzeChan      chan event.Event
 	telemetryChan        chan event.Event
+	fileRequestChan      chan<- domain.FileDownloaderRequest
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
 	fileTaskRepository   storage.IFileTaskRepository
@@ -55,10 +56,13 @@ type Orchestrator struct {
 	minScoring           float64
 	maxScoring           float64
 	maxAnalyzedEvent     int
+	fileTransferInterval time.Duration
+	pendingFileBatchSize int
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan, eventChan chan event.Event,
+	fileRequestChan chan<- domain.FileDownloaderRequest,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
 	fileTaskRepository storage.IFileTaskRepository,
@@ -67,7 +71,9 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	sinkTimeout, bufferTimeout, specialistTimeout time.Duration,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
 	lowCapacityThreshold, maxContentLength int,
-	minScoring, maxScoring float64, maxAnalyzedEvent int) *Orchestrator {
+	minScoring, maxScoring float64, maxAnalyzedEvent int,
+	fileTransferInterval time.Duration, pendingFileBatchSize int,
+) *Orchestrator {
 	return &Orchestrator{
 		log:                  log,
 		counter:              event.NewCounter(),
@@ -76,6 +82,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		supervisor:           supervisor,
 		registry:             registry,
 		telemetryChan:        telemetryChan,
+		fileRequestChan:      fileRequestChan,
 		globalCommands:       make(chan chat.Command, bufferSize),
 		moderationChan:       make(chan event.Event, bufferSize),
 		eventChan:            eventChan,
@@ -95,6 +102,8 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		minScoring:           minScoring,
 		maxScoring:           maxScoring,
 		maxAnalyzedEvent:     maxAnalyzedEvent,
+		fileTransferInterval: fileTransferInterval,
+		pendingFileBatchSize: pendingFileBatchSize,
 	}
 }
 
@@ -165,6 +174,8 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	// Heavy tasks like I/O (loading files) and CPU (Aho-Corasick build) are done here.
 	poolWorkers := o.preparePoolWorkers()
 
+	fileTransferWorker := o.prepareFileTransferWorker()
+
 	moderationWorker, err := o.prepareModeration("censored", o.charReplacement)
 	if err != nil {
 		return err
@@ -184,6 +195,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	)
 	o.supervisor.Add(fanoutWorkers...)
 	o.supervisor.Add(poolWorkers...)
+	o.supervisor.Add(fileTransferWorker)
 
 	o.mu.Unlock()
 
@@ -200,6 +212,16 @@ func (o *Orchestrator) preparePoolWorkers() []contract.Worker {
 		res = append(res, workers.NewPoolUnitWorker(o.rooms, o.globalCommands, o.moderationChan, o.log))
 	}
 	return res
+}
+
+func (o *Orchestrator) prepareFileTransferWorker() contract.Worker {
+	return workers.NewFileTransferWorker(
+		o.fileRequestChan,
+		o.fileTaskRepository,
+		o.log,
+		o.fileTransferInterval,
+		o.pendingFileBatchSize,
+	)
 }
 
 // prepareModeration loads censored words and builds the Aho-Corasick automaton.
@@ -260,9 +282,13 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 		{Name: "EventChan", Channel: o.eventChan},
 		{Name: "ModerationChan", Channel: o.moderationChan},
 		{Name: "TelemetryChan", Channel: o.telemetryChan},
+		{Name: "FileRequestChan", Channel: o.fileRequestChan},
 		{Name: "GlobalCommands", Channel: o.globalCommands},
 	}
-	channelCapWorker := workers.NewChannelCapacityWorker(o.log, channels, o.telemetryChan, o.metricInterval)
+	channelCapWorker := workers.NewChannelCapacityWorker(
+		o.log, channels, o.telemetryChan,
+		o.metricInterval,
+	)
 	telemetryWorker := workers.NewTelemetryWorker(o.log, o.metricInterval, o.telemetryChan, handlers)
 
 	return channelCapWorker, telemetryWorker

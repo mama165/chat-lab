@@ -1,4 +1,4 @@
-package services
+package workers
 
 import (
 	"chat-lab/domain"
@@ -6,12 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/go-playground/validator/v10"
 	"io"
 	"log/slog"
 	"os"
 	"sync"
+
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/go-playground/validator/v10"
 )
 
 type FileDownloaderWorker struct {
