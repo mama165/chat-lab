@@ -149,7 +149,7 @@ func run() (int, error) {
 
 	logger.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
 	if config.EnableSpecialists {
-		if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel); err != nil {
+		if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel, config.GrpcConfig); err != nil {
 			return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
 		}
 	}

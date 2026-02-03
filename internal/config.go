@@ -59,7 +59,7 @@ type GrpcConfig struct {
 	BackoffMultiplier float64       `env:"GRPC_RETRY_BACKOFF_MULTIPLIER,default=2.0"`
 }
 
-// ToServiceConfig génère le JSON de retry pour un service donné.
+// ToServiceConfig generate JSON retry for a given service
 // On utilise .Seconds() car gRPC JSON attend un format string se terminant par 's'.
 func (g GrpcConfig) ToServiceConfig(serviceName string) string {
 	return fmt.Sprintf(`{

@@ -4,13 +4,14 @@ import (
 	"chat-lab/domain/specialist"
 	"chat-lab/errors"
 	"chat-lab/infrastructure/grpc/client"
+	"chat-lab/internal"
 	pb "chat-lab/proto/specialist"
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Coordinator handles the lifecycle and coordination of all specialist sidecars.
@@ -42,11 +44,11 @@ func (m *Coordinator) Add(s *client.SpecialistClient) {
 }
 
 // Init launches all configured specialists and blocks until they are all ready.
-func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, logLevel string) error {
+func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, logLevel string, grpcConfig internal.GrpcConfig) error {
 	for _, cfg := range configs {
 		// Start each specialist using our robust launcher.
 		// If one fails, we return the error to the Master to decide what to do.
-		sClient, err := startSpecialist(ctx, cfg, logLevel)
+		sClient, err := startSpecialist(ctx, cfg, logLevel, grpcConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize specialist %s: %w", cfg.ID, err)
 		}
@@ -57,20 +59,22 @@ func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, log
 	return nil
 }
 
-// startSpecialist orchestrates the full lifecycle of a sidecar process.
-// It performs a "fail-fast" check on the binary, executes it as a child process
-// linked to the provided context, and ensures the gRPC server is ready before
-// returning a functional specialist client.
-func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string) (*client.SpecialistClient, error) {
+// startSpecialist orchestrates the full lifecycle of a specialist sidecar process.
+// It verifies the binary existence, determines the correct Python interpreter based on the OS,
+// launches the process with the required environment variables, and establishes a gRPC
+// connection with a native retry policy. If the gRPC handshake fails, it ensures
+// the child process is killed to prevent zombie processes.
+func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string, grpcCfg internal.GrpcConfig) (*client.SpecialistClient, error) {
 	if _, err := os.Stat(cfg.BinPath); err != nil {
 		return nil, fmt.Errorf("%w: %s", errors.ErrSpecialistNotFound, cfg.BinPath)
 	}
 
-	// On WSL/Linux : venv/bin/python
-	// On Windows : venv/Scripts/python.exe
+	// Prepare interpreter (Depending on OS)
 	pythonInterpreter := "./venv/bin/python3"
+	if runtime.GOOS == "windows" {
+		pythonInterpreter = ".\\venv\\Scripts\\python.exe"
+	}
 
-	// Préparer l'exécution : python3 path/to/script.py -id ...
 	cmd := exec.CommandContext(ctx, pythonInterpreter, cfg.BinPath,
 		"-id", string(cfg.ID),
 		"-port", strconv.Itoa(cfg.Port),
@@ -78,68 +82,72 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 		"-level", logLevel,
 	)
 
-	// Inject environment variables if necessary
 	cmd.Env = append(os.Environ(),
 		"PYTHONPATH=.",
 		"PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
 	)
 
-	log.Printf("Specialist binary called : %s", cmd.String())
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Redirect stdout/stderr through our prefixed logger
+	cmd.Stdout = &specialistLogWriter{logger: slog.Default(), prefix: string(cfg.ID), isError: false}
+	cmd.Stderr = &specialistLogWriter{logger: slog.Default(), prefix: string(cfg.ID), isError: true}
+
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: %v", errors.ErrSpecialistStartFailed, err)
 	}
 
-	conn, err := dialWithRetry(ctx, cfg.Host, cfg.Port)
+	// gRPC connection with native retry
+	serviceName := pb.SpecialistService_ServiceDesc.ServiceName
+	retryConfig := grpcCfg.ToServiceConfig(serviceName)
+
+	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	conn, err := grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(retryConfig),
+	)
 	if err != nil {
-		// Cleanup: prevent zombie processes if the gRPC handshake fails.
 		_ = cmd.Process.Kill()
-		return nil, fmt.Errorf("%w on port %d: %v", errors.ErrSpecialistUnavailable, cfg.Port, err)
+		return nil, fmt.Errorf("failed to create gRPC client for %s: %w", cfg.ID, err)
 	}
 
-	// 5. Return the fully operational specialist client
-	specialistClient := client.NewSpecialistClient(
+	// 5. Attente de la disponibilité réelle du serveur gRPC Python
+	// On bloque ici pour que Init() ne rende la main que quand tout est prêt
+	if err := waitForReady(ctx, conn, 30*time.Second); err != nil {
+		_ = cmd.Process.Kill()
+		_ = conn.Close()
+		return nil, fmt.Errorf("specialist %s (port %d) failed to become ready: %w", cfg.ID, cfg.Port, err)
+	}
+
+	return client.NewSpecialistClient(
 		cfg.ID,
 		pb.NewSpecialistServiceClient(conn),
 		cmd.Process,
 		cfg.Port,
 		time.Now(),
-		cfg.Capabilities)
-	return specialistClient, nil
+		cfg.Capabilities), nil
 }
 
-// dialWithRetry Retry connection to the specialist to handle container startup latency
-func dialWithRetry(ctx context.Context, host string, port int) (*grpc.ClientConn, error) {
-	addr := fmt.Sprintf("%s:%d", host, port)
+// waitForReady blocks until the gRPC connection state becomes READY or the timeout is reached.
+// It monitors the connection's state machine and triggers immediate reconnection attempts
+// if a transient failure is detected. This ensures the specialist's gRPC server is
+// fully operational before the Orchestrator starts sending analysis requests.
+func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
-	opts := []grpc.DialOption{grpc.WithInsecure()}
-
-	conn, err := grpc.DialContext(ctx, addr, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial: %w", err)
-	}
-
-	// On attend que l'état passe à "Ready" avec un petit timeout
-	for i := 0; i < 60; i++ {
+	for {
 		state := conn.GetState()
 		if state == connectivity.Ready {
-			return conn, nil
+			return nil
 		}
 
-		// Si l'état est en échec, on tente de reconnecter
-		if state == connectivity.TransientFailure || state == connectivity.Shutdown {
+		if state == connectivity.TransientFailure {
 			conn.ResetConnectBackoff()
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		if !conn.WaitForStateChange(ctx, state) {
+			return fmt.Errorf("timeout reached while waiting for state %s", state)
+		}
 	}
-
-	err = conn.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to close connection: %w", err)
-	}
-	return nil, fmt.Errorf("timeout: specialist at %s stay in state %s", addr, conn.GetState())
 }
 
 // Broadcast orchestrates the analysis of a file by streaming its content to relevant
