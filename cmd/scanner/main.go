@@ -61,9 +61,15 @@ func main() {
 		log.Fatalf("failed to listen on %s: %v", masterAddress, err)
 	}
 
-	conn, err := grpc.NewClient(masterAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	serviceTarget := pb.FileAnalyzerService_ServiceDesc.ServiceName
+	retryConfig := config.GrpcConfig.ToServiceConfig(serviceTarget)
+
+	conn, err := grpc.NewClient(masterAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(retryConfig),
+	)
 	if err != nil {
-		log.Fatalf("Fail to connect with Master: %v", err)
+		logger.Error("Could not setup connection to Master", "error", err)
 	}
 	defer conn.Close()
 
