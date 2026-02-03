@@ -11,6 +11,7 @@ import (
 	"chat-lab/errors"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/moderation"
+	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
 	"context"
@@ -39,11 +40,13 @@ type Orchestrator struct {
 	moderationChan       chan event.Event
 	eventChan            chan event.Event
 	telemetryChan        chan event.Event
-	fileRequestChan      chan<- domain.FileDownloaderRequest
+	fileRequestChan      chan domain.FileDownloaderRequest
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
 	fileTaskRepository   storage.IFileTaskRepository
 	coordinator          contract.SpecialistCoordinator
+	grpcClient           pb.FileDownloaderServiceClient
+	fileAccumulator      contract.IFileAccumulator
 	sinkTimeout          time.Duration
 	bufferTimeout        time.Duration
 	specialistTimeout    time.Duration
@@ -62,11 +65,13 @@ type Orchestrator struct {
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan, eventChan chan event.Event,
-	fileRequestChan chan<- domain.FileDownloaderRequest,
+	fileRequestChan chan domain.FileDownloaderRequest,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
 	fileTaskRepository storage.IFileTaskRepository,
 	specialistCoordinator contract.SpecialistCoordinator,
+	grpcClient pb.FileDownloaderServiceClient,
+	fileAccumulator contract.IFileAccumulator,
 	numWorkers, bufferSize int,
 	sinkTimeout, bufferTimeout, specialistTimeout time.Duration,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
@@ -90,6 +95,8 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		analysisRepository:   analysisRepository,
 		fileTaskRepository:   fileTaskRepository,
 		coordinator:          specialistCoordinator,
+		grpcClient:           grpcClient,
+		fileAccumulator:      fileAccumulator,
 		sinkTimeout:          sinkTimeout,
 		bufferTimeout:        bufferTimeout,
 		specialistTimeout:    specialistTimeout,
@@ -174,7 +181,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	// Heavy tasks like I/O (loading files) and CPU (Aho-Corasick build) are done here.
 	poolWorkers := o.preparePoolWorkers()
 
-	fileTransferWorker := o.prepareFileTransferWorker()
+	fileTransferWorker, fileDownloaderWorker := o.prepareFileTransferWorker()
 
 	moderationWorker, err := o.prepareModeration("censored", o.charReplacement)
 	if err != nil {
@@ -196,6 +203,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	o.supervisor.Add(fanoutWorkers...)
 	o.supervisor.Add(poolWorkers...)
 	o.supervisor.Add(fileTransferWorker)
+	o.supervisor.Add(fileDownloaderWorker)
 
 	o.mu.Unlock()
 
@@ -214,14 +222,22 @@ func (o *Orchestrator) preparePoolWorkers() []contract.Worker {
 	return res
 }
 
-func (o *Orchestrator) prepareFileTransferWorker() contract.Worker {
-	return workers.NewFileTransferWorker(
+func (o *Orchestrator) prepareFileTransferWorker() (contract.Worker, contract.Worker) {
+	fileTransferWorker := workers.NewFileTransferWorker(
 		o.fileRequestChan,
 		o.fileTaskRepository,
 		o.log,
 		o.fileTransferInterval,
 		o.pendingFileBatchSize,
 	)
+
+	fileDownloaderWorker := workers.NewFileDownloaderMasterWorker(
+		o.log,
+		o.fileRequestChan,
+		o.grpcClient,
+		o.fileAccumulator,
+	)
+	return fileTransferWorker, fileDownloaderWorker
 }
 
 // prepareModeration loads censored words and builds the Aho-Corasick automaton.

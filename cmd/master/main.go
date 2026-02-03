@@ -30,6 +30,7 @@ import (
 	"github.com/blugelabs/bluge"
 	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 
 	grpc3 "github.com/mama165/sdk-go/grpc"
@@ -63,7 +64,7 @@ func main() {
 // 2. It improves testability by decoupling the initialization logic from the main entry point.
 // 3. It provides a structured way to handle graceful shutdowns for gRPC and background workers.
 func run() (int, error) {
-	// 1. Configuration & Logger
+	// Configuration & Logger
 	var config internal.Config
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
 		return exitConfig, fmt.Errorf("config error: %w", err)
@@ -78,7 +79,7 @@ func run() (int, error) {
 
 	ctx := context.Background()
 
-	// 2. Database (BadgerDB)
+	// Database (BadgerDB)
 	options := buildBadgerOpts(config, logger, ctx)
 
 	db, err := badger.Open(options)
@@ -153,7 +154,7 @@ func run() (int, error) {
 		}
 	}
 
-	// 3. Setup Supervision & Orchestration
+	// Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
 	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
@@ -164,6 +165,26 @@ func run() (int, error) {
 	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
 	userRepository := storage.NewUserRepository(db)
 
+	// gRPC Server Setup
+	masterAddress := fmt.Sprintf("%s:%d", config.Host, config.MasterPort)
+	scannerAddress := fmt.Sprintf("%s:%d", config.Host, config.ScannerPort)
+	listener, err := net.Listen("tcp", masterAddress)
+	if err != nil {
+		return exitRuntime, fmt.Errorf("failed to listen on master %s: %w", masterAddress, err)
+	}
+
+	retryConfig := config.GrpcConfig.ToServiceConfig(pb3.FileDownloaderService_Download_FullMethodName)
+	conn, err := grpc.NewClient(scannerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(retryConfig),
+	)
+	if err != nil {
+		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", scannerAddress, err)
+	}
+
+	grpcClient := pb3.NewFileDownloaderServiceClient(conn)
+
+	fileAccumulator := services.NewFileAccumulator("../../tmp")
 	orchestrator := runtime.NewOrchestrator(
 		logger, sup, registry, telemetryChan, eventChan,
 		fileDownloaderRequestChan,
@@ -171,6 +192,8 @@ func run() (int, error) {
 		analysisRepository,
 		fileTaskRepository,
 		coordinator,
+		grpcClient,
+		fileAccumulator,
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		charReplacement,
@@ -182,7 +205,7 @@ func run() (int, error) {
 		config.PendingFileBatchSize,
 	)
 
-	// 4. Context & Signals
+	// Context & Signals
 	// NotifyContext captures OS signals and cancels the context to trigger a shutdown.
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -190,20 +213,13 @@ func run() (int, error) {
 	// Error (gRPC & Orchestrator)
 	errChan := make(chan error, 2)
 
-	// 5. Start the Engine (Workers and Fanout)
+	// Start the Engine (Workers and Fanout)
 	go func() {
 		logger.Info("Starting orchestrator...")
 		if err := orchestrator.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("orchestrator error: %w", err)
 		}
 	}()
-
-	// 6. gRPC Server Setup
-	address := fmt.Sprintf("0.0.0.0:%d", config.MasterPort)
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", address, err)
-	}
 
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -224,7 +240,7 @@ func run() (int, error) {
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
-		logger.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
+		logger.Info("Starting gRPC server", "address", masterAddress, "at", time.Now().UTC())
 		for serviceName := range s.GetServiceInfo() {
 			logger.Debug("📡 gRPC exposed services", "name", serviceName)
 		}
@@ -233,7 +249,7 @@ func run() (int, error) {
 		}
 	}()
 
-	// 7. Wait for Stop or Error
+	// Wait for Stop or Error
 	// The execution blocks here until either a signal is received or the server crashes.
 	select {
 	case <-ctx.Done():
@@ -242,7 +258,7 @@ func run() (int, error) {
 		return exitRuntime, err
 	}
 
-	// 8. Final Cleanup (Graceful Shutdown)
+	// Final Cleanup (Graceful Shutdown)
 	// We allow active gRPC streams to finish and workers to drain their channels.
 	logger.Info("Shutting down gracefully...")
 	s.GracefulStop()

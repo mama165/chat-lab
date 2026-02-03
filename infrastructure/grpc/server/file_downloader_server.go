@@ -11,14 +11,14 @@ import (
 type FileDownloaderServer struct {
 	pb.UnimplementedFileDownloaderServiceServer
 	log          *slog.Logger
-	requestChan  chan domain.FileDownloaderRequest
-	responseChan chan domain.FileDownloaderResponse
+	requestChan  chan<- domain.FileDownloaderRequest
+	responseChan <-chan domain.FileDownloaderResponse
 }
 
 func NewFileDownloaderServer(
 	log *slog.Logger,
-	requestChan chan domain.FileDownloaderRequest,
-	responseChan chan domain.FileDownloaderResponse) *FileDownloaderServer {
+	requestChan chan<- domain.FileDownloaderRequest,
+	responseChan <-chan domain.FileDownloaderResponse) *FileDownloaderServer {
 	return &FileDownloaderServer{
 		log:          log,
 		requestChan:  requestChan,

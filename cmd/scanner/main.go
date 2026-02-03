@@ -53,9 +53,15 @@ func main() {
 		"numCPU", numCPU,
 	)
 
-	address := fmt.Sprintf("%s:%d", config.Host, config.MasterPort)
+	masterAddress := fmt.Sprintf("%s:%d", config.Host, config.MasterPort)
+	scannerAddress := fmt.Sprintf("%s:%d", config.Host, config.ScannerPort)
 
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	listener, err := net.Listen("tcp", scannerAddress)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", masterAddress, err)
+	}
+
+	conn, err := grpc.NewClient(masterAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Fail to connect with Master: %v", err)
 	}
@@ -69,11 +75,6 @@ func main() {
 
 	errChan := make(chan error, 1)
 
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", address, err)
-	}
-
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc2.UnaryLoggingInterceptor(logger),
@@ -84,7 +85,7 @@ func main() {
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
-		logger.Info("Starting gRPC server", "address", address, "at", time.Now().UTC())
+		logger.Info("Starting gRPC server", "address", scannerAddress, "at", time.Now().UTC())
 		for serviceName := range s.GetServiceInfo() {
 			logger.Debug("📡 gRPC exposed services", "name", serviceName)
 		}

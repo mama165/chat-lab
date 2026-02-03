@@ -49,6 +49,32 @@ type Config struct {
 	ScannerBackpressureHardThreshold int           `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`
 	ChunkSizeKb                      int           `env:"CHUNK_SIZE_KB,required=true"`
 	MaxFileSizeMb                    int           `env:"MAX_FILE_SIZE_MB,required=true"`
+	GrpcConfig                       GrpcConfig
+}
+
+type GrpcConfig struct {
+	MaxAttempts       int           `env:"GRPC_RETRY_MAX_ATTEMPTS,default=5"`
+	InitialBackoff    time.Duration `env:"GRPC_RETRY_INITIAL_BACKOFF,default=100ms"`
+	MaxBackoff        time.Duration `env:"GRPC_RETRY_MAX_BACKOFF,default=1s"`
+	BackoffMultiplier float64       `env:"GRPC_RETRY_BACKOFF_MULTIPLIER,default=2.0"`
+}
+
+// ToServiceConfig génère le JSON de retry pour un service donné.
+// On utilise .Seconds() car gRPC JSON attend un format string se terminant par 's'.
+func (g GrpcConfig) ToServiceConfig(serviceName string) string {
+	return fmt.Sprintf(`{
+        "methodConfig": [{
+            "name": [{"service": "%s"}],
+            "waitForReady": true,
+            "retryPolicy": {
+                "MaxAttempts": %d,
+                "InitialBackoff": "%.3fs",
+                "MaxBackoff": "%.3fs",
+                "BackoffMultiplier": %.1f,
+                "RetryableStatusCodes": ["UNAVAILABLE"]
+            }
+        }]
+    }`, serviceName, g.MaxAttempts, g.InitialBackoff.Seconds(), g.MaxBackoff.Seconds(), g.BackoffMultiplier)
 }
 
 func CharacterRune(str string) (rune, error) {
