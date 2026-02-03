@@ -103,8 +103,6 @@ func main() {
 	counter := analyzer.NewCounterFileScanner()
 	dirChan := make(chan string, config.BufferSize)
 	fileChan := make(chan *analyzer.FileAnalyzerRequest, config.BufferSize)
-	requestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
-	responseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
 	var scanWG sync.WaitGroup
 	var workersWG sync.WaitGroup
 
@@ -115,7 +113,7 @@ func main() {
 		buildFileWorkers(
 			config,
 			&workersWG, &scanWG, logger, counter, dirChan,
-			fileChan, requestChan, responseChan, grpcClient,
+			fileChan, fileDownloaderRequestChan, fileDownloaderResponseChan, grpcClient,
 			config.ChunkSizeKb, config.MaxFileSizeMb,
 		)
 	supervisor.
@@ -218,7 +216,7 @@ func buildFileWorkers(config internal.Config,
 	var allFileDownloaderWorkers = make([]contract.Worker, 0, config.DownloaderWorkerNb)
 	for i := 0; i < config.DownloaderWorkerNb; i++ {
 		allFileDownloaderWorkers = append(allFileDownloaderWorkers,
-			workers.NewFileDownloaderWorker(
+			workers.NewFileDownloaderScannerWorker(
 				logger,
 				requestChan,
 				responseChan,

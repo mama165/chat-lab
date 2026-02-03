@@ -3,8 +3,9 @@ package server
 import (
 	"chat-lab/domain"
 	pb "chat-lab/proto/analyzer"
-	"google.golang.org/grpc"
 	"log/slog"
+
+	"google.golang.org/grpc"
 )
 
 type FileDownloaderServer struct {
@@ -76,30 +77,34 @@ func fromPbRequest(req *pb.FileDownloaderRequest) domain.FileDownloaderRequest {
 func toPbResponse(resp domain.FileDownloaderResponse) *pb.FileDownloaderResponse {
 	pbResp := &pb.FileDownloaderResponse{}
 
-	if resp.FileMetadata != nil {
+	// The switch handles the oneof 'control' field from the protobuf message.
+	// Each case maps a domain struct to its corresponding protobuf message type.
+	switch {
+	case resp.FileMetadata != nil:
 		pbResp.Control = &pb.FileDownloaderResponse_Metadata{
 			Metadata: &pb.FileMetadata{
 				MimeType: resp.FileMetadata.MimeType,
 				Size:     resp.FileMetadata.Size,
 			},
 		}
-	} else if resp.FileChunk != nil {
+	case resp.FileChunk != nil:
 		pbResp.Control = &pb.FileDownloaderResponse_Chunk{
 			Chunk: &pb.FileChunk{
 				Data: resp.FileChunk.Chunk,
 			},
 		}
-	} else if resp.FileSignature != nil {
+	case resp.FileSignature != nil:
 		pbResp.Control = &pb.FileDownloaderResponse_Signature{
 			Signature: &pb.FileSignature{
 				Sha256: resp.FileSignature.Sha256,
 			},
 		}
-	} else if resp.FileError != nil {
+	case resp.FileError != nil:
 		pbResp.Control = &pb.FileDownloaderResponse_Error{
 			Error: &pb.FileError{
 				Message: resp.FileError.Message,
-				Code:    pb.ErrorCode(resp.FileError.ErrorCode),
+				// Double cast for maximum type safety between domain and generated proto types
+				Code: pb.ErrorCode(int32(resp.FileError.ErrorCode)),
 			},
 		}
 	}

@@ -18,7 +18,6 @@ type FileAccumulator struct {
 	hash    map[domain.FileID]hash.Hash          // Map FileID -> Running SHA256 computation
 }
 
-// NewFileAccumulator initializes a new accumulator with the specified temporary directory.
 func NewFileAccumulator(tempDir string) *FileAccumulator {
 	return &FileAccumulator{
 		tempDir: tempDir,

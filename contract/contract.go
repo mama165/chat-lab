@@ -2,6 +2,7 @@
 package contract
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/chat"
 	"chat-lab/domain/specialist"
 	"context"
@@ -76,4 +77,8 @@ type SpecialistCoordinator interface {
 // underlying communication protocol (gRPC, HTTP, or local).
 type ISpecialistClient interface {
 	Analyze(ctx context.Context, request specialist.Request) (specialist.Response, error)
+}
+
+type IFileAccumulator interface {
+	ProcessResponse(resp domain.FileDownloaderResponse) error
 }

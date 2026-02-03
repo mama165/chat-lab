@@ -15,7 +15,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-type FileDownloaderWorker struct {
+type FileDownloaderScannerWorker struct {
 	log           *slog.Logger
 	validator     *validator.Validate
 	requestChan   chan domain.FileDownloaderRequest
@@ -27,12 +27,12 @@ type FileDownloaderWorker struct {
 
 var chunk int
 
-func NewFileDownloaderWorker(log *slog.Logger,
+func NewFileDownloaderScannerWorker(log *slog.Logger,
 	requestChan chan domain.FileDownloaderRequest,
 	responseChan chan domain.FileDownloaderResponse,
-	chunkSizeKb, maxFileSizeMb int) *FileDownloaderWorker {
+	chunkSizeKb, maxFileSizeMb int) *FileDownloaderScannerWorker {
 	chunk = chunkSizeKb * domain.KB
-	return &FileDownloaderWorker{
+	return &FileDownloaderScannerWorker{
 		log:           log,
 		validator:     validator.New(),
 		requestChan:   requestChan,
@@ -51,7 +51,7 @@ func NewFileDownloaderWorker(log *slog.Logger,
 // Run acts as the main orchestration loop for file download requests.
 // It listens for incoming requests on the internal channel and triggers the
 // processing for each. It respects the provided context for graceful shutdown.
-func (s FileDownloaderWorker) Run(ctx context.Context) error {
+func (s FileDownloaderScannerWorker) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -67,7 +67,7 @@ func (s FileDownloaderWorker) Run(ctx context.Context) error {
 // Process handles the end-to-end lifecycle of a single file download.
 // It performs security checks, sniffs metadata, streams chunks, and calculates
 // a SHA256 checksum on the fly to ensure data integrity.
-func (s FileDownloaderWorker) Process(ctx context.Context, request domain.FileDownloaderRequest) error {
+func (s FileDownloaderScannerWorker) Process(ctx context.Context, request domain.FileDownloaderRequest) error {
 	if err := s.validator.Struct(request); err != nil {
 		s.sendError(ctx, "Invalid path parameters", domain.InvalidFilePath)
 		return err
@@ -184,7 +184,7 @@ func (s FileDownloaderWorker) Process(ctx context.Context, request domain.FileDo
 	return nil
 }
 
-func (s FileDownloaderWorker) sendError(ctx context.Context, msg string, code domain.ErrorCode) {
+func (s FileDownloaderScannerWorker) sendError(ctx context.Context, msg string, code domain.ErrorCode) {
 	select {
 	case <-ctx.Done():
 	case s.responseChan <- domain.FileDownloaderResponse{
