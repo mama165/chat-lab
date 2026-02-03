@@ -31,7 +31,6 @@ func NewFileDownloaderMasterWorker(
 }
 
 func (w *FileDownloaderMasterWorker) Run(ctx context.Context) error {
-	w.log.Info("FileDownloaderMasterWorker started")
 	for {
 		select {
 		case <-ctx.Done():
