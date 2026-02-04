@@ -3,7 +3,9 @@ package server
 import (
 	"chat-lab/domain"
 	pb "chat-lab/proto/analyzer"
+	"io"
 	"log/slog"
+	"sync"
 
 	"github.com/go-playground/validator/v10"
 	"google.golang.org/grpc"
@@ -39,9 +41,14 @@ func (s *FileDownloaderServer) Download(stream grpc.BidiStreamingServer[pb.FileD
 	errChan := make(chan error, 2)
 
 	// Receiving requests from Master
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		for {
 			req, err := stream.Recv()
+			if err == io.EOF { // Master terminated
+				return
+			}
 			if err != nil {
 				errChan <- err
 				return
@@ -51,20 +58,30 @@ func (s *FileDownloaderServer) Download(stream grpc.BidiStreamingServer[pb.FileD
 				errChan <- err
 				return
 			}
-			s.requestChan <- fromPbRequest(req)
+			s.requestChan <- request
 		}
 	}()
 
 	// Sending responses (Chunks/Signatures) to Master
 	go func() {
+		defer wg.Done()
 		for {
 			select {
 			case <-stream.Context().Done():
 				errChan <- stream.Context().Err()
 				return
-			case response := <-s.responseChan:
+			case response, ok := <-s.responseChan:
+				if !ok {
+					s.log.Debug("Channel is closed")
+					return
+				}
 				if err := stream.Send(toPbResponse(response)); err != nil {
 					errChan <- err
+					return
+				}
+				// Key point : if sending a signature or an error
+				// File has been processed
+				if response.FileSignature != nil || response.FileError != nil {
 					return
 				}
 			}
@@ -72,6 +89,11 @@ func (s *FileDownloaderServer) Download(stream grpc.BidiStreamingServer[pb.FileD
 	}()
 
 	// Wait for one of them to stop (Error or stream ended)
+	go func() {
+		wg.Wait()
+		errChan <- nil //  Clean ending signal
+	}()
+
 	return <-errChan
 }
 

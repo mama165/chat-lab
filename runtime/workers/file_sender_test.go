@@ -6,11 +6,12 @@ import (
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
-	"go.uber.org/mock/gomock"
 	"io"
 	"log/slog"
 	"testing"
 	"time"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,7 +29,7 @@ func TestFileSenderWorker_Run(t *testing.T) {
 		fileChan := make(chan *analyzer.FileAnalyzerRequest, 1)
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-		worker := NewFileSenderWorker(mockClient, logger, fileChan)
+		worker := NewFileSenderWorker(mockClient, logger, fileChan, 5*time.Second)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -61,7 +62,7 @@ func TestFileSenderWorker_Run(t *testing.T) {
 		fileChan := make(chan *analyzer.FileAnalyzerRequest, 1)
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-		worker := NewFileSenderWorker(mockClient, logger, fileChan)
+		worker := NewFileSenderWorker(mockClient, logger, fileChan, 5*time.Second)
 
 		mockClient.EXPECT().Analyze(gomock.Any()).Return(mockStream, nil)
 
@@ -88,7 +89,7 @@ func TestFileSenderWorker_Run(t *testing.T) {
 		fileChan := make(chan *analyzer.FileAnalyzerRequest)
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-		worker := NewFileSenderWorker(mockClient, logger, fileChan)
+		worker := NewFileSenderWorker(mockClient, logger, fileChan, 5*time.Second)
 
 		ctx, cancel := context.WithCancel(context.Background())
 

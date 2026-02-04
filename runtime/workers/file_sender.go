@@ -14,20 +14,23 @@ import (
 )
 
 type FileSenderWorker struct {
-	client   client.FileAnalyzerClient
-	log      *slog.Logger
-	fileChan chan *analyzer.FileAnalyzerRequest
+	client              client.FileAnalyzerClient
+	log                 *slog.Logger
+	fileChan            chan *analyzer.FileAnalyzerRequest
+	progressLogInterval time.Duration
 }
 
 func NewFileSenderWorker(
 	client client.FileAnalyzerClient,
 	log *slog.Logger,
 	fileChan chan *analyzer.FileAnalyzerRequest,
+	progressLogInterval time.Duration,
 ) *FileSenderWorker {
 	return &FileSenderWorker{
-		client:   client,
-		log:      log,
-		fileChan: fileChan,
+		client:              client,
+		log:                 log,
+		fileChan:            fileChan,
+		progressLogInterval: progressLogInterval,
 	}
 }
 

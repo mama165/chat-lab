@@ -21,6 +21,7 @@ type Config struct {
 	LatencyThreshold                 time.Duration `env:"LATENCY_THRESHOLD,required=true"`
 	RestartInterval                  time.Duration `env:"RESTART_INTERVAL,required=true"`
 	AuthTokenDuration                time.Duration `env:"AUTH_TOKEN_DURATION,required=true"`
+	AuthenticationEnabled            bool          `env:"AUTHENTICATION_ENABLED,required=true"`
 	BadgerFilepath                   string        `env:"BADGER_FILEPATH,required=true"`
 	BlugeFilepath                    string        `env:"BLUGE_FILEPATH,required=true"`
 	LogLevel                         string        `env:"LOG_LEVEL,required=true"`
@@ -48,6 +49,7 @@ type Config struct {
 	ScannerBackpressureHardThreshold int           `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`
 	ChunkSizeKb                      int           `env:"CHUNK_SIZE_KB,required=true"`
 	MaxFileSizeMb                    int           `env:"MAX_FILE_SIZE_MB,required=true"`
+	ProgressLogInterval              time.Duration `env:"PROGRESS_LOG_INTERVAL,required=true"`
 	GrpcConfig                       GrpcConfig
 }
 

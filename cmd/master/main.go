@@ -224,8 +224,9 @@ func run() (int, error) {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc3.UnaryLoggingInterceptor(logger),
-			server.AuthInterceptor,
+			server.AuthInterceptor(config.AuthenticationEnabled),
 		))
+
 	chatService := services.NewChatService(orchestrator)
 	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()

@@ -5,13 +5,13 @@ import (
 )
 
 type Config struct {
-	MasterAddr  string `envconfig:"MASTER_ADDR" default:"localhost:50051"`
-	ScannerAddr string `envconfig:"SCANNER_ADDR" default:"localhost:50052"`
+	MasterAddr  string `envconfig:"MASTER_ADDR"`
+	ScannerAddr string `envconfig:"SCANNER_ADDR"`
 	// E2E_DEBUG_JSON allows dumping full gRPC request/response bodies as JSON
 	DebugJSON bool `envconfig:"E2E_DEBUG_JSON" default:"false"`
 	// E2E_COLOURS enables colorized output for better log readability
-	Colours bool   `envconfig:"E2E_COLOURS" default:"true"`
-	rootDir string `envconfig:"ROOT_DIR"`
+	Colours        bool   `envconfig:"E2E_COLOURS" default:"true"`
+	ScannerRootDir string `envconfig:"SCANNER_ROOT_DIR"`
 }
 
 func LoadConfig() (Config, error) {

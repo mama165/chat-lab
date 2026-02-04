@@ -86,16 +86,16 @@ func main() {
 	fileDownloaderResponseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
 	fileDownloaderServer := server.NewFileDownloaderServer(logger, fileDownloaderRequestChan, fileDownloaderResponseChan)
 	scannerControlService := services.NewScannerControlService(dirChan, &scanWG, logger)
-	scannerControlerServer := server.NewScannerControllerServer(scannerControlService)
+	scannerControllerServer := server.NewScannerControllerServer(scannerControlService)
 
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc2.UnaryLoggingInterceptor(logger),
-			server.AuthInterceptor,
+			server.AuthInterceptor(config.AuthenticationEnabled),
 		))
 
 	pb.RegisterFileDownloaderServiceServer(s, fileDownloaderServer)
-	pb.RegisterScannerControllerServer(s, scannerControlerServer)
+	pb.RegisterScannerControllerServer(s, scannerControllerServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
@@ -226,7 +226,7 @@ func buildFileWorkers(config internal.Config,
 			))
 	}
 
-	fileSenderWorker := workers.NewFileSenderWorker(client, logger, fileChan)
+	fileSenderWorker := workers.NewFileSenderWorker(client, logger, fileChan, config.ProgressLogInterval)
 
 	return allFileScannerWorkers, allFileDownloaderWorkers, fileSenderWorker
 }

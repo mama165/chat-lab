@@ -30,7 +30,7 @@ func TestAuthInterceptor(t *testing.T) {
 			FullMethod: pb.AuthService_Login_FullMethodName,
 		}
 
-		resCtx, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
+		resCtx, err := server.AuthInterceptor(true)(ctx, nil, info, dummyHandler)
 
 		req.NoError(err)
 		req.NotNil(resCtx)
@@ -43,7 +43,7 @@ func TestAuthInterceptor(t *testing.T) {
 			FullMethod: pb2.ChatService_PostMessage_FullMethodName,
 		}
 
-		_, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
+		_, err := server.AuthInterceptor(true)(ctx, nil, info, dummyHandler)
 
 		req.Error(err)
 		st, ok := status.FromError(err)
@@ -61,7 +61,7 @@ func TestAuthInterceptor(t *testing.T) {
 			FullMethod: pb2.ChatService_PostMessage_FullMethodName,
 		}
 
-		_, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
+		_, err := server.AuthInterceptor(true)(ctx, nil, info, dummyHandler)
 
 		req.Error(err)
 		req.Contains(err.Error(), "invalid or expired token")
@@ -85,7 +85,7 @@ func TestAuthInterceptor(t *testing.T) {
 		}
 
 		// 3. Call the interceptor
-		resCtx, err := server.AuthInterceptor(ctx, nil, info, dummyHandler)
+		resCtx, err := server.AuthInterceptor(true)(ctx, nil, info, dummyHandler)
 
 		// 4. Assertions
 		req.NoError(err)

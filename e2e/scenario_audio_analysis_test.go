@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -24,14 +26,14 @@ func TestAudioAnalysisSuite(t *testing.T) {
 func (s *testAudioAnalysisSuite) TestFullAudioAnalysisFlow() {
 	fileID := uuid.New().String()
 	// This path represents the file location on the scanner's filesystem
-	targetPath := "./testdata/sample_audio_macos.aiff"
+	filename := "sample_audio_macos.aiff"
 
 	// --- STEP 0: TRIGGER MANUAL SCAN ---
 	// Since we disabled auto-scan on startup, we tell the scanner to start
 	s.Run("Step 0: Trigger manual scan via Controller", func() {
 		s.WithScannerControl("Triggering scan on target directory", func(ctx context.Context, client pb.ScannerControllerClient) {
 			resp, err := client.TriggerScan(ctx, &pb.ScanRequest{
-				Path: "./testdata/", // We trigger the whole folder
+				Path: s.Config.ScannerRootDir,
 			})
 			s.Require().NoError(err, "Failed to trigger scan via gRPC")
 			s.Require().True(resp.Started, "Scanner reported it could not start the scan")
@@ -44,15 +46,17 @@ func (s *testAudioAnalysisSuite) TestFullAudioAnalysisFlow() {
 			stream, err := client.Download(ctx)
 			s.Require().NoError(err)
 
+			cwd, _ := os.Getwd()
+			absolutePath := filepath.Join(cwd, s.Config.ScannerRootDir, filename)
+			_, err = os.Stat(absolutePath)
+			s.Require().NoError(err)
+
 			// Send the initial request (Command)
 			err = stream.Send(&pb.FileDownloaderRequest{
 				FileId: fileID,
-				Path:   targetPath,
+				Path:   absolutePath,
 			})
 			s.Require().NoError(err)
-
-			// We close our side of the stream as we only send one request
-			s.Require().NoError(stream.CloseSend())
 
 			// Protocol state sentinels
 			receivedMetadata := false

@@ -28,40 +28,45 @@ const (
 )
 
 // AuthInterceptor handles JWT validation for incoming gRPC calls.
-func AuthInterceptor(ctx context.Context, req any,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	// 1. Skip authentication for public methods (Login/Register)
-	if isPublicMethod(info.FullMethod) {
-		return handler(ctx, req)
+func AuthInterceptor(authEnabled bool) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+		if !authEnabled {
+			return handler(ctx, req)
+		}
+
+		// 1. Skip authentication for public methods (Login/Register)
+		if isPublicMethod(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
+		// 2. Extract metadata (headers) from the incoming gRPC context
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "metadata is missing")
+		}
+
+		// 3. Retrieve and validate the Authorization header
+		values := md.Get("authorization")
+		if len(values) == 0 {
+			return nil, status.Error(codes.Unauthenticated, "authorization token is missing")
+		}
+
+		// Expecting the standard "Bearer <token>" format
+		tokenStr := strings.TrimPrefix(values[0], "Bearer ")
+
+		// 4. Validate the JWT and extract claims
+		claims, err := auth.ValidateToken(tokenStr)
+		if err != nil {
+			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+		}
+
+		// 5. Inject user identity into context for downstream service layers
+		newCtx := context.WithValue(ctx, UserIDKey, claims.UserID)
+		newCtx = context.WithValue(newCtx, RolesKey, claims.Roles)
+
+		// Continue the execution chain with the enriched context
+		return handler(newCtx, req)
 	}
-
-	// 2. Extract metadata (headers) from the incoming gRPC context
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "metadata is missing")
-	}
-
-	// 3. Retrieve and validate the Authorization header
-	values := md.Get("authorization")
-	if len(values) == 0 {
-		return nil, status.Error(codes.Unauthenticated, "authorization token is missing")
-	}
-
-	// Expecting the standard "Bearer <token>" format
-	tokenStr := strings.TrimPrefix(values[0], "Bearer ")
-
-	// 4. Validate the JWT and extract claims
-	claims, err := auth.ValidateToken(tokenStr)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
-	}
-
-	// 5. Inject user identity into context for downstream service layers
-	newCtx := context.WithValue(ctx, UserIDKey, claims.UserID)
-	newCtx = context.WithValue(newCtx, RolesKey, claims.Roles)
-
-	// Continue the execution chain with the enriched context
-	return handler(newCtx, req)
 }
 
 // isPublicMethod checks if the current gRPC method is allowed without a token.
