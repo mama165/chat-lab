@@ -2,11 +2,15 @@
 grpcio
 grpcio-tools
 protobuf
+
 # --- Specialist: PDF ---
 pymupdf
+
 # --- Specialist: Audio & Video ---
 faster-whisper
 
+# --- Specialist: Image ---
+Pillow
+
 # --- Utilities ---
-# Optional but useful for monitoring if needed
 psutil

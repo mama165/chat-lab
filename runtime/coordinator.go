@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"chat-lab/domain/specialist"
+	"chat-lab/domain"
 	"chat-lab/errors"
 	"chat-lab/infrastructure/grpc/client"
 	"chat-lab/internal"
@@ -26,13 +26,13 @@ import (
 type Coordinator struct {
 	mu          sync.RWMutex
 	log         *slog.Logger
-	specialists map[specialist.Metric]*client.SpecialistClient
+	specialists map[domain.Metric]*client.SpecialistClient
 }
 
 func NewCoordinator(log *slog.Logger) *Coordinator {
 	return &Coordinator{
 		log:         log,
-		specialists: make(map[specialist.Metric]*client.SpecialistClient),
+		specialists: make(map[domain.Metric]*client.SpecialistClient),
 	}
 }
 
@@ -44,11 +44,11 @@ func (m *Coordinator) Add(s *client.SpecialistClient) {
 }
 
 // Init launches all configured specialists and blocks until they are all ready.
-func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, logLevel string, grpcConfig internal.GrpcConfig) error {
+func (m *Coordinator) Init(appCtx, bootCtx context.Context, configs []domain.Config, logLevel string, grpcConfig internal.GrpcConfig) error {
 	for _, cfg := range configs {
 		// Start each specialist using our robust launcher.
 		// If one fails, we return the error to the Master to decide what to do.
-		sClient, err := startSpecialist(ctx, cfg, logLevel, grpcConfig)
+		sClient, err := startSpecialist(appCtx, bootCtx, cfg, logLevel, grpcConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize specialist %s: %w", cfg.ID, err)
 		}
@@ -60,11 +60,11 @@ func (m *Coordinator) Init(ctx context.Context, configs []specialist.Config, log
 }
 
 // startSpecialist orchestrates the full lifecycle of a specialist sidecar process.
-// It verifies the binary existence, determines the correct Python interpreter based on the OS,
-// launches the process with the required environment variables, and establishes a gRPC
-// connection with a native retry policy. If the gRPC handshake fails, it ensures
-// the child process is killed to prevent zombie processes.
-func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string, grpcCfg internal.GrpcConfig) (*client.SpecialistClient, error) {
+// It uses appCtx to ensure the child process survival for the entire application lifetime,
+// while bootCtx is used to bound the gRPC handshake and readiness check.
+// If the gRPC connection is not established within the bootCtx deadline, the process
+// is killed to prevent orphan sidecars.
+func startSpecialist(appCtx, bootCtx context.Context, cfg domain.Config, logLevel string, grpcCfg internal.GrpcConfig) (*client.SpecialistClient, error) {
 	if _, err := os.Stat(cfg.BinPath); err != nil {
 		return nil, fmt.Errorf("%w: %s", errors.ErrSpecialistNotFound, cfg.BinPath)
 	}
@@ -75,20 +75,26 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 		pythonInterpreter = ".\\venv\\Scripts\\python.exe"
 	}
 
-	cmd := exec.CommandContext(ctx, pythonInterpreter, cfg.BinPath,
+	cmd := exec.CommandContext(appCtx, pythonInterpreter, cfg.BinPath,
 		"-id", string(cfg.ID),
 		"-port", strconv.Itoa(cfg.Port),
-		"-type", string(cfg.ID),
 		"-level", logLevel,
 	)
 
-	// Send a signal SIGKILL to children (python) if father (go) dies suddendly
+	// Send a signal SIGKILL to children (python) if father (go) dies suddenly
 	setPlatformSpecificAttrs(cmd)
 
 	cmd.Env = append(os.Environ(),
 		"PYTHONPATH=.",
 		"PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
 	)
+
+	// CRITICAL: Ensure the command runs from the project root
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	cmd.Dir = cwd
 
 	// Redirect stdout/stderr through our prefixed logger
 	cmd.Stdout = &specialistLogWriter{logger: slog.Default(), prefix: string(cfg.ID), isError: false}
@@ -112,9 +118,9 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 		return nil, fmt.Errorf("failed to create gRPC client for %s: %w", cfg.ID, err)
 	}
 
-	// 5. Attente de la disponibilité réelle du serveur gRPC Python
-	// On bloque ici pour que Init() ne rende la main que quand tout est prêt
-	if err := waitForReady(ctx, conn, 30*time.Second); err != nil {
+	// Waiting for reliable availability from gRPC python/C++ server
+	// Blocking until Init() release when ready
+	if err := waitForReady(bootCtx, conn, 30*time.Second); err != nil {
 		_ = cmd.Process.Kill()
 		_ = conn.Close()
 		return nil, fmt.Errorf("specialist %s (port %d) failed to become ready: %w", cfg.ID, cfg.Port, err)
@@ -129,13 +135,16 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 		cfg.Capabilities), nil
 }
 
-// waitForReady blocks until the gRPC connection state becomes READY or the timeout is reached.
-// It monitors the connection's state machine and triggers immediate reconnection attempts
-// if a transient failure is detected. This ensures the specialist's gRPC server is
-// fully operational before the Orchestrator starts sending analysis requests.
-func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+// waitForReady blocks until the gRPC connection state becomes READY.
+// It uses conn.Connect() to proactively trigger the transition from IDLE to CONNECTING,
+// as gRPC-Go clients are "lazy" by default and won't connect until a request is made.
+// It respects the bootCtx deadline for the initial handshake.
+func waitForReady(bootCtx context.Context, conn *grpc.ClientConn, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(bootCtx, timeout)
 	defer cancel()
+
+	// Force connection instead of waiting for IDLE
+	conn.Connect()
 
 	for {
 		state := conn.GetState()
@@ -143,23 +152,31 @@ func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Durat
 			return nil
 		}
 
+		// If IDLE -> technically ready to attempt for a connection
+		// But Go often waits for an RPC to be READY
+		if state == connectivity.Idle {
+			// Attempting a connection to force passage to CONNECTING/READY
+			conn.Connect()
+		}
+
 		if state == connectivity.TransientFailure {
 			conn.ResetConnectBackoff()
 		}
 
+		// If context is expired -> returns error with actual connection state
 		if !conn.WaitForStateChange(ctx, state) {
-			return fmt.Errorf("timeout reached while waiting for state %s", state)
+			return fmt.Errorf("timeout reached while waiting, last state: %s", state)
 		}
 	}
 }
 
 // Broadcast orchestrates the analysis of a file by streaming its content to relevant
 // specialists in parallel based on their capabilities (MIME types).
-func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequest) (specialist.AnalysisResponse, error) {
+func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) (domain.SpecialistResponse, error) {
 	// 1. Read file content once to share it across specialists
 	data, err := os.ReadFile(req.Path)
 	if err != nil {
-		return specialist.AnalysisResponse{}, fmt.Errorf("failed to read file %s: %w", req.Path, err)
+		return domain.SpecialistResponse{}, fmt.Errorf("failed to read file %s: %w", req.Path, err)
 	}
 
 	m.mu.RLock()
@@ -174,12 +191,12 @@ func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequ
 
 	if len(targets) == 0 {
 		m.log.Warn("No specialist found for MIME type", "mime", req.MimeType, "path", req.Path)
-		return specialist.AnalysisResponse{Results: make(map[specialist.Metric]specialist.Response)}, nil
+		return domain.SpecialistResponse{Results: make(map[domain.Metric]domain.Response)}, nil
 	}
 
 	type specResult struct {
-		id   specialist.Metric
-		resp specialist.Response
+		id   domain.Metric
+		resp domain.Response
 		err  error
 	}
 
@@ -191,8 +208,8 @@ func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequ
 		go func(s *client.SpecialistClient) {
 			defer wg.Done()
 
-			domainReq := specialist.Request{
-				Metadata: &specialist.Metadata{
+			domainReq := domain.Request{
+				Metadata: &domain.Metadata{
 					MessageID: uuid.New().String(),
 					FileName:  req.Path,
 					MimeType:  req.MimeType,
@@ -223,12 +240,12 @@ func (m *Coordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequ
 	}()
 
 	// 6. Aggregate results into the final response map
-	results := make(map[specialist.Metric]specialist.Response)
+	results := make(map[domain.Metric]domain.Response)
 	for res := range resChan {
 		if res.err == nil {
 			results[res.id] = res.resp
 		}
 	}
 
-	return specialist.AnalysisResponse{Results: results}, nil
+	return domain.SpecialistResponse{Results: results}, nil
 }

@@ -5,7 +5,6 @@ import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/domain/mimetypes"
-	"chat-lab/domain/specialist"
 	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/internal"
@@ -28,6 +27,7 @@ import (
 	"time"
 
 	"github.com/blugelabs/bluge"
+	"github.com/joho/godotenv"
 	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,6 +65,11 @@ func main() {
 // 3. It provides a structured way to handle graceful shutdowns for gRPC and background workers.
 func run() (int, error) {
 	// Configuration & Logger
+	err := godotenv.Load()
+	if err != nil {
+		return exitConfig, fmt.Errorf("error loading .env file : %w", err)
+	}
+
 	var config internal.Config
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
 		return exitConfig, fmt.Errorf("config error: %w", err)
@@ -75,7 +80,7 @@ func run() (int, error) {
 		return exitConfig, err
 	}
 
-	logger := logs.GetLoggerFromString("INFO")
+	logger := logs.GetLoggerFromString(config.LogLevel)
 
 	ctx := context.Background()
 
@@ -122,16 +127,16 @@ func run() (int, error) {
 		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, MasterPort: config.SentimentPort},
 	}*/
 
-	specialistConfigs := []specialist.Config{
+	specialistConfigs := []domain.Config{
 		{
-			ID:           specialist.MetricPDF,
+			ID:           domain.MetricPDF,
 			BinPath:      "./services/pdf_specialist.py",
 			Host:         "localhost",
 			Port:         50055,
 			Capabilities: []mimetypes.MIME{mimetypes.ApplicationPDF},
 		},
 		{
-			ID:      "audio-transcriber",
+			ID:      domain.MetricAudio,
 			BinPath: "./services/audio_specialist.py",
 			Host:    "localhost",
 			Port:    50056,
@@ -139,6 +144,17 @@ func run() (int, error) {
 				mimetypes.AudioMPEG,
 				mimetypes.AudioWAV,
 				mimetypes.AudioXAIFF,
+			},
+		},
+		{
+			ID:      domain.MetricImage,
+			BinPath: "./services/image_specialist.py",
+			Host:    "localhost",
+			Port:    50057,
+			Capabilities: []mimetypes.MIME{
+				mimetypes.ImagePNG,
+				mimetypes.ImageJPEG,
+				mimetypes.ImageGIF,
 			},
 		},
 	}
@@ -149,7 +165,7 @@ func run() (int, error) {
 
 	if config.EnableSpecialists {
 		logger.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
-		if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel, config.GrpcConfig); err != nil {
+		if err := coordinator.Init(ctx, bootCtx, specialistConfigs, config.LogLevel, config.GrpcConfig); err != nil {
 			return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
 		}
 	}

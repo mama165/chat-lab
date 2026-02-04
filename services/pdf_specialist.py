@@ -1,5 +1,7 @@
+import argparse
+import logging
 import grpc
-import fitz  # PyMuPDF
+import fitz
 from concurrent import futures
 import traceback
 
@@ -65,12 +67,22 @@ class MonitorService(pb_grpc.SpecialistServiceServicer):
             context.abort(grpc.StatusCode.INTERNAL, str(e))
 
 def serve():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-id', type=str)
+    parser.add_argument('-port', type=int)
+    parser.add_argument('-level', type=str, default='INFO')
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.level, format='%(message)s')
+    logger = logging.getLogger(args.id)
+
     # Initialize gRPC server with a thread pool
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb_grpc.add_SpecialistServiceServicer_to_server(MonitorService(), server)
 
-    server.add_insecure_port('[::]:50055')
-    print("🚀 Python PDF Specialist ready on port 50055")
+    address = f'[::]:{args.port}'
+    server.add_insecure_port(address)
+    #print(f'🚀 Python PDF Specialist ready on port {args.port}", flush=True")
     server.start()
     server.wait_for_termination()
 

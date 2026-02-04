@@ -11,8 +11,8 @@ package mocks
 
 import (
 	contract "chat-lab/contract"
+	specialist "chat-lab/domain"
 	chat "chat-lab/domain/chat"
-	specialist "chat-lab/domain/specialist"
 	context "context"
 	reflect "reflect"
 
@@ -452,10 +452,10 @@ func (m *MockSpecialistCoordinator) EXPECT() *MockSpecialistCoordinatorMockRecor
 }
 
 // Broadcast mocks base method.
-func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req specialist.AnalysisRequest) (specialist.AnalysisResponse, error) {
+func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req specialist.SpecialistRequest) (specialist.SpecialistResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, req)
-	ret0, _ := ret[0].(specialist.AnalysisResponse)
+	ret0, _ := ret[0].(specialist.SpecialistResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

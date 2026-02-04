@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"chat-lab/domain/specialist"
+	"chat-lab/domain"
 	pb "chat-lab/proto/storage"
 	"fmt"
 	"strings"
@@ -15,7 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var MetricTest specialist.Metric = "test"
+var MetricTest domain.Metric = "test"
 
 func TestAnalysisRepository_DebugView(t *testing.T) {
 	req := require.New(t)
@@ -32,7 +32,7 @@ func TestAnalysisRepository_DebugView(t *testing.T) {
 		Namespace: "chat:room_99", // Our new "Bucket"
 		At:        time.Now(),
 		Summary:   "This is a test message for the debugger",
-		Scores:    map[specialist.Metric]float64{"toxicity": 0.01},
+		Scores:    map[domain.Metric]float64{"toxicity": 0.01},
 		Payload:   TextContent{Content: "Test content for debugging"},
 	}
 
@@ -67,9 +67,9 @@ func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
 		At:        time.Now().UTC(),
 		Summary:   "Test Summary",
 		Tags:      []string{"urgent", "bug"},
-		Scores: map[specialist.Metric]float64{
-			specialist.MetricToxicity: 0.12,
-			specialist.MetricBusiness: 0.88,
+		Scores: map[domain.Metric]float64{
+			domain.MetricToxicity: 0.12,
+			domain.MetricBusiness: 0.88,
 		},
 		Payload: TextContent{Content: "This is a test message about gRPC implementation"},
 		Version: uuid.New(),
@@ -115,8 +115,8 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 		Namespace: namespace,
 		At:        time.Now().UTC(),
 		Summary:   "Meeting recording",
-		Scores: map[specialist.Metric]float64{
-			specialist.MetricSentiment: 0.75},
+		Scores: map[domain.Metric]float64{
+			domain.MetricSentiment: 0.75},
 		Payload: AudioDetails{
 			Transcription: "We decided to migrate to PostgreSQL for better scalability",
 			Duration:      180,
@@ -443,7 +443,7 @@ func TestAnalysisRepository_SearchByScoreRange_SingleScore(t *testing.T) {
 			Namespace: namespace,
 			At:        time.Now(),
 			Summary:   fmt.Sprintf("Score %.2f", a.score),
-			Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: a.score},
+			Scores:    map[domain.Metric]float64{domain.MetricToxicity: a.score},
 		}))
 	}
 	req.NoError(repo.Flush())
@@ -480,10 +480,10 @@ func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 		Namespace: namespace,
 		At:        time.Now(),
 		Summary:   "High business value",
-		Scores: map[specialist.Metric]float64{
-			specialist.MetricBusiness:  0.92,
-			specialist.MetricToxicity:  0.05,
-			specialist.MetricSentiment: 0.75,
+		Scores: map[domain.Metric]float64{
+			domain.MetricBusiness:  0.92,
+			domain.MetricToxicity:  0.05,
+			domain.MetricSentiment: 0.75,
 		},
 	}))
 
@@ -492,10 +492,10 @@ func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 		Namespace: namespace,
 		At:        time.Now(),
 		Summary:   "Low business value",
-		Scores: map[specialist.Metric]float64{
-			specialist.MetricBusiness:  0.12,
-			specialist.MetricToxicity:  0.88,
-			specialist.MetricSentiment: 0.25,
+		Scores: map[domain.Metric]float64{
+			domain.MetricBusiness:  0.12,
+			domain.MetricToxicity:  0.88,
+			domain.MetricSentiment: 0.25,
 		},
 	}))
 
@@ -530,7 +530,7 @@ func TestAnalysisRepository_SearchByScoreRange_EdgeCases(t *testing.T) {
 		Namespace: namespace,
 		At:        time.Now(),
 		Summary:   "Exactly 0.5",
-		Scores:    map[specialist.Metric]float64{MetricTest: 0.5},
+		Scores:    map[domain.Metric]float64{MetricTest: 0.5},
 	}))
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
@@ -564,7 +564,7 @@ func TestAnalysisRepository_SearchByScoreRange_NonExistentScore(t *testing.T) {
 		EntityId:  uuid.New(),
 		Namespace: namespace,
 		At:        time.Now(),
-		Scores:    map[specialist.Metric]float64{specialist.MetricToxicity: 0.5},
+		Scores:    map[domain.Metric]float64{domain.MetricToxicity: 0.5},
 	}))
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
@@ -699,7 +699,7 @@ func TestAnalysisRepository_FetchFullByEntityId_Success(t *testing.T) {
 		At:        time.Now().UTC(),
 		Summary:   "Original summary",
 		Tags:      []string{"tag1", "tag2"},
-		Scores:    map[specialist.Metric]float64{MetricTest: 0.42},
+		Scores:    map[domain.Metric]float64{MetricTest: 0.42},
 		Payload:   TextContent{Content: "Test content"},
 	}
 	req.NoError(repo.Store(original))
@@ -777,9 +777,9 @@ func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 			Namespace: namespace,
 			At:        time.Now().Add(-2 * time.Hour),
 			Summary:   "Bug report",
-			Scores: map[specialist.Metric]float64{
-				specialist.MetricToxicity: 0.15,
-				specialist.MetricBusiness: 0.92,
+			Scores: map[domain.Metric]float64{
+				domain.MetricToxicity: 0.15,
+				domain.MetricBusiness: 0.92,
 			},
 			Payload: TextContent{Content: "Critical bug in payment processing"},
 		},
@@ -788,9 +788,9 @@ func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 			Namespace: namespace,
 			At:        time.Now().Add(-1 * time.Hour),
 			Summary:   "Feature request",
-			Scores: map[specialist.Metric]float64{
-				specialist.MetricToxicity: 0.05,
-				specialist.MetricBusiness: 0.88,
+			Scores: map[domain.Metric]float64{
+				domain.MetricToxicity: 0.05,
+				domain.MetricBusiness: 0.88,
 			},
 			Payload: TextContent{Content: "Add dark mode to the application"},
 		},

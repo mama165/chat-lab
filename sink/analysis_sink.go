@@ -2,9 +2,9 @@ package sink
 
 import (
 	"chat-lab/contract"
+	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/domain/mimetypes"
-	"chat-lab/domain/specialist"
 	"chat-lab/infrastructure/storage"
 	"context"
 	"log/slog"
@@ -117,7 +117,7 @@ func (a *AnalysisSink) processAndStore(events []event.FileAnalyse) error {
 	allAnalyses := make([]storage.Analysis, 0, len(events))
 
 	for _, evt := range events {
-		analysis := a.buildFinalAnalysis(evt, specialist.AnalysisResponse{})
+		analysis := a.buildFinalAnalysis(evt, domain.SpecialistResponse{})
 		allAnalyses = append(allAnalyses, analysis)
 
 		if mimetypes.IsAudio(evt.MimeType) || mimetypes.IsPDF(evt.MimeType) {
@@ -145,7 +145,7 @@ func (a *AnalysisSink) processAndStore(events []event.FileAnalyse) error {
 // buildFinalAnalysis maps and merges raw file events with specialized analysis results.
 // It acts as a decorator that enriches the initial metadata (path, mimetype)
 // with deeper insights like extracted titles, authors, or sentiment/toxicity scores.
-func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist.AnalysisResponse) storage.Analysis {
+func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp domain.SpecialistResponse) storage.Analysis {
 	analysis := storage.Analysis{
 		ID:        evt.Id,
 		EntityId:  evt.Id,
@@ -153,7 +153,7 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist
 		At:        evt.ScannedAt,
 		Summary:   evt.Path,
 		Tags:      []string{evt.MimeType, evt.SourceType},
-		Scores:    make(map[specialist.Metric]float64),
+		Scores:    make(map[domain.Metric]float64),
 		Version:   uuid.New(),
 	}
 
@@ -167,11 +167,11 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist
 	for metric, res := range resp.Results {
 		switch data := res.OneOf.(type) {
 
-		case specialist.AudioData:
+		case domain.AudioData:
 			// Assign the transcription to the file content
 			payload.Content = data.Transcription
 			analysis.Summary = "Audio Transcription"
-		case specialist.DocumentData:
+		case domain.DocumentData:
 			if data.Title != "" {
 				analysis.Summary = data.Title
 			}
@@ -186,7 +186,7 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp specialist
 				// a.log.Debug("Content extracted", "length", len(payload.Content))
 			}
 
-		case specialist.Score:
+		case domain.Score:
 			analysis.Scores[metric] = data.Score
 			analysis.Tags = append(analysis.Tags, data.Label)
 

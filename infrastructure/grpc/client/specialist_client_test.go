@@ -1,8 +1,8 @@
 package client
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/mimetypes"
-	"chat-lab/domain/specialist"
 	pb "chat-lab/proto/specialist"
 	"context"
 	"errors"
@@ -70,8 +70,8 @@ func TestSpecialistClient_Analyze_Chunking(t *testing.T) {
 		largeData[i] = byte(i % 256)
 	}
 
-	req := specialist.Request{
-		Metadata: &specialist.Metadata{
+	req := domain.Request{
+		Metadata: &domain.Metadata{
 			MessageID: "msg-123",
 			FileName:  "test.pdf",
 		},
@@ -123,8 +123,8 @@ func TestSpecialistClient_Analyze_NetworkErrorDuringChunks(t *testing.T) {
 		return nil
 	}
 
-	req := specialist.Request{
-		Metadata: &specialist.Metadata{MessageID: "err-456"},
+	req := domain.Request{
+		Metadata: &domain.Metadata{MessageID: "err-456"},
 		Chunk:    data,
 	}
 

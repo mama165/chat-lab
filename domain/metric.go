@@ -1,4 +1,4 @@
-package specialist
+package domain
 
 import "chat-lab/domain/mimetypes"
 
@@ -10,6 +10,7 @@ const (
 	MetricBusiness  Metric = "business"
 	MetricPDF       Metric = "pdf"
 	MetricAudio     Metric = "audio"
+	MetricImage     Metric = "image"
 )
 
 type Config struct {

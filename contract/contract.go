@@ -4,7 +4,6 @@ package contract
 import (
 	"chat-lab/domain"
 	"chat-lab/domain/chat"
-	"chat-lab/domain/specialist"
 	"context"
 	"reflect"
 )
@@ -68,7 +67,7 @@ type IOrchestrator interface {
 // SpecialistCoordinator defines the ability to fan-out analysis requests
 // to all available sidecars.
 type SpecialistCoordinator interface {
-	Broadcast(ctx context.Context, req specialist.AnalysisRequest) (specialist.AnalysisResponse, error)
+	Broadcast(ctx context.Context, req domain.SpecialistRequest) (domain.SpecialistResponse, error)
 }
 
 // ISpecialistClient defines the contract for interacting with specialized
@@ -76,7 +75,7 @@ type SpecialistCoordinator interface {
 // This abstraction allows the Orchestrator to remain agnostic of the
 // underlying communication protocol (gRPC, HTTP, or local).
 type ISpecialistClient interface {
-	Analyze(ctx context.Context, request specialist.Request) (specialist.Response, error)
+	Analyze(ctx context.Context, request domain.Request) (domain.Response, error)
 }
 
 type IFileAccumulator interface {

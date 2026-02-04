@@ -2,7 +2,7 @@
 package storage
 
 import (
-	"chat-lab/domain/specialist"
+	"chat-lab/domain"
 	pb "chat-lab/proto/storage"
 	"context"
 	"fmt"
@@ -65,7 +65,7 @@ type Analysis struct {
 	At        time.Time
 	Summary   string
 	Tags      []string
-	Scores    map[specialist.Metric]float64
+	Scores    map[domain.Metric]float64
 	Payload   any
 	Version   uuid.UUID
 }
@@ -131,8 +131,8 @@ func (a *AnalysisRepository) Store(analysis Analysis) error {
 // and stores AI specialist scores as numeric fields to enable range-based filtering.
 // This method ensures the search index stays synchronized with the primary BadgerDB storage.
 func (a *AnalysisRepository) upsertSearchIndex(id, content string,
-	metadata map[specialist.Metric]float64,
-	category specialist.Category, namespace string) error {
+	metadata map[domain.Metric]float64,
+	category domain.Category, namespace string) error {
 	doc := bluge.NewDocument(id)
 	// TextField allows full-text search with tokenization (e.g., lowercase, stop words)
 	doc.AddField(bluge.NewTextField(CONTENT, content).StoreValue())
@@ -493,7 +493,7 @@ func buildKey(Namespace string, at time.Time, EntityId uuid.UUID) []byte {
 }
 
 func fromAnalysis(analysis Analysis) *pb.Analysis {
-	scores := lo.MapKeys(analysis.Scores, func(_ float64, key specialist.Metric) string {
+	scores := lo.MapKeys(analysis.Scores, func(_ float64, key domain.Metric) string {
 		return string(key)
 	})
 
@@ -569,8 +569,8 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 	}
 
 	// Map string keys to domain Metric type
-	scores := lo.MapKeys(analysisPb.Scores, func(_ float64, key string) specialist.Metric {
-		return specialist.Metric(key)
+	scores := lo.MapKeys(analysisPb.Scores, func(_ float64, key string) domain.Metric {
+		return domain.Metric(key)
 	})
 
 	// 3. Initialize Base Structure
@@ -624,9 +624,9 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 // prepareInternalData extracts searchable text and determines the data category
 // from the flexible analysis payload. It handles both value and pointer types
 // to ensure consistency between storage and search indexing.
-func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, specialist.Category) {
+func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, domain.Category) {
 	fullText := an.Summary
-	category := specialist.TextType // Default category
+	category := domain.TextType // Default category
 
 	if an.Payload == nil {
 		return fullText, category
@@ -635,27 +635,27 @@ func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, specialis
 	switch p := an.Payload.(type) {
 	case TextContent:
 		fullText += " " + p.Content
-		category = specialist.TextType
+		category = domain.TextType
 	case *TextContent:
 		if p != nil {
 			fullText += " " + p.Content
 		}
-		category = specialist.TextType
+		category = domain.TextType
 	case AudioDetails:
 		fullText += " " + p.Transcription
-		category = specialist.AudioType
+		category = domain.AudioType
 	case *AudioDetails:
 		if p != nil {
 			fullText += " " + p.Transcription
 		}
-		category = specialist.AudioType
+		category = domain.AudioType
 
 	case FileDetails:
 		fullText += " " + p.Filename
 		if p.Content != "" {
 			fullText += " " + p.Content
 		}
-		category = specialist.FileType
+		category = domain.FileType
 	case *FileDetails:
 		if p != nil {
 			fullText += " " + p.Filename
@@ -663,7 +663,7 @@ func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, specialis
 				fullText += " " + p.Content
 			}
 		}
-		category = specialist.FileType
+		category = domain.FileType
 
 	default:
 		// Log the exact type to help debugging unexpected AI pipeline outputs [cite: 2026-01-19]

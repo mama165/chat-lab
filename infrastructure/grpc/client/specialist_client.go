@@ -1,8 +1,8 @@
 package client
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/mimetypes"
-	"chat-lab/domain/specialist"
 	pb "chat-lab/proto/specialist"
 	"context"
 	"os"
@@ -12,7 +12,7 @@ import (
 )
 
 type SpecialistClient struct {
-	Id           specialist.Metric
+	Id           domain.Metric
 	Client       pb.SpecialistServiceClient
 	Process      *os.Process
 	Port         int
@@ -20,7 +20,7 @@ type SpecialistClient struct {
 	Capabilities []mimetypes.MIME
 }
 
-func NewSpecialistClient(id specialist.Metric,
+func NewSpecialistClient(id domain.Metric,
 	client pb.SpecialistServiceClient,
 	process *os.Process, port int, lastHealth time.Time,
 	capabilities []mimetypes.MIME,
@@ -36,10 +36,10 @@ func NewSpecialistClient(id specialist.Metric,
 // It first transmits document metadata, then streams the data content in 32KB chunks
 // to manage memory efficiently and stay within gRPC message size limits.
 // Finally, it closes the stream and returns the specialist's analysis response.
-func (s *SpecialistClient) Analyze(ctx context.Context, request specialist.Request) (specialist.Response, error) {
+func (s *SpecialistClient) Analyze(ctx context.Context, request domain.Request) (domain.Response, error) {
 	stream, err := s.Client.AnalyzeStream(ctx)
 	if err != nil {
-		return specialist.Response{}, err
+		return domain.Response{}, err
 	}
 
 	if request.Metadata != nil {
@@ -53,7 +53,7 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request specialist.Reque
 			},
 		})
 		if err != nil {
-			return specialist.Response{}, err
+			return domain.Response{}, err
 		}
 	}
 
@@ -70,13 +70,13 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request specialist.Reque
 			},
 		})
 		if err != nil {
-			return specialist.Response{}, err
+			return domain.Response{}, err
 		}
 	}
 
 	response, err := stream.CloseAndRecv()
 	if err != nil {
-		return specialist.Response{}, err
+		return domain.Response{}, err
 	}
 
 	return ToResponse(response), nil
@@ -86,11 +86,11 @@ func (s *SpecialistClient) CanHandle(mimeType mimetypes.MIME) bool {
 	return lo.Contains(s.Capabilities, mimeType)
 }
 
-func ToResponse(response *pb.SpecialistResponse) specialist.Response {
+func ToResponse(response *pb.SpecialistResponse) domain.Response {
 	switch resp := (response.Response).(type) {
 	case *pb.SpecialistResponse_DocumentData:
-		return specialist.Response{
-			OneOf: specialist.DocumentData{
+		return domain.Response{
+			OneOf: domain.DocumentData{
 				Title:     resp.DocumentData.Title,
 				Author:    resp.DocumentData.Author,
 				PageCount: resp.DocumentData.PageCount,
@@ -99,28 +99,28 @@ func ToResponse(response *pb.SpecialistResponse) specialist.Response {
 			},
 		}
 	case *pb.SpecialistResponse_Score:
-		return specialist.Response{
-			OneOf: specialist.Score{
+		return domain.Response{
+			OneOf: domain.Score{
 				Score: resp.Score.Score,
 				Label: resp.Score.Label,
 			},
 		}
 	case *pb.SpecialistResponse_Audio:
-		return specialist.Response{
-			OneOf: specialist.AudioData{
+		return domain.Response{
+			OneOf: domain.AudioData{
 				Transcription: resp.Audio.Transcription,
 				Duration:      resp.Audio.DurationSec,
 				Language:      resp.Audio.Language,
 			},
 		}
 	default:
-		return specialist.Response{}
+		return domain.Response{}
 	}
 }
 
-func toPages(pages []*pb.Page) []specialist.Page {
-	return lo.Map(pages, func(item *pb.Page, _ int) specialist.Page {
-		return specialist.Page{
+func toPages(pages []*pb.Page) []domain.Page {
+	return lo.Map(pages, func(item *pb.Page, _ int) domain.Page {
+		return domain.Page{
 			Number:  item.Number,
 			Content: item.Content,
 		}

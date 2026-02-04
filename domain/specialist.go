@@ -1,4 +1,4 @@
-package specialist
+package domain
 
 import "chat-lab/domain/mimetypes"
 
@@ -61,11 +61,11 @@ type Score struct {
 	Label string
 }
 
-type AnalysisRequest struct {
+type SpecialistRequest struct {
 	Path     string
 	MimeType mimetypes.MIME
 }
 
-type AnalysisResponse struct {
+type SpecialistResponse struct {
 	Results map[Metric]Response
 }
