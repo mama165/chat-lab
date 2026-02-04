@@ -147,8 +147,8 @@ func run() (int, error) {
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
 
-	logger.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
 	if config.EnableSpecialists {
+		logger.Info(fmt.Sprintf("Launching %d sidecar specialists...", len(specialistConfigs)))
 		if err := coordinator.Init(bootCtx, specialistConfigs, config.LogLevel, config.GrpcConfig); err != nil {
 			return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
 		}

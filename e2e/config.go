@@ -10,7 +10,8 @@ type Config struct {
 	// E2E_DEBUG_JSON allows dumping full gRPC request/response bodies as JSON
 	DebugJSON bool `envconfig:"E2E_DEBUG_JSON" default:"false"`
 	// E2E_COLOURS enables colorized output for better log readability
-	Colours bool `envconfig:"E2E_COLOURS" default:"true"`
+	Colours bool   `envconfig:"E2E_COLOURS" default:"true"`
+	rootDir string `envconfig:"ROOT_DIR"`
 }
 
 func LoadConfig() (Config, error) {

@@ -44,7 +44,6 @@ func TestFileScannerWorker_Run(t *testing.T) {
 
 		worker := NewFileScannerWorker(
 			logger,
-			tempDir,
 			"drive-123",
 			counter,
 			dirChan,
@@ -106,7 +105,6 @@ func TestFileScannerWorker_Run(t *testing.T) {
 
 		worker := NewFileScannerWorker(
 			logger,
-			"root",
 			"id",
 			analyzer.NewCounterFileScanner(),
 			nil, fileChan, nil, nil,

@@ -5,12 +5,14 @@ import (
 	pb "chat-lab/proto/analyzer"
 	"log/slog"
 
+	"github.com/go-playground/validator/v10"
 	"google.golang.org/grpc"
 )
 
 type FileDownloaderServer struct {
 	pb.UnimplementedFileDownloaderServiceServer
 	log          *slog.Logger
+	validator    *validator.Validate
 	requestChan  chan<- domain.FileDownloaderRequest
 	responseChan <-chan domain.FileDownloaderResponse
 }
@@ -21,6 +23,7 @@ func NewFileDownloaderServer(
 	responseChan <-chan domain.FileDownloaderResponse) *FileDownloaderServer {
 	return &FileDownloaderServer{
 		log:          log,
+		validator:    validator.New(),
 		requestChan:  requestChan,
 		responseChan: responseChan,
 	}
@@ -40,6 +43,11 @@ func (s *FileDownloaderServer) Download(stream grpc.BidiStreamingServer[pb.FileD
 		for {
 			req, err := stream.Recv()
 			if err != nil {
+				errChan <- err
+				return
+			}
+			request := fromPbRequest(req)
+			if err = s.validator.Struct(request); err != nil {
 				errChan <- err
 				return
 			}

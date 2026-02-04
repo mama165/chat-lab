@@ -17,7 +17,6 @@ import (
 // back into the dirChan and produces metadata requests for every regular file found.
 type FileScannerWorker struct {
 	log          *slog.Logger
-	rootDir      string
 	driveID      string
 	countScanner *analyzer.CounterFileScanner
 	// dirChan is a shared work queue used to distribute directory paths among
@@ -34,7 +33,6 @@ type FileScannerWorker struct {
 
 func NewFileScannerWorker(
 	log *slog.Logger,
-	rootDir string,
 	driveID string,
 	countScanner *analyzer.CounterFileScanner,
 	dirChan chan string,
@@ -46,7 +44,6 @@ func NewFileScannerWorker(
 ) *FileScannerWorker {
 	return &FileScannerWorker{
 		log:                              log,
-		rootDir:                          rootDir,
 		driveID:                          driveID,
 		countScanner:                     countScanner,
 		dirChan:                          dirChan,

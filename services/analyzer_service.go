@@ -70,7 +70,7 @@ func toEvent(request analyzer.FileAnalyzerRequest) event.Event {
 			DriveID:    request.DriveID,
 			Size:       request.Size,
 			Attributes: request.Attributes,
-			MimeType:   string(request.MimeType),
+			MimeType:   request.MimeType,
 			MagicBytes: request.MagicBytes,
 			ScannedAt:  request.ScannedAt,
 			SourceType: string(request.SourceType),

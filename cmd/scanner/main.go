@@ -10,6 +10,7 @@ import (
 	"chat-lab/internal"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
+	"chat-lab/services"
 	"context"
 	"errors"
 	"fmt"
@@ -75,11 +76,17 @@ func main() {
 
 	grpcClient := client.NewFileAnalyzerClient(conn)
 
+	var scanWG sync.WaitGroup
+	var workersWG sync.WaitGroup
+
+	dirChan := make(chan string, config.BufferSize)
+	errChan := make(chan error, 1)
+
 	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
 	fileDownloaderResponseChan := make(chan domain.FileDownloaderResponse, config.BufferSize)
 	fileDownloaderServer := server.NewFileDownloaderServer(logger, fileDownloaderRequestChan, fileDownloaderResponseChan)
-
-	errChan := make(chan error, 1)
+	scannerControlService := services.NewScannerControlService(dirChan, &scanWG, logger)
+	scannerControlerServer := server.NewScannerControllerServer(scannerControlService)
 
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -88,6 +95,7 @@ func main() {
 		))
 
 	pb.RegisterFileDownloaderServiceServer(s, fileDownloaderServer)
+	pb.RegisterScannerControllerServer(s, scannerControlerServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
@@ -108,10 +116,7 @@ func main() {
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	supervisor := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	counter := analyzer.NewCounterFileScanner()
-	dirChan := make(chan string, config.BufferSize)
 	fileChan := make(chan *analyzer.FileAnalyzerRequest, config.BufferSize)
-	var scanWG sync.WaitGroup
-	var workersWG sync.WaitGroup
 
 	telemetryWorkers, channelCapWorker, reporterWorker :=
 		buildTelemetryWorkers(config, logger, &workersWG, fileChan, dirChan, telemetryChan, counter)
@@ -134,27 +139,17 @@ func main() {
 		supervisor.Run(ctx)
 	}()
 
-	scanWG.Add(1)
-	dirChan <- config.RootDir
+	// Blocking to keep binary alive
+	logger.Info("🚀 Scanner Server is ready and listening for triggers... (Ctrl+C to stop)")
+	<-ctx.Done()
 
-	scanDone := make(chan struct{})
-	go func() {
-		logger.Info("Waiting for scan to complete...")
-		scanWG.Wait()
-		close(scanDone)
-		logger.Info("Logic: No more directories to scan. Closing dirChan.")
-	}()
+	logger.Warn("Shutting down scanner gracefully...")
 
-	logger.Info("Scan still alive... (Ctrl+C to stop)")
+	// Stop gRPC gracefully
+	s.GracefulStop()
+	close(dirChan)
 
-	select {
-	case <-ctx.Done():
-		logger.Warn("Scan interrupted...")
-	case <-scanDone:
-		logger.Info("Scan terminated gracefully")
-		close(dirChan)
-	}
-
+	// Wait for workers to empty channels
 	workersWG.Wait()
 	close(fileChan)
 
@@ -209,8 +204,7 @@ func buildFileWorkers(config internal.Config,
 		workersWG.Add(1)
 		allFileScannerWorkers = append(allFileScannerWorkers,
 			workers.NewFileScannerWorker(
-				logger,
-				config.RootDir, config.DriveID, counter,
+				logger, config.DriveID, counter,
 				dirChan, fileChan,
 				scanWG,
 				workersWG,

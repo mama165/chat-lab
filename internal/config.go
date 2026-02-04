@@ -39,7 +39,6 @@ type Config struct {
 	SentimentBinPath                 string        `env:"SENTIMENT_BIN_PATH,required=true"`
 	SentimentPort                    int           `env:"SENTIMENT_PORT,required=true"`
 	EnableSpecialists                bool          `env:"ENABLE_SPECIALISTS,required=true"`
-	RootDir                          string        `env:"ROOT_DIR,required=true"`
 	ScannerWorkerNb                  int           `env:"SCANNER_WORKER_NB,required=true"`
 	DownloaderWorkerNb               int           `env:"DOWNLOADER_WORKER_NB,required=true"`
 	FileTransferInterval             time.Duration `env:"FILE_TRANSFER_INTERVAL,required=true"`

@@ -26,6 +26,19 @@ func (s *testAudioAnalysisSuite) TestFullAudioAnalysisFlow() {
 	// This path represents the file location on the scanner's filesystem
 	targetPath := "./testdata/sample_audio_macos.aiff"
 
+	// --- STEP 0: TRIGGER MANUAL SCAN ---
+	// Since we disabled auto-scan on startup, we tell the scanner to start
+	s.Run("Step 0: Trigger manual scan via Controller", func() {
+		s.WithScannerControl("Triggering scan on target directory", func(ctx context.Context, client pb.ScannerControllerClient) {
+			resp, err := client.TriggerScan(ctx, &pb.ScanRequest{
+				Path: "./testdata/", // We trigger the whole folder
+			})
+			s.Require().NoError(err, "Failed to trigger scan via gRPC")
+			s.Require().True(resp.Started, "Scanner reported it could not start the scan")
+		})
+	})
+
+	// --- STEP 1: STREAM INTEGRITY ---
 	s.Run("Step 1: Download stream and validate protocol sequence", func() {
 		s.WithScanner("Request file and verify stream integrity", func(ctx context.Context, client pb.FileDownloaderServiceClient) {
 			stream, err := client.Download(ctx)
@@ -103,8 +116,19 @@ func (s *testAudioAnalysisSuite) TestFullAudioAnalysisFlow() {
 }
 
 // ----------------------------------------------------------------------------
-// STUBS: Temporary methods to be replaced by real gRPC Master calls
+// STUBS & HELPERS
 // ----------------------------------------------------------------------------
+
+func (s *BaseGrpcSuite) WithScannerControl(name string, fn func(ctx context.Context, client pb.ScannerControllerClient)) {
+	conn := s.GrpcConn(s.T(), name, s.Config.ScannerAddr)
+	defer conn.Close()
+
+	client := pb.NewScannerControllerClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	fn(ctx, client)
+}
 
 type AnalysisResult struct {
 	ID   string

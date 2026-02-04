@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package analyzer;
+option go_package = "./pb";
+
+service ScannerController {
+  rpc TriggerScan (ScanRequest) returns (ScanResponse);
+}
+
+message ScanRequest {
+  string path = 1;
+}
+
+message ScanResponse {
+  bool started = 1;
+  string message = 2;
+}
