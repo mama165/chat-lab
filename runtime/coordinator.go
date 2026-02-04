@@ -82,6 +82,9 @@ func startSpecialist(ctx context.Context, cfg specialist.Config, logLevel string
 		"-level", logLevel,
 	)
 
+	// Send a signal SIGKILL to children (python) if father (go) dies suddendly
+	setPlatformSpecificAttrs(cmd)
+
 	cmd.Env = append(os.Environ(),
 		"PYTHONPATH=.",
 		"PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",

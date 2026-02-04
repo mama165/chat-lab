@@ -127,14 +127,14 @@ func run() (int, error) {
 			ID:           specialist.MetricPDF,
 			BinPath:      "./services/pdf_specialist.py",
 			Host:         "localhost",
-			Port:         50055, // 👈 Change ici (au lieu de 50051)
+			Port:         50055,
 			Capabilities: []mimetypes.MIME{mimetypes.ApplicationPDF},
 		},
 		{
 			ID:      "audio-transcriber",
 			BinPath: "./services/audio_specialist.py",
 			Host:    "localhost",
-			Port:    50056, // 👈 Change ici (au lieu de 50052 pour être large)
+			Port:    50056,
 			Capabilities: []mimetypes.MIME{
 				mimetypes.AudioMPEG,
 				mimetypes.AudioWAV,
