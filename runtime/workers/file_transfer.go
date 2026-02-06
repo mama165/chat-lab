@@ -35,7 +35,7 @@ func NewFileTransferWorker(
 // Run start a loop that polls Badger for new tasks.
 // It sends requests to the gRPC worker through the send-only channel.
 func (w *FileTransferWorker) Run(ctx context.Context) error {
-	w.log.Debug("Starting pending file poller", "started_at", time.Now())
+	w.log.Info("Starting pending file poller", "started_at", time.Now())
 
 	ticker := time.NewTicker(w.fileTransferInterval)
 	defer ticker.Stop()
@@ -53,8 +53,11 @@ func (w *FileTransferWorker) Run(ctx context.Context) error {
 			}
 
 			if len(tasks) == 0 {
+				w.log.Debug("No tasks have been found")
 				continue
 			}
+
+			w.log.Debug("tasks have been found", "count", len(tasks))
 
 			for _, task := range tasks {
 				if err := w.filesTaskRepository.MarkAsProcessing(task); err != nil {
