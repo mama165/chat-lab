@@ -8,15 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type Type string
-
 const (
-	DomainType              Type = "DOMAIN_TYPE"
-	CensorshipHitType       Type = "CENSORSHIP_HIT"
-	RestartedAfterPanicType Type = "WORKER_RESTARTED_AFTER_PANIC"
-	ChannelCapacityType     Type = "CHANNEL_CAPACITY"
-	MessageSentType         Type = "MESSAGE_SENT"
-	FileAnalyzeType         Type = "FILE_ANALYZE"
+	DomainType        Type = "DOMAIN_TYPE"
+	CensorshipHitType Type = "CENSORSHIP_HIT"
+	MessageSentType   Type = "MESSAGE_SENT"
 )
 
 type Counter struct {
@@ -74,23 +69,11 @@ type SanitizedMessage struct {
 	ToxicityScore float64
 }
 
+type MessageSent struct{}
+
 func (m MessagePosted) RoomID() chat.RoomID {
 	return chat.RoomID(m.Room)
 }
 func (m SanitizedMessage) RoomID() chat.RoomID {
 	return chat.RoomID(m.Room)
 }
-
-// Telemetry
-
-type WorkerRestartedAfterPanic struct {
-	WorkerName string
-}
-
-type ChannelCapacity struct {
-	ChannelName string
-	Capacity    int
-	Length      int
-}
-
-type MessageSent struct{}

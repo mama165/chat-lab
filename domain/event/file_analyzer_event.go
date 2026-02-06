@@ -6,6 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	FileAnalyzeType Type = "FILE_ANALYZE"
+)
+
 type FileAnalyse struct {
 	Id         uuid.UUID
 	Path       string

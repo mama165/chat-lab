@@ -40,6 +40,7 @@ type Orchestrator struct {
 	moderationChan       chan event.Event
 	eventChan            chan event.Event
 	telemetryChan        chan event.Event
+	processTrackerChan   chan domain.Process
 	fileRequestChan      chan domain.FileDownloaderRequest
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
@@ -65,6 +66,7 @@ type Orchestrator struct {
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan, eventChan chan event.Event,
+	processTrackerChan chan domain.Process,
 	fileRequestChan chan domain.FileDownloaderRequest,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
@@ -87,6 +89,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		supervisor:           supervisor,
 		registry:             registry,
 		telemetryChan:        telemetryChan,
+		processTrackerChan:   processTrackerChan,
 		fileRequestChan:      fileRequestChan,
 		globalCommands:       make(chan chat.Command, bufferSize),
 		moderationChan:       make(chan event.Event, bufferSize),
@@ -190,6 +193,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 
 	fanoutWorkers := o.PrepareFanouts()
 	channelCapWorker, telemetryWorker := o.prepareTelemetry()
+	heathMonitoringWorker := o.prepareHeathMonitoringWorker()
 
 	// 2. Critical Section (Short Lock)
 	// We only lock to update the internal state and the supervisor.
@@ -198,7 +202,9 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	// Registering all workers to the supervisor
 	o.supervisor.Add(
 		moderationWorker,
-		channelCapWorker, telemetryWorker,
+		channelCapWorker,
+		telemetryWorker,
+		heathMonitoringWorker,
 	)
 	o.supervisor.Add(fanoutWorkers...)
 	o.supervisor.Add(poolWorkers...)
@@ -289,6 +295,7 @@ func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	handlers := []event.Handler{
 		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
+		event.NewProcessTrackerHandler(o.log),
 		event.NewCensoredHandler(o.log, o.counter),
 		event.NewLatencyHandler(o.log, o.latencyThreshold),
 		event.NewMessageSentHandler(o.log, o.counter),
@@ -298,6 +305,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 		{Name: "EventChan", Channel: o.eventChan},
 		{Name: "ModerationChan", Channel: o.moderationChan},
 		{Name: "TelemetryChan", Channel: o.telemetryChan},
+		{Name: "ProcessTrackerChan", Channel: o.processTrackerChan},
 		{Name: "FileRequestChan", Channel: o.fileRequestChan},
 		{Name: "GlobalCommands", Channel: o.globalCommands},
 	}
@@ -308,6 +316,15 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	telemetryWorker := workers.NewTelemetryWorker(o.log, o.metricInterval, o.telemetryChan, handlers)
 
 	return channelCapWorker, telemetryWorker
+}
+
+func (o *Orchestrator) prepareHeathMonitoringWorker() contract.Worker {
+	return workers.NewHealthMonitoringWorker(
+		o.log,
+		o.telemetryChan,
+		o.processTrackerChan,
+		o.metricInterval,
+	)
 }
 
 // Stop initiates a graceful shutdown of the orchestrator.

@@ -24,15 +24,19 @@ import (
 
 // Coordinator handles the lifecycle and coordination of all specialist sidecars.
 type Coordinator struct {
-	mu          sync.RWMutex
-	log         *slog.Logger
-	specialists map[domain.Metric]*client.SpecialistClient
+	mu                 sync.RWMutex
+	log                *slog.Logger
+	specialists        map[domain.Metric]*client.SpecialistClient
+	processTrackerChan chan domain.Process
 }
 
-func NewCoordinator(log *slog.Logger) *Coordinator {
+func NewCoordinator(
+	log *slog.Logger,
+	processTrackerChan chan domain.Process) *Coordinator {
 	return &Coordinator{
-		log:         log,
-		specialists: make(map[domain.Metric]*client.SpecialistClient),
+		log:                log,
+		specialists:        make(map[domain.Metric]*client.SpecialistClient),
+		processTrackerChan: processTrackerChan,
 	}
 }
 
@@ -55,6 +59,13 @@ func (m *Coordinator) Init(appCtx, bootCtx context.Context, configs []domain.Con
 
 		m.Add(sClient)
 		m.log.Info(fmt.Sprintf("Specialist %s is ready on port %d (PID: %d)\n", cfg.ID, cfg.Port, sClient.Process.Pid))
+
+		select {
+		case <-appCtx.Done():
+			return appCtx.Err()
+		case m.processTrackerChan <- domain.Process{PID: domain.PID(sClient.Process.Pid), Metric: sClient.Id}:
+			m.log.Info("Registering process for health monitoring worker", "PID", sClient.Process.Pid)
+		}
 	}
 	return nil
 }

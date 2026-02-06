@@ -158,7 +158,18 @@ func run() (int, error) {
 			},
 		},
 	}
-	coordinator := runtime.NewCoordinator(logger)
+	// Setup Supervision & Orchestration
+	telemetryChan := make(chan event.Event, config.BufferSize)
+	processTrackerChan := make(chan domain.Process, config.BufferSize)
+	eventChan := make(chan event.Event, config.BufferSize)
+	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
+	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
+	registry := runtime.NewRegistry()
+	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
+	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
+	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
+	userRepository := storage.NewUserRepository(db)
+	coordinator := runtime.NewCoordinator(logger, processTrackerChan)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
@@ -169,17 +180,6 @@ func run() (int, error) {
 			return exitRuntime, fmt.Errorf("specialist init failed: %w", err)
 		}
 	}
-
-	// Setup Supervision & Orchestration
-	telemetryChan := make(chan event.Event, config.BufferSize)
-	eventChan := make(chan event.Event, config.BufferSize)
-	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
-	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
-	registry := runtime.NewRegistry()
-	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
-	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
-	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
-	userRepository := storage.NewUserRepository(db)
 
 	// gRPC Server Setup
 	masterAddress := fmt.Sprintf("%s:%d", config.Host, config.MasterPort)
@@ -203,6 +203,7 @@ func run() (int, error) {
 	fileAccumulator := services.NewFileAccumulator("../../tmp")
 	orchestrator := runtime.NewOrchestrator(
 		logger, sup, registry, telemetryChan, eventChan,
+		processTrackerChan,
 		fileDownloaderRequestChan,
 		messageRepository,
 		analysisRepository,
