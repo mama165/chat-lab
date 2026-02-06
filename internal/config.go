@@ -49,6 +49,7 @@ type Config struct {
 	ScannerBackpressureHardThreshold int           `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`
 	ChunkSizeKb                      int           `env:"CHUNK_SIZE_KB,required=true"`
 	MaxFileSizeMb                    int           `env:"MAX_FILE_SIZE_MB,required=true"`
+	TmpDownloadingDir                string        `env:"TMP_DOWNLOADING_DIR,required=true"`
 	ProgressLogInterval              time.Duration `env:"PROGRESS_LOG_INTERVAL,required=true"`
 	GrpcConfig                       GrpcConfig
 }

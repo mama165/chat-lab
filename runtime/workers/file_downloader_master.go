@@ -69,7 +69,7 @@ func (w *FileDownloaderMasterWorker) handleDownload(ctx context.Context, req dom
 		}
 
 		// Accumulator physically write in master disk
-		if err := w.accumulator.ProcessResponse(fromPbResponse(resp, req.FileID)); err != nil {
+		if err := w.accumulator.ProcessResponse(ctx, fromPbResponse(resp, req.FileID)); err != nil {
 			w.log.Error("Accumulator failed to process chunk", "error", err)
 			break
 		}

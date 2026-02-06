@@ -62,7 +62,7 @@ type Score struct {
 }
 
 type SpecialistRequest struct {
-	Path     string
+	Path     string `validate:"required,max=1024"`
 	MimeType mimetypes.MIME
 }
 

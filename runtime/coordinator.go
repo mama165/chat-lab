@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -28,15 +29,23 @@ type Coordinator struct {
 	log                *slog.Logger
 	specialists        map[domain.Metric]*client.SpecialistClient
 	processTrackerChan chan domain.Process
+	tmpFilePath        chan string
+	maxFileSizeMB      int
+	validator          *validator.Validate
 }
 
 func NewCoordinator(
 	log *slog.Logger,
-	processTrackerChan chan domain.Process) *Coordinator {
+	processTrackerChan chan domain.Process,
+	tmpFilePath chan string,
+	maxFileSizeMB int) *Coordinator {
 	return &Coordinator{
 		log:                log,
 		specialists:        make(map[domain.Metric]*client.SpecialistClient),
 		processTrackerChan: processTrackerChan,
+		tmpFilePath:        tmpFilePath,
+		maxFileSizeMB:      maxFileSizeMB,
+		validator:          validator.New(),
 	}
 }
 
@@ -184,7 +193,20 @@ func waitForReady(bootCtx context.Context, conn *grpc.ClientConn, timeout time.D
 // Broadcast orchestrates the analysis of a file by streaming its content to relevant
 // specialists in parallel based on their capabilities (MIME types).
 func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) (domain.SpecialistResponse, error) {
-	// 1. Read file content once to share it across specialists
+	if err := m.validator.Struct(req); err != nil {
+		return domain.SpecialistResponse{}, err
+	}
+
+	fileInfo, err := os.Stat(req.Path)
+	if err != nil {
+		return domain.SpecialistResponse{}, fmt.Errorf("file not found at : %s, err : %w", req.Path, err)
+	}
+
+	size := fileInfo.Size()
+	if size > int64(m.maxFileSizeMB) {
+		return domain.SpecialistResponse{}, fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
+	}
+
 	data, err := os.ReadFile(req.Path)
 	if err != nil {
 		return domain.SpecialistResponse{}, fmt.Errorf("failed to read file %s: %w", req.Path, err)

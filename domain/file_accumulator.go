@@ -21,8 +21,9 @@ const (
 	StatusFailed
 )
 
-// Internal representation for the accumulator
+// FileBuffer Internal representation for the accumulator
 type FileBuffer struct {
 	File   *os.File
+	Path   string
 	Target *FileTransfer
 }

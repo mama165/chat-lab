@@ -42,6 +42,7 @@ type Orchestrator struct {
 	telemetryChan        chan event.Event
 	processTrackerChan   chan domain.Process
 	fileRequestChan      chan domain.FileDownloaderRequest
+	tmpFilePath          chan string
 	messageRepository    storage.IMessageRepository
 	analysisRepository   storage.IAnalysisRepository
 	fileTaskRepository   storage.IFileTaskRepository
@@ -68,6 +69,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan, eventChan chan event.Event,
 	processTrackerChan chan domain.Process,
 	fileRequestChan chan domain.FileDownloaderRequest,
+	tmpFilePath chan string,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
 	fileTaskRepository storage.IFileTaskRepository,
@@ -91,6 +93,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		telemetryChan:        telemetryChan,
 		processTrackerChan:   processTrackerChan,
 		fileRequestChan:      fileRequestChan,
+		tmpFilePath:          tmpFilePath,
 		globalCommands:       make(chan chat.Command, bufferSize),
 		moderationChan:       make(chan event.Event, bufferSize),
 		eventChan:            eventChan,
@@ -307,6 +310,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 		{Name: "TelemetryChan", Channel: o.telemetryChan},
 		{Name: "ProcessTrackerChan", Channel: o.processTrackerChan},
 		{Name: "FileRequestChan", Channel: o.fileRequestChan},
+		{Name: "TmpFilePath", Channel: o.tmpFilePath},
 		{Name: "GlobalCommands", Channel: o.globalCommands},
 	}
 	channelCapWorker := workers.NewChannelCapacityWorker(

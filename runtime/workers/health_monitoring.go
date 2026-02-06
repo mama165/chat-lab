@@ -36,6 +36,11 @@ func NewHealthMonitoringWorker(
 	}
 }
 
+// Run starts the monitoring loop that tracks specialist processes health.
+// It handles two main tasks:
+// 1. Periodically iterates over registered PIDs to collect CPU, RAM, and status metrics.
+// 2. Listens for new process registration requests to add them to the watch list.
+// If a process is no longer reachable, it is automatically removed from the tracking map.
 func (w *HealthMonitoringWorker) Run(ctx context.Context) error {
 	ticker := time.NewTicker(w.metricInterval)
 	defer ticker.Stop()
@@ -91,7 +96,7 @@ func (w *HealthMonitoringWorker) Run(ctx context.Context) error {
 }
 
 func toProcessTrackerEvent(pid domain.PID, metric domain.Metric,
-	status string, cpu float64, ram float32, ) event.Event {
+	status string, cpu float64, ram float32) event.Event {
 	return event.Event{
 		Type:      event.PIDTrackerType,
 		CreatedAt: time.Now().UTC(),

@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -163,13 +164,14 @@ func run() (int, error) {
 	processTrackerChan := make(chan domain.Process, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
 	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
+	tmpFilePath := make(chan string, config.BufferSize)
 	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
 	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
 	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
 	userRepository := storage.NewUserRepository(db)
-	coordinator := runtime.NewCoordinator(logger, processTrackerChan)
+	coordinator := runtime.NewCoordinator(logger, processTrackerChan, tmpFilePath, config.MaxFileSizeMb)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
@@ -200,11 +202,19 @@ func run() (int, error) {
 
 	grpcClient := pb3.NewFileDownloaderServiceClient(conn)
 
-	fileAccumulator := services.NewFileAccumulator("../../tmp")
+	// Create the temp directory
+	// /tmp/{directory}
+	fileDownloadingDirPath := filepath.Join(os.TempDir(), config.TmpDownloadingDir)
+	if err = os.MkdirAll(fileDownloadingDirPath, 0755); err != nil {
+		return exitRuntime, fmt.Errorf("failed to create dir %s : %w", fileDownloadingDirPath, err)
+	}
+	fileAccumulator := services.NewFileAccumulator(fileDownloadingDirPath, tmpFilePath)
+
 	orchestrator := runtime.NewOrchestrator(
 		logger, sup, registry, telemetryChan, eventChan,
 		processTrackerChan,
 		fileDownloaderRequestChan,
+		tmpFilePath,
 		messageRepository,
 		analysisRepository,
 		fileTaskRepository,
