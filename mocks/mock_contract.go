@@ -11,7 +11,7 @@ package mocks
 
 import (
 	contract "chat-lab/contract"
-	specialist "chat-lab/domain"
+	domain "chat-lab/domain"
 	chat "chat-lab/domain/chat"
 	context "context"
 	reflect "reflect"
@@ -452,10 +452,10 @@ func (m *MockSpecialistCoordinator) EXPECT() *MockSpecialistCoordinatorMockRecor
 }
 
 // Broadcast mocks base method.
-func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req specialist.SpecialistRequest) (specialist.SpecialistResponse, error) {
+func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) (domain.SpecialistResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, req)
-	ret0, _ := ret[0].(specialist.SpecialistResponse)
+	ret0, _ := ret[0].(domain.SpecialistResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -491,10 +491,10 @@ func (m *MockISpecialistClient) EXPECT() *MockISpecialistClientMockRecorder {
 }
 
 // Analyze mocks base method.
-func (m *MockISpecialistClient) Analyze(ctx context.Context, request specialist.Request) (specialist.Response, error) {
+func (m *MockISpecialistClient) Analyze(ctx context.Context, request domain.Request) (domain.Response, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Analyze", ctx, request)
-	ret0, _ := ret[0].(specialist.Response)
+	ret0, _ := ret[0].(domain.Response)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -503,4 +503,42 @@ func (m *MockISpecialistClient) Analyze(ctx context.Context, request specialist.
 func (mr *MockISpecialistClientMockRecorder) Analyze(ctx, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Analyze", reflect.TypeOf((*MockISpecialistClient)(nil).Analyze), ctx, request)
+}
+
+// MockIFileAccumulator is a mock of IFileAccumulator interface.
+type MockIFileAccumulator struct {
+	ctrl     *gomock.Controller
+	recorder *MockIFileAccumulatorMockRecorder
+	isgomock struct{}
+}
+
+// MockIFileAccumulatorMockRecorder is the mock recorder for MockIFileAccumulator.
+type MockIFileAccumulatorMockRecorder struct {
+	mock *MockIFileAccumulator
+}
+
+// NewMockIFileAccumulator creates a new mock instance.
+func NewMockIFileAccumulator(ctrl *gomock.Controller) *MockIFileAccumulator {
+	mock := &MockIFileAccumulator{ctrl: ctrl}
+	mock.recorder = &MockIFileAccumulatorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIFileAccumulator) EXPECT() *MockIFileAccumulatorMockRecorder {
+	return m.recorder
+}
+
+// ProcessResponse mocks base method.
+func (m *MockIFileAccumulator) ProcessResponse(resp domain.FileDownloaderResponse) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcessResponse", resp)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ProcessResponse indicates an expected call of ProcessResponse.
+func (mr *MockIFileAccumulatorMockRecorder) ProcessResponse(resp any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessResponse", reflect.TypeOf((*MockIFileAccumulator)(nil).ProcessResponse), resp)
 }
