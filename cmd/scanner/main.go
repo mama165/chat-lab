@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/Netflix/go-env"
+	"github.com/joho/godotenv"
 	grpc2 "github.com/mama165/sdk-go/grpc"
 	"github.com/mama165/sdk-go/logs"
 	"google.golang.org/grpc"
@@ -32,12 +33,11 @@ import (
 )
 
 func main() {
-	// 1. Parsing des options (root, server addr, parallel)
-	/*	rootDir := flag.String("root", ".", "target directory")
-		address := flag.String("address", "localhost:8080", "gRPC listen address")
-		goroutineNbr := flag.Int("parallel", runtime.NumCPU(), "number of concurrent goroutines")
-		driveID := flag.String("driveID", "os-main", "disk identifier for Badger")
-		flag.Parse()*/
+	// Configuration & Logger
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("error loading .env file : %v", err)
+	}
 
 	var config internal.Config
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {

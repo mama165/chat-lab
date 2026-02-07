@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -15,6 +16,10 @@ type Config struct {
 }
 
 func LoadConfig() (Config, error) {
+	if err := godotenv.Load("./e2e.conf"); err != nil {
+		return Config{}, err
+	}
+
 	var cfg Config
 	err := envconfig.Process("", &cfg)
 	return cfg, err

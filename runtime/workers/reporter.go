@@ -63,6 +63,6 @@ func (w *ReporterWorker) printStats(startTime time.Time) {
 	speed := float64(files) / elapsed
 	gb := float64(bytes) / (1024 * 1024 * 1024)
 
-	fmt.Printf("\r🚀 Time: %s | Dirs: %d | Files: %d | Speed: %.0f f/s | Data: %.2f GB | Skipped: %d | ⚠️ Errs: %d",
+	fmt.Printf("\r🚀 Time: %s | Dirs: %d | Files: %d | Speed: %.0f f/s | Data: %.2f GB | Skipped: %d | ⚠️ Errs: %d\n",
 		durationStr, dirs, files, speed, gb, skipped, errs)
 }
