@@ -23,7 +23,8 @@ const (
 
 // FileBuffer Internal representation for the accumulator
 type FileBuffer struct {
-	File   *os.File
-	Path   string
-	Target *FileTransfer
+	File     *os.File
+	Path     string
+	MimeType string
+	Target   *FileTransfer
 }

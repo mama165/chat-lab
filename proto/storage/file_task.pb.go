@@ -69,16 +69,17 @@ func (Priority) EnumDescriptor() ([]byte, []int) {
 }
 
 type FileTask struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	MimeType      string                 `protobuf:"bytes,3,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	Size          uint64                 `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
-	Prior         Priority               `protobuf:"varint,5,opt,name=prior,proto3,enum=storage.Priority" json:"prior,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	RetryCount    int32                  `protobuf:"varint,7,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Path              string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	RawMimeType       string                 `protobuf:"bytes,3,opt,name=raw_mime_type,json=rawMimeType,proto3" json:"raw_mime_type,omitempty"`
+	EffectiveMimeType string                 `protobuf:"bytes,4,opt,name=effective_mime_type,json=effectiveMimeType,proto3" json:"effective_mime_type,omitempty"`
+	Size              uint64                 `protobuf:"varint,5,opt,name=size,proto3" json:"size,omitempty"`
+	Prior             Priority               `protobuf:"varint,6,opt,name=prior,proto3,enum=storage.Priority" json:"prior,omitempty"`
+	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	RetryCount        int32                  `protobuf:"varint,8,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *FileTask) Reset() {
@@ -125,9 +126,16 @@ func (x *FileTask) GetPath() string {
 	return ""
 }
 
-func (x *FileTask) GetMimeType() string {
+func (x *FileTask) GetRawMimeType() string {
 	if x != nil {
-		return x.MimeType
+		return x.RawMimeType
+	}
+	return ""
+}
+
+func (x *FileTask) GetEffectiveMimeType() string {
+	if x != nil {
+		return x.EffectiveMimeType
 	}
 	return ""
 }
@@ -164,16 +172,17 @@ var File_proto_storage_file_task_proto protoreflect.FileDescriptor
 
 const file_proto_storage_file_task_proto_rawDesc = "" +
 	"\n" +
-	"\x1dproto/storage/file_task.proto\x12\astorage\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe4\x01\n" +
+	"\x1dproto/storage/file_task.proto\x12\astorage\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9b\x02\n" +
 	"\bFileTask\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
-	"\tmime_type\x18\x03 \x01(\tR\bmimeType\x12\x12\n" +
-	"\x04size\x18\x04 \x01(\x04R\x04size\x12'\n" +
-	"\x05prior\x18\x05 \x01(\x0e2\x11.storage.PriorityR\x05prior\x129\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\"\n" +
+	"\rraw_mime_type\x18\x03 \x01(\tR\vrawMimeType\x12.\n" +
+	"\x13effective_mime_type\x18\x04 \x01(\tR\x11effectiveMimeType\x12\x12\n" +
+	"\x04size\x18\x05 \x01(\x04R\x04size\x12'\n" +
+	"\x05prior\x18\x06 \x01(\x0e2\x11.storage.PriorityR\x05prior\x129\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1f\n" +
-	"\vretry_count\x18\a \x01(\x05R\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1f\n" +
+	"\vretry_count\x18\b \x01(\x05R\n" +
 	"retryCount* \n" +
 	"\bPriority\x12\b\n" +
 	"\x04HIGH\x10\x00\x12\n" +

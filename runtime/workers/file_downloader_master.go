@@ -69,17 +69,19 @@ func (w *FileDownloaderMasterWorker) handleDownload(ctx context.Context, req dom
 		}
 
 		// Accumulator physically write in master disk
-		if err := w.accumulator.ProcessResponse(ctx, fromPbResponse(resp, req.FileID)); err != nil {
+		response, err := fromPbResponse(resp, req.FileID)
+		if err != nil {
+			w.log.Error("unable to parse response", "error", err)
+		}
+		if err := w.accumulator.ProcessResponse(ctx, response); err != nil {
 			w.log.Error("Accumulator failed to process chunk", "error", err)
 			break
 		}
 	}
 }
 
-func fromPbResponse(pbResp *pb.FileDownloaderResponse, id domain.FileID) domain.FileDownloaderResponse {
-	res := domain.FileDownloaderResponse{
-		FileID: id,
-	}
+func fromPbResponse(pbResp *pb.FileDownloaderResponse, id domain.FileID) (domain.FileDownloaderResponse, error) {
+	res := domain.FileDownloaderResponse{FileID: id}
 
 	switch c := pbResp.Control.(type) {
 	case *pb.FileDownloaderResponse_Metadata:
@@ -102,5 +104,5 @@ func fromPbResponse(pbResp *pb.FileDownloaderResponse, id domain.FileID) domain.
 		}
 	}
 
-	return res
+	return res, nil
 }

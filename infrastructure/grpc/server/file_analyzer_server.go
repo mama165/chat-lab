@@ -54,7 +54,7 @@ func (s *FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAn
 		if request == nil {
 			continue
 		}
-		err = s.fileAnalyzerService.Analyze(stream.Context(), toRequest(request))
+		err = s.fileAnalyzerService.Analyze(stream.Context(), fromPbFileAnalyzerRequest(request))
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			s.log.Error("Context has been canceled")
 			return err
@@ -65,7 +65,7 @@ func (s *FileAnalyzerServer) Analyze(stream grpc.ClientStreamingServer[pb.FileAn
 	}
 }
 
-func toRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
+func fromPbFileAnalyzerRequest(req *pb.FileAnalyzerRequest) analyzer.FileAnalyzerRequest {
 	return analyzer.FileAnalyzerRequest{
 		Path:       req.Path,
 		DriveID:    req.DriveId,

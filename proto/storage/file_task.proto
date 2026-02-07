@@ -8,11 +8,12 @@ import "google/protobuf/timestamp.proto";
 message FileTask {
   string id = 1;
   string path = 2;
-  string mime_type = 3;
-  uint64 size = 4;
-  Priority prior = 5;
-  google.protobuf.Timestamp created_at = 6;
-  int32 retry_count = 7;
+  string raw_mime_type = 3;
+  string effective_mime_type = 4;
+  uint64 size = 5;
+  Priority prior = 6;
+  google.protobuf.Timestamp created_at = 7;
+  int32 retry_count = 8;
 }
 
 enum Priority {

@@ -29,7 +29,6 @@ type Coordinator struct {
 	log                *slog.Logger
 	specialists        map[domain.Metric]*client.SpecialistClient
 	processTrackerChan chan domain.Process
-	tmpFilePath        chan string
 	maxFileSizeMB      int
 	validator          *validator.Validate
 }
@@ -37,13 +36,11 @@ type Coordinator struct {
 func NewCoordinator(
 	log *slog.Logger,
 	processTrackerChan chan domain.Process,
-	tmpFilePath chan string,
 	maxFileSizeMB int) *Coordinator {
 	return &Coordinator{
 		log:                log,
 		specialists:        make(map[domain.Metric]*client.SpecialistClient),
 		processTrackerChan: processTrackerChan,
-		tmpFilePath:        tmpFilePath,
 		maxFileSizeMB:      maxFileSizeMB,
 		validator:          validator.New(),
 	}

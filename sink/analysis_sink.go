@@ -120,14 +120,15 @@ func (a *AnalysisSink) processAndStore(events []event.FileAnalyse) error {
 		analysis := a.buildFinalAnalysis(evt, domain.SpecialistResponse{})
 		allAnalyses = append(allAnalyses, analysis)
 
-		if mimetypes.IsAudio(evt.MimeType) || mimetypes.IsPDF(evt.MimeType) {
+		if _, ok := mimetypes.IsAuthorized(evt.RawMimeType); ok {
 			task := storage.FileTask{
-				ID:        evt.Id.String(),
-				Path:      evt.Path,
-				MimeType:  evt.MimeType,
-				Size:      evt.Size,
-				Priority:  storage.NORMAL,
-				CreatedAt: time.Now(),
+				ID:                evt.Id.String(),
+				Path:              evt.Path,
+				RawMimeType:       evt.RawMimeType,
+				EffectiveMimeType: evt.EffectiveMimeType,
+				Size:              evt.Size,
+				Priority:          storage.NORMAL,
+				CreatedAt:         time.Now(),
 			}
 
 			if err := a.fileTaskRepository.EnqueueTask(task); err != nil {
@@ -152,7 +153,7 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp domain.Spe
 		Namespace: "file-room",
 		At:        evt.ScannedAt,
 		Summary:   evt.Path,
-		Tags:      []string{evt.MimeType, evt.SourceType},
+		Tags:      []string{evt.RawMimeType, evt.SourceType},
 		Scores:    make(map[domain.Metric]float64),
 		Version:   uuid.New(),
 	}
@@ -160,7 +161,7 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp domain.Spe
 	// Prepare payload (empty for now)
 	payload := storage.FileDetails{
 		Filename: evt.Path,
-		MimeType: evt.MimeType,
+		MimeType: evt.RawMimeType,
 		Size:     evt.Size,
 	}
 

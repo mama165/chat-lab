@@ -69,7 +69,8 @@ func TestIsAudio(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req.Equal(tt.want, IsAudio(tt.detected))
+			_, ok := IsAudio(tt.detected)
+			req.Equal(tt.want, ok)
 		})
 	}
 }
