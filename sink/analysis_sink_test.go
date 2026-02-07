@@ -92,10 +92,10 @@ func TestTaskEnqueuingForSpecificMimeTypes(t *testing.T) {
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
 
 	err := s.Consume(context.Background(), event.FileAnalyse{
-		Id:         uuid.New(),
-		Path:       "/test/document.pdf",
-		MimeType:   string(mimetypes.ApplicationPDF),
-		SourceType: "file",
+		Id:          uuid.New(),
+		Path:        "/test/document.pdf",
+		RawMimeType: string(mimetypes.ApplicationPDF),
+		SourceType:  "file",
 	})
 	req.NoError(err)
 
@@ -103,10 +103,10 @@ func TestTaskEnqueuingForSpecificMimeTypes(t *testing.T) {
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
 
 	err = s.Consume(context.Background(), event.FileAnalyse{
-		Id:         uuid.New(),
-		Path:       "/test/notes.txt",
-		MimeType:   string(mimetypes.TextPlain),
-		SourceType: "file",
+		Id:          uuid.New(),
+		Path:        "/test/notes.txt",
+		RawMimeType: string(mimetypes.TextPlain),
+		SourceType:  "file",
 	})
 	req.NoError(err)
 }

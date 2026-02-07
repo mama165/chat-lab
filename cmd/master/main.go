@@ -162,16 +162,17 @@ func run() (int, error) {
 	// Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	processTrackerChan := make(chan domain.Process, config.BufferSize)
+	specialistResponseChan := make(chan domain.SpecialistResponse, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
 	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
-	tmpFilePath := make(chan string, config.BufferSize)
+	tmpFilePathChan := make(chan domain.TmpFileLocation, config.BufferSize)
 	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	registry := runtime.NewRegistry()
 	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
 	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
 	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
 	userRepository := storage.NewUserRepository(db)
-	coordinator := runtime.NewCoordinator(logger, processTrackerChan, tmpFilePath, config.MaxFileSizeMb)
+	coordinator := runtime.NewCoordinator(logger, processTrackerChan, specialistResponseChan, config.MaxFileSizeMb)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
@@ -208,13 +209,13 @@ func run() (int, error) {
 	if err = os.MkdirAll(fileDownloadingDirPath, 0755); err != nil {
 		return exitRuntime, fmt.Errorf("failed to create dir %s : %w", fileDownloadingDirPath, err)
 	}
-	fileAccumulator := services.NewFileAccumulator(fileDownloadingDirPath, tmpFilePath)
+	fileAccumulator := services.NewFileAccumulator(fileDownloadingDirPath, tmpFilePathChan)
 
 	orchestrator := runtime.NewOrchestrator(
 		logger, sup, registry, telemetryChan, eventChan,
 		processTrackerChan,
 		fileDownloaderRequestChan,
-		tmpFilePath,
+		tmpFilePathChan,
 		messageRepository,
 		analysisRepository,
 		fileTaskRepository,

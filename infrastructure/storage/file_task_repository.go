@@ -2,6 +2,7 @@
 package storage
 
 import (
+	"chat-lab/domain/mimetypes"
 	pb "chat-lab/proto/storage"
 	"errors"
 	"fmt"
@@ -23,13 +24,14 @@ const (
 // FileTask represents a unit of work for the specialists.
 // It is stored in BadgerDB to ensure persistence and prevent OOM.
 type FileTask struct {
-	ID         string
-	Path       string
-	MimeType   string
-	Size       uint64
-	Priority   Priority
-	CreatedAt  time.Time
-	RetryCount int
+	ID                string
+	Path              string
+	RawMimeType       string
+	EffectiveMimeType mimetypes.MIME
+	Size              uint64
+	Priority          Priority
+	CreatedAt         time.Time
+	RetryCount        int
 }
 type IFileTaskRepository interface {
 	EnqueueTask(task FileTask) error
@@ -142,25 +144,27 @@ func (f FileTaskRepository) MarkAsProcessing(task FileTask) error {
 
 func fromPbFileTask(p *pb.FileTask) FileTask {
 	return FileTask{
-		ID:         p.Id,
-		Path:       p.Path,
-		MimeType:   p.MimeType,
-		Size:       p.Size,
-		Priority:   Priority(p.Prior),
-		CreatedAt:  p.CreatedAt.AsTime(),
-		RetryCount: int(p.RetryCount),
+		ID:                p.Id,
+		Path:              p.Path,
+		RawMimeType:       p.RawMimeType,
+		EffectiveMimeType: mimetypes.ToMIME(p.EffectiveMimeType),
+		Size:              p.Size,
+		Priority:          Priority(p.Prior),
+		CreatedAt:         p.CreatedAt.AsTime(),
+		RetryCount:        int(p.RetryCount),
 	}
 }
 
 func toPbFileTask(task FileTask) *pb.FileTask {
 	return &pb.FileTask{
-		Id:         task.ID,
-		Path:       task.Path,
-		MimeType:   task.MimeType,
-		Size:       task.Size,
-		Prior:      toPbPriority(task.Priority),
-		CreatedAt:  timestamppb.New(task.CreatedAt),
-		RetryCount: int32(task.RetryCount),
+		Id:                task.ID,
+		Path:              task.Path,
+		RawMimeType:       task.RawMimeType,
+		EffectiveMimeType: string(task.EffectiveMimeType),
+		Size:              task.Size,
+		Prior:             toPbPriority(task.Priority),
+		CreatedAt:         timestamppb.New(task.CreatedAt),
+		RetryCount:        int32(task.RetryCount),
 	}
 }
 

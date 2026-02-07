@@ -3,6 +3,7 @@ package services
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
+	"chat-lab/domain/mimetypes"
 	"chat-lab/infrastructure/storage"
 	"context"
 	"log/slog"
@@ -65,15 +66,16 @@ func toEvent(request analyzer.FileAnalyzerRequest) event.Event {
 		Type:      event.FileAnalyzeType,
 		CreatedAt: time.Now().UTC(),
 		Payload: event.FileAnalyse{
-			Id:         uuid.New(),
-			Path:       request.Path,
-			DriveID:    request.DriveID,
-			Size:       request.Size,
-			Attributes: request.Attributes,
-			MimeType:   request.MimeType,
-			MagicBytes: request.MagicBytes,
-			ScannedAt:  request.ScannedAt,
-			SourceType: string(request.SourceType),
+			Id:                uuid.New(),
+			Path:              request.Path,
+			DriveID:           request.DriveID,
+			Size:              request.Size,
+			Attributes:        request.Attributes,
+			RawMimeType:       request.MimeType,
+			EffectiveMimeType: mimetypes.ToMIME(request.MimeType),
+			MagicBytes:        request.MagicBytes,
+			ScannedAt:         request.ScannedAt,
+			SourceType:        string(request.SourceType),
 		},
 	}
 }

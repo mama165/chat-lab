@@ -32,6 +32,10 @@ func NewSpecialistClient(id domain.Metric,
 	}
 }
 
+func (s *SpecialistClient) CanHandle(mimeType mimetypes.MIME) bool {
+	return lo.Contains(s.Capabilities, mimeType)
+}
+
 // Analyze orchestrates a client-side streaming request to a specialized service.
 // It first transmits document metadata, then streams the data content in 32KB chunks
 // to manage memory efficiently and stay within gRPC message size limits.
@@ -48,7 +52,7 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request domain.Request) 
 				Metadata: &pb.Metadata{
 					MessageId: request.Metadata.MessageID,
 					FileName:  request.Metadata.FileName,
-					MimeType:  string(request.Metadata.MimeType),
+					MimeType:  string(request.Metadata.EffectiveMimeType),
 				},
 			},
 		})
@@ -79,14 +83,10 @@ func (s *SpecialistClient) Analyze(ctx context.Context, request domain.Request) 
 		return domain.Response{}, err
 	}
 
-	return ToResponse(response), nil
+	return fromPbSpecialistResponse(response), nil
 }
 
-func (s *SpecialistClient) CanHandle(mimeType mimetypes.MIME) bool {
-	return lo.Contains(s.Capabilities, mimeType)
-}
-
-func ToResponse(response *pb.SpecialistResponse) domain.Response {
+func fromPbSpecialistResponse(response *pb.SpecialistResponse) domain.Response {
 	switch resp := (response.Response).(type) {
 	case *pb.SpecialistResponse_DocumentData:
 		return domain.Response{
@@ -95,7 +95,7 @@ func ToResponse(response *pb.SpecialistResponse) domain.Response {
 				Author:    resp.DocumentData.Author,
 				PageCount: resp.DocumentData.PageCount,
 				Language:  resp.DocumentData.Language,
-				Pages:     toPages(resp.DocumentData.Pages),
+				Pages:     fromPbPage(resp.DocumentData.Pages),
 			},
 		}
 	case *pb.SpecialistResponse_Score:
@@ -118,7 +118,7 @@ func ToResponse(response *pb.SpecialistResponse) domain.Response {
 	}
 }
 
-func toPages(pages []*pb.Page) []domain.Page {
+func fromPbPage(pages []*pb.Page) []domain.Page {
 	return lo.Map(pages, func(item *pb.Page, _ int) domain.Page {
 		return domain.Page{
 			Number:  item.Number,

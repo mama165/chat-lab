@@ -33,9 +33,12 @@ func Matches(detected string, expected MIME) (MIME, bool) {
 	return expected, mt == string(expected)
 }
 
-func IsPDF(detected string) bool {
-	_, ok := Matches(detected, ApplicationPDF)
-	return ok
+func IsPDF(detected string) (MIME, bool) {
+	mimeType, ok := Matches(detected, ApplicationPDF)
+	if ok {
+		return mimeType, true
+	}
+	return Unknown, false
 }
 
 func IsImage(detected string) bool {
@@ -45,13 +48,47 @@ func IsImage(detected string) bool {
 	return ok1 || ok2 || ok3
 }
 
-func IsAudio(detected string) bool {
-	_, ok1 := Matches(detected, AudioMPEG)
-	_, ok2 := Matches(detected, AudioWAV)
-	_, ok3 := Matches(detected, AudioXAIFF)
-	return ok1 || ok2 || ok3
+func IsAudio(detected string) (MIME, bool) {
+	found, ok := Matches(detected, AudioMPEG)
+	if ok {
+		return found, true
+	}
+	found, ok = Matches(detected, AudioWAV)
+	if ok {
+		return found, true
+	}
+	found, ok = Matches(detected, AudioXAIFF)
+	if ok {
+		return found, true
+	}
+	return Unknown, false
 }
 
 func IsVideo(detected MIME) bool {
 	return detected == VideoMP4
+}
+
+func IsAuthorized(detected string) (MIME, bool) {
+	mimeType, ok := IsAudio(detected)
+	if ok {
+		return mimeType, ok
+	}
+	mimeType, ok = IsPDF(detected)
+	if ok {
+		return mimeType, ok
+	}
+	return Unknown, false
+}
+
+func ToMIME(m string) MIME {
+	switch MIME(m) {
+	case AudioMPEG, AudioWAV, AudioXAIFF:
+		return MIME(m)
+	case ApplicationPDF:
+		return ApplicationPDF
+	case VideoMP4:
+		return MIME(m)
+	default:
+		return Unknown
+	}
 }

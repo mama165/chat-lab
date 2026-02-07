@@ -78,7 +78,7 @@ func (s *testAudioAnalysisSuite) TestFullAudioAnalysisFlow() {
 					s.Require().Equal(0, chunkCount, "Protocol error: Metadata received after data chunks")
 
 					receivedMetadata = true
-					s.T().Logf("Verified: Metadata received for %s", res.Metadata.MimeType)
+					s.T().Logf("Verified: Metadata received for %s", res.Metadata.RawMimeType)
 
 				case *pb.FileDownloaderResponse_Chunk:
 					// SEQUENCE CHECK: Metadata MUST have been received before any chunk

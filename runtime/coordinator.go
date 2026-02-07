@@ -25,27 +25,27 @@ import (
 
 // Coordinator handles the lifecycle and coordination of all specialist sidecars.
 type Coordinator struct {
-	mu                 sync.RWMutex
-	log                *slog.Logger
-	specialists        map[domain.Metric]*client.SpecialistClient
-	processTrackerChan chan domain.Process
-	tmpFilePath        chan string
-	maxFileSizeMB      int
-	validator          *validator.Validate
+	mu                     sync.RWMutex
+	log                    *slog.Logger
+	specialists            map[domain.Metric]*client.SpecialistClient
+	processTrackerChan     chan domain.Process
+	specialistResponseChan chan domain.SpecialistResponse
+	maxFileSizeMB          int
+	validator              *validator.Validate
 }
 
 func NewCoordinator(
 	log *slog.Logger,
 	processTrackerChan chan domain.Process,
-	tmpFilePath chan string,
+	specialistResponseChan chan domain.SpecialistResponse,
 	maxFileSizeMB int) *Coordinator {
 	return &Coordinator{
-		log:                log,
-		specialists:        make(map[domain.Metric]*client.SpecialistClient),
-		processTrackerChan: processTrackerChan,
-		tmpFilePath:        tmpFilePath,
-		maxFileSizeMB:      maxFileSizeMB,
-		validator:          validator.New(),
+		log:                    log,
+		specialists:            make(map[domain.Metric]*client.SpecialistClient),
+		processTrackerChan:     processTrackerChan,
+		specialistResponseChan: specialistResponseChan,
+		maxFileSizeMB:          maxFileSizeMB,
+		validator:              validator.New(),
 	}
 }
 
@@ -192,24 +192,24 @@ func waitForReady(bootCtx context.Context, conn *grpc.ClientConn, timeout time.D
 
 // Broadcast orchestrates the analysis of a file by streaming its content to relevant
 // specialists in parallel based on their capabilities (MIME types).
-func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) (domain.SpecialistResponse, error) {
+func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) error {
 	if err := m.validator.Struct(req); err != nil {
-		return domain.SpecialistResponse{}, err
+		return err
 	}
 
 	fileInfo, err := os.Stat(req.Path)
 	if err != nil {
-		return domain.SpecialistResponse{}, fmt.Errorf("file not found at : %s, err : %w", req.Path, err)
+		return fmt.Errorf("file not found at : %s, err : %w", req.Path, err)
 	}
 
 	size := fileInfo.Size()
 	if size > int64(m.maxFileSizeMB) {
-		return domain.SpecialistResponse{}, fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
+		return fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
 	}
 
 	data, err := os.ReadFile(req.Path)
 	if err != nil {
-		return domain.SpecialistResponse{}, fmt.Errorf("failed to read file %s: %w", req.Path, err)
+		return fmt.Errorf("failed to read file %s: %w", req.Path, err)
 	}
 
 	m.mu.RLock()
@@ -217,68 +217,62 @@ func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistReques
 
 	var targets []*client.SpecialistClient
 	for _, spec := range m.specialists {
-		if spec.CanHandle(req.MimeType) {
+		if spec.CanHandle(req.EffectiveMimeType) {
 			targets = append(targets, spec)
 		}
 	}
 
 	if len(targets) == 0 {
-		m.log.Warn("No specialist found for MIME type", "mime", req.MimeType, "path", req.Path)
-		return domain.SpecialistResponse{Results: make(map[domain.Metric]domain.Response)}, nil
+		m.log.Warn("No specialist found for MIME type", "mime", req.EffectiveMimeType, "path", req.Path)
+		return nil
 	}
 
-	type specResult struct {
-		id   domain.Metric
-		resp domain.Response
-		err  error
-	}
-
-	resChan := make(chan specResult, len(targets))
 	var wg sync.WaitGroup
+	results := make([]domain.SpecialistResult, len(targets))
 
 	for _, spec := range targets {
 		wg.Add(1)
-		go func(s *client.SpecialistClient) {
-			defer wg.Done()
-
+		go func(specialist *client.SpecialistClient) {
 			domainReq := domain.Request{
 				Metadata: &domain.Metadata{
-					MessageID: uuid.New().String(),
-					FileName:  req.Path,
-					MimeType:  req.MimeType,
+					MessageID:         uuid.New().String(),
+					FileName:          req.Path,
+					EffectiveMimeType: req.EffectiveMimeType,
 				},
 				Chunk: data,
 			}
 
-			// Call gRPC Analyze (stream or unary depending on your client impl)
-			resp, err := s.Analyze(ctx, domainReq)
-			if err != nil {
-				m.log.Error("Specialist analysis failed",
-					"id", s.Id,
-					"mime", req.MimeType,
-					"error", err,
-				)
-				resChan <- specResult{id: s.Id, err: err}
-				return
-			}
+			go func(request domain.Request) {
+				defer wg.Done()
+				resp, err := specialist.Analyze(ctx, domainReq)
+				if err != nil {
+					m.log.Error("Specialist analysis failed",
+						"id", specialist.Id,
+						"mimeType", req.EffectiveMimeType,
+						"error", err,
+					)
 
-			resChan <- specResult{id: s.Id, resp: resp}
+					results = append(results, domain.SpecialistResult{ID: &specialist.Id, SpecialistErr: err})
+					return
+				}
+				results = append(results, domain.SpecialistResult{ID: &specialist.Id, Resp: &resp})
+			}(domainReq)
 		}(spec)
 	}
 
-	// 5. Close results channel once all specialists have responded or failed
-	go func() {
+	go func(res []domain.SpecialistResult) {
 		wg.Wait()
-		close(resChan)
-	}()
-
-	// 6. Aggregate results into the final response map
-	results := make(map[domain.Metric]domain.Response)
-	for res := range resChan {
-		if res.err == nil {
-			results[res.id] = res.resp
+		select {
+		case <-ctx.Done():
+			m.log.Warn("Giving up sending results, context canceled", "fileID", req.FileID)
+			return
+		case m.specialistResponseChan <- domain.SpecialistResponse{
+			FileID: req.FileID,
+			Res:    res,
+		}:
 		}
-	}
+		m.log.Debug("All specialist terminated", "targets", len(targets))
+	}(results)
 
-	return domain.SpecialistResponse{Results: results}, nil
+	return nil
 }

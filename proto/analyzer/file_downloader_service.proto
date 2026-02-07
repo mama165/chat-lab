@@ -23,7 +23,8 @@ message FileDownloaderResponse {
 }
 
 message FileMetadata {
-  string mime_type = 2;   // To check against the expected type
+  string raw_mime_type = 1;   // To check against the expected type
+  string effective_mime_type = 2;
   uint64 size = 3;        // To prevent "Zip Bombs" or overflow
 }
 

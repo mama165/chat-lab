@@ -452,12 +452,11 @@ func (m *MockSpecialistCoordinator) EXPECT() *MockSpecialistCoordinatorMockRecor
 }
 
 // Broadcast mocks base method.
-func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) (domain.SpecialistResponse, error) {
+func (m *MockSpecialistCoordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, req)
-	ret0, _ := ret[0].(domain.SpecialistResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Broadcast indicates an expected call of Broadcast.
@@ -530,15 +529,15 @@ func (m *MockIFileAccumulator) EXPECT() *MockIFileAccumulatorMockRecorder {
 }
 
 // ProcessResponse mocks base method.
-func (m *MockIFileAccumulator) ProcessResponse(resp domain.FileDownloaderResponse) error {
+func (m *MockIFileAccumulator) ProcessResponse(ctx context.Context, resp domain.FileDownloaderResponse) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessResponse", resp)
+	ret := m.ctrl.Call(m, "ProcessResponse", ctx, resp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ProcessResponse indicates an expected call of ProcessResponse.
-func (mr *MockIFileAccumulatorMockRecorder) ProcessResponse(resp any) *gomock.Call {
+func (mr *MockIFileAccumulatorMockRecorder) ProcessResponse(ctx, resp any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessResponse", reflect.TypeOf((*MockIFileAccumulator)(nil).ProcessResponse), resp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessResponse", reflect.TypeOf((*MockIFileAccumulator)(nil).ProcessResponse), ctx, resp)
 }

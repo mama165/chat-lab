@@ -113,8 +113,9 @@ func toPbResponse(resp domain.FileDownloaderResponse) *pb.FileDownloaderResponse
 	case resp.FileMetadata != nil:
 		pbResp.Control = &pb.FileDownloaderResponse_Metadata{
 			Metadata: &pb.FileMetadata{
-				MimeType: resp.FileMetadata.MimeType,
-				Size:     resp.FileMetadata.Size,
+				RawMimeType:       resp.FileMetadata.RawMimeType,
+				EffectiveMimeType: string(resp.FileMetadata.EffectiveMimeType),
+				Size:              resp.FileMetadata.Size,
 			},
 		}
 	case resp.FileChunk != nil:

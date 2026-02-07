@@ -73,7 +73,7 @@ func TestAnalyzerService_Analyze(t *testing.T) {
 			true,
 		},
 		{
-			"Should fail if MimeType is missing",
+			"Should fail if RawMimeType is missing",
 			func(r *analyzer.FileAnalyzerRequest) { r.MimeType = "" },
 			true,
 		},

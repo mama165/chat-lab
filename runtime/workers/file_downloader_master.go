@@ -3,6 +3,7 @@ package workers
 import (
 	"chat-lab/contract"
 	"chat-lab/domain"
+	"chat-lab/domain/mimetypes"
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"io"
@@ -69,23 +70,26 @@ func (w *FileDownloaderMasterWorker) handleDownload(ctx context.Context, req dom
 		}
 
 		// Accumulator physically write in master disk
-		if err := w.accumulator.ProcessResponse(ctx, fromPbResponse(resp, req.FileID)); err != nil {
+		response, err := fromPbResponse(resp, req.FileID)
+		if err != nil {
+			w.log.Error("unable to parse response", "error", err)
+		}
+		if err := w.accumulator.ProcessResponse(ctx, response); err != nil {
 			w.log.Error("Accumulator failed to process chunk", "error", err)
 			break
 		}
 	}
 }
 
-func fromPbResponse(pbResp *pb.FileDownloaderResponse, id domain.FileID) domain.FileDownloaderResponse {
-	res := domain.FileDownloaderResponse{
-		FileID: id,
-	}
+func fromPbResponse(pbResp *pb.FileDownloaderResponse, id domain.FileID) (domain.FileDownloaderResponse, error) {
+	res := domain.FileDownloaderResponse{FileID: id}
 
 	switch c := pbResp.Control.(type) {
 	case *pb.FileDownloaderResponse_Metadata:
 		res.FileMetadata = &domain.FileMetadata{
-			MimeType: c.Metadata.MimeType,
-			Size:     c.Metadata.Size,
+			RawMimeType:       c.Metadata.RawMimeType,
+			EffectiveMimeType: mimetypes.ToMIME(c.Metadata.EffectiveMimeType),
+			Size:              c.Metadata.Size,
 		}
 	case *pb.FileDownloaderResponse_Chunk:
 		res.FileChunk = &domain.FileChunk{
@@ -102,5 +106,5 @@ func fromPbResponse(pbResp *pb.FileDownloaderResponse, id domain.FileID) domain.
 		}
 	}
 
-	return res
+	return res, nil
 }

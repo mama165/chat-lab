@@ -1,6 +1,9 @@
 package domain
 
-import "os"
+import (
+	"chat-lab/domain/mimetypes"
+	"os"
+)
 
 // FileTransfer state to track progress in Badger
 type FileTransfer struct {
@@ -23,7 +26,8 @@ const (
 
 // FileBuffer Internal representation for the accumulator
 type FileBuffer struct {
-	File   *os.File
-	Path   string
-	Target *FileTransfer
+	File              *os.File
+	Path              string
+	EffectiveMimeType mimetypes.MIME
+	Target            *FileTransfer
 }

@@ -22,9 +22,9 @@ type Request struct {
 
 // Metadata contains descriptive information about the message or file.
 type Metadata struct {
-	MessageID string
-	FileName  string
-	MimeType  mimetypes.MIME
+	MessageID         string
+	FileName          string
+	EffectiveMimeType mimetypes.MIME
 }
 
 // Response is a container for the specialist's output.
@@ -62,10 +62,18 @@ type Score struct {
 }
 
 type SpecialistRequest struct {
-	Path     string `validate:"required,max=1024"`
-	MimeType mimetypes.MIME
+	FileID            FileID
+	Path              string `validate:"required,max=1024"`
+	EffectiveMimeType mimetypes.MIME
+}
+
+type SpecialistResult struct {
+	ID            *Metric
+	Resp          *Response
+	SpecialistErr error
 }
 
 type SpecialistResponse struct {
-	Results map[Metric]Response
+	FileID FileID
+	Res    []SpecialistResult
 }

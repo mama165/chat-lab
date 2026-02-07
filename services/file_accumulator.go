@@ -2,6 +2,7 @@ package services
 
 import (
 	"chat-lab/domain"
+	"chat-lab/domain/mimetypes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -14,19 +15,21 @@ import (
 // FileAccumulator handles concurrent reassembly of files received via gRPC streams.
 // It uses mutexes to safely manage multiple file transfers simultaneously.
 type FileAccumulator struct {
-	tempDir     string
-	mu          sync.RWMutex                         // Protects access to buffers and hash maps
-	buffers     map[domain.FileID]*domain.FileBuffer // Map FileID -> Active file handle
-	hash        map[domain.FileID]hash.Hash          // Map FileID -> Running SHA256 computation
-	tmpFilePath chan string
+	tempDir             string
+	mu                  sync.RWMutex                         // Protects access to buffers and hash maps
+	buffers             map[domain.FileID]*domain.FileBuffer // Map FileID -> Active file handle
+	hash                map[domain.FileID]hash.Hash          // Map FileID -> Running SHA256 computation
+	tmpFileLocationChan chan domain.TmpFileLocation
 }
 
-func NewFileAccumulator(tempDir string, tmpFilePath chan string) *FileAccumulator {
+func NewFileAccumulator(
+	tempDir string,
+	tmpFileLocationChan chan domain.TmpFileLocation) *FileAccumulator {
 	return &FileAccumulator{
-		tempDir:     tempDir,
-		buffers:     make(map[domain.FileID]*domain.FileBuffer),
-		hash:        make(map[domain.FileID]hash.Hash),
-		tmpFilePath: tmpFilePath,
+		tempDir:             tempDir,
+		buffers:             make(map[domain.FileID]*domain.FileBuffer),
+		hash:                make(map[domain.FileID]hash.Hash),
+		tmpFileLocationChan: tmpFileLocationChan,
 	}
 }
 
@@ -50,11 +53,11 @@ func (a *FileAccumulator) ProcessResponse(ctx context.Context, resp domain.FileD
 			return fmt.Errorf("failed to create temp file for %s: %w", fileID, err)
 		}
 
-		a.buffers[fileID] = &domain.FileBuffer{File: f, Path: path}
+		a.buffers[fileID] = &domain.FileBuffer{File: f, Path: path, EffectiveMimeType: resp.FileMetadata.EffectiveMimeType}
 		a.hash[fileID] = sha256.New()
 		return nil
 	case resp.FileChunk != nil:
-		// Read lock is sufficient to retrieve existing handles and hashers
+		// Read lock is sufficient to retrieve existing handles and hashes
 		a.mu.RLock()
 		fileBuffer, bufOk := a.buffers[fileID]
 		h, hashOk := a.hash[fileID]
@@ -73,21 +76,25 @@ func (a *FileAccumulator) ProcessResponse(ctx context.Context, resp domain.FileD
 
 	case resp.FileSignature != nil:
 		// Finalization logic handles cleanup and integrity verification
-		tmpPath, err := a.finalize(fileID, resp.FileSignature.Sha256)
+		tmpPath, mimeType, err := a.finalize(fileID, resp.FileSignature.Sha256)
 		if err != nil {
 			return err
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case a.tmpFilePath <- tmpPath:
+		case a.tmpFileLocationChan <- domain.TmpFileLocation{
+			FileID:            fileID,
+			TmpFilePath:       tmpPath,
+			EffectiveMimeType: mimeType,
+		}:
 		}
 	}
 	return nil
 }
 
 // finalize verifies the file integrity against the expected SHA256 and cleans up resources.
-func (a *FileAccumulator) finalize(fileID domain.FileID, expectedSha string) (string, error) {
+func (a *FileAccumulator) finalize(fileID domain.FileID, expectedSha string) (string, mimetypes.MIME, error) {
 	// Exclusive lock required to remove entries from the maps
 	a.mu.Lock()
 	fileBuffer, ok := a.buffers[fileID]
@@ -101,7 +108,7 @@ func (a *FileAccumulator) finalize(fileID domain.FileID, expectedSha string) (st
 	a.mu.Unlock()
 
 	if !ok {
-		return "", fmt.Errorf("cannot finalize: buffer not found for %s", fileID)
+		return "", "", fmt.Errorf("cannot finalize: buffer not found for %s", fileID)
 	}
 
 	// Ensure the file handle is closed
@@ -111,9 +118,9 @@ func (a *FileAccumulator) finalize(fileID domain.FileID, expectedSha string) (st
 	// Compare calculated hash with the expected signature
 	actualSha := fmt.Sprintf("%x", signature)
 	if actualSha != expectedSha {
-		return "", fmt.Errorf("integrity check failed for %s: got %s, want %s", fileID, actualSha, expectedSha)
+		return "", "", fmt.Errorf("integrity check failed for %s: got %s, want %s", fileID, actualSha, expectedSha)
 	}
 
 	// Success: The file is ready to be moved to final storage or indexed in Badger
-	return fileBuffer.Path, nil
+	return fileBuffer.Path, fileBuffer.EffectiveMimeType, nil
 }

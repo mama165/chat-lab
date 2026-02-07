@@ -246,11 +246,12 @@ func (*FileDownloaderResponse_Signature) isFileDownloaderResponse_Control() {}
 func (*FileDownloaderResponse_Error) isFileDownloaderResponse_Control() {}
 
 type FileMetadata struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	MimeType      string                 `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"` // To check against the expected type
-	Size          uint64                 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`                        // To prevent "Zip Bombs" or overflow
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	RawMimeType       string                 `protobuf:"bytes,1,opt,name=raw_mime_type,json=rawMimeType,proto3" json:"raw_mime_type,omitempty"` // To check against the expected type
+	EffectiveMimeType string                 `protobuf:"bytes,2,opt,name=effective_mime_type,json=effectiveMimeType,proto3" json:"effective_mime_type,omitempty"`
+	Size              uint64                 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"` // To prevent "Zip Bombs" or overflow
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *FileMetadata) Reset() {
@@ -283,9 +284,16 @@ func (*FileMetadata) Descriptor() ([]byte, []int) {
 	return file_proto_analyzer_file_downloader_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *FileMetadata) GetMimeType() string {
+func (x *FileMetadata) GetRawMimeType() string {
 	if x != nil {
-		return x.MimeType
+		return x.RawMimeType
+	}
+	return ""
+}
+
+func (x *FileMetadata) GetEffectiveMimeType() string {
+	if x != nil {
+		return x.EffectiveMimeType
 	}
 	return ""
 }
@@ -450,9 +458,10 @@ const file_proto_analyzer_file_downloader_service_proto_rawDesc = "" +
 	"\x05chunk\x18\x02 \x01(\v2\x13.analyzer.FileChunkH\x00R\x05chunk\x127\n" +
 	"\tsignature\x18\x03 \x01(\v2\x17.analyzer.FileSignatureH\x00R\tsignature\x12+\n" +
 	"\x05error\x18\x04 \x01(\v2\x13.analyzer.FileErrorH\x00R\x05errorB\t\n" +
-	"\acontrol\"?\n" +
-	"\fFileMetadata\x12\x1b\n" +
-	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
+	"\acontrol\"v\n" +
+	"\fFileMetadata\x12\"\n" +
+	"\rraw_mime_type\x18\x01 \x01(\tR\vrawMimeType\x12.\n" +
+	"\x13effective_mime_type\x18\x02 \x01(\tR\x11effectiveMimeType\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\x04R\x04size\"\x1f\n" +
 	"\tFileChunk\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\"'\n" +

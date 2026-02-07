@@ -2,6 +2,7 @@ package workers
 
 import (
 	"chat-lab/domain"
+	"chat-lab/domain/mimetypes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -106,12 +107,15 @@ func (s FileDownloaderScannerWorker) Process(ctx context.Context, request domain
 		return err
 	}
 
+	rawMimeType := mimetype.Detect(sniffBuf).String()
+	effectiveMimeType := mimetypes.ToMIME(rawMimeType)
 	select {
 	case <-ctx.Done():
 	case s.responseChan <- domain.FileDownloaderResponse{
 		FileMetadata: &domain.FileMetadata{
-			MimeType: mimetype.Detect(sniffBuf).String(),
-			Size:     uint64(fileInfo.Size()),
+			RawMimeType:       rawMimeType,
+			EffectiveMimeType: effectiveMimeType,
+			Size:              uint64(fileInfo.Size()),
 		}}:
 	}
 

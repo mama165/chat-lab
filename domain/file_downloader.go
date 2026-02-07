@@ -1,5 +1,7 @@
 package domain
 
+import "chat-lab/domain/mimetypes"
+
 type FileID string
 
 type FileDownloaderRequest struct {
@@ -16,8 +18,9 @@ type FileDownloaderResponse struct {
 }
 
 type FileMetadata struct {
-	MimeType string
-	Size     uint64
+	RawMimeType       string
+	EffectiveMimeType mimetypes.MIME
+	Size              uint64
 }
 
 type FileChunk struct {
@@ -34,6 +37,12 @@ type FileError struct {
 }
 
 type ErrorCode int
+
+type TmpFileLocation struct {
+	FileID            FileID
+	TmpFilePath       string
+	EffectiveMimeType mimetypes.MIME
+}
 
 const (
 	InvalidFilePath = iota
