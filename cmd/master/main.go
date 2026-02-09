@@ -24,12 +24,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	runtime2 "runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/blugelabs/bluge"
 	"github.com/joho/godotenv"
-	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -93,13 +94,7 @@ func run() (int, error) {
 		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
 	}
 
-	if logger.Enabled(ctx, slog.LevelDebug) {
-		debugPort := config.DebugPort
-		endpoint := "/inspect"
-		url := fmt.Sprintf("http://localhost:%d%s", debugPort, endpoint)
-		logger.Info("Debug Badger inspector available", "url", url)
-		database.StartDebugServer(db, debugPort, endpoint, AnalysisMapper)
-	}
+	monitor := domain.NewGlobalMonitoring(config.MaxTmpFileToProcess)
 
 	defer func() {
 		// Defer ensures the database lock is released and buffers are flushed before the function returns.
@@ -270,6 +265,36 @@ func run() (int, error) {
 	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
 
+	if logger.Enabled(ctx, slog.LevelDebug) {
+		statsProvider := func() map[string]any {
+			// Préparation de la map pour l'UI
+			res := map[string]any{
+				"🚀 Total Analysés": atomic.LoadUint64(&monitor.TotalProcessed),
+				"⚙️ Occupation Scan": fmt.Sprintf("%d / %d",
+					atomic.LoadUint32(&monitor.ActiveScans),
+					monitor.MaxScans),
+				"📂 File Queue":      len(tmpFilePathChan),
+				"🔄 Specialist Flow": len(specialistResponseChan),
+			}
+
+			// Ajout dynamique de la santé des spécialistes (Thread-safe)
+			monitor.SpecialistsMu.RLock()
+			for metric, health := range monitor.Specialists {
+				key := fmt.Sprintf("🛡️ %s (PID %d)", metric, health.PID)
+				val := fmt.Sprintf("CPU: %.1f%% | RAM: %.1f%% [%s]",
+					health.CPU, health.RAM, health.Status)
+				res[key] = val
+			}
+			monitor.SpecialistsMu.RUnlock()
+
+			res["🧠 Goroutines"] = runtime2.NumGoroutine()
+			return res
+		}
+
+		// On lance le serveur avec notre fournisseur de stats "vivant"
+		internal.StartDebugServer(db, config.DebugPort, "/inspect", AnalysisMapper, statsProvider)
+	}
+
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {
 		logger.Info("Starting gRPC server", "address", masterAddress, "at", time.Now().UTC())
@@ -313,8 +338,8 @@ func buildBadgerOpts(config internal.Config, logger *slog.Logger, ctx context.Co
 	return options
 }
 
-func AnalysisMapper(key string, val []byte) database.InspectRow {
-	row := database.DefaultMapper(key, val)
+func AnalysisMapper(key string, val []byte) internal.InspectRow {
+	row := internal.DefaultMapper(key, val)
 
 	var p pb4.Analysis
 	if err := proto.Unmarshal(val, &p); err != nil {

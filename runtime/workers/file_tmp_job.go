@@ -62,6 +62,12 @@ func NewFileTmpJobWorker(
 	}
 }
 
+func (w *FileTmpJobWorker) GetState() (processing uint32, max uint32) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.processingFileCount, w.maxFileToProcess
+}
+
 // Run starts the main worker loop. It handles new file arrivals, specialist responses,
 // and periodic job processing based on the configured interval.
 func (w *FileTmpJobWorker) Run(ctx context.Context) error {

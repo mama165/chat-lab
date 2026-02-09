@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat-Lab Inspector</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --accent: #58a6ff;
+            --purple: #bc8cff;
+            --green: #3fb950;
+            --red: #ff7b72;
+            --orange: #d29922;
+            --dim: #8b949e;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+            margin: 0;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        /* --- DASHBOARD STATS --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--text);
+            white-space: pre-wrap; /* Allows multiline for CPU/RAM */
+        }
+
+        /* Highlight specific stats based on emoji content (simple heuristic) */
+        .stat-card:has(.stat-label:contains("CPU")) .stat-value { color: var(--orange); }
+
+        /* --- CONTROLS --- */
+        .control-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 15px;
+            background: var(--surface);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .logo { font-size: 16px; color: var(--accent); margin-right: auto; display: flex; align-items: center; gap: 8px; }
+
+        input[type="text"] {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            width: 250px;
+            font-family: inherit;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-blue { background: var(--accent); color: #0d1117; }
+        .btn-blue:hover { opacity: 0.9; }
+
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline.active { border-color: var(--green); color: var(--green); }
+
+        .btn-purple { background: var(--purple); color: #0d1117; }
+
+        #statusMsg { font-weight: bold; color: var(--green); margin-left: 10px; opacity: 0; transition: 0.3s; font-size: 12px; }
+        #statusMsg.show { opacity: 1; }
+
+        /* --- TABLE --- */
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            min-width: 1000px; /* Ensure scroll on small screens */
+        }
+
+        th {
+            background: #21262d;
+            color: var(--dim);
+            text-align: left;
+            padding: 10px 12px;
+            font-size: 11px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 13px;
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: rgba(255,255,255,0.03); }
+
+        /* Columns Widths */
+        .col-key { color: var(--dim); width: 25%; font-size: 12px; }
+        .col-type { width: 90px; font-weight: bold; }
+        .col-ts { width: 100px; color: var(--text); font-size: 12px; }
+        .col-id { color: var(--accent); width: 90px; }
+        .col-ns { width: 120px; color: var(--dim); }
+        .col-detail { color: #e6edf3; width: auto; }
+        .col-scores { color: var(--orange); width: 200px; text-align: right; }
+
+        /* Type Badges */
+        .badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; display: inline-block; }
+        .type-AUDIO { color: var(--purple); background: rgba(188, 140, 255, 0.1); border: 1px solid rgba(188, 140, 255, 0.2); }
+        .type-PDF { color: var(--red); background: rgba(255, 123, 114, 0.1); border: 1px solid rgba(255, 123, 114, 0.2); }
+        .type-FILE { color: var(--accent); background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2); }
+        .type-CHAT { color: var(--green); background: rgba(63, 185, 80, 0.1); border: 1px solid rgba(63, 185, 80, 0.2); }
+        .type-RAW { color: var(--dim); border: 1px solid var(--border); }
+
+    </style>
+</head>
+<body>
+
+<div class="stats-grid">
+    {{range $key, $val := .Stats}}
+    <div class="stat-card">
+        <div class="stat-label">{{$key}}</div>
+        <div class="stat-value">{{$val}}</div>
+    </div>
+    {{else}}
+    <div class="stat-card" style="opacity: 0.5">
+        <div class="stat-label">System Status</div>
+        <div class="stat-value">Waiting for metrics...</div>
+    </div>
+    {{end}}
+</div>
+
+<div class="control-bar">
+    <div class="logo">
+        <span>🧪</span> <strong>CHAT-LAB INSPECTOR</strong>
+    </div>
+
+    <form method="GET" action="/inspect" style="display:flex; gap:8px;">
+        <input type="text" name="prefix" list="known-prefixes"
+               value="{{if .Prefix}}{{.Prefix}}{{else}}analysis:{{end}}"
+               placeholder="Prefix (e.g. analysis:)...">
+
+        <datalist id="known-prefixes">
+            <option value="analysis:">Analysis (Files)</option>
+            <option value="chat:room:">Chat Rooms</option>
+            <option value="msg:">Messages</option>
+            <option value="user:">Users</option>
+            <option value="task:file:">File Tasks</option>
+        </datalist>
+
+        <button type="submit" class="btn-blue">Filter</button>
+    </form>
+
+    <div style="flex-grow:1"></div>
+
+    <button id="btnRefresh" onclick="toggleAutoRefresh()" class="btn-outline">
+        <span>🔄</span> Auto-Refresh
+    </button>
+
+    <button onclick="resumeTest()" class="btn-purple">
+        <span>▶</span> Resume Test
+    </button>
+    <span id="statusMsg"></span>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+        <tr>
+            <th class="col-key">Key</th>
+            <th class="col-type">Type</th>
+            <th class="col-ts">Timestamp</th>
+            <th class="col-id">Entity ID</th>
+            <th class="col-ns">Namespace</th>
+            <th>Detail</th>
+            <th class="col-scores">Scores / Metadata</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range .Items}}
+        <tr>
+            <td class="col-key" title="{{.Key}}">{{.Key}}</td>
+
+            <td>
+                <span class="badge type-{{.Type}}">{{.Type}}</span>
+            </td>
+
+            <td class="col-ts">{{.Timestamp}}</td>
+            <td class="col-id">{{.EntityID}}</td>
+            <td class="col-ns">{{.Namespace}}</td>
+            <td class="col-detail" title="{{.Detail}}">{{.Detail}}</td>
+            <td class="col-scores">{{.Scores}}</td>
+        </tr>
+        {{else}}
+        <tr style="opacity: 0.5;">
+            <td class="col-key">analysis:demo:123...</td>
+            <td><span class="badge type-PDF">PDF</span></td>
+            <td class="col-ts">--:--:--</td>
+            <td class="col-id">1234abcd</td>
+            <td class="col-ns">demo-room</td>
+            <td class="col-detail">Waiting for real data...</td>
+            <td class="col-scores">toxicity:0.00</td>
+        </tr>
+        <tr>
+            <td colspan="7" style="text-align:center; padding: 40px; color: var(--dim);">
+                No records found for this prefix. Check your filter or start a scan.
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Resume Test Logic
+    function resumeTest() {
+        const msg = document.getElementById('statusMsg');
+        fetch('/resume').then(r => r.text()).then(t => {
+            msg.innerText = "✅ " + t;
+            msg.classList.add('show');
+            setTimeout(() => msg.classList.remove('show'), 2000);
+        });
+    }
+
+    // Auto Refresh Logic
+    let refreshInterval;
+    const btnRefresh = document.getElementById('btnRefresh');
+
+    function toggleAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+            btnRefresh.classList.remove('active');
+            // Remove param from URL to avoid loop on manual reload
+            const url = new URL(window.location);
+            url.searchParams.delete('autorefresh');
+            window.history.replaceState({}, '', url);
+        } else {
+            refreshInterval = setInterval(() => {
+                window.location.reload();
+            }, 2000); // 2 seconds
+            btnRefresh.classList.add('active');
+
+            // Add param to URL so refresh persists
+            const url = new URL(window.location);
+            url.searchParams.set('autorefresh', 'true');
+            window.history.replaceState({}, '', url);
+        }
+    }
+
+    // Check on load if we should auto-refresh
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('autorefresh') === 'true') {
+        toggleAutoRefresh();
+    }
+</script>
+</body>
+</html>
