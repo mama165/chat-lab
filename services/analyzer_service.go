@@ -55,7 +55,6 @@ func (s *AnalyzerService) Analyze(ctx context.Context, request analyzer.FileAnal
 		s.log.Debug("Context done, skipping file analyzer")
 		return ctx.Err()
 	case s.eventChan <- toEvent(request):
-		s.log.Debug("Received one file to analyze", "bytes", request.Size)
 		s.increment(request.Size)
 	}
 	return nil

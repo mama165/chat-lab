@@ -4,7 +4,6 @@ import (
 	"chat-lab/contract"
 	"chat-lab/domain/event"
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 )
@@ -69,7 +68,6 @@ func (w *EventFanoutWorker) Run(ctx context.Context) error {
 }
 
 func (w *EventFanoutWorker) handleFileEvent(ctx context.Context, evt contract.FileAnalyzerEvent) {
-	w.log.Debug(fmt.Sprintf("Consumed eventChan : %v", evt))
 	if err := w.analysisSink.Consume(ctx, evt); err != nil {
 		w.log.Error("sink failed", "error", err)
 
@@ -91,7 +89,6 @@ func (w *EventFanoutWorker) Fanout(evt contract.DomainEvent) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), w.sinkTimeout)
 			defer cancel()
-			w.log.Debug(fmt.Sprintf("Consumed eventChan : %v", evt))
 			if err := s.Consume(ctx, evt); err != nil {
 				w.log.Error("sink failed", "error", err)
 			}

@@ -138,6 +138,12 @@ func (w *FileTmpJobWorker) processJobs(ctx context.Context) {
 		w.processingFileCount++ // Atomic is not needed (mutex can be used)
 		if err := w.coordinator.Broadcast(ctx, request); err != nil {
 			w.log.Error("Error while calling specialists", "err", err)
+			w.processingFileCount--
+			if err = w.deleteFile(fileJob.TmpFilePath); err != nil {
+				w.log.Error("unable to delete file after broadcast specialist failure", "path", fileJob.TmpFilePath)
+			}
+			delete(w.jobs, fileID) // Deleting job to avoid looping again and again
+			continue
 		}
 		job := w.jobs[fileID]
 		job.IsRunning = true

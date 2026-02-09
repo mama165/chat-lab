@@ -186,11 +186,6 @@ func (a *AnalysisRepository) StoreBatch(analyses []Analysis) error {
 		// Pointer key for O(1) lookup: idx:msg:{uuid} -> mainKey
 		indexKey := []byte(fmt.Sprintf("idx:msg:%s", analysis.EntityId.String()))
 
-		a.log.Debug("💾 WRITING TO BADGER",
-			"key", string(mainKey),
-			"entity_id", analysis.EntityId.String(),
-			"namespace", analysis.Namespace)
-
 		// Store both the data and the pointer in the same batch
 		if err := wb.Set(mainKey, bytes); err != nil {
 			return fmt.Errorf("failed to set badger main key: %w", err)
@@ -586,9 +581,6 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 
 	// 4. Map Polymorphic Payload
 	if analysisPb.Payload != nil {
-		// Log the concrete type of the protobuf oneof for debugging purposes
-		fmt.Printf("🔍 [DEBUG MAPPER] Protobuf Payload Type: %T\n", analysisPb.Payload)
-
 		switch p := analysisPb.Payload.(type) {
 		case *pb.Analysis_TextContent:
 			res.Payload = TextContent{
@@ -608,13 +600,7 @@ func ToAnalysis(analysisPb *pb.Analysis) (Analysis, error) {
 				Size:     p.File.Size,
 				Content:  p.File.Content,
 			}
-
-			// Even if it's a file, let's see what's inside the proto object
-			fmt.Printf("📂 [DEBUG FILE] Content size: %d bytes\n", len(p.File.Content))
-			fmt.Printf("📂 [DEBUG FILE] Raw Content: %s\n", p.File.Content)
-
 		default:
-			fmt.Printf("⚠️ [DEBUG MAPPER] Unknown payload type: %T\n", p)
 		}
 	}
 

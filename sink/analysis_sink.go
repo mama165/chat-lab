@@ -70,7 +70,6 @@ func (a *AnalysisSink) handleNewFile(e event.FileAnalyse) error {
 	// We only start it if no other timer is currently running (timer == nil).
 	if len(a.events) == 1 && a.timer == nil {
 		a.timer = time.AfterFunc(a.bufferTimeout, func() {
-			a.log.Debug("Flushing events", "events size", len(a.events))
 			if err := a.flush(); err != nil {
 				a.log.Error("Batching: Timeout flush failed", "error", err)
 			}

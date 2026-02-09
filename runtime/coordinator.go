@@ -203,7 +203,7 @@ func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistReques
 	}
 
 	size := fileInfo.Size()
-	if size > int64(m.maxFileSizeMB) {
+	if size > int64(m.maxFileSizeMB*domain.MB) {
 		return fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
 	}
 

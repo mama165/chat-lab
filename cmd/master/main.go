@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -198,6 +197,27 @@ func run() (int, error) {
 
 	grpcClient := pb3.NewFileDownloaderServiceClient(conn)
 
+	var scanAllowed bool
+	scanAllowed = true
+	if scanAllowed {
+		go func() {
+			time.Sleep(5 * time.Second) // On laisse le temps au Scanner de boot
+
+			// On crée le client pour le contrôleur du scanner
+			scannerCtrlClient := pb3.NewScannerControllerClient(conn)
+
+			target := "/mnt/c/Users/Maël/Desktop"
+			slog.Info("📡 Master envoie l'ordre de scan au Scanner", "path", target)
+
+			_, err = scannerCtrlClient.TriggerScan(ctx, &pb3.ScanRequest{
+				Path: target,
+			})
+			if err != nil {
+				slog.Error("❌ Erreur lors du trigger gRPC", "error", err)
+			}
+		}()
+	}
+
 	// Create the temp directory
 	// /tmp/{directory}
 	fileDownloadingDirPath := filepath.Join(os.TempDir(), config.TmpDownloadingDir)
@@ -328,11 +348,13 @@ func run() (int, error) {
 func buildBadgerOpts(config internal.Config, logger *slog.Logger, ctx context.Context) badger.Options {
 	options := badger.DefaultOptions(config.BadgerFilepath)
 
+	options.IndexCacheSize = 100 << 20 // Optional : 100MB cache
+	options.DetectConflicts = false    // Detect & repair conflicts
+
+	options = options.WithLoggingLevel(badger.INFO)
+
 	if logger.Enabled(ctx, slog.LevelDebug) {
-		options = options.WithLoggingLevel(badger.DEBUG).
-			WithBypassLockGuard(true)
-	} else {
-		options = options.WithLoggingLevel(badger.INFO)
+		options = options.WithBypassLockGuard(true)
 	}
 
 	return options
@@ -372,7 +394,6 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 			}
 
 			row.Detail = transcription
-			log.Printf("🎤 [DEBUG] Transcription trouvée : %s", transcription)
 
 		// Cas 2 : C'est identifié comme un fichier (cas actuel de tes logs)
 		case storage.FileDetails, *storage.FileDetails:
@@ -388,9 +409,6 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 			// Si le contenu est vide, on garde le summary, sinon on affiche le texte
 			if content != "" {
 				row.Detail = content
-				log.Printf("📄 [DEBUG] Texte extrait du fichier : %s", content)
-			} else {
-				log.Printf("📄 [DEBUG] Fichier standard sans contenu textuel")
 			}
 
 		// Cas 3 : Texte brut (Chat)
