@@ -195,7 +195,7 @@ func (w *FileTmpJobWorker) deleteFile(path string) error {
 
 func toEvent(driveID string, resp domain.SpecialistResponse) event.Event {
 	return event.Event{
-		Type:      event.ProcessedResultType,
+		Type:      event.AnalysisSegmentType,
 		CreatedAt: time.Now().UTC(),
 		Payload: event.AnalysisSegment{
 			DriveID: driveID,

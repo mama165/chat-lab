@@ -7,6 +7,7 @@ import (
 	"chat-lab/domain/mimetypes"
 	"chat-lab/infrastructure/storage"
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -45,18 +46,24 @@ func NewAnalysisSink(
 }
 
 // Consume implements the EventSink interface.
-// It acts as a high-performance buffer that aggregates file analysis events.
-// The flush is triggered either by reaching a size threshold (maxAnalyzedEvent)
-// or a time-based deadline (deliveryTimeout).
 func (a *AnalysisSink) Consume(_ context.Context, e contract.FileAnalyzerEvent) error {
-	evt, ok := e.(event.FileAnalyse)
-	if !ok {
+	// Détection du type d'événement via le Payload
+	switch evt := e.(type) {
+	case event.FileAnalyse:
+		return a.handleNewFile(evt)
+
+	case event.AnalysisSegment:
+		return a.handleAnalysisSegment(evt)
+
+	default:
 		return nil
 	}
+}
 
+func (a *AnalysisSink) handleNewFile(e event.FileAnalyse) error {
 	a.mu.Lock()
 	// 2. State update: Append the event to the current slice
-	a.events = append(a.events, evt)
+	a.events = append(a.events, e)
 
 	// 3. Timer management: if this is the first event of a new batch,
 	// start a background timer to ensure data is not stuck if the throughput is low.
@@ -78,6 +85,72 @@ func (a *AnalysisSink) Consume(_ context.Context, e contract.FileAnalyzerEvent) 
 	if isFull {
 		return a.flush()
 	}
+
+	return nil
+}
+
+// handleAnalysisSegment performs the asynchronous enrichment of a file's analysis.
+// It retrieves the existing metadata from storage (created during the initial scan)
+// and merges the new specialist results (scores, transcriptions, or metadata)
+// into the record. This ensures that the final Analysis object is an aggregate
+// of both the raw file system data and the deep insights provided by specialists.
+func (a *AnalysisSink) handleAnalysisSegment(segment event.AnalysisSegment) error {
+	fileID, err := uuid.Parse(string(segment.FileID))
+	if err != nil {
+		return fmt.Errorf("invalid file ID format: %w", err)
+	}
+	analysis, err := a.analysisRepository.FetchFullByEntityId(segment.DriveID, fileID)
+	if err != nil {
+		return fmt.Errorf("could not fetch analysis for enrichment: %w", err)
+	}
+
+	if analysis.Scores == nil {
+		analysis.Scores = make(map[domain.Metric]float64)
+	}
+
+	for _, result := range segment.Metrics {
+		if result.SpecialistErr != nil {
+			a.log.Warn("specialist error reported", "metric", result.ID, "err", result.SpecialistErr)
+			continue
+		}
+
+		if result.Resp == nil || result.Resp.OneOf == nil {
+			continue
+		}
+
+		switch data := result.Resp.OneOf.(type) {
+		case domain.Score:
+			if result.ID != nil {
+				analysis.Scores[*result.ID] = data.Score
+				if data.Label != "" {
+					analysis.Tags = append(analysis.Tags, data.Label)
+				}
+			}
+		case domain.AudioData:
+			if details, ok := analysis.Payload.(storage.FileDetails); ok {
+				details.Content = data.Transcription
+				analysis.Payload = details
+			}
+
+		case domain.DocumentData:
+			if data.Title != "" {
+				analysis.Summary = data.Title
+			}
+			if data.Author != "" {
+				analysis.Tags = append(analysis.Tags, "author:"+data.Author)
+			}
+		}
+	}
+
+	analysis.Version = uuid.New()
+	if err := a.analysisRepository.Store(analysis); err != nil {
+		return fmt.Errorf("failed to save enriched analysis: %w", err)
+	}
+
+	a.log.Info("Analysis enriched",
+		"driveID", segment.DriveID,
+		"fileID", fileID,
+		"metrics_count", len(segment.Metrics))
 
 	return nil
 }
