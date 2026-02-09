@@ -9,8 +9,9 @@ service FileDownloaderService {
 }
 
 message FileDownloaderRequest {
-  string file_id = 1; // Better than path for security (obfuscation)
-  string path = 2;    // The actual path on the scanner's disk
+  string drive_id = 1;
+  string file_id = 2; // Better than path for security (obfuscation)
+  string path = 3;    // The actual path on the scanner's disk
 }
 
 message FileDownloaderResponse {

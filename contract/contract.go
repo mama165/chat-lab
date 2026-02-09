@@ -79,5 +79,5 @@ type ISpecialistClient interface {
 }
 
 type IFileAccumulator interface {
-	ProcessResponse(ctx context.Context, resp domain.FileDownloaderResponse) error
+	ProcessResponse(ctx context.Context, driveID string, fileID domain.FileID, resp domain.FileDownloaderResponse) error
 }

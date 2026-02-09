@@ -123,6 +123,7 @@ func (a *AnalysisSink) processAndStore(events []event.FileAnalyse) error {
 		if _, ok := mimetypes.IsAuthorized(evt.RawMimeType); ok {
 			task := storage.FileTask{
 				ID:                evt.Id.String(),
+				DriveID:           evt.DriveID,
 				Path:              evt.Path,
 				RawMimeType:       evt.RawMimeType,
 				EffectiveMimeType: evt.EffectiveMimeType,

@@ -35,9 +35,7 @@ func NewFileAccumulator(
 
 // ProcessResponse dispatches the incoming response to the appropriate handling logic based on its content.
 // It ensures thread-safe access to internal maps using both Write and Read locks.
-func (a *FileAccumulator) ProcessResponse(ctx context.Context, resp domain.FileDownloaderResponse) error {
-	fileID := resp.FileID
-
+func (a *FileAccumulator) ProcessResponse(ctx context.Context, driveID string, fileID domain.FileID, resp domain.FileDownloaderResponse) error {
 	switch {
 	case resp.FileMetadata != nil:
 		// Exclusive lock required to initialize new entries in the maps
@@ -84,6 +82,7 @@ func (a *FileAccumulator) ProcessResponse(ctx context.Context, resp domain.FileD
 		case <-ctx.Done():
 			return ctx.Err()
 		case a.tmpFileLocationChan <- domain.TmpFileLocation{
+			DriveID:           driveID,
 			FileID:            fileID,
 			TmpFilePath:       tmpPath,
 			EffectiveMimeType: mimeType,

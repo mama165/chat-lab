@@ -216,6 +216,7 @@ func run() (int, error) {
 		processTrackerChan,
 		fileDownloaderRequestChan,
 		tmpFilePathChan,
+		specialistResponseChan,
 		messageRepository,
 		analysisRepository,
 		fileTaskRepository,
@@ -231,6 +232,8 @@ func run() (int, error) {
 		config.MaxAnalyzedEvent,
 		config.FileTransferInterval,
 		config.PendingFileBatchSize,
+		config.MaxTmpFileToProcess,
+		config.FileTmpJobInterval,
 	)
 
 	// Context & Signals

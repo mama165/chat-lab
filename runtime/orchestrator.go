@@ -29,40 +29,43 @@ import (
 var censoredFolder embed.FS
 
 type Orchestrator struct {
-	mu                   sync.Mutex
-	log                  *slog.Logger
-	counter              *event.Counter
-	numWorkers           int
-	rooms                map[chat.RoomID]*chat.Room
-	supervisor           contract.ISupervisor
-	registry             contract.IRegistry
-	globalCommands       chan chat.Command
-	moderationChan       chan event.Event
-	eventChan            chan event.Event
-	telemetryChan        chan event.Event
-	processTrackerChan   chan domain.Process
-	fileRequestChan      chan domain.FileDownloaderRequest
-	tmpFileLocationChan  chan domain.TmpFileLocation
-	messageRepository    storage.IMessageRepository
-	analysisRepository   storage.IAnalysisRepository
-	fileTaskRepository   storage.IFileTaskRepository
-	coordinator          contract.SpecialistCoordinator
-	grpcClient           pb.FileDownloaderServiceClient
-	fileAccumulator      contract.IFileAccumulator
-	sinkTimeout          time.Duration
-	bufferTimeout        time.Duration
-	specialistTimeout    time.Duration
-	metricInterval       time.Duration
-	latencyThreshold     time.Duration
-	waitAndFail          time.Duration
-	charReplacement      rune
-	lowCapacityThreshold int
-	maxContentLength     int
-	minScoring           float64
-	maxScoring           float64
-	maxAnalyzedEvent     int
-	fileTransferInterval time.Duration
-	pendingFileBatchSize int
+	mu                     sync.Mutex
+	log                    *slog.Logger
+	counter                *event.Counter
+	numWorkers             int
+	rooms                  map[chat.RoomID]*chat.Room
+	supervisor             contract.ISupervisor
+	registry               contract.IRegistry
+	globalCommands         chan chat.Command
+	moderationChan         chan event.Event
+	eventChan              chan event.Event
+	telemetryChan          chan event.Event
+	processTrackerChan     chan domain.Process
+	fileRequestChan        chan domain.FileDownloaderRequest
+	tmpFileLocationChan    chan domain.TmpFileLocation
+	specialistResponseChan chan domain.SpecialistResponse
+	messageRepository      storage.IMessageRepository
+	analysisRepository     storage.IAnalysisRepository
+	fileTaskRepository     storage.IFileTaskRepository
+	coordinator            contract.SpecialistCoordinator
+	grpcClient             pb.FileDownloaderServiceClient
+	fileAccumulator        contract.IFileAccumulator
+	sinkTimeout            time.Duration
+	bufferTimeout          time.Duration
+	specialistTimeout      time.Duration
+	metricInterval         time.Duration
+	latencyThreshold       time.Duration
+	waitAndFail            time.Duration
+	charReplacement        rune
+	lowCapacityThreshold   int
+	maxContentLength       int
+	minScoring             float64
+	maxScoring             float64
+	maxAnalyzedEvent       int
+	fileTransferInterval   time.Duration
+	pendingFileBatchSize   int
+	maxFileToProcess       uint32
+	fileTmpJobInterval     time.Duration
 }
 
 func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
@@ -70,6 +73,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	processTrackerChan chan domain.Process,
 	fileRequestChan chan domain.FileDownloaderRequest,
 	tmpFileLocationChan chan domain.TmpFileLocation,
+	specialistResponseChan chan domain.SpecialistResponse,
 	messageRepository storage.IMessageRepository,
 	analysisRepository storage.IAnalysisRepository,
 	fileTaskRepository storage.IFileTaskRepository,
@@ -82,41 +86,46 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	lowCapacityThreshold, maxContentLength int,
 	minScoring, maxScoring float64, maxAnalyzedEvent int,
 	fileTransferInterval time.Duration, pendingFileBatchSize int,
+	maxFileToProcess uint32,
+	fileTmpJobInterval time.Duration,
 ) *Orchestrator {
 	return &Orchestrator{
-		log:                  log,
-		counter:              event.NewCounter(),
-		numWorkers:           numWorkers,
-		rooms:                make(map[chat.RoomID]*chat.Room),
-		supervisor:           supervisor,
-		registry:             registry,
-		telemetryChan:        telemetryChan,
-		processTrackerChan:   processTrackerChan,
-		fileRequestChan:      fileRequestChan,
-		tmpFileLocationChan:  tmpFileLocationChan,
-		globalCommands:       make(chan chat.Command, bufferSize),
-		moderationChan:       make(chan event.Event, bufferSize),
-		eventChan:            eventChan,
-		messageRepository:    messageRepository,
-		analysisRepository:   analysisRepository,
-		fileTaskRepository:   fileTaskRepository,
-		coordinator:          specialistCoordinator,
-		grpcClient:           grpcClient,
-		fileAccumulator:      fileAccumulator,
-		sinkTimeout:          sinkTimeout,
-		bufferTimeout:        bufferTimeout,
-		specialistTimeout:    specialistTimeout,
-		metricInterval:       metricInterval,
-		latencyThreshold:     latencyThreshold,
-		waitAndFail:          waitAndFail,
-		charReplacement:      charReplacement,
-		lowCapacityThreshold: lowCapacityThreshold,
-		maxContentLength:     maxContentLength,
-		minScoring:           minScoring,
-		maxScoring:           maxScoring,
-		maxAnalyzedEvent:     maxAnalyzedEvent,
-		fileTransferInterval: fileTransferInterval,
-		pendingFileBatchSize: pendingFileBatchSize,
+		log:                    log,
+		counter:                event.NewCounter(),
+		numWorkers:             numWorkers,
+		rooms:                  make(map[chat.RoomID]*chat.Room),
+		supervisor:             supervisor,
+		registry:               registry,
+		telemetryChan:          telemetryChan,
+		processTrackerChan:     processTrackerChan,
+		fileRequestChan:        fileRequestChan,
+		tmpFileLocationChan:    tmpFileLocationChan,
+		specialistResponseChan: specialistResponseChan,
+		globalCommands:         make(chan chat.Command, bufferSize),
+		moderationChan:         make(chan event.Event, bufferSize),
+		eventChan:              eventChan,
+		messageRepository:      messageRepository,
+		analysisRepository:     analysisRepository,
+		fileTaskRepository:     fileTaskRepository,
+		coordinator:            specialistCoordinator,
+		grpcClient:             grpcClient,
+		fileAccumulator:        fileAccumulator,
+		sinkTimeout:            sinkTimeout,
+		bufferTimeout:          bufferTimeout,
+		specialistTimeout:      specialistTimeout,
+		metricInterval:         metricInterval,
+		latencyThreshold:       latencyThreshold,
+		waitAndFail:            waitAndFail,
+		charReplacement:        charReplacement,
+		lowCapacityThreshold:   lowCapacityThreshold,
+		maxContentLength:       maxContentLength,
+		minScoring:             minScoring,
+		maxScoring:             maxScoring,
+		maxAnalyzedEvent:       maxAnalyzedEvent,
+		fileTransferInterval:   fileTransferInterval,
+		pendingFileBatchSize:   pendingFileBatchSize,
+		maxFileToProcess:       maxFileToProcess,
+		fileTmpJobInterval:     fileTmpJobInterval,
 	}
 }
 
@@ -187,7 +196,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	// Heavy tasks like I/O (loading files) and CPU (Aho-Corasick build) are done here.
 	poolWorkers := o.preparePoolWorkers()
 
-	fileTransferWorker, fileDownloaderWorker := o.prepareFileTransferWorker()
+	fileTransferWorker, fileDownloaderWorker, fileTmpJobWorker := o.prepareFileTransferWorker()
 
 	moderationWorker, err := o.prepareModeration("censored", o.charReplacement)
 	if err != nil {
@@ -213,6 +222,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	o.supervisor.Add(poolWorkers...)
 	o.supervisor.Add(fileTransferWorker)
 	o.supervisor.Add(fileDownloaderWorker)
+	o.supervisor.Add(fileTmpJobWorker)
 
 	o.mu.Unlock()
 
@@ -231,7 +241,7 @@ func (o *Orchestrator) preparePoolWorkers() []contract.Worker {
 	return res
 }
 
-func (o *Orchestrator) prepareFileTransferWorker() (contract.Worker, contract.Worker) {
+func (o *Orchestrator) prepareFileTransferWorker() (contract.Worker, contract.Worker, contract.Worker) {
 	fileTransferWorker := workers.NewFileTransferWorker(
 		o.fileRequestChan,
 		o.fileTaskRepository,
@@ -246,7 +256,17 @@ func (o *Orchestrator) prepareFileTransferWorker() (contract.Worker, contract.Wo
 		o.grpcClient,
 		o.fileAccumulator,
 	)
-	return fileTransferWorker, fileDownloaderWorker
+
+	fileTmpJobWorker := workers.NewFileTmpJobWorker(
+		o.coordinator,
+		o.log,
+		o.maxFileToProcess,
+		o.fileTmpJobInterval,
+		o.eventChan,
+		o.tmpFileLocationChan,
+		o.specialistResponseChan,
+	)
+	return fileTransferWorker, fileDownloaderWorker, fileTmpJobWorker
 }
 
 // prepareModeration loads censored words and builds the Aho-Corasick automaton.
@@ -311,6 +331,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 		{Name: "ProcessTrackerChan", Channel: o.processTrackerChan},
 		{Name: "FileRequestChan", Channel: o.fileRequestChan},
 		{Name: "TmpFileLocation", Channel: o.tmpFileLocationChan},
+		{Name: "SpecialistResponse", Channel: o.specialistResponseChan},
 		{Name: "GlobalCommands", Channel: o.globalCommands},
 	}
 	channelCapWorker := workers.NewChannelCapacityWorker(

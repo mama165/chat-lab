@@ -5,12 +5,12 @@ import "chat-lab/domain/mimetypes"
 type FileID string
 
 type FileDownloaderRequest struct {
-	FileID FileID `validate:"required,max=1024"`
-	Path   string `validate:"required,max=1024"`
+	DriveID string
+	FileID  FileID `validate:"required,max=1024"`
+	Path    string `validate:"required,max=1024"`
 }
 
 type FileDownloaderResponse struct {
-	FileID        FileID
 	FileMetadata  *FileMetadata
 	FileChunk     *FileChunk
 	FileSignature *FileSignature
@@ -39,6 +39,7 @@ type FileError struct {
 type ErrorCode int
 
 type TmpFileLocation struct {
+	DriveID           string
 	FileID            FileID
 	TmpFilePath       string
 	EffectiveMimeType mimetypes.MIME

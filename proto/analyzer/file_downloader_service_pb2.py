@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n,proto/analyzer/file_downloader_service.proto\x12\x08\x61nalyzer\"6\n\x15\x46ileDownloaderRequest\x12\x0f\n\x07\x66ile_id\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"\xc9\x01\n\x16\x46ileDownloaderResponse\x12*\n\x08metadata\x18\x01 \x01(\x0b\x32\x16.analyzer.FileMetadataH\x00\x12$\n\x05\x63hunk\x18\x02 \x01(\x0b\x32\x13.analyzer.FileChunkH\x00\x12,\n\tsignature\x18\x03 \x01(\x0b\x32\x17.analyzer.FileSignatureH\x00\x12$\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x13.analyzer.FileErrorH\x00\x42\t\n\x07\x63ontrol\"P\n\x0c\x46ileMetadata\x12\x15\n\rraw_mime_type\x18\x01 \x01(\t\x12\x1b\n\x13\x65\x66\x66\x65\x63tive_mime_type\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x04\"\x19\n\tFileChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\"\x1f\n\rFileSignature\x12\x0e\n\x06sha256\x18\x01 \x01(\t\"?\n\tFileError\x12\x0f\n\x07message\x18\x01 \x01(\t\x12!\n\x04\x63ode\x18\x02 \x01(\x0e\x32\x13.analyzer.ErrorCode*}\n\tErrorCode\x12\x15\n\x11INVALID_FILE_PATH\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x11\n\rACCESS_DENIED\x10\x02\x12\x0c\n\x08NOT_FILE\x10\x03\x12\x12\n\x0e\x46ILE_TOO_LARGE\x10\x04\x12\x15\n\x11\x43HECKSUM_MISMATCH\x10\x05\x32j\n\x15\x46ileDownloaderService\x12Q\n\x08\x44ownload\x12\x1f.analyzer.FileDownloaderRequest\x1a .analyzer.FileDownloaderResponse(\x01\x30\x01\x42\x06Z\x04./pbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n,proto/analyzer/file_downloader_service.proto\x12\x08\x61nalyzer\"H\n\x15\x46ileDownloaderRequest\x12\x10\n\x08\x64rive_id\x18\x01 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"\xc9\x01\n\x16\x46ileDownloaderResponse\x12*\n\x08metadata\x18\x01 \x01(\x0b\x32\x16.analyzer.FileMetadataH\x00\x12$\n\x05\x63hunk\x18\x02 \x01(\x0b\x32\x13.analyzer.FileChunkH\x00\x12,\n\tsignature\x18\x03 \x01(\x0b\x32\x17.analyzer.FileSignatureH\x00\x12$\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x13.analyzer.FileErrorH\x00\x42\t\n\x07\x63ontrol\"P\n\x0c\x46ileMetadata\x12\x15\n\rraw_mime_type\x18\x01 \x01(\t\x12\x1b\n\x13\x65\x66\x66\x65\x63tive_mime_type\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x04\"\x19\n\tFileChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\"\x1f\n\rFileSignature\x12\x0e\n\x06sha256\x18\x01 \x01(\t\"?\n\tFileError\x12\x0f\n\x07message\x18\x01 \x01(\t\x12!\n\x04\x63ode\x18\x02 \x01(\x0e\x32\x13.analyzer.ErrorCode*}\n\tErrorCode\x12\x15\n\x11INVALID_FILE_PATH\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x11\n\rACCESS_DENIED\x10\x02\x12\x0c\n\x08NOT_FILE\x10\x03\x12\x12\n\x0e\x46ILE_TOO_LARGE\x10\x04\x12\x15\n\x11\x43HECKSUM_MISMATCH\x10\x05\x32j\n\x15\x46ileDownloaderService\x12Q\n\x08\x44ownload\x12\x1f.analyzer.FileDownloaderRequest\x1a .analyzer.FileDownloaderResponse(\x01\x30\x01\x42\x06Z\x04./pbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,20 +32,20 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'proto.analyzer.file_downloa
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z\004./pb'
-  _globals['_ERRORCODE']._serialized_start=525
-  _globals['_ERRORCODE']._serialized_end=650
+  _globals['_ERRORCODE']._serialized_start=543
+  _globals['_ERRORCODE']._serialized_end=668
   _globals['_FILEDOWNLOADERREQUEST']._serialized_start=58
-  _globals['_FILEDOWNLOADERREQUEST']._serialized_end=112
-  _globals['_FILEDOWNLOADERRESPONSE']._serialized_start=115
-  _globals['_FILEDOWNLOADERRESPONSE']._serialized_end=316
-  _globals['_FILEMETADATA']._serialized_start=318
-  _globals['_FILEMETADATA']._serialized_end=398
-  _globals['_FILECHUNK']._serialized_start=400
-  _globals['_FILECHUNK']._serialized_end=425
-  _globals['_FILESIGNATURE']._serialized_start=427
-  _globals['_FILESIGNATURE']._serialized_end=458
-  _globals['_FILEERROR']._serialized_start=460
-  _globals['_FILEERROR']._serialized_end=523
-  _globals['_FILEDOWNLOADERSERVICE']._serialized_start=652
-  _globals['_FILEDOWNLOADERSERVICE']._serialized_end=758
+  _globals['_FILEDOWNLOADERREQUEST']._serialized_end=130
+  _globals['_FILEDOWNLOADERRESPONSE']._serialized_start=133
+  _globals['_FILEDOWNLOADERRESPONSE']._serialized_end=334
+  _globals['_FILEMETADATA']._serialized_start=336
+  _globals['_FILEMETADATA']._serialized_end=416
+  _globals['_FILECHUNK']._serialized_start=418
+  _globals['_FILECHUNK']._serialized_end=443
+  _globals['_FILESIGNATURE']._serialized_start=445
+  _globals['_FILESIGNATURE']._serialized_end=476
+  _globals['_FILEERROR']._serialized_start=478
+  _globals['_FILEERROR']._serialized_end=541
+  _globals['_FILEDOWNLOADERSERVICE']._serialized_start=670
+  _globals['_FILEDOWNLOADERSERVICE']._serialized_end=776
 # @@protoc_insertion_point(module_scope)

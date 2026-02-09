@@ -25,6 +25,7 @@ const (
 // It is stored in BadgerDB to ensure persistence and prevent OOM.
 type FileTask struct {
 	ID                string
+	DriveID           string
 	Path              string
 	RawMimeType       string
 	EffectiveMimeType mimetypes.MIME
@@ -145,6 +146,7 @@ func (f FileTaskRepository) MarkAsProcessing(task FileTask) error {
 func fromPbFileTask(p *pb.FileTask) FileTask {
 	return FileTask{
 		ID:                p.Id,
+		DriveID:           p.DriveId,
 		Path:              p.Path,
 		RawMimeType:       p.RawMimeType,
 		EffectiveMimeType: mimetypes.ToMIME(p.EffectiveMimeType),
@@ -158,6 +160,7 @@ func fromPbFileTask(p *pb.FileTask) FileTask {
 func toPbFileTask(task FileTask) *pb.FileTask {
 	return &pb.FileTask{
 		Id:                task.ID,
+		DriveId:           task.DriveID,
 		Path:              task.Path,
 		RawMimeType:       task.RawMimeType,
 		EffectiveMimeType: string(task.EffectiveMimeType),

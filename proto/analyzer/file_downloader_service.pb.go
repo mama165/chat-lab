@@ -81,8 +81,9 @@ func (ErrorCode) EnumDescriptor() ([]byte, []int) {
 
 type FileDownloaderRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // Better than path for security (obfuscation)
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`                   // The actual path on the scanner's disk
+	DriveId       string                 `protobuf:"bytes,1,opt,name=drive_id,json=driveId,proto3" json:"drive_id,omitempty"`
+	FileId        string                 `protobuf:"bytes,2,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // Better than path for security (obfuscation)
+	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`                   // The actual path on the scanner's disk
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -115,6 +116,13 @@ func (x *FileDownloaderRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use FileDownloaderRequest.ProtoReflect.Descriptor instead.
 func (*FileDownloaderRequest) Descriptor() ([]byte, []int) {
 	return file_proto_analyzer_file_downloader_service_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *FileDownloaderRequest) GetDriveId() string {
+	if x != nil {
+		return x.DriveId
+	}
+	return ""
 }
 
 func (x *FileDownloaderRequest) GetFileId() string {
@@ -449,10 +457,11 @@ var File_proto_analyzer_file_downloader_service_proto protoreflect.FileDescripto
 
 const file_proto_analyzer_file_downloader_service_proto_rawDesc = "" +
 	"\n" +
-	",proto/analyzer/file_downloader_service.proto\x12\banalyzer\"D\n" +
-	"\x15FileDownloaderRequest\x12\x17\n" +
-	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"\xec\x01\n" +
+	",proto/analyzer/file_downloader_service.proto\x12\banalyzer\"_\n" +
+	"\x15FileDownloaderRequest\x12\x19\n" +
+	"\bdrive_id\x18\x01 \x01(\tR\adriveId\x12\x17\n" +
+	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\"\xec\x01\n" +
 	"\x16FileDownloaderResponse\x124\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x16.analyzer.FileMetadataH\x00R\bmetadata\x12+\n" +
 	"\x05chunk\x18\x02 \x01(\v2\x13.analyzer.FileChunkH\x00R\x05chunk\x127\n" +

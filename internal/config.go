@@ -52,6 +52,8 @@ type Config struct {
 	TmpDownloadingDir                string        `env:"TMP_DOWNLOADING_DIR,required=true"`
 	ProgressLogInterval              time.Duration `env:"PROGRESS_LOG_INTERVAL,required=true"`
 	GrpcConfig                       GrpcConfig
+	MaxTmpFileToProcess              uint32        `env:"MAX_TMP_FILE_TO_PROCESS,required=true"`
+	FileTmpJobInterval               time.Duration `env:"FILE_TMP_JOB_INTERVAL,required=true"`
 }
 
 type GrpcConfig struct {

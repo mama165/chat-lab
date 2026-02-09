@@ -1,6 +1,7 @@
 package event
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/mimetypes"
 	"time"
 
@@ -8,7 +9,8 @@ import (
 )
 
 const (
-	FileAnalyzeType Type = "FILE_ANALYZE"
+	FileAnalyzeType     Type = "FILE_ANALYZE"
+	ProcessedResultType      = "PROCESSED_RESULT"
 )
 
 type FileAnalyse struct {
@@ -25,5 +27,21 @@ type FileAnalyse struct {
 }
 
 func (r FileAnalyse) Namespace() string {
+	return r.DriveID
+}
+
+type AnalysisSegment struct {
+	DriveID string
+	FileID  domain.FileID
+	Metrics []AnalysisMetric
+}
+
+type AnalysisMetric struct {
+	ID            *domain.Metric
+	Resp          *domain.Response
+	SpecialistErr error
+}
+
+func (r AnalysisSegment) Namespace() string {
 	return r.DriveID
 }

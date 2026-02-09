@@ -67,8 +67,9 @@ func (w *FileTransferWorker) Run(ctx context.Context) error {
 
 				// This will block if the gRPC worker is overwhelmed (Natural Backpressure)
 				w.requestChan <- domain.FileDownloaderRequest{
-					FileID: domain.FileID(task.ID),
-					Path:   task.Path,
+					DriveID: task.DriveID,
+					FileID:  domain.FileID(task.ID),
+					Path:    task.Path,
 				}
 
 				w.log.Debug("Task dispatched to gRPC worker", "id", task.ID)
