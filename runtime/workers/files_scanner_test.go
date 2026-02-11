@@ -2,6 +2,7 @@ package workers
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/observability"
 	"context"
 	"io"
 	"log/slog"
@@ -33,7 +34,7 @@ func TestFileScannerWorker_Run(t *testing.T) {
 	t.Run("Full scan execution", func(t *testing.T) {
 		// Initialize all dependencies for the concurrent worker.
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-		counter := analyzer.NewCounterFileScanner()
+		monitoring := observability.NewMonitoringManager(logger)
 
 		// Use buffered channels to avoid deadlocks during the test
 		dirChan := make(chan string, 10)
@@ -45,7 +46,7 @@ func TestFileScannerWorker_Run(t *testing.T) {
 		worker := NewFileScannerWorker(
 			logger,
 			"drive-123",
-			counter,
+			monitoring,
 			dirChan,
 			fileChan,
 			&scanWG,
@@ -87,9 +88,9 @@ func TestFileScannerWorker_Run(t *testing.T) {
 		workersWG.Wait()
 
 		// Assertions
-		req.Equal(uint64(2), counter.FilesScanned, "Should have found 2 files")
-		req.Equal(uint64(2), counter.DirsScanned, "Should have scanned root + subdir")
-		req.Equal(uint64(24), counter.BytesProcessed, "Total size should match content length")
+		req.Equal(uint64(2), monitoring.FilesFound, "Should have found 2 files")
+		req.Equal(uint64(2), monitoring.DirsScanned, "Should have scanned root + subdir")
+		req.Equal(uint64(24), monitoring.ScannerBytes, "Total size should match content length")
 
 		// Verify fileChan content
 		req.Equal(2, len(fileChan))
@@ -106,7 +107,7 @@ func TestFileScannerWorker_Run(t *testing.T) {
 		worker := NewFileScannerWorker(
 			logger,
 			"id",
-			analyzer.NewCounterFileScanner(),
+			observability.NewMonitoringManager(logger),
 			nil, fileChan, nil, nil,
 			70,
 			90)

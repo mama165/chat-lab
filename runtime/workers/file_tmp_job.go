@@ -78,6 +78,7 @@ func (w *FileTmpJobWorker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case tmpFileLocation := <-w.tmpFileLocationChan:
+			w.log.Info("📥 Job reçu dans le Worker !", "path", tmpFileLocation.TmpFilePath, "mime", tmpFileLocation.EffectiveMimeType)
 			w.addJob(tmpFileLocation)
 		case <-ticker.C:
 			w.processJobs(ctx)
@@ -116,6 +117,7 @@ func (w *FileTmpJobWorker) processJobs(ctx context.Context) {
 		w.log.Debug("No tmp file to send to specialist, waiting for next job...")
 		return
 	}
+	w.log.Debug("jobs contains elements", "size", len(w.jobs))
 	nbrOfFile := w.maxFileToProcess - w.processingFileCount
 	if nbrOfFile <= 0 {
 		w.log.Debug("maximum number of file processing capacity reached",

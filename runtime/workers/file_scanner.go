@@ -2,6 +2,8 @@ package workers
 
 import (
 	"chat-lab/domain/analyzer"
+	"chat-lab/domain/mimetypes"
+	"chat-lab/observability"
 	"context"
 	"log/slog"
 	"os"
@@ -16,9 +18,9 @@ import (
 // filesystem traversal. It explores directories recursively by feeding subdirectories
 // back into the dirChan and produces metadata requests for every regular file found.
 type FileScannerWorker struct {
-	log          *slog.Logger
-	driveID      string
-	countScanner *analyzer.CounterFileScanner
+	log        *slog.Logger
+	driveID    string
+	monitoring *observability.MonitoringManager
 	// dirChan is a shared work queue used to distribute directory paths among
 	// all active scanner workers, enabling concurrent tree walking.
 	dirChan chan string
@@ -34,7 +36,7 @@ type FileScannerWorker struct {
 func NewFileScannerWorker(
 	log *slog.Logger,
 	driveID string,
-	countScanner *analyzer.CounterFileScanner,
+	monitoring *observability.MonitoringManager,
 	dirChan chan string,
 	fileChan chan *analyzer.FileAnalyzerRequest,
 	scanWG *sync.WaitGroup,
@@ -45,7 +47,7 @@ func NewFileScannerWorker(
 	return &FileScannerWorker{
 		log:                              log,
 		driveID:                          driveID,
-		countScanner:                     countScanner,
+		monitoring:                       monitoring,
 		dirChan:                          dirChan,
 		fileChan:                         fileChan,
 		scanWG:                           scanWG,
@@ -105,16 +107,16 @@ func (w *FileScannerWorker) handleDirectory(ctx context.Context, currentDir stri
 
 	entries, err := os.ReadDir(currentDir)
 	if err != nil {
-		w.countScanner.IncrErrorCount()
+		w.monitoring.IncrErrorCount()
 		w.log.Debug("Permission denied or path error", "path", currentDir, "error", err)
 		return
 	}
 
-	w.countScanner.IncrDirsScanned()
+	w.monitoring.IncrDirsScanned()
 
 	for _, entry := range entries {
 		if entry.Type()&os.ModeSymlink != 0 {
-			w.countScanner.IncrSkippedItems()
+			w.monitoring.IncrSkippedItems()
 			continue
 		}
 		fullPath := filepath.Join(currentDir, entry.Name())
@@ -131,7 +133,7 @@ func (w *FileScannerWorker) handleDirectory(ctx context.Context, currentDir stri
 		if entry.Type().IsRegular() {
 			w.processFile(ctx, fullPath, entry)
 		} else {
-			w.countScanner.IncrSkippedItems()
+			w.monitoring.IncrSkippedItems()
 		}
 	}
 }
@@ -145,7 +147,6 @@ func buildBackPressureLimit(fileChan chan *analyzer.FileAnalyzerRequest, limit i
 func (w *FileScannerWorker) processFile(ctx context.Context, path string, entry os.DirEntry) {
 	info, err := entry.Info()
 	if err != nil {
-		w.countScanner.IncrErrorCount()
 		return
 	}
 
@@ -161,12 +162,18 @@ func (w *FileScannerWorker) processFile(ctx context.Context, path string, entry 
 		magicBytes = magicBytes[:0]
 	}
 
+	mimeType := mimetype.Detect(magicBytes).String()
+	_, ok := mimetypes.IsAuthorized(mimeType)
+	if !ok {
+		return
+	}
 	// Build the domain request
+	size := uint64(info.Size())
 	req := &analyzer.FileAnalyzerRequest{
 		Path:       path,
 		DriveID:    w.driveID,
-		Size:       uint64(info.Size()),
-		MimeType:   mimetype.Detect(magicBytes).String(),
+		Size:       size,
+		MimeType:   mimeType,
 		MagicBytes: magicBytes,
 		ScannedAt:  time.Now(),
 		SourceType: analyzer.LOCALFIXED,
@@ -175,7 +182,13 @@ func (w *FileScannerWorker) processFile(ctx context.Context, path string, entry 
 	select {
 	case <-ctx.Done():
 	case w.fileChan <- req:
-		w.countScanner.IncrFilesScanned()
-		w.countScanner.IncrSizeFound(req.Size)
+		w.monitoring.IncrScannerBytes(size)
+		w.monitoring.IncrFileFound()
+		w.monitoring.AddBatch(
+			"file-id",
+			path,
+			mimeType,
+			"scanned",
+		)
 	}
 }

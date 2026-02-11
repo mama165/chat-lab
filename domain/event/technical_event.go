@@ -23,7 +23,7 @@ type ChannelCapacity struct {
 type ProcessTracker struct {
 	PID    domain.PID
 	Metric domain.Metric
-	Status domain.PidStatus
+	Status domain.PIDStatus
 	Cpu    float64
-	Ram    float32
+	Ram    uint64
 }

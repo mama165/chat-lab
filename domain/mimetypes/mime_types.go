@@ -41,11 +41,20 @@ func IsPDF(detected string) (MIME, bool) {
 	return Unknown, false
 }
 
-func IsImage(detected string) bool {
-	_, ok1 := Matches(detected, ImagePNG)
-	_, ok2 := Matches(detected, ImageJPEG)
-	_, ok3 := Matches(detected, ImageGIF)
-	return ok1 || ok2 || ok3
+func IsImage(detected string) (MIME, bool) {
+	found, ok := Matches(detected, ImagePNG)
+	if ok {
+		return found, true
+	}
+	found, ok = Matches(detected, ImageJPEG)
+	if ok {
+		return found, true
+	}
+	found, ok = Matches(detected, ImageGIF)
+	if ok {
+		return found, true
+	}
+	return Unknown, false
 }
 
 func IsAudio(detected string) (MIME, bool) {
@@ -77,6 +86,10 @@ func IsAuthorized(detected string) (MIME, bool) {
 	if ok {
 		return mimeType, ok
 	}
+	mimeType, ok = IsImage(detected)
+	if ok {
+		return mimeType, ok
+	}
 	return Unknown, false
 }
 
@@ -86,6 +99,8 @@ func ToMIME(m string) MIME {
 		return MIME(m)
 	case ApplicationPDF:
 		return ApplicationPDF
+	case ImagePNG, ImageJPEG, ImageGIF:
+		return MIME(m)
 	case VideoMP4:
 		return MIME(m)
 	default:

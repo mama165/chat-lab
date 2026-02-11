@@ -11,6 +11,7 @@ import (
 	"chat-lab/errors"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/moderation"
+	"chat-lab/observability"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
 	"chat-lab/sink"
@@ -31,6 +32,7 @@ var censoredFolder embed.FS
 type Orchestrator struct {
 	mu                     sync.Mutex
 	log                    *slog.Logger
+	globalMonitor          *domain.GlobalMonitoring
 	counter                *event.Counter
 	numWorkers             int
 	rooms                  map[chat.RoomID]*chat.Room
@@ -50,6 +52,7 @@ type Orchestrator struct {
 	coordinator            contract.SpecialistCoordinator
 	grpcClient             pb.FileDownloaderServiceClient
 	fileAccumulator        contract.IFileAccumulator
+	monitoring             *observability.MonitoringManager
 	sinkTimeout            time.Duration
 	bufferTimeout          time.Duration
 	specialistTimeout      time.Duration
@@ -68,7 +71,10 @@ type Orchestrator struct {
 	fileTmpJobInterval     time.Duration
 }
 
-func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
+func NewOrchestrator(
+	log *slog.Logger,
+	globalMonitor *domain.GlobalMonitoring,
+	supervisor *workers.Supervisor,
 	registry *Registry, telemetryChan, eventChan chan event.Event,
 	processTrackerChan chan domain.Process,
 	fileRequestChan chan domain.FileDownloaderRequest,
@@ -80,6 +86,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 	specialistCoordinator contract.SpecialistCoordinator,
 	grpcClient pb.FileDownloaderServiceClient,
 	fileAccumulator contract.IFileAccumulator,
+	monitoring *observability.MonitoringManager,
 	numWorkers, bufferSize int,
 	sinkTimeout, bufferTimeout, specialistTimeout time.Duration,
 	metricInterval, latencyThreshold, waitAndFail time.Duration, charReplacement rune,
@@ -91,6 +98,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 ) *Orchestrator {
 	return &Orchestrator{
 		log:                    log,
+		globalMonitor:          globalMonitor,
 		counter:                event.NewCounter(),
 		numWorkers:             numWorkers,
 		rooms:                  make(map[chat.RoomID]*chat.Room),
@@ -110,6 +118,7 @@ func NewOrchestrator(log *slog.Logger, supervisor *workers.Supervisor,
 		coordinator:            specialistCoordinator,
 		grpcClient:             grpcClient,
 		fileAccumulator:        fileAccumulator,
+		monitoring:             monitoring,
 		sinkTimeout:            sinkTimeout,
 		bufferTimeout:          bufferTimeout,
 		specialistTimeout:      specialistTimeout,
@@ -317,7 +326,7 @@ func (o *Orchestrator) PrepareFanouts() []contract.Worker {
 
 func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 	handlers := []event.Handler{
-		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold),
+		event.NewChannelCapacityHandler(o.log, o.lowCapacityThreshold, o.monitoring),
 		event.NewProcessTrackerHandler(o.log),
 		event.NewCensoredHandler(o.log, o.counter),
 		event.NewLatencyHandler(o.log, o.latencyThreshold),
@@ -346,6 +355,7 @@ func (o *Orchestrator) prepareTelemetry() (contract.Worker, contract.Worker) {
 func (o *Orchestrator) prepareHeathMonitoringWorker() contract.Worker {
 	return workers.NewHealthMonitoringWorker(
 		o.log,
+		o.globalMonitor,
 		o.telemetryChan,
 		o.processTrackerChan,
 		o.metricInterval,

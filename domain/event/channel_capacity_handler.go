@@ -2,6 +2,7 @@ package event
 
 import (
 	"chat-lab/errors"
+	"chat-lab/observability"
 	"fmt"
 	"log/slog"
 )
@@ -12,10 +13,18 @@ import (
 type ChannelCapacityHandler struct {
 	log                  *slog.Logger
 	lowCapacityThreshold int
+	monitoring           *observability.MonitoringManager
 }
 
-func NewChannelCapacityHandler(log *slog.Logger, lowCapacityThreshold int) *ChannelCapacityHandler {
-	return &ChannelCapacityHandler{log: log, lowCapacityThreshold: lowCapacityThreshold}
+func NewChannelCapacityHandler(log *slog.Logger,
+	lowCapacityThreshold int,
+	monitoring *observability.MonitoringManager,
+) *ChannelCapacityHandler {
+	return &ChannelCapacityHandler{
+		log:                  log,
+		lowCapacityThreshold: lowCapacityThreshold,
+		monitoring:           monitoring,
+	}
 }
 
 func (h ChannelCapacityHandler) Handle(event Event) {
@@ -26,6 +35,13 @@ func (h ChannelCapacityHandler) Handle(event Event) {
 			h.log.Error(errors.ErrInvalidPayload.Error())
 			return
 		}
+
+		stats := observability.MonitoringStats{
+			MaxCapacity:      uint32(payload.Capacity),
+			CurrentQueueSize: payload.Length,
+		}
+		h.monitoring.MergeExternalStats(stats)
+
 		h.log.Debug(fmt.Sprintf("Channel %s usage: %d / %d", payload.ChannelName, payload.Length, payload.Capacity))
 		if payload.Capacity <= 0 {
 			// In case of unbuffered channel

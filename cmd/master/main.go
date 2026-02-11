@@ -8,9 +8,11 @@ import (
 	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/internal"
+	"chat-lab/observability"
 	pb2 "chat-lab/proto/account"
 	pb3 "chat-lab/proto/analyzer"
 	pb1 "chat-lab/proto/chat"
+	pb "chat-lab/proto/monitoring"
 	pb4 "chat-lab/proto/storage"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
@@ -18,13 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
-	runtime2 "runtime"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -81,7 +82,30 @@ func run() (int, error) {
 		return exitConfig, err
 	}
 
-	logger := logs.GetLoggerFromString(config.LogLevel)
+	// 2. On prépare le fichier de log
+	logFile, err := os.OpenFile("master_execution.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		return exitRuntime, fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer logFile.Close()
+
+	// 3. On crée un MultiWriter (Console + Fichier)
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+
+	// 4. On crée un NOUVEAU handler qui utilise le niveau de ton baseLogger
+	// mais qui écrit vers notre multiWriter
+	level := logs.GetLevelFromString(config.LogLevel)
+
+	handler := slog.NewTextHandler(multiWriter, &slog.HandlerOptions{
+		Level: level,
+	})
+
+	// 5. On instancie le logger final
+	logger := slog.New(handler)
+
+	// CRITIQUE : On définit ce logger comme défaut global
+	// Ainsi, ton Coordinator et ton Orchestrator l'utiliseront automatiquement
+	slog.SetDefault(logger)
 
 	ctx := context.Background()
 
@@ -93,7 +117,7 @@ func run() (int, error) {
 		return exitRuntime, fmt.Errorf("database opening failed: %w", err)
 	}
 
-	monitor := domain.NewGlobalMonitoring(config.MaxTmpFileToProcess)
+	monitor := domain.NewGlobalMonitoring()
 
 	defer func() {
 		// Defer ensures the database lock is released and buffers are flushed before the function returns.
@@ -206,7 +230,9 @@ func run() (int, error) {
 			// On crée le client pour le contrôleur du scanner
 			scannerCtrlClient := pb3.NewScannerControllerClient(conn)
 
-			target := "/mnt/c/Users/Maël/Desktop"
+			//target := "/mnt/c/Users/Maël/Downloads"
+			//target := "/mnt/c/Users/Maël/Desktop/test_data"
+			target := "/home/mael/develop/chat-lab/test_data"
 			slog.Info("📡 Master envoie l'ordre de scan au Scanner", "path", target)
 
 			_, err = scannerCtrlClient.TriggerScan(ctx, &pb3.ScanRequest{
@@ -220,14 +246,16 @@ func run() (int, error) {
 
 	// Create the temp directory
 	// /tmp/{directory}
-	fileDownloadingDirPath := filepath.Join(os.TempDir(), config.TmpDownloadingDir)
+	//fileDownloadingDirPath := filepath.Join(os.TempDir(), config.TmpDownloadingDir)
+	//fileDownloadingDirPath := filepath.Join("/tmp", config.TmpDownloadingDir)
+	fileDownloadingDirPath := filepath.Join("/tmp", config.TmpDownloadingDir)
 	if err = os.MkdirAll(fileDownloadingDirPath, 0755); err != nil {
 		return exitRuntime, fmt.Errorf("failed to create dir %s : %w", fileDownloadingDirPath, err)
 	}
 	fileAccumulator := services.NewFileAccumulator(fileDownloadingDirPath, tmpFilePathChan)
 
 	orchestrator := runtime.NewOrchestrator(
-		logger, sup, registry, telemetryChan, eventChan,
+		logger, monitor, sup, registry, telemetryChan, eventChan,
 		processTrackerChan,
 		fileDownloaderRequestChan,
 		tmpFilePathChan,
@@ -238,6 +266,7 @@ func run() (int, error) {
 		coordinator,
 		grpcClient,
 		fileAccumulator,
+		observability.NewMonitoringManager(logger),
 		config.NumberOfWorkers, config.BufferSize,
 		config.SinkTimeout, config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
 		charReplacement,
@@ -267,6 +296,15 @@ func run() (int, error) {
 		}
 	}()
 
+	// Ton serveur qui expose les données
+	statsServer := server.NewMonitoringServer(monitor)
+	go func() {
+		logger.Info("📊 Monitoring server starting on :8092")
+		if err := statsServer.Start(8092); err != nil {
+			logger.Error("Monitoring server failed", "err", err)
+		}
+	}()
+
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc3.UnaryLoggingInterceptor(logger),
@@ -279,41 +317,13 @@ func run() (int, error) {
 	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
 	chatServer := server.NewChatServer(logger, chatService, config.ConnectionBufferSize, config.BufferTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
+	monitoringServer := server.NewMonitoringServer(monitor)
 
 	authServer := server.NewAuthServer(authService)
 	pb1.RegisterChatServiceServer(s, chatServer)
 	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
-
-	if logger.Enabled(ctx, slog.LevelDebug) {
-		statsProvider := func() map[string]any {
-			// Préparation de la map pour l'UI
-			res := map[string]any{
-				"🚀 Total Analysés": atomic.LoadUint64(&monitor.TotalProcessed),
-				"⚙️ Occupation Scan": fmt.Sprintf("%d / %d",
-					atomic.LoadUint32(&monitor.ActiveScans),
-					monitor.MaxScans),
-				"📂 File Queue":      len(tmpFilePathChan),
-				"🔄 Specialist Flow": len(specialistResponseChan),
-			}
-
-			// Ajout dynamique de la santé des spécialistes (Thread-safe)
-			monitor.SpecialistsMu.RLock()
-			for metric, health := range monitor.Specialists {
-				key := fmt.Sprintf("🛡️ %s (PID %d)", metric, health.PID)
-				val := fmt.Sprintf("CPU: %.1f%% | RAM: %.1f%% [%s]",
-					health.CPU, health.RAM, health.Status)
-				res[key] = val
-			}
-			monitor.SpecialistsMu.RUnlock()
-
-			res["🧠 Goroutines"] = runtime2.NumGoroutine()
-			return res
-		}
-
-		// On lance le serveur avec notre fournisseur de stats "vivant"
-		internal.StartDebugServer(db, config.DebugPort, "/inspect", AnalysisMapper, statsProvider)
-	}
+	pb.RegisterMonitoringServiceServer(s, monitoringServer)
 
 	// Use an error channel to capture Serve() issues asynchronously.
 	go func() {

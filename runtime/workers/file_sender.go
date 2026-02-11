@@ -3,6 +3,7 @@ package workers
 import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/infrastructure/grpc/client"
+	"chat-lab/observability"
 	pb "chat-lab/proto/analyzer"
 	"context"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 type FileSenderWorker struct {
 	client              client.FileAnalyzerClient
 	log                 *slog.Logger
+	monitoring          *observability.MonitoringManager
 	fileChan            chan *analyzer.FileAnalyzerRequest
 	progressLogInterval time.Duration
 }
@@ -23,12 +25,14 @@ type FileSenderWorker struct {
 func NewFileSenderWorker(
 	client client.FileAnalyzerClient,
 	log *slog.Logger,
+	monitoring *observability.MonitoringManager,
 	fileChan chan *analyzer.FileAnalyzerRequest,
 	progressLogInterval time.Duration,
 ) *FileSenderWorker {
 	return &FileSenderWorker{
 		client:              client,
 		log:                 log,
+		monitoring:          monitoring,
 		fileChan:            fileChan,
 		progressLogInterval: progressLogInterval,
 	}
@@ -106,6 +110,7 @@ func (w FileSenderWorker) Run(ctx context.Context) error {
 					return
 				}
 
+				w.monitoring.IncrMasterBytes(req.Size)
 				fileCount++
 
 				// Release slot: stream.Send blocks if gRPC internal buffers are full.

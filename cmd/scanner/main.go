@@ -8,15 +8,18 @@ import (
 	"chat-lab/infrastructure/grpc/client"
 	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/internal"
+	"chat-lab/observability"
 	pb "chat-lab/proto/analyzer"
 	"chat-lab/runtime/workers"
 	"chat-lab/services"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -115,21 +118,60 @@ func main() {
 
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	supervisor := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
-	counter := analyzer.NewCounterFileScanner()
 	fileChan := make(chan *analyzer.FileAnalyzerRequest, config.BufferSize)
+	// 1. Instanciation du Manager et du Channel de métriques
+	monitoringManager := observability.NewMonitoringManager(logger)
+	metricsStatsChan := make(chan observability.MonitoringStats, config.BufferSize)
 
-	telemetryWorkers, channelCapWorker, reporterWorker :=
-		buildTelemetryWorkers(config, logger, &workersWG, fileChan, dirChan, telemetryChan, counter)
+	// 2. Lancement du processeur de métriques (Listen)
+	go monitoringManager.Listen(ctx, metricsStatsChan)
+
+	// 2. Lancement du serveur HTTP pour l'API et le Dashboard
+	go func() {
+		mux := http.NewServeMux()
+
+		// Endpoint API pour le JSON
+		mux.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Access-Control-Allow-Origin", "*") // Autorise l'accès depuis d'autres ports si besoin
+
+			stats := monitoringManager.GetLatest()
+			if err := json.NewEncoder(w).Encode(stats); err != nil {
+				logger.Error("❌ Erreur encodage JSON stats", "error", err)
+			}
+		})
+
+		// Endpoint pour servir le dashboard HTML
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			// Assure-toi que dashboard_1.html est à la racine de ton projet
+			http.ServeFile(w, r, "ui/monitoring.html")
+		})
+
+		serverAddr := ":8091"
+		logger.Info("📊 Dashboard de monitoring disponible", "url", "http://localhost"+serverAddr)
+
+		if err := http.ListenAndServe(serverAddr, mux); err != nil {
+			logger.Error("❌ Serveur de monitoring en échec", "error", err)
+		}
+	}()
+
+	telemetryWorkers, channelCapWorker :=
+		buildTelemetryWorkers(config, logger, fileChan,
+			dirChan, telemetryChan, monitoringManager)
 
 	fileScannerWorkers, fileDownloaderWorker, fileSenderWorker :=
 		buildFileWorkers(
 			config,
-			&workersWG, &scanWG, logger, counter, dirChan,
+			&workersWG, &scanWG, logger, monitoringManager, dirChan,
 			fileChan, fileDownloaderRequestChan, fileDownloaderResponseChan, grpcClient,
 			config.ChunkSizeKb, config.MaxFileSizeMb,
 		)
+
+	heartbeatWorker := workers.NewHeartbeatWorker(logger, conn, monitoringManager)
+
 	supervisor.
-		Add(telemetryWorkers, channelCapWorker, reporterWorker).
+		Add(telemetryWorkers, channelCapWorker).
+		Add(heartbeatWorker).
 		Add(fileScannerWorkers...).
 		Add(fileSenderWorker).
 		Add(fileDownloaderWorker...)
@@ -154,24 +196,26 @@ func main() {
 	close(fileChan)
 
 	logger.Info("Scan Summary",
-		"Files", counter.FilesScanned,
-		"Dirs", counter.DirsScanned,
-		"Bytes", counter.BytesProcessed,
-		"Errors", counter.ErrorCount,
-		"Skipped", counter.SkippedItems,
+		"Files", monitoringManager.FilesFound,
+		"Dirs", monitoringManager.DirsScanned,
+		"Bytes", monitoringManager.ScannerBytes,
+		"Errors", monitoringManager.ErrorCount,
+		"Skipped", monitoringManager.SkippedItem,
 	)
 }
 
 func buildTelemetryWorkers(
 	config internal.Config,
 	logger *slog.Logger,
-	workersWG *sync.WaitGroup,
 	fileChan chan *analyzer.FileAnalyzerRequest,
 	dirChan chan string,
 	telemetryChan chan event.Event,
-	counter *analyzer.CounterFileScanner,
-) (contract.Worker, contract.Worker, contract.Worker) {
-	channelCapacityHandler := event.NewChannelCapacityHandler(logger, config.LowCapacityThreshold)
+	monitoring *observability.MonitoringManager,
+) (contract.Worker, contract.Worker) {
+	channelCapacityHandler := event.NewChannelCapacityHandler(
+		logger, config.LowCapacityThreshold,
+		monitoring,
+	)
 	telemetryWorker := workers.NewTelemetryWorker(
 		logger, config.MetricInterval, telemetryChan,
 		[]event.Handler{channelCapacityHandler},
@@ -184,15 +228,13 @@ func buildTelemetryWorkers(
 	channelCapacityWorker := workers.NewChannelCapacityWorker(
 		logger, channelsToMonitor, telemetryChan, config.MetricInterval)
 
-	reporterWorker := workers.NewReporterWorker(counter, 2*time.Second, workersWG)
-
-	return telemetryWorker, channelCapacityWorker, reporterWorker
+	return telemetryWorker, channelCapacityWorker
 }
 
 func buildFileWorkers(config internal.Config,
 	workersWG, scanWG *sync.WaitGroup,
 	logger *slog.Logger,
-	counter *analyzer.CounterFileScanner,
+	monitoring *observability.MonitoringManager,
 	dirChan chan string, fileChan chan *analyzer.FileAnalyzerRequest,
 	requestChan chan domain.FileDownloaderRequest,
 	responseChan chan domain.FileDownloaderResponse,
@@ -204,7 +246,7 @@ func buildFileWorkers(config internal.Config,
 		workersWG.Add(1)
 		allFileScannerWorkers = append(allFileScannerWorkers,
 			workers.NewFileScannerWorker(
-				logger, config.DriveID, counter,
+				logger, config.DriveID, monitoring,
 				dirChan, fileChan,
 				scanWG,
 				workersWG,
@@ -226,7 +268,7 @@ func buildFileWorkers(config internal.Config,
 			))
 	}
 
-	fileSenderWorker := workers.NewFileSenderWorker(client, logger, fileChan, config.ProgressLogInterval)
+	fileSenderWorker := workers.NewFileSenderWorker(client, logger, monitoring, fileChan, config.ProgressLogInterval)
 
 	return allFileScannerWorkers, allFileDownloaderWorkers, fileSenderWorker
 }

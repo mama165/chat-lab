@@ -90,7 +90,8 @@ func TestIsImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req.Equal(tt.want, IsImage(tt.detected))
+			_, ok := IsImage(tt.detected)
+			req.Equal(tt.want, ok)
 		})
 	}
 }

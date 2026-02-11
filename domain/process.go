@@ -6,30 +6,30 @@ type Process struct {
 }
 
 type PID int32
-type PidStatus string
+type PIDStatus string
 
 const (
-	RUNNING PidStatus = "RUNNING"
-	SLEEP   PidStatus = "SLEEP"
-	STOP    PidStatus = "STOP"
-	IDLE    PidStatus = "IDLE"
-	ZOMBIE  PidStatus = "ZOMBIE"
-	WAIT    PidStatus = "WAIT"
-	LOCK    PidStatus = "LOCK"
-	UNKNOWN PidStatus = "UNKNOWN"
+	RUNNING PIDStatus = "RUNNING"
+	SLEEP   PIDStatus = "SLEEP"
+	STOP    PIDStatus = "STOP"
+	IDLE    PIDStatus = "IDLE"
+	ZOMBIE  PIDStatus = "ZOMBIE"
+	WAIT    PIDStatus = "WAIT"
+	LOCK    PIDStatus = "LOCK"
+	UNKNOWN PIDStatus = "UNKNOWN"
 )
 
-func ToStatus(status string) PidStatus {
+func ToPIDStatus(status string) PIDStatus {
 	switch status {
-	case "R":
+	case "R", "RUNNING":
 		return RUNNING
-	case "S":
+	case "S", "SLEEP", "SLEEPING":
 		return SLEEP
-	case "T":
+	case "T", "STOP", "STOPPED":
 		return STOP
-	case "I":
+	case "I", "IDLE":
 		return IDLE
-	case "Z":
+	case "Z", "ZOMBIE":
 		return ZOMBIE
 	case "W":
 		return WAIT

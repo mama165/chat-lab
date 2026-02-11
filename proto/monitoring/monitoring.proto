@@ -1,0 +1,35 @@
+syntax = "proto3";
+package analysis;
+option go_package = "./pb";
+import "google/protobuf/empty.proto";
+
+service MonitoringService {
+  rpc ReportStatus (NodeStatus) returns (google.protobuf.Empty);
+}
+
+message Ack {
+  bool ok = 1;
+}
+
+message NodeStatus {
+  // --- Identification ---
+  string node_id = 1;        // ex: "scanner-01" ou "specialist-toxicity-01"
+  string node_type = 2;      // "SCANNER", "MASTER", "SPECIALIST"
+  int64 pid = 3;
+  string pid_status = 4;     // IMPORTANT: "running", "sleep", "idle", etc.
+
+  // --- System resources ---
+  double cpu_percent = 5;
+  uint64 ram_bytes = 6;
+  uint32 num_goroutines = 7;
+
+  // --- Pipeline metric / Backpressure ---
+  uint64 items_processed = 8;
+  uint32 current_load = 9;    // 0 or 1 for a specialist)
+  uint32 queue_size = 10;     // Waiting inside internal node
+  uint32 max_capacity = 11;   // Max channel capacity
+
+  // --- Contexte Métier ---
+  string current_item_name = 12; // Name/UUID of the file being processed
+  uint64 uptime_seconds = 13;
+}

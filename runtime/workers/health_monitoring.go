@@ -15,6 +15,7 @@ import (
 type HealthMonitoringWorker struct {
 	mu                 sync.Mutex
 	log                *slog.Logger
+	globalMonitor      *domain.GlobalMonitoring
 	telemetryChan      chan event.Event
 	processTrackerChan chan domain.Process
 	metricInterval     time.Duration
@@ -23,12 +24,14 @@ type HealthMonitoringWorker struct {
 
 func NewHealthMonitoringWorker(
 	log *slog.Logger,
+	globalMonitor *domain.GlobalMonitoring,
 	telemetryChan chan event.Event,
 	processTrackerChan chan domain.Process,
 	metricInterval time.Duration,
 ) *HealthMonitoringWorker {
 	return &HealthMonitoringWorker{
 		log:                log,
+		globalMonitor:      globalMonitor,
 		telemetryChan:      telemetryChan,
 		processTrackerChan: processTrackerChan,
 		metricInterval:     metricInterval,
@@ -70,7 +73,7 @@ func (w *HealthMonitoringWorker) Run(ctx context.Context) error {
 					w.log.Error("Error while finding process cpu usage", "err", err)
 					continue
 				}
-				ram, err := p.MemoryPercent()
+				ram, err := p.MemoryInfo()
 				if err != nil {
 					w.log.Error("Error while finding process ram usage", "err", err)
 					continue
@@ -78,7 +81,17 @@ func (w *HealthMonitoringWorker) Run(ctx context.Context) error {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case w.telemetryChan <- toProcessTrackerEvent(pid, metric, status, cpu, ram):
+				case w.telemetryChan <- toProcessTrackerEvent(pid, metric, status, cpu, ram.RSS):
+					w.globalMonitor.UpdateNode(domain.NodeHealth{
+						ID:             string(metric),
+						Type:           domain.SPECIALIST,
+						PIDStatus:      domain.ToPIDStatus(status),
+						PID:            int64(pid),
+						CPU:            cpu,
+						RAM:            ram.RSS,
+						ItemsProcessed: 0,
+						QueueSize:      0,
+					})
 				default:
 					w.log.Debug("Observability telemetry processTrackerChan lost")
 				}
@@ -96,13 +109,13 @@ func (w *HealthMonitoringWorker) Run(ctx context.Context) error {
 }
 
 func toProcessTrackerEvent(pid domain.PID, metric domain.Metric,
-	status string, cpu float64, ram float32) event.Event {
+	status string, cpu float64, ram uint64) event.Event {
 	return event.Event{
 		Type:      event.PIDTrackerType,
 		CreatedAt: time.Now().UTC(),
 		Payload: event.ProcessTracker{
 			Metric: metric,
-			Status: domain.ToStatus(status),
+			Status: domain.ToPIDStatus(status),
 			PID:    pid,
 			Cpu:    cpu,
 			Ram:    ram,

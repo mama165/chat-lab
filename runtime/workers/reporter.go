@@ -1,7 +1,7 @@
 package workers
 
 import (
-	"chat-lab/domain/analyzer"
+	"chat-lab/observability"
 	"context"
 	"fmt"
 	"sync"
@@ -9,22 +9,12 @@ import (
 )
 
 type ReporterWorker struct {
-	counter   *analyzer.CounterFileScanner
-	interval  time.Duration
-	workersWG *sync.WaitGroup
+	monitoring *observability.MonitoringManager
+	interval   time.Duration
+	workersWG  *sync.WaitGroup
 }
 
-func NewReporterWorker(counter *analyzer.CounterFileScanner,
-	interval time.Duration, workersWG *sync.WaitGroup) *ReporterWorker {
-	return &ReporterWorker{
-		counter:   counter,
-		interval:  interval,
-		workersWG: workersWG,
-	}
-}
-
-// Run starts the reporting loop. It ticks at a regular interval to display
-// real-time scanning metrics until the context is cancelled.
+// Run starts the reporting loop to display real-time metrics until context cancellation
 func (w *ReporterWorker) Run(ctx context.Context) error {
 	defer w.workersWG.Done()
 	startTime := time.Now()
@@ -43,26 +33,17 @@ func (w *ReporterWorker) Run(ctx context.Context) error {
 	}
 }
 
-// printStats calculates and prints the current progress metrics to the console.
-// It uses the carriage return character (\r) to overwrite the current line,
-// providing a dynamic dashboard view without polluting the terminal output.
+// printStats formats and prints the latest metrics snapshot to the console
 func (w *ReporterWorker) printStats(startTime time.Time) {
-	c := w.counter
-	files := c.FilesScanned
-	dirs := c.DirsScanned
-	bytes := c.BytesProcessed
-	errs := c.ErrorCount
-	skipped := c.SkippedItems
+	stats := w.monitoring.GetLatest()
+	duration := time.Since(startTime).Round(time.Second).String()
 
-	duration := time.Since(startTime)
-
-	// Truncate milliseconds for cleaning display
-	durationStr := duration.Round(time.Second).String()
-
-	elapsed := duration.Seconds()
-	speed := float64(files) / elapsed
-	gb := float64(bytes) / (1024 * 1024 * 1024)
-
-	fmt.Printf("\r🚀 Time: %s | Dirs: %d | Files: %d | Speed: %.0f f/s | Data: %.2f GB | Skipped: %d | ⚠️ Errs: %d\n",
-		durationStr, dirs, files, speed, gb, skipped, errs)
+	fmt.Printf("\r📊 [%s] RAM: %dMB | Disk: %.2f MB/s | Net: %.2f MB/s | Files: %d | Queue: %d",
+		duration,
+		stats.AllocMemMb,
+		stats.ScannerDiskSpeed,
+		stats.MasterNetSpeed,
+		stats.FilesFound,
+		stats.CurrentQueueSize,
+	)
 }

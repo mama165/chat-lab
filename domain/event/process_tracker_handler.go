@@ -23,7 +23,7 @@ func (h ProcessTrackerHandler) Handle(event Event) {
 			h.log.Error(errors.ErrInvalidPayload.Error())
 			return
 		}
-		h.log.Debug(fmt.Sprintf(" [SPECIALIST][%s] | PID %d | STATUS %s | CPU %.2f%% | RAM %.2f%%",
+		h.log.Debug(fmt.Sprintf(" [SPECIALIST][%s] | PID %d | STATUS %s | CPU %.2f%% | RAM %d",
 			strings.ToUpper(string(payload.Metric)), payload.PID, payload.Status, payload.Cpu, payload.Ram))
 	}
 }
