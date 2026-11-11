@@ -9,12 +9,10 @@ import (
 )
 
 var (
-	ErrWorkerPanic      = errors.New("worker panic")
-	ErrEmptyWords       = errors.New("no words have been found")
-	ErrInvalidPayload   = errors.New("payload of event has a wrong type")
-	ErrServerOverloaded = errors.New("too many messages, please backoff")
-	ErrNoValidPatterns  = errors.New("no valid patterns after normalization")
-	ErrContentTooLarge  = errors.New("content  too large")
+	ErrWorkerPanic     = errors.New("worker panic")
+	ErrEmptyWords      = errors.New("no words have been found")
+	ErrInvalidPayload  = errors.New("payload of event has a wrong type")
+	ErrNoValidPatterns = errors.New("no valid patterns after normalization")
 
 	// Specialist/Sidecar Errors
 	ErrSpecialistNotFound    = errors.New("specialist binary not found")
@@ -29,15 +27,7 @@ func MapToGRPCError(err error) error {
 		return nil
 	}
 	switch {
-	// Client errors (4xx)
-	case errors.Is(err, ErrContentTooLarge):
-		return status.Error(codes.InvalidArgument, err.Error())
-
-		// Server capacity errors
-	case errors.Is(err, ErrServerOverloaded):
-		return status.Error(codes.ResourceExhausted, err.Error())
-
-		// Context errors
+	// Context errors
 	case errors.Is(err, context.DeadlineExceeded):
 		return status.Error(codes.DeadlineExceeded, "request took too long")
 	case errors.Is(err, context.Canceled):
