@@ -4,7 +4,6 @@ go 1.24.0
 
 require (
 	github.com/Netflix/go-env v0.1.2
-	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
 	github.com/blugelabs/bluge v0.2.2
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/gabriel-vasile/mimetype v1.4.12
@@ -26,7 +25,6 @@ require (
 
 require (
 	github.com/RoaringBitmap/roaring v1.9.4 // indirect
-	github.com/anknown/darts v0.0.0-20151216065714-83ff685239e6 // indirect
 	github.com/axiomhq/hyperloglog v0.2.6 // indirect
 	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect

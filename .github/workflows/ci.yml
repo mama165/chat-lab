@@ -123,7 +123,7 @@ jobs:
           cache: true
 
       - name: Run Benchmarks
-        # Ensuring no performance regressions in moderation and storage.
+        # Ensuring no performance regressions in storage.
         # -run='^$' runs benchmarks only, without re-running the tests.
         run: |
           set -o pipefail

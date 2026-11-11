@@ -9,10 +9,8 @@ import (
 )
 
 var (
-	ErrWorkerPanic     = errors.New("worker panic")
-	ErrEmptyWords      = errors.New("no words have been found")
-	ErrInvalidPayload  = errors.New("payload of event has a wrong type")
-	ErrNoValidPatterns = errors.New("no valid patterns after normalization")
+	ErrWorkerPanic    = errors.New("worker panic")
+	ErrInvalidPayload = errors.New("payload of event has a wrong type")
 
 	// Specialist/Sidecar Errors
 	ErrSpecialistNotFound    = errors.New("specialist binary not found")

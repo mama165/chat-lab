@@ -1,22 +1,9 @@
 services:
-  ai-gen:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
-    image: chat-lab-ai-gen
-    volumes:
-      - ./ai:/app
-    user: "${D_UID}:${D_GID}"
-    environment:
-      - PYTHONUNBUFFERED=1
-
   chat-lab:
     build:
       context: .
       dockerfile: app.Dockerfile
     image: chat-lab-app
-    depends_on:
-      - ai-gen
     volumes:
       - .:/app
       - /tmp/badger:/tmp/badger
