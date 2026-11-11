@@ -10,7 +10,6 @@ import (
 	"chat-lab/internal"
 	"chat-lab/observability"
 	pb3 "chat-lab/proto/analyzer"
-	pb1 "chat-lab/proto/chat"
 	pb "chat-lab/proto/monitoring"
 	pb4 "chat-lab/proto/storage"
 	"chat-lab/runtime"
@@ -74,11 +73,6 @@ func run() (int, error) {
 	var config internal.Config
 	if _, err := env.UnmarshalFromEnviron(&config); err != nil {
 		return exitConfig, fmt.Errorf("config error: %w", err)
-	}
-
-	charReplacement, err := internal.CharacterRune(config.CharReplacement)
-	if err != nil {
-		return exitConfig, err
 	}
 
 	// 2. On prépare le fichier de log
@@ -184,8 +178,6 @@ func run() (int, error) {
 	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
 	tmpFilePathChan := make(chan domain.TmpFileLocation, config.BufferSize)
 	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
-	registry := runtime.NewRegistry()
-	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
 	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
 	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
 	coordinator := runtime.NewCoordinator(logger, processTrackerChan, specialistResponseChan, config.MaxFileSizeMb)
@@ -252,24 +244,20 @@ func run() (int, error) {
 	fileAccumulator := services.NewFileAccumulator(fileDownloadingDirPath, tmpFilePathChan)
 
 	orchestrator := runtime.NewOrchestrator(
-		logger, monitor, sup, registry, telemetryChan, eventChan,
+		logger, monitor, sup, telemetryChan, eventChan,
 		processTrackerChan,
 		fileDownloaderRequestChan,
 		tmpFilePathChan,
 		specialistResponseChan,
-		messageRepository,
 		analysisRepository,
 		fileTaskRepository,
 		coordinator,
 		grpcClient,
 		fileAccumulator,
 		observability.NewMonitoringManager(logger),
-		config.NumberOfWorkers, config.BufferSize,
-		config.SinkTimeout, config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval, config.LatencyThreshold, config.IngestionTimeout,
-		charReplacement,
+		config.NumberOfWorkers,
+		config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval,
 		config.LowCapacityThreshold,
-		config.MaxContentLength,
-		config.MinScoring, config.MaxScoring,
 		config.MaxAnalyzedEvent,
 		config.FileTransferInterval,
 		config.PendingFileBatchSize,
@@ -307,14 +295,11 @@ func run() (int, error) {
 			grpc3.UnaryLoggingInterceptor(logger),
 		))
 
-	chatService := services.NewChatService(orchestrator)
 	counter := analyzer.NewCountAnalyzedFiles()
 	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
-	chatServer := server.NewChatServer(logger, chatService, config.ConnectionBufferSize, config.BufferTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
 	monitoringServer := server.NewMonitoringServer(monitor)
 
-	pb1.RegisterChatServiceServer(s, chatServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
 	pb.RegisterMonitoringServiceServer(s, monitoringServer)
 
@@ -414,9 +399,9 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 				row.Detail = content
 			}
 
-		// Cas 3 : Texte brut (Chat)
+		// Cas 3 : Texte brut
 		case storage.TextContent, *storage.TextContent:
-			row.Type = "CHAT"
+			row.Type = "TEXT"
 			if t, ok := payload.(storage.TextContent); ok {
 				row.Detail = t.Content
 			} else if tPtr, ok := payload.(*storage.TextContent); ok {
