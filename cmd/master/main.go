@@ -129,15 +129,10 @@ func run() (int, error) {
 	}()
 
 	// 2.bis Sidecar Specialists Initialization
-	// We launch the specialized binaries (Toxicity, Sentiment, Business...) before the engine starts.
+	// We launch the specialized binaries (PDF, audio, image) before the engine starts.
 	// This ensures the Orchestrator has all its analysis "organs" ready.
 	// We use a dedicated timeout to prevent the Master from hanging if a binary
 	// fails to load its resources (like ML models) or if a port is already in use.
-
-	/*	specialistConfigs := []specialist.Config{
-		{ID: specialist.MetricToxicity, BinPath: config.ToxicityBinPath, Host: config.Host, MasterPort: config.ToxicityPort},
-		{ID: specialist.MetricSentiment, BinPath: config.SentimentBinPath, Host: config.Host, MasterPort: config.SentimentPort},
-	}*/
 
 	specialistConfigs := []domain.Config{
 		{

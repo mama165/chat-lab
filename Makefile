@@ -31,7 +31,7 @@ endif
 DB_PATH ?= $(BADGER_FILEPATH)
 
 # --- Phony Targets Declaration ---
-.PHONY: build build-master proto-gen ai-gen clean-db lab dev clean fmt
+.PHONY: build build-master proto-gen clean-db lab dev clean fmt
 
 # --- Code Formatting ---
 
@@ -67,14 +67,6 @@ proto-gen:
        protoc -I. --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative \$$(find proto -name '*.proto') && \
        python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. \$$(find proto -name '*.proto') && \
        find proto -type d -exec touch {}/__init__.py \;"
-	@$(MAKE) fmt
-
-## ai-gen: Run the AI model generation (Python transpilation) and force formatting
-ai-gen:
-	@echo "--- 🧠 Generating AI Model (Python Transpilation) ---"
-	D_UID=$(D_UID) D_GID=$(D_GID) docker-compose run --rm ai-gen
-	@echo "--- ⏳ Waiting for filesystem sync ---"
-	@sleep 1
 	@$(MAKE) fmt
 
 # --- Maintenance ---

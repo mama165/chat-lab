@@ -8,7 +8,6 @@ import (
 type Config struct {
 	BufferSize      int           `env:"BUFFER_SIZE,required=true"`
 	NumberOfWorkers int           `env:"NUMBER_OF_WORKERS,required=true"`
-	CharReplacement string        `env:"CHARACTER_REPLACEMENT,required=true"`
 	MetricInterval  time.Duration `env:"METRIC_INTERVAL,required=true"`
 
 	BufferTimeout     time.Duration `env:"BUFFER_TIMEOUT,required=true"`
@@ -19,18 +18,12 @@ type Config struct {
 	BlugeFilepath                    string        `env:"BLUGE_FILEPATH,required=true"`
 	LogLevel                         string        `env:"LOG_LEVEL,required=true"`
 	LowCapacityThreshold             int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
-	MinScoring                       float64       `env:"MIN_SCORING,required=true"`
-	MaxScoring                       float64       `env:"MAX_SCORING,required=true"`
 	MaxAnalyzedEvent                 int           `env:"MAX_ANALYZED_EVENT,required=true"`
 	Host                             string        `env:"HOST,required=true"`
 	MasterPort                       int           `env:"MASTER_PORT,required=true"`
 	ScannerPort                      int           `env:"SCANNER_PORT,required=true"`
 	DebugPort                        int           `env:"DEBUG_PORT,required=true"`
 	MaxSpecialistBootDuration        time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION,required=true"`
-	ToxicityBinPath                  string        `env:"TOXICITY_BIN_PATH,required=true"`
-	ToxicityPort                     int           `env:"TOXICITY_PORT,required=true"`
-	SentimentBinPath                 string        `env:"SENTIMENT_BIN_PATH,required=true"`
-	SentimentPort                    int           `env:"SENTIMENT_PORT,required=true"`
 	EnableSpecialists                bool          `env:"ENABLE_SPECIALISTS,required=true"`
 	ScannerWorkerNb                  int           `env:"SCANNER_WORKER_NB,required=true"`
 	DownloaderWorkerNb               int           `env:"DOWNLOADER_WORKER_NB,required=true"`
@@ -71,15 +64,4 @@ func (g GrpcConfig) ToServiceConfig(serviceName string) string {
             }
         }]
     }`, serviceName, g.MaxAttempts, g.InitialBackoff.Seconds(), g.MaxBackoff.Seconds(), g.BackoffMultiplier)
-}
-
-func CharacterRune(str string) (rune, error) {
-	r := []rune(str)
-	if len(r) != 1 {
-		return 0, fmt.Errorf(
-			"CHARACTER_REPLACEMENT must be a single character, got %q",
-			str,
-		)
-	}
-	return r[0], nil
 }
