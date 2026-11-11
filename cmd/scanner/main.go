@@ -94,7 +94,6 @@ func main() {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc2.UnaryLoggingInterceptor(logger),
-			server.AuthInterceptor(config.AuthenticationEnabled),
 		))
 
 	pb.RegisterFileDownloaderServiceServer(s, fileDownloaderServer)

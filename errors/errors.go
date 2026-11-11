@@ -9,17 +9,12 @@ import (
 )
 
 var (
-	ErrWorkerPanic        = errors.New("worker panic")
-	ErrEmptyWords         = errors.New("no words have been found")
-	ErrInvalidPayload     = errors.New("payload of event has a wrong type")
-	ErrServerOverloaded   = errors.New("too many messages, please backoff")
-	ErrNoValidPatterns    = errors.New("no valid patterns after normalization")
-	ErrContentTooLarge    = errors.New("content  too large")
-	ErrUserAlreadyExists  = errors.New("user already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrTokenGeneration    = errors.New("token generation failed")
-	ErrInvalidPassword    = errors.New("password must " +
-		"contain at least one uppercase, one lowercase")
+	ErrWorkerPanic      = errors.New("worker panic")
+	ErrEmptyWords       = errors.New("no words have been found")
+	ErrInvalidPayload   = errors.New("payload of event has a wrong type")
+	ErrServerOverloaded = errors.New("too many messages, please backoff")
+	ErrNoValidPatterns  = errors.New("no valid patterns after normalization")
+	ErrContentTooLarge  = errors.New("content  too large")
 
 	// Specialist/Sidecar Errors
 	ErrSpecialistNotFound    = errors.New("specialist binary not found")
@@ -35,12 +30,8 @@ func MapToGRPCError(err error) error {
 	}
 	switch {
 	// Client errors (4xx)
-	case errors.Is(err, ErrContentTooLarge), errors.Is(err, ErrInvalidPassword):
+	case errors.Is(err, ErrContentTooLarge):
 		return status.Error(codes.InvalidArgument, err.Error())
-	case errors.Is(err, ErrInvalidCredentials):
-		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, ErrUserAlreadyExists):
-		return status.Error(codes.AlreadyExists, err.Error())
 
 		// Server capacity errors
 	case errors.Is(err, ErrServerOverloaded):
@@ -51,10 +42,6 @@ func MapToGRPCError(err error) error {
 		return status.Error(codes.DeadlineExceeded, "request took too long")
 	case errors.Is(err, context.Canceled):
 		return status.Error(codes.Canceled, "client canceled the request")
-
-		// Server errors (5xx)
-	case errors.Is(err, ErrTokenGeneration):
-		return status.Error(codes.Internal, "security token could not be issued")
 
 		// Infrastructure / Specialist errors
 	case errors.Is(err, ErrSpecialistUnavailable), errors.Is(err, ErrSpecialistCrash):
