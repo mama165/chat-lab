@@ -9,7 +9,6 @@ import (
 	"chat-lab/infrastructure/storage"
 	"chat-lab/internal"
 	"chat-lab/observability"
-	pb2 "chat-lab/proto/account"
 	pb3 "chat-lab/proto/analyzer"
 	pb1 "chat-lab/proto/chat"
 	pb "chat-lab/proto/monitoring"
@@ -189,7 +188,6 @@ func run() (int, error) {
 	messageRepository := storage.NewMessageRepository(db, logger, config.LimitMessages)
 	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
 	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
-	userRepository := storage.NewUserRepository(db)
 	coordinator := runtime.NewCoordinator(logger, processTrackerChan, specialistResponseChan, config.MaxFileSizeMb)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
@@ -307,20 +305,16 @@ func run() (int, error) {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpc3.UnaryLoggingInterceptor(logger),
-			server.AuthInterceptor(config.AuthenticationEnabled),
 		))
 
 	chatService := services.NewChatService(orchestrator)
-	authService := services.NewAuthService(userRepository, config.AuthTokenDuration)
 	counter := analyzer.NewCountAnalyzedFiles()
 	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
 	chatServer := server.NewChatServer(logger, chatService, config.ConnectionBufferSize, config.BufferTimeout)
 	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
 	monitoringServer := server.NewMonitoringServer(monitor)
 
-	authServer := server.NewAuthServer(authService)
 	pb1.RegisterChatServiceServer(s, chatServer)
-	pb2.RegisterAuthServiceServer(s, authServer)
 	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
 	pb.RegisterMonitoringServiceServer(s, monitoringServer)
 
