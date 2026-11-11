@@ -10,7 +10,7 @@ import (
 
 const (
 	FileAnalyzeType     Type = "FILE_ANALYZE"
-	AnalysisSegmentType      = "ANALYSIS_SEGMENT"
+	AnalysisSegmentType Type = "ANALYSIS_SEGMENT"
 )
 
 type FileAnalyse struct {

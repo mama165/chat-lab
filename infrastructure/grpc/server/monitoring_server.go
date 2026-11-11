@@ -64,5 +64,7 @@ func (s *MonitoringServer) handleMonitoring(w http.ResponseWriter, _ *http.Reque
 	// On récupère le snapshot que tu as codé dans domain/GlobalMonitoring
 	snapshot := s.monitor.GetSnapshot()
 
-	json.NewEncoder(w).Encode(snapshot)
+	if err := json.NewEncoder(w).Encode(snapshot); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

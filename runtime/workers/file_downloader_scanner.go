@@ -87,7 +87,6 @@ func (s FileDownloaderScannerWorker) Process(ctx context.Context, request domain
 		return fmt.Errorf("file is too large: %d bytes (limit is %d)", fileSize, maxFileSize)
 	}
 
-	fileInfo.Mode().IsRegular()
 	if fileInfo.IsDir() || !fileInfo.Mode().IsRegular() {
 		s.sendError(ctx, fmt.Sprintf("entry%s is not a file", request.Path), domain.NotFile)
 		return fmt.Errorf("entry%s is not a file", request.Path)
