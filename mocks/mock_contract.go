@@ -529,15 +529,15 @@ func (m *MockIFileAccumulator) EXPECT() *MockIFileAccumulatorMockRecorder {
 }
 
 // ProcessResponse mocks base method.
-func (m *MockIFileAccumulator) ProcessResponse(ctx context.Context, resp domain.FileDownloaderResponse) error {
+func (m *MockIFileAccumulator) ProcessResponse(ctx context.Context, driveID string, fileID domain.FileID, resp domain.FileDownloaderResponse) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessResponse", ctx, resp)
+	ret := m.ctrl.Call(m, "ProcessResponse", ctx, driveID, fileID, resp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ProcessResponse indicates an expected call of ProcessResponse.
-func (mr *MockIFileAccumulatorMockRecorder) ProcessResponse(ctx, resp any) *gomock.Call {
+func (mr *MockIFileAccumulatorMockRecorder) ProcessResponse(ctx, driveID, fileID, resp any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessResponse", reflect.TypeOf((*MockIFileAccumulator)(nil).ProcessResponse), ctx, resp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessResponse", reflect.TypeOf((*MockIFileAccumulator)(nil).ProcessResponse), ctx, driveID, fileID, resp)
 }

@@ -221,8 +221,7 @@ func run() (int, error) {
 
 	grpcClient := pb3.NewFileDownloaderServiceClient(conn)
 
-	var scanAllowed bool
-	scanAllowed = true
+	scanAllowed := true
 	if scanAllowed {
 		go func() {
 			time.Sleep(5 * time.Second) // On laisse le temps au Scanner de boot

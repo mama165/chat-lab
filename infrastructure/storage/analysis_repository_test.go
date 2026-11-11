@@ -2,9 +2,7 @@ package storage
 
 import (
 	"chat-lab/domain"
-	pb "chat-lab/proto/storage"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -12,7 +10,6 @@ import (
 	"github.com/mama165/sdk-go/database"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 )
 
 var MetricTest domain.Metric = "test"
@@ -1040,48 +1037,4 @@ func allUnique(ids []uuid.UUID) bool {
 		seen[id] = true
 	}
 	return true
-}
-
-// analysisMapper translates the Protobuf bytes stored in Badger into a format
-// the SDK's DebugServer can display.
-func analysisMapper(key string, val []byte) database.InspectRow {
-	// 1. Start with basic key metadata (Namespace, TS)
-	row := database.DefaultMapper(key, val)
-
-	// 2. Unmarshal the Protobuf data
-	var msg pb.Analysis
-	if err := proto.Unmarshal(val, &msg); err == nil {
-		row.EntityID = msg.Id
-		if len(row.EntityID) > 8 {
-			row.EntityID = row.EntityID[:8]
-		}
-
-		row.Detail = msg.Summary
-
-		// 3. Dynamic Type from oneof payload
-		switch msg.Payload.(type) {
-		case *pb.Analysis_Audio:
-			row.Type = "AUDIO"
-		case *pb.Analysis_TextContent:
-			row.Type = "TEXT"
-		case *pb.Analysis_File:
-			row.Type = "FILE"
-		default:
-			row.Type = "UNKNOWN"
-		}
-
-		// 4. Format scores for the dashboard
-		if len(msg.Scores) > 0 {
-			var s []string
-			for k, v := range msg.Scores {
-				s = append(s, fmt.Sprintf("%s:%.2f", k, v))
-			}
-			row.Scores = strings.Join(s, " ")
-		}
-	} else {
-		row.Type = "ERROR"
-		row.Detail = "Failed to unmarshal Protobuf"
-	}
-
-	return row
 }
