@@ -2,8 +2,6 @@
 - Fix CI-Lint
 - Fix all tests
 - Careful with 500 Mo PDF File (Out ot memory risks)
-- Remove cmd/tester/main.go
-- Remove test_audio.aiff
 - Add E2E tests
 - Remove all french comments
 - Use variable everywhere for FILE, AUDIO, PDF...
