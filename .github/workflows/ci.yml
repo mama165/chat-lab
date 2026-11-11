@@ -87,4 +87,4 @@ jobs:
       - name: Build Binary
         run: |
           # Build with optimization flags for production
-          go build -ldflags="-s -w" cmd/main.go
+          go build -ldflags="-s -w" ./cmd/...
