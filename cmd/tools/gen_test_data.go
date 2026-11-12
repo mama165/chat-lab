@@ -46,15 +46,18 @@ func main() {
 // genPDF crée un document multi-pages pour tester l'extraction de texte
 func genPDF(path string) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
+	// The built-in fonts only know Windows-1252: without this conversion, the UTF-8
+	// bytes of an accented letter are drawn as two wrong characters ("é" -> "Ã©").
+	translate := pdf.UnicodeTranslatorFromDescriptor("")
 	pdf.AddPage()
 	pdf.SetFont("Arial", "B", 20)
-	pdf.Cell(40, 20, "Chat-Lab : Analyse PDF")
+	pdf.Cell(40, 20, translate("Chat-Lab : Analyse PDF"))
 	pdf.Ln(20)
 
 	pdf.SetFont("Arial", "", 12)
 	content := "Ceci est un document généré pour tester le spécialiste Python.\n" +
 		"Le moteur PyMuPDF devrait extraire ce texte et compter 1 page."
-	pdf.MultiCell(0, 10, content, "", "", false)
+	pdf.MultiCell(0, 10, translate(content), "", "", false)
 
 	err := pdf.OutputFileAndClose(path)
 	if err != nil {
