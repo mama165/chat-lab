@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/blugelabs/bluge"
 	"github.com/dgraph-io/badger/v4"
@@ -637,14 +638,14 @@ func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, domain.Ca
 		category = domain.AudioType
 
 	case FileDetails:
-		fullText += " " + p.Filename
+		fullText += " " + searchableFilename(p.Filename)
 		if p.Content != "" {
 			fullText += " " + p.Content
 		}
 		category = domain.FileType
 	case *FileDetails:
 		if p != nil {
-			fullText += " " + p.Filename
+			fullText += " " + searchableFilename(p.Filename)
 			if p.Content != "" {
 				fullText += " " + p.Content
 			}
@@ -659,4 +660,18 @@ func (a *AnalysisRepository) prepareInternalData(an Analysis) (string, domain.Ca
 	}
 
 	return fullText, category
+}
+
+// searchableFilename returns the file name followed by the words it is made of.
+// The search engine keeps a name such as "annual_report.pdf" as a single word,
+// so on its own it would only match a query for the exact full name. Adding
+// "annual report pdf" lets a file be found by any part of its name or path.
+func searchableFilename(filename string) string {
+	words := strings.FieldsFunc(filename, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	if len(words) == 0 {
+		return filename
+	}
+	return filename + " " + strings.Join(words, " ")
 }
