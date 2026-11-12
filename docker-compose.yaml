@@ -11,4 +11,4 @@ services:
     env_file:
       - internal/local.conf
     ports:
-      - "8080:8080"
+      - "8092:8092"

@@ -1,5 +1,5 @@
 # English comments in Golang code
-FROM golang:1.24-alpine
+FROM golang:1.27-alpine
 
 # Install essential tools
 RUN apk add --no-cache libc6-compat gcompat net-tools procps
@@ -12,11 +12,8 @@ RUN go mod download
 
 COPY . .
 
-# Build binaries into /usr/local/bin so they aren't shadowed by the volume
+# Build the binary into /usr/local/bin so it isn't shadowed by the volume
 RUN go build -o /usr/local/bin/master ./cmd/master
-RUN go build -o /usr/local/bin/specialist ./cmd/specialist
-
-RUN chmod +x /usr/local/bin/master /usr/local/bin/specialist
 
 # Use the absolute path to the binary
 CMD ["/usr/local/bin/master"]

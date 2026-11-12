@@ -34,6 +34,9 @@ go.work.sum
 # env file
 .env
 
+# Execution log written by the program
+master_execution.log
+
 # Editor/IDE
 .idea/
 # .vscode/

@@ -2,7 +2,6 @@ APP_NAME    := chatlab
 GO          := go
 CONF        := internal/local.conf
 CMD_MASTER  := ./cmd/master
-CMD_SPEC    := ./cmd/specialist
 BIN_DIR     := ./bin
 BENCHMARK_IMAGE_NAME=benchmark
 BENCHMARK_DIR=benchmark
@@ -42,7 +41,7 @@ fmt:
 
 # --- Local Build ---
 
-## build: Build all local binaries (Master and Specialists)
+## build: Build the local binary
 build: build-master
 
 build-master:
@@ -58,7 +57,7 @@ proto-gen:
 	@find proto -name "*_pb2.py" -type f -delete
 	@find proto -name "*_pb2_grpc.py" -type f -delete
 	@echo "--- 🚀 Generating gRPC/Protobuf code for all contracts ---"
-	@docker run --rm -v "$(PWD):/src" -w /src golang:1.24-alpine sh -c "\
+	@docker run --rm -v "$(PWD):/src" -w /src golang:1.27-alpine sh -c "\
        apk add --no-cache protobuf-dev protoc python3 py3-pip && \
        pip install grpcio-tools --break-system-packages && \
        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
@@ -111,7 +110,7 @@ bench-profile:
 	# Run tests and generate cpu.out
 	# The "-" prefix allows the Makefile to continue even if the test fails
 	-docker run --rm -v $(PWD):/app $(BENCHMARK_IMAGE_NAME) \
-	   go test -v ./repositories \
+	   go test -v ./infrastructure/storage \
 	   -run=TestAnalysisRepository_Search_100kDocuments \
 	   -cpuprofile=/app/$(BENCHMARK_DIR)/benchmark.out \
 	   -timeout=5m \

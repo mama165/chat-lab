@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine
+FROM golang:1.27-alpine
 
 # Install tools for profiling and CGO (needed for some DB drivers)
 RUN apk add --no-cache graphviz make gcc musl-dev

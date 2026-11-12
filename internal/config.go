@@ -19,7 +19,6 @@ type Config struct {
 	LogLevel                  string        `env:"LOG_LEVEL,required=true"`
 	LowCapacityThreshold      int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
 	MaxAnalyzedEvent          int           `env:"MAX_ANALYZED_EVENT,required=true"`
-	DebugPort                 int           `env:"DEBUG_PORT,required=true"`
 	MaxSpecialistBootDuration time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION,required=true"`
 	EnableSpecialists         bool          `env:"ENABLE_SPECIALISTS,required=true"`
 	// ScanRootDir is the folder scanned at startup; the -dir flag overrides it.
