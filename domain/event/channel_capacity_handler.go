@@ -8,7 +8,8 @@ import (
 )
 
 // ChannelCapacityHandler handles events reporting the capacity of channels.
-// It is triggered to monitor the length and max capacity of internal channels.
+// It is triggered to monitor the length and max capacity of internal channels,
+// and logs a warning when a channel holds items and has at most lowCapacityThreshold free slots.
 // Useful for observability, detecting backpressure, and avoiding message drops.
 type ChannelCapacityHandler struct {
 	log                  *slog.Logger
@@ -47,9 +48,12 @@ func (h ChannelCapacityHandler) Handle(event Event) {
 			// In case of unbuffered channel
 			return
 		}
+		// An empty queue is never "nearly full", even when the threshold is larger
+		// than the queue itself.
 		capacityLeft := payload.Capacity - payload.Length
-		if capacityLeft > 0 && capacityLeft <= h.lowCapacityThreshold {
-			h.log.Warn(fmt.Sprintf("metric event channel capacity left : %d", capacityLeft))
+		if payload.Length > 0 && capacityLeft <= h.lowCapacityThreshold {
+			h.log.Warn(fmt.Sprintf("channel %s is nearly full : %d / %d, capacity left : %d",
+				payload.ChannelName, payload.Length, payload.Capacity, capacityLeft))
 		}
 	}
 }
