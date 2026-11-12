@@ -78,20 +78,23 @@ func (w *HealthMonitoringWorker) Run(ctx context.Context) error {
 					w.log.Error("Error while finding process ram usage", "err", err)
 					continue
 				}
+				// The monitoring is updated first and always: it is what the dashboard shows.
+				w.globalMonitor.UpdateNode(domain.NodeHealth{
+					ID:             string(metric),
+					Type:           domain.SPECIALIST,
+					PIDStatus:      domain.ToPIDStatus(status),
+					PID:            int64(pid),
+					CPU:            cpu,
+					RAM:            ram.RSS,
+					ItemsProcessed: 0,
+					QueueSize:      0,
+				})
+
+				// The telemetry event is best effort: a full channel drops it, not the node.
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
 				case w.telemetryChan <- toProcessTrackerEvent(pid, metric, status, cpu, ram.RSS):
-					w.globalMonitor.UpdateNode(domain.NodeHealth{
-						ID:             string(metric),
-						Type:           domain.SPECIALIST,
-						PIDStatus:      domain.ToPIDStatus(status),
-						PID:            int64(pid),
-						CPU:            cpu,
-						RAM:            ram.RSS,
-						ItemsProcessed: 0,
-						QueueSize:      0,
-					})
 				default:
 					w.log.Debug("Observability telemetry processTrackerChan lost")
 				}
