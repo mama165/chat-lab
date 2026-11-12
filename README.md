@@ -13,7 +13,13 @@ It is written in Go. The heavy extraction work (reading PDFs, transcribing audio
 3. **Analyze.** Each file is sent to the specialist that handles its type.
 4. **Enrich.** What the specialist returns (title, author, text of the pages, transcription) is merged into the stored record, which makes the file searchable by its content.
 
-Supported types today: PDF, audio (MP3, WAV, AIFF) and images (PNG, JPEG, GIF).
+Supported types today: PDF, audio (MP3, WAV, AIFF) and images (PNG, JPEG, GIF). What each specialist extracts:
+
+| Type | Extracted | Stored as searchable content |
+| :--- | :--- | :--- |
+| PDF | title, author, text of the pages | the text |
+| Audio | transcription, language, duration | the transcription |
+| Image | width, height, format, color mode | a description such as `png image 800x600 RGB` |
 
 ## Architecture
 
@@ -105,7 +111,13 @@ go test -race ./...
 
 Add `-short` to skip the slow storage test that indexes several thousand documents.
 
-The CI runs six independent jobs on every pull request: build, code quality (vet, gofmt, golangci-lint), security (govulncheck), generated code (mocks), tests with the race detector, and benchmarks.
+The tests in `e2e/` run the real Python specialists on files from `test_data/`: a PDF, a spoken recording and a picture, alone and then together through the whole pipeline. They need the environment created by `./scripts/setup_env.sh`, and the first audio run downloads the Whisper model (about 140 MB). Without that environment they are skipped. To run only them:
+
+```bash
+go test -v ./e2e/
+```
+
+The CI runs seven independent jobs on every pull request: build, code quality (vet, gofmt, golangci-lint), security (govulncheck), generated code (mocks), tests with the race detector, benchmarks, and the specialists on real files.
 
 After changing an interface that has a mock, regenerate the mocks:
 
@@ -119,3 +131,4 @@ go generate ./...
 - **No incremental scan.** Every run scans the whole folder again and creates new records.
 - **Files are loaded in memory** before being sent to a specialist, up to `MAX_FILE_SIZE_MB` each.
 - **`.aiff` files are not picked up by the scanner**, although the audio specialist declares the type.
+- **The Whisper model is downloaded automatically** the first time the audio specialist starts. There is no setting yet to use a model already present on disk.

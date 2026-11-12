@@ -8,4 +8,5 @@
 - Remove all french comments
 - Rename "room" to "namespace" in the analysis repository
 - Docker: the app image has no Python, so specialists cannot run in it
+- Setting for a local Whisper model folder (today the model is downloaded on first start)
 - Replace the hand-made monitoring pages with Prometheus metrics and a Grafana dashboard
