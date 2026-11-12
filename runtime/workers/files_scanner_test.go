@@ -4,6 +4,7 @@ import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/observability"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -21,15 +22,22 @@ func TestFileScannerWorker_Run(t *testing.T) {
 	// t.TempDir automatically cleans up after the test.
 	tempDir := t.TempDir()
 
-	// Create a dummy file structure for testing.
-	file1 := filepath.Join(tempDir, "file1.txt")
-	req.NoError(os.WriteFile(file1, []byte("test content"), 0644))
+	// Create a dummy file structure for testing. Only supported types (detected from
+	// the first bytes, not from the extension) are reported by the scanner.
+	pdfContent := []byte("%PDF-1.4 test")
+	pngContent := []byte("\x89PNG\r\n\x1a\n test")
+
+	file1 := filepath.Join(tempDir, "file1.pdf")
+	req.NoError(os.WriteFile(file1, pdfContent, 0644))
 
 	subDir := filepath.Join(tempDir, "subdir")
 	req.NoError(os.Mkdir(subDir, 0755))
 
-	file2 := filepath.Join(subDir, "file2.log")
-	req.NoError(os.WriteFile(file2, []byte("more content"), 0644))
+	file2 := filepath.Join(subDir, "file2.png")
+	req.NoError(os.WriteFile(file2, pngContent, 0644))
+
+	// A plain text file is not a supported type and must be ignored.
+	req.NoError(os.WriteFile(filepath.Join(subDir, "notes.txt"), []byte("just text"), 0644))
 
 	t.Run("Full scan execution", func(t *testing.T) {
 		// Initialize all dependencies for the concurrent worker.
@@ -41,7 +49,6 @@ func TestFileScannerWorker_Run(t *testing.T) {
 		fileChan := make(chan *analyzer.FileAnalyzerRequest, 10)
 
 		var scanWG sync.WaitGroup
-		var workersWG sync.WaitGroup
 
 		worker := NewFileScannerWorker(
 			logger,
@@ -50,7 +57,6 @@ func TestFileScannerWorker_Run(t *testing.T) {
 			dirChan,
 			fileChan,
 			&scanWG,
-			&workersWG,
 			70,
 			90,
 		)
@@ -63,8 +69,9 @@ func TestFileScannerWorker_Run(t *testing.T) {
 		dirChan <- tempDir
 
 		// Start the worker in a separate goroutine.
-		workersWG.Add(1)
+		workerDone := make(chan struct{})
 		go func() {
+			defer close(workerDone)
 			_ = worker.Run(ctx)
 		}()
 
@@ -85,12 +92,12 @@ func TestFileScannerWorker_Run(t *testing.T) {
 
 		// Shutdown the worker by closing the work channel.
 		close(dirChan)
-		workersWG.Wait()
+		<-workerDone
 
 		// Assertions
-		req.Equal(uint64(2), monitoring.FilesFound, "Should have found 2 files")
+		req.Equal(uint64(2), monitoring.FilesFound, "Should have found the 2 supported files")
 		req.Equal(uint64(2), monitoring.DirsScanned, "Should have scanned root + subdir")
-		req.Equal(uint64(24), monitoring.ScannerBytes, "Total size should match content length")
+		req.Equal(uint64(len(pdfContent)+len(pngContent)), monitoring.ScannerBytes, "Total size should match content length")
 
 		// Verify fileChan content
 		req.Equal(2, len(fileChan))
@@ -108,7 +115,7 @@ func TestFileScannerWorker_Run(t *testing.T) {
 			logger,
 			"id",
 			observability.NewMonitoringManager(logger),
-			nil, fileChan, nil, nil,
+			nil, fileChan, nil,
 			70,
 			90)
 
@@ -132,4 +139,58 @@ func TestFileScannerWorker_Run(t *testing.T) {
 		req.NoError(err)
 		req.GreaterOrEqual(time.Since(start), 200*time.Millisecond, "Should have throttled for at least 200ms")
 	})
+}
+
+// A worker both consumes dirChan and feeds it with the subdirectories it
+// discovers. When the queue is full, it must keep making progress instead of
+// waiting for room that only another (equally stuck) worker could free.
+func TestFileScannerWorker_DoesNotDeadlockWhenDirQueueIsFull(t *testing.T) {
+	req := require.New(t)
+
+	const subDirs = 50
+	root := t.TempDir()
+	for i := 0; i < subDirs; i++ {
+		req.NoError(os.Mkdir(filepath.Join(root, fmt.Sprintf("dir-%02d", i)), 0755))
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	monitoring := observability.NewMonitoringManager(logger)
+
+	// A queue far smaller than the number of subdirectories, and a single worker:
+	// the worst case for the feedback loop.
+	dirChan := make(chan string, 1)
+	fileChan := make(chan *analyzer.FileAnalyzerRequest, 10)
+
+	var scanWG sync.WaitGroup
+
+	worker := NewFileScannerWorker(
+		logger, "drive-123", monitoring,
+		dirChan, fileChan,
+		&scanWG,
+		70, 90,
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	scanWG.Add(1)
+	dirChan <- root
+
+	go func() {
+		_ = worker.Run(ctx)
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		scanWG.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("scan did not complete: the worker is blocked on a full directory queue")
+	}
+
+	req.Equal(uint64(subDirs+1), monitoring.DirsScanned, "root and every subdirectory should be scanned")
 }

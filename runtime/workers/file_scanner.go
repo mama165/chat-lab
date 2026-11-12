@@ -25,10 +25,10 @@ type FileScannerWorker struct {
 	// all active scanner workers, enabling concurrent tree walking.
 	dirChan chan string
 	// fileChan is the outbound pipeline where discovered file metadata is sent
-	// as pointers to be consumed by the gRPC streaming sender.
-	fileChan                         chan *analyzer.FileAnalyzerRequest
+	// as pointers to be consumed by the ingestion worker.
+	fileChan chan *analyzer.FileAnalyzerRequest
+	// scanWG counts the directories still to explore: it reaches zero when the scan is complete.
 	scanWG                           *sync.WaitGroup
-	workersWG                        *sync.WaitGroup
 	scannerBackpressureLowThreshold  int
 	scannerBackpressureHardThreshold int
 }
@@ -40,7 +40,6 @@ func NewFileScannerWorker(
 	dirChan chan string,
 	fileChan chan *analyzer.FileAnalyzerRequest,
 	scanWG *sync.WaitGroup,
-	workersWG *sync.WaitGroup,
 	scannerBackpressureLowThreshold int,
 	scannerBackpressureHardThreshold int,
 ) *FileScannerWorker {
@@ -51,7 +50,6 @@ func NewFileScannerWorker(
 		dirChan:                          dirChan,
 		fileChan:                         fileChan,
 		scanWG:                           scanWG,
-		workersWG:                        workersWG,
 		scannerBackpressureLowThreshold:  scannerBackpressureLowThreshold,
 		scannerBackpressureHardThreshold: scannerBackpressureHardThreshold,
 	}
@@ -60,7 +58,6 @@ func NewFileScannerWorker(
 // Run executes the worker's main loop, consuming directory paths from dirChan and feeding subdirectories
 // back into it while processing regular files. It exits when the context is canceled or dirChan is closed.
 func (w *FileScannerWorker) Run(ctx context.Context) error {
-	defer w.workersWG.Done()
 	for {
 		select {
 		case <-ctx.Done():
@@ -102,8 +99,19 @@ func (w *FileScannerWorker) throttle(ctx context.Context) error {
 	return nil
 }
 
+// handleDirectory lists one directory: regular files are processed, subdirectories are
+// handed to the shared queue so that idle workers can pick them up.
+//
+// A worker is both a consumer and a producer of dirChan. If it waited for room in a
+// full queue, every worker could end up waiting at the same time with nobody left to
+// drain it, and the scan would hang forever. So when the queue is full, the worker
+// explores the subdirectory itself instead of waiting.
 func (w *FileScannerWorker) handleDirectory(ctx context.Context, currentDir string) {
 	defer w.scanWG.Done()
+
+	if ctx.Err() != nil {
+		return
+	}
 
 	entries, err := os.ReadDir(currentDir)
 	if err != nil {
@@ -123,9 +131,9 @@ func (w *FileScannerWorker) handleDirectory(ctx context.Context, currentDir stri
 		if entry.IsDir() {
 			w.scanWG.Add(1)
 			select {
-			case <-ctx.Done():
-				return
 			case w.dirChan <- fullPath:
+			default:
+				w.handleDirectory(ctx, fullPath)
 			}
 			continue
 		}
@@ -158,8 +166,11 @@ func (w *FileScannerWorker) processFile(ctx context.Context, path string, entry 
 		file.Close()
 		magicBytes = magicBytes[:n]
 	} else {
-		// If we can't open (locked file or permissions), we send an empty slice
-		magicBytes = magicBytes[:0]
+		// Locked file or missing permission: its type cannot be detected, so it is
+		// skipped, but counted so that it does not disappear silently.
+		w.monitoring.IncrErrorCount()
+		w.log.Debug("Unable to open file for type detection", "path", path, "error", err)
+		return
 	}
 
 	mimeType := mimetype.Detect(magicBytes).String()
