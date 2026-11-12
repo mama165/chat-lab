@@ -36,11 +36,12 @@ class AudioSpecialist(pb_grpc.SpecialistServiceServicer):
             segments, info = self.model.transcribe(tmp_path, beam_size=5)
             full_text = " ".join([segment.text for segment in segments])
 
-            #  Return the result as DocumentData (Pages) which is understandable for Go
+            # info describes the recording and the language Whisper detected
             return pb.SpecialistResponse(
                 audio=pb.AudioDetails(
                     transcription=full_text.strip(),
-                    duration_sec=0 # ou la vraie durée si tu l'as
+                    duration_sec=info.duration,
+                    language=info.language,
                 )
             )
         finally:
