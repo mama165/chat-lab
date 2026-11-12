@@ -75,7 +75,7 @@ The settings you are most likely to change:
 | `MAX_FILE_SIZE_MB` | Files larger than this are not analyzed |
 | `ENABLE_SPECIALISTS` | Set to `false` to scan and index names only, without Python |
 | `BADGER_FILEPATH`, `BLUGE_FILEPATH` | Where the database and the index are stored |
-| `MONITORING_PORT` | Port of the monitoring pages (8092 by default) |
+| `MONITORING_HOST`, `MONITORING_PORT` | Address and port of the HTTP server: search API and monitoring pages (`127.0.0.1` and `8092` by default) |
 
 **3. Run it:**
 
@@ -90,6 +90,25 @@ go run ./cmd/master -dir /path/to/folder
 ```
 
 The program scans the folder, then keeps running while the specialists work through the files. Stop it with Ctrl+C.
+
+## Search
+
+While the program runs, the indexed files can be searched over HTTP:
+
+```bash
+curl "http://localhost:8092/api/search?q=invoice+roof"
+```
+
+| Parameter | Meaning |
+| :--- | :--- |
+| `q` | Text to look for. A file matches when it contains every word, in its name, its path or its extracted content. Required. |
+| `type` | `pdf`, `audio` or `image`, to keep one kind of file. |
+| `page` | Page number, starting at 1. |
+| `size` | Results per page: 20 by default, 100 at most. |
+
+The answer gives the total number of matching files and, for each result of the page, its path, name, type, size, title when a specialist found one, and an excerpt of the content around the first word found. The search covers every scanned drive, best matches first.
+
+The HTTP server only accepts connections from the machine it runs on. To reach it from another device, set `MONITORING_HOST=0.0.0.0`; there is no authentication, so only do this on a network you trust.
 
 ## Monitoring
 
@@ -127,8 +146,8 @@ go generate ./...
 
 ## Known limitations
 
-- **No search interface yet.** The index is filled, but nothing exposes it to a user for now.
-- **No incremental scan.** Every run scans the whole folder again and creates new records.
+- **No search page yet.** The search is an HTTP API; there is no screen to type a query in.
+- **No incremental scan.** Every run scans the whole folder again and creates new records, so a file scanned twice into the same database appears twice in the search results.
 - **Files are loaded in memory** before being sent to a specialist, up to `MAX_FILE_SIZE_MB` each.
 - **`.aiff` files are not picked up by the scanner**, although the audio specialist declares the type.
 - **The Whisper model is downloaded automatically** the first time the audio specialist starts. There is no setting yet to use a model already present on disk.
