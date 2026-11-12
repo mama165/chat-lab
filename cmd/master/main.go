@@ -5,40 +5,34 @@ import (
 	"chat-lab/domain/analyzer"
 	"chat-lab/domain/event"
 	"chat-lab/domain/mimetypes"
-	"chat-lab/infrastructure/grpc/server"
 	"chat-lab/infrastructure/storage"
+	"chat-lab/infrastructure/web"
 	"chat-lab/internal"
 	"chat-lab/observability"
-	pb3 "chat-lab/proto/analyzer"
-	pb "chat-lab/proto/monitoring"
 	pb4 "chat-lab/proto/storage"
 	"chat-lab/runtime"
 	"chat-lab/runtime/workers"
 	"chat-lab/services"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
+	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/blugelabs/bluge"
 	"github.com/joho/godotenv"
 	"github.com/samber/lo"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
-
-	grpc3 "github.com/mama165/sdk-go/grpc"
 
 	"github.com/Netflix/go-env"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/mama165/sdk-go/logs"
-	"google.golang.org/grpc"
 )
 
 // Exit codes to provide meaningful status to the operating system or service manager (e.g., systemd).
@@ -47,6 +41,9 @@ const (
 	exitRuntime = 1
 	exitConfig  = 2
 )
+
+// shutdownTimeout bounds how long the program waits for its workers to stop.
+const shutdownTimeout = 10 * time.Second
 
 func main() {
 	// The main function acts as a thin wrapper.
@@ -75,6 +72,17 @@ func run() (int, error) {
 		return exitConfig, fmt.Errorf("config error: %w", err)
 	}
 
+	// The folder to scan comes from SCAN_ROOT_DIR; the -dir flag overrides it.
+	scanDir := flag.String("dir", config.ScanRootDir, "folder to scan (overrides SCAN_ROOT_DIR)")
+	flag.Parse()
+	config.ScanRootDir = *scanDir
+	if config.ScanRootDir == "" {
+		return exitConfig, errors.New("no folder to scan: set SCAN_ROOT_DIR or pass -dir <folder>")
+	}
+	if info, err := os.Stat(config.ScanRootDir); err != nil || !info.IsDir() {
+		return exitConfig, fmt.Errorf("folder to scan %q is not an accessible directory", config.ScanRootDir)
+	}
+
 	// 2. On prépare le fichier de log
 	logFile, err := os.OpenFile("master_execution.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -100,7 +108,11 @@ func run() (int, error) {
 	// Ainsi, ton Coordinator et ton Orchestrator l'utiliseront automatiquement
 	slog.SetDefault(logger)
 
-	ctx := context.Background()
+	// Context & Signals
+	// NotifyContext captures OS signals and cancels the context to trigger a shutdown.
+	// It is created first so that the specialists, started below, are stopped with it.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// Database (BadgerDB)
 	options := buildBadgerOpts(config, logger, ctx)
@@ -168,14 +180,11 @@ func run() (int, error) {
 	// Setup Supervision & Orchestration
 	telemetryChan := make(chan event.Event, config.BufferSize)
 	processTrackerChan := make(chan domain.Process, config.BufferSize)
-	specialistResponseChan := make(chan domain.SpecialistResponse, config.BufferSize)
 	eventChan := make(chan event.Event, config.BufferSize)
-	fileDownloaderRequestChan := make(chan domain.FileDownloaderRequest, config.BufferSize)
-	tmpFilePathChan := make(chan domain.TmpFileLocation, config.BufferSize)
 	sup := workers.NewSupervisor(logger, telemetryChan, config.RestartInterval)
 	analysisRepository := storage.NewAnalysisRepository(db, blugeWriter, logger, lo.ToPtr(50), 50)
-	fileTaskRepository := storage.NewFileTaskRepository(db, logger)
-	coordinator := runtime.NewCoordinator(logger, processTrackerChan, specialistResponseChan, config.MaxFileSizeMb)
+	coordinator := runtime.NewCoordinator(logger, processTrackerChan, config.MaxFileSizeMb)
+	monitoringManager := observability.NewMonitoringManager(logger)
 
 	bootCtx, cancelBoot := context.WithTimeout(ctx, config.MaxSpecialistBootDuration)
 	defer cancelBoot()
@@ -187,130 +196,44 @@ func run() (int, error) {
 		}
 	}
 
-	// gRPC Server Setup
-	masterAddress := fmt.Sprintf("%s:%d", config.Host, config.MasterPort)
-	scannerAddress := fmt.Sprintf("%s:%d", config.Host, config.ScannerPort)
-	listener, err := net.Listen("tcp", masterAddress)
-	if err != nil {
-		return exitRuntime, fmt.Errorf("failed to listen on master %s: %w", masterAddress, err)
-	}
-
-	retryConfig := config.GrpcConfig.ToServiceConfig(pb3.FileDownloaderService_Download_FullMethodName)
-	conn, err := grpc.NewClient(scannerAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultServiceConfig(retryConfig),
-	)
-	if err != nil {
-		return exitRuntime, fmt.Errorf("failed to listen on %s: %w", scannerAddress, err)
-	}
-
-	grpcClient := pb3.NewFileDownloaderServiceClient(conn)
-
-	scanAllowed := true
-	if scanAllowed {
-		go func() {
-			time.Sleep(5 * time.Second) // On laisse le temps au Scanner de boot
-
-			// On crée le client pour le contrôleur du scanner
-			scannerCtrlClient := pb3.NewScannerControllerClient(conn)
-
-			//target := "/mnt/c/Users/Maël/Downloads"
-			//target := "/mnt/c/Users/Maël/Desktop/test_data"
-			target := "/home/mael/develop/chat-lab/test_data"
-			slog.Info("📡 Master envoie l'ordre de scan au Scanner", "path", target)
-
-			_, err = scannerCtrlClient.TriggerScan(ctx, &pb3.ScanRequest{
-				Path: target,
-			})
-			if err != nil {
-				slog.Error("❌ Erreur lors du trigger gRPC", "error", err)
-			}
-		}()
-	}
-
-	// Create the temp directory
-	// /tmp/{directory}
-	//fileDownloadingDirPath := filepath.Join(os.TempDir(), config.TmpDownloadingDir)
-	//fileDownloadingDirPath := filepath.Join("/tmp", config.TmpDownloadingDir)
-	fileDownloadingDirPath := filepath.Join("/tmp", config.TmpDownloadingDir)
-	if err = os.MkdirAll(fileDownloadingDirPath, 0755); err != nil {
-		return exitRuntime, fmt.Errorf("failed to create dir %s : %w", fileDownloadingDirPath, err)
-	}
-	fileAccumulator := services.NewFileAccumulator(fileDownloadingDirPath, tmpFilePathChan)
+	counter := analyzer.NewCountAnalyzedFiles()
+	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
 
 	orchestrator := runtime.NewOrchestrator(
-		logger, monitor, sup, telemetryChan, eventChan,
+		logger, config, monitor, sup,
+		telemetryChan, eventChan,
 		processTrackerChan,
-		fileDownloaderRequestChan,
-		tmpFilePathChan,
-		specialistResponseChan,
 		analysisRepository,
-		fileTaskRepository,
 		coordinator,
-		grpcClient,
-		fileAccumulator,
-		observability.NewMonitoringManager(logger),
-		config.NumberOfWorkers,
-		config.BufferTimeout, config.SpecialistTimeout, config.MetricInterval,
-		config.LowCapacityThreshold,
-		config.MaxAnalyzedEvent,
-		config.FileTransferInterval,
-		config.PendingFileBatchSize,
-		config.MaxTmpFileToProcess,
-		config.FileTmpJobInterval,
+		analyzerService,
+		monitoringManager,
 	)
 
-	// Context & Signals
-	// NotifyContext captures OS signals and cancels the context to trigger a shutdown.
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Error (gRPC & Orchestrator)
+	// Error (monitoring server & orchestrator)
 	errChan := make(chan error, 2)
 
-	// Start the Engine (Workers and Fanout)
+	// Start the engine: scan, storage, analysis and telemetry workers.
+	orchestratorDone := make(chan struct{})
 	go func() {
+		defer close(orchestratorDone)
 		logger.Info("Starting orchestrator...")
 		if err := orchestrator.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("orchestrator error: %w", err)
 		}
 	}()
 
-	// Ton serveur qui expose les données
-	statsServer := server.NewMonitoringServer(monitor)
+	// Monitoring API and dashboard pages
+	monitoringServer := web.NewMonitoringServer(monitor, monitoringManager)
 	go func() {
-		logger.Info("📊 Monitoring server starting on :8092")
-		if err := statsServer.Start(8092); err != nil {
+		logger.Info("📊 Monitoring available",
+			"url", fmt.Sprintf("http://localhost:%d/monitoring.html", config.MonitoringPort))
+		if err := monitoringServer.Start(config.MonitoringPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Monitoring server failed", "err", err)
 		}
 	}()
 
-	s := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			grpc3.UnaryLoggingInterceptor(logger),
-		))
-
-	counter := analyzer.NewCountAnalyzedFiles()
-	analyzerService := services.NewAnalyzerService(logger, analysisRepository, eventChan, &counter)
-	fileAnalyzerServer := server.NewFileAnalyzerServer(analyzerService, logger, &counter)
-	monitoringServer := server.NewMonitoringServer(monitor)
-
-	pb3.RegisterFileAnalyzerServiceServer(s, fileAnalyzerServer)
-	pb.RegisterMonitoringServiceServer(s, monitoringServer)
-
-	// Use an error channel to capture Serve() issues asynchronously.
-	go func() {
-		logger.Info("Starting gRPC server", "address", masterAddress, "at", time.Now().UTC())
-		for serviceName := range s.GetServiceInfo() {
-			logger.Debug("📡 gRPC exposed services", "name", serviceName)
-		}
-		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			errChan <- fmt.Errorf("gRPC server error: %w", err)
-		}
-	}()
-
 	// Wait for Stop or Error
-	// The execution blocks here until either a signal is received or the server crashes.
+	// The execution blocks here until either a signal is received or the engine fails.
 	select {
 	case <-ctx.Done():
 		logger.Info("Shutdown signal received")
@@ -319,10 +242,14 @@ func run() (int, error) {
 	}
 
 	// Final Cleanup (Graceful Shutdown)
-	// We allow active gRPC streams to finish and workers to drain their channels.
+	// Wait for the workers to exit before the deferred database closes run.
 	logger.Info("Shutting down gracefully...")
-	s.GracefulStop()
 	orchestrator.Stop()
+	select {
+	case <-orchestratorDone:
+	case <-time.After(shutdownTimeout):
+		logger.Warn("Some workers did not stop in time", "timeout", shutdownTimeout)
+	}
 	logger.Info("Program stopped cleanly")
 
 	return exitOK, nil

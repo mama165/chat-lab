@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"chat-lab/domain"
+	"chat-lab/domain/mimetypes"
 	"chat-lab/errors"
 	"chat-lab/infrastructure/grpc/client"
 	"chat-lab/internal"
@@ -25,27 +26,24 @@ import (
 
 // Coordinator handles the lifecycle and coordination of all specialist sidecars.
 type Coordinator struct {
-	mu                     sync.RWMutex
-	log                    *slog.Logger
-	specialists            map[domain.Metric]*client.SpecialistClient
-	processTrackerChan     chan domain.Process
-	specialistResponseChan chan domain.SpecialistResponse
-	maxFileSizeMB          int
-	validator              *validator.Validate
+	mu                 sync.RWMutex
+	log                *slog.Logger
+	specialists        map[domain.Metric]*client.SpecialistClient
+	processTrackerChan chan domain.Process
+	maxFileSizeMB      int
+	validator          *validator.Validate
 }
 
 func NewCoordinator(
 	log *slog.Logger,
 	processTrackerChan chan domain.Process,
-	specialistResponseChan chan domain.SpecialistResponse,
 	maxFileSizeMB int) *Coordinator {
 	return &Coordinator{
-		log:                    log,
-		specialists:            make(map[domain.Metric]*client.SpecialistClient),
-		processTrackerChan:     processTrackerChan,
-		specialistResponseChan: specialistResponseChan,
-		maxFileSizeMB:          maxFileSizeMB,
-		validator:              validator.New(),
+		log:                log,
+		specialists:        make(map[domain.Metric]*client.SpecialistClient),
+		processTrackerChan: processTrackerChan,
+		maxFileSizeMB:      maxFileSizeMB,
+		validator:          validator.New(),
 	}
 }
 
@@ -190,89 +188,81 @@ func waitForReady(bootCtx context.Context, conn *grpc.ClientConn, timeout time.D
 	}
 }
 
-// Broadcast orchestrates the analysis of a file by streaming its content to relevant
-// specialists in parallel based on their capabilities (MIME types).
-func (m *Coordinator) Broadcast(ctx context.Context, req domain.SpecialistRequest) error {
+// Analyze sends a file to every specialist able to handle its MIME type, in
+// parallel, and waits for all of them. It returns one result per specialist:
+// either its response or the error it failed with.
+// It returns no result (and no error) when no specialist handles the file type.
+func (m *Coordinator) Analyze(ctx context.Context, req domain.SpecialistRequest) ([]domain.SpecialistResult, error) {
 	if err := m.validator.Struct(req); err != nil {
-		return err
+		return nil, err
+	}
+
+	targets := m.targetsFor(req.EffectiveMimeType)
+	if len(targets) == 0 {
+		m.log.Warn("No specialist found for MIME type", "mime", req.EffectiveMimeType, "path", req.Path)
+		return nil, nil
 	}
 
 	fileInfo, err := os.Stat(req.Path)
 	if err != nil {
-		return fmt.Errorf("file not found at : %s, err : %w", req.Path, err)
+		return nil, fmt.Errorf("file not found at : %s, err : %w", req.Path, err)
 	}
 
 	size := fileInfo.Size()
 	if size > int64(m.maxFileSizeMB*domain.MB) {
-		return fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
+		return nil, fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
 	}
 
 	data, err := os.ReadFile(req.Path)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", req.Path, err)
+		return nil, fmt.Errorf("failed to read file %s: %w", req.Path, err)
 	}
 
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	var targets []*client.SpecialistClient
-	for _, spec := range m.specialists {
-		if spec.CanHandle(req.EffectiveMimeType) {
-			targets = append(targets, spec)
-		}
-	}
-
-	if len(targets) == 0 {
-		m.log.Warn("No specialist found for MIME type", "mime", req.EffectiveMimeType, "path", req.Path)
-		return nil
-	}
-
-	var wg sync.WaitGroup
+	// Each goroutine writes to its own slot, so no lock is needed.
 	results := make([]domain.SpecialistResult, len(targets))
+	var wg sync.WaitGroup
 
-	for _, spec := range targets {
+	for i, specialist := range targets {
 		wg.Add(1)
-		go func(specialist *client.SpecialistClient) {
-			domainReq := domain.Request{
+		go func() {
+			defer wg.Done()
+			id := specialist.Id
+			resp, err := specialist.Analyze(ctx, domain.Request{
 				Metadata: &domain.Metadata{
 					MessageID:         uuid.New().String(),
 					FileName:          req.Path,
 					EffectiveMimeType: req.EffectiveMimeType,
 				},
 				Chunk: data,
+			})
+			if err != nil {
+				m.log.Error("Specialist analysis failed",
+					"id", id,
+					"mimeType", req.EffectiveMimeType,
+					"error", err,
+				)
+				results[i] = domain.SpecialistResult{ID: &id, SpecialistErr: err}
+				return
 			}
-
-			go func(request domain.Request) {
-				defer wg.Done()
-				resp, err := specialist.Analyze(ctx, domainReq)
-				if err != nil {
-					m.log.Error("Specialist analysis failed",
-						"id", specialist.Id,
-						"mimeType", req.EffectiveMimeType,
-						"error", err,
-					)
-
-					results = append(results, domain.SpecialistResult{ID: &specialist.Id, SpecialistErr: err})
-					return
-				}
-				results = append(results, domain.SpecialistResult{ID: &specialist.Id, Resp: &resp})
-			}(domainReq)
-		}(spec)
+			results[i] = domain.SpecialistResult{ID: &id, Resp: &resp}
+		}()
 	}
+	wg.Wait()
 
-	go func(res []domain.SpecialistResult) {
-		wg.Wait()
-		select {
-		case <-ctx.Done():
-			m.log.Warn("Giving up sending results, context canceled", "fileID", req.FileID)
-			return
-		case m.specialistResponseChan <- domain.SpecialistResponse{
-			FileID: req.FileID,
-			Res:    res,
-		}:
+	m.log.Debug("All specialists terminated", "fileID", req.FileID, "targets", len(targets))
+	return results, nil
+}
+
+// targetsFor returns the specialists able to handle the given MIME type.
+func (m *Coordinator) targetsFor(mimeType mimetypes.MIME) []*client.SpecialistClient {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var targets []*client.SpecialistClient
+	for _, spec := range m.specialists {
+		if spec.CanHandle(mimeType) {
+			targets = append(targets, spec)
 		}
-		m.log.Debug("All specialist terminated", "targets", len(targets))
-	}(results)
-
-	return nil
+	}
+	return targets
 }

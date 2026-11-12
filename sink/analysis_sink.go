@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,17 +20,23 @@ type AnalysisSink struct {
 	mu                 sync.Mutex
 	timer              *time.Timer
 	analysisRepository storage.IAnalysisRepository
-	fileTaskRepository storage.IFileTaskRepository
-	log                *slog.Logger
-	events             []event.FileAnalyse
-	maxAnalyzedEvent   int
-	bufferTimeout      time.Duration
-	specialistTimeout  time.Duration
+	// jobChan receives the files to analyze once their metadata is stored.
+	// It is bounded: when the specialists are slower than the scan, sending
+	// blocks, and the pressure goes back up to the scanner.
+	jobChan           chan<- domain.AnalysisJob
+	log               *slog.Logger
+	events            []event.FileAnalyse
+	maxAnalyzedEvent  int
+	bufferTimeout     time.Duration
+	specialistTimeout time.Duration
+	// stop is closed by Close to release senders blocked on jobChan at shutdown.
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func NewAnalysisSink(
 	analysisRepository storage.IAnalysisRepository,
-	fileTaskRepository storage.IFileTaskRepository,
+	jobChan chan<- domain.AnalysisJob,
 	log *slog.Logger,
 	maxAnalyzedEvent int,
 	bufferTimeout time.Duration,
@@ -37,20 +44,26 @@ func NewAnalysisSink(
 ) *AnalysisSink {
 	return &AnalysisSink{
 		analysisRepository: analysisRepository,
-		fileTaskRepository: fileTaskRepository,
+		jobChan:            jobChan,
 		log:                log,
 		maxAnalyzedEvent:   maxAnalyzedEvent,
 		bufferTimeout:      bufferTimeout,
 		specialistTimeout:  specialistTimeout,
+		stop:               make(chan struct{}),
 	}
 }
 
+// Close releases any goroutine waiting to hand a file over for analysis.
+// It is safe to call several times.
+func (a *AnalysisSink) Close() {
+	a.stopOnce.Do(func() { close(a.stop) })
+}
+
 // Consume implements the EventSink interface.
-func (a *AnalysisSink) Consume(_ context.Context, e contract.FileAnalyzerEvent) error {
-	// Détection du type d'événement via le Payload
+func (a *AnalysisSink) Consume(ctx context.Context, e contract.FileAnalyzerEvent) error {
 	switch evt := e.(type) {
 	case event.FileAnalyse:
-		return a.handleNewFile(evt)
+		return a.handleNewFile(ctx, evt)
 
 	case event.AnalysisSegment:
 		return a.handleAnalysisSegment(evt)
@@ -60,7 +73,7 @@ func (a *AnalysisSink) Consume(_ context.Context, e contract.FileAnalyzerEvent) 
 	}
 }
 
-func (a *AnalysisSink) handleNewFile(e event.FileAnalyse) error {
+func (a *AnalysisSink) handleNewFile(ctx context.Context, e event.FileAnalyse) error {
 	a.mu.Lock()
 	// 2. State update: Append the event to the current slice
 	a.events = append(a.events, e)
@@ -70,7 +83,8 @@ func (a *AnalysisSink) handleNewFile(e event.FileAnalyse) error {
 	// We only start it if no other timer is currently running (timer == nil).
 	if len(a.events) == 1 && a.timer == nil {
 		a.timer = time.AfterFunc(a.bufferTimeout, func() {
-			if err := a.flush(); err != nil {
+			// No caller to inherit a context from: Close() is what releases this flush.
+			if err := a.flush(context.Background()); err != nil {
 				a.log.Error("Batching: Timeout flush failed", "error", err)
 			}
 		})
@@ -82,7 +96,7 @@ func (a *AnalysisSink) handleNewFile(e event.FileAnalyse) error {
 
 	// 5. Size-based flush: triggered if the batch is full
 	if isFull {
-		return a.flush()
+		return a.flush(ctx)
 	}
 
 	return nil
@@ -138,6 +152,15 @@ func (a *AnalysisSink) handleAnalysisSegment(segment event.AnalysisSegment) erro
 			if data.Author != "" {
 				analysis.Tags = append(analysis.Tags, "author:"+data.Author)
 			}
+			// Keep the text of every page: this is what makes the document searchable.
+			if details, ok := analysis.Payload.(storage.FileDetails); ok && len(data.Pages) > 0 {
+				pages := make([]string, 0, len(data.Pages))
+				for _, page := range data.Pages {
+					pages = append(pages, page.Content)
+				}
+				details.Content = strings.Join(pages, "\n")
+				analysis.Payload = details
+			}
 		}
 	}
 
@@ -156,7 +179,7 @@ func (a *AnalysisSink) handleAnalysisSegment(segment event.AnalysisSegment) erro
 
 // flush handles the transition of data from the transient buffer to the specialists and persistent storage.
 // It employs an 'atomic swap' pattern to minimize lock contention.
-func (a *AnalysisSink) flush() error {
+func (a *AnalysisSink) flush(ctx context.Context) error {
 	a.mu.Lock()
 
 	// Stop and clear the timer to prevent redundant flushes.
@@ -178,101 +201,68 @@ func (a *AnalysisSink) flush() error {
 
 	a.mu.Unlock()
 
-	return a.processAndStore(batchEvents)
+	return a.processAndStore(ctx, batchEvents)
 }
 
-// processAndStore executes the core business logic: it persists basic file metadata
-// and offloads heavy analysis (Audio, PDF) to a persistent task queue.
-// This ensures high throughput for the scanner by decoupling immediate storage
-// from long-running specialized processing.
-func (a *AnalysisSink) processAndStore(events []event.FileAnalyse) error {
-	allAnalyses := make([]storage.Analysis, 0, len(events))
-
-	for _, evt := range events {
-		analysis := a.buildFinalAnalysis(evt, domain.SpecialistResponse{})
-		allAnalyses = append(allAnalyses, analysis)
-
-		if _, ok := mimetypes.IsAuthorized(evt.RawMimeType); ok {
-			task := storage.FileTask{
-				ID:                evt.Id.String(),
-				DriveID:           evt.DriveID,
-				Path:              evt.Path,
-				RawMimeType:       evt.RawMimeType,
-				EffectiveMimeType: evt.EffectiveMimeType,
-				Size:              evt.Size,
-				Priority:          storage.NORMAL,
-				CreatedAt:         time.Now(),
-			}
-
-			if err := a.fileTaskRepository.EnqueueTask(task); err != nil {
-				a.log.Error("Failed to enqueue task", "path", evt.Path, "error", err)
-			}
-		}
+// processAndStore persists the basic file metadata, then hands the files over
+// to the specialists for the heavy analysis (audio, PDF, image).
+// The order matters: a file is queued only once its record exists, because the
+// specialist results are merged into that record.
+func (a *AnalysisSink) processAndStore(ctx context.Context, events []event.FileAnalyse) error {
+	if len(events) == 0 {
+		return nil
 	}
 
-	if len(allAnalyses) > 0 {
-		return a.analysisRepository.StoreBatch(allAnalyses)
+	allAnalyses := make([]storage.Analysis, 0, len(events))
+	for _, evt := range events {
+		allAnalyses = append(allAnalyses, a.buildFinalAnalysis(evt))
+	}
+
+	if err := a.analysisRepository.StoreBatch(allAnalyses); err != nil {
+		return err
+	}
+
+	for _, evt := range events {
+		if _, ok := mimetypes.IsAuthorized(evt.RawMimeType); !ok {
+			continue
+		}
+		job := domain.AnalysisJob{
+			DriveID:           evt.DriveID,
+			FileID:            domain.FileID(evt.Id.String()),
+			Path:              evt.Path,
+			Size:              evt.Size,
+			EffectiveMimeType: evt.EffectiveMimeType,
+		}
+		select {
+		case a.jobChan <- job:
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-a.stop:
+			return nil
+		}
 	}
 	return nil
 }
 
-// buildFinalAnalysis maps and merges raw file events with specialized analysis results.
-// It acts as a decorator that enriches the initial metadata (path, mimetype)
-// with deeper insights like extracted titles, authors, or sentiment/toxicity scores.
-func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse, resp domain.SpecialistResponse) storage.Analysis {
-	analysis := storage.Analysis{
+// buildFinalAnalysis maps a scanned file to its initial record: the metadata
+// known from the file system. The specialist results are merged later by
+// handleAnalysisSegment.
+// The record is stored under the drive ID, which is also the namespace used to
+// fetch it back for enrichment.
+func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse) storage.Analysis {
+	return storage.Analysis{
 		ID:        evt.Id,
 		EntityId:  evt.Id,
-		Namespace: "file-room",
+		Namespace: evt.DriveID,
 		At:        evt.ScannedAt,
 		Summary:   evt.Path,
 		Tags:      []string{evt.RawMimeType, evt.SourceType},
 		Scores:    make(map[domain.Metric]float64),
 		Version:   uuid.New(),
+		Payload: storage.FileDetails{
+			Filename: evt.Path,
+			MimeType: evt.RawMimeType,
+			Size:     evt.Size,
+		},
 	}
-
-	// Prepare payload (empty for now)
-	payload := storage.FileDetails{
-		Filename: evt.Path,
-		MimeType: evt.RawMimeType,
-		Size:     evt.Size,
-	}
-
-	for _, res := range resp.Res {
-		switch data := res.Resp.OneOf.(type) {
-
-		case domain.AudioData:
-			// Assign the transcription to the file content
-			payload.Content = data.Transcription
-			analysis.Summary = "Audio Transcription"
-		case domain.DocumentData:
-			if data.Title != "" {
-				analysis.Summary = data.Title
-			}
-			if data.Author != "" {
-				analysis.Tags = append(analysis.Tags, "author:"+data.Author)
-			}
-
-			// Extract content from the first page (or merge all pages)
-			if len(data.Pages) > 0 {
-				payload.Content = data.Pages[0].Content
-				// Optional debug log
-				// a.log.Debug("Content extracted", "length", len(payload.Content))
-			}
-
-		case domain.Score:
-			if res.ID != nil {
-				analysis.Scores[*res.ID] = data.Score
-				analysis.Tags = append(analysis.Tags, data.Label)
-
-				// (Optionnal)
-				// case specialist.AudioData:
-				//    payload.Content = data.Transcription
-			}
-		}
-	}
-
-	analysis.Payload = payload
-
-	return analysis
 }

@@ -44,10 +44,10 @@ type EventSink[E any] interface {
 	Consume(ctx context.Context, e E) error
 }
 
-// SpecialistCoordinator defines the ability to fan-out analysis requests
-// to all available sidecars.
+// SpecialistCoordinator defines the ability to fan-out an analysis request
+// to all the sidecars able to handle the file, and to collect their results.
 type SpecialistCoordinator interface {
-	Broadcast(ctx context.Context, req domain.SpecialistRequest) error
+	Analyze(ctx context.Context, req domain.SpecialistRequest) ([]domain.SpecialistResult, error)
 }
 
 // ISpecialistClient defines the contract for interacting with specialized
@@ -56,8 +56,4 @@ type SpecialistCoordinator interface {
 // underlying communication protocol (gRPC, HTTP, or local).
 type ISpecialistClient interface {
 	Analyze(ctx context.Context, request domain.Request) (domain.Response, error)
-}
-
-type IFileAccumulator interface {
-	ProcessResponse(ctx context.Context, driveID string, fileID domain.FileID, resp domain.FileDownloaderResponse) error
 }

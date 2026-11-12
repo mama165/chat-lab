@@ -72,8 +72,3 @@ type SpecialistResult struct {
 	Resp          *Response
 	SpecialistErr error
 }
-
-type SpecialistResponse struct {
-	FileID FileID
-	Res    []SpecialistResult
-}
