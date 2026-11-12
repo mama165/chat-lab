@@ -10,5 +10,8 @@ services:
     user: "${D_UID}:${D_GID}"
     env_file:
       - internal/local.conf
+    environment:
+      # Listen on every interface inside the container so the published port works
+      - MONITORING_HOST=0.0.0.0
     ports:
       - "8092:8092"

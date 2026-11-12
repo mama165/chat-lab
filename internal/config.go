@@ -25,7 +25,10 @@ type Config struct {
 	ScanRootDir     string `env:"SCAN_ROOT_DIR"`
 	ScannerWorkerNb int    `env:"SCANNER_WORKER_NB,required=true"`
 	// AnalysisWorkerNb is the number of files sent to the specialists at the same time.
-	AnalysisWorkerNb                 int    `env:"ANALYSIS_WORKER_NB,required=true"`
+	AnalysisWorkerNb int `env:"ANALYSIS_WORKER_NB,required=true"`
+	// MonitoringHost is the address the HTTP server (search, monitoring) listens on.
+	// The default only accepts connections from this machine.
+	MonitoringHost                   string `env:"MONITORING_HOST,default=127.0.0.1"`
 	MonitoringPort                   int    `env:"MONITORING_PORT,default=8092"`
 	DriveID                          string `env:"DRIVE_ID,required=true"`
 	ScannerBackpressureLowThreshold  int    `env:"SCANNER_BACKPRESSURE_LOW_THRESHOLD_PERCENT,required=true"`
