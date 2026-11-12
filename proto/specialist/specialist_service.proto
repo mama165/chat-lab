@@ -27,7 +27,16 @@ message SpecialistResponse {
   DocumentData document_data = 1;
   Score score = 2;
     AudioDetails audio = 3;
+    ImageData image = 4;
   }
+}
+
+// What the image specialist reads from the picture itself.
+message ImageData {
+  int32 width = 1;
+  int32 height = 2;
+  string format = 3; // e.g. "PNG", "JPEG", "GIF"
+  string mode = 4;   // e.g. "RGB", "RGBA", "L"
 }
 
 message AudioDetails {

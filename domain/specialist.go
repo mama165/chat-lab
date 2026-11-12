@@ -49,6 +49,14 @@ type DocumentData struct {
 	Pages     []Page
 }
 
+// ImageData holds what the image specialist reads from the picture itself.
+type ImageData struct {
+	Width  int32
+	Height int32
+	Format string // e.g. "PNG"
+	Mode   string // e.g. "RGB"
+}
+
 // Page represents a single unit of text within a DocumentData.
 type Page struct {
 	Number  int32

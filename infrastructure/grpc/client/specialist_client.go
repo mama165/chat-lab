@@ -113,6 +113,15 @@ func fromPbSpecialistResponse(response *pb.SpecialistResponse) domain.Response {
 				Language:      resp.Audio.Language,
 			},
 		}
+	case *pb.SpecialistResponse_Image:
+		return domain.Response{
+			OneOf: domain.ImageData{
+				Width:  resp.Image.Width,
+				Height: resp.Image.Height,
+				Format: resp.Image.Format,
+				Mode:   resp.Image.Mode,
+			},
+		}
 	default:
 		return domain.Response{}
 	}
