@@ -8,6 +8,9 @@ pymupdf
 
 # --- Specialist: Audio & Video ---
 faster-whisper
+# faster-whisper 1.2.1 passes an option (metadata_errors) that PyAV 17 and later
+# no longer accept: with an unpinned PyAV, a fresh install cannot transcribe.
+av<17
 
 # --- Specialist: Image ---
 Pillow
