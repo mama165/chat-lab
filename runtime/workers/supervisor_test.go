@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -18,11 +19,12 @@ func TestSupervisor_RestartOnPanic(t *testing.T) {
 	defer ctrl.Finish()
 	workerMock := mocks.NewMockWorker(ctrl)
 
-	calls := 0
+	// The counter is written by the supervised goroutine and read by the test.
+	var calls atomic.Int32
 	workerMock.EXPECT().
 		Run(gomock.Any()).
 		DoAndReturn(func(ctx context.Context) error {
-			calls++
+			calls.Add(1)
 			panic("boom")
 		}).
 		AnyTimes()
@@ -38,7 +40,7 @@ func TestSupervisor_RestartOnPanic(t *testing.T) {
 	// Waiting for panics and restarts
 	time.Sleep(900 * time.Millisecond)
 
-	req.GreaterOrEqual(calls, 2)
+	req.GreaterOrEqual(calls.Load(), int32(2))
 }
 
 func TestSupervisor_StopOnSuccess(t *testing.T) {

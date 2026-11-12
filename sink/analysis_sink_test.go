@@ -175,8 +175,8 @@ func TestCloseReleasesSinkBlockedOnFullJobQueue(t *testing.T) {
 	}()
 
 	select {
-	case <-done:
-		t.Fatal("the sink should be waiting for room in the job queue")
+	case err := <-done:
+		t.Fatalf("the sink should be waiting for room in the job queue, but returned: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
 
