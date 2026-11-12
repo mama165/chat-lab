@@ -30,7 +30,7 @@ func GetWorkerName(w Worker) string {
 		return "NilWorker"
 	}
 	t := reflect.TypeOf(w)
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t.Name()

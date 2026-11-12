@@ -1,0 +1,12 @@
+# golangci-lint v2 configuration.
+# The default linters are kept (errcheck, govet, ineffassign, staticcheck, unused).
+version: "2"
+
+linters:
+  exclusions:
+    # Same tolerance as golangci-lint v1 had by default, e.g. an unchecked
+    # error on Close() in a defer is not reported.
+    presets:
+      - std-error-handling
+      - common-false-positives
+      - legacy
