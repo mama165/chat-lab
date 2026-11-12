@@ -239,6 +239,45 @@ func TestSpecialistResultsAreMergedIntoStoredRecord(t *testing.T) {
 	req.NoError(err)
 }
 
+func TestImageResultsAreMergedIntoStoredRecord(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	s, mockRepo, _ := setupSink(ctrl, 1, 1*time.Hour)
+
+	fileID := uuid.New()
+	image := domain.MetricImage
+	mockRepo.EXPECT().
+		FetchFullByEntityId("drive-1", fileID).
+		Return(storage.Analysis{
+			ID:        fileID,
+			EntityId:  fileID,
+			Namespace: "drive-1",
+			Summary:   "/pictures/capture.png",
+			Payload:   storage.FileDetails{Filename: "/pictures/capture.png"},
+		}, nil).Times(1)
+
+	mockRepo.EXPECT().
+		Store(gomock.Any()).
+		DoAndReturn(func(a storage.Analysis) error {
+			details, ok := a.Payload.(storage.FileDetails)
+			req.True(ok)
+			req.Equal("png image 800x600 RGB", details.Content)
+			return nil
+		}).Times(1)
+
+	err := s.Consume(context.Background(), event.AnalysisSegment{
+		DriveID: "drive-1",
+		FileID:  domain.FileID(fileID.String()),
+		Metrics: []event.AnalysisMetric{{
+			ID:   &image,
+			Resp: &domain.Response{OneOf: domain.ImageData{Width: 800, Height: 600, Format: "PNG", Mode: "RGB"}},
+		}},
+	})
+	req.NoError(err)
+}
+
 func TestConcurrentAccessSafety(t *testing.T) {
 	req := require.New(t)
 	ctrl := gomock.NewController(t)

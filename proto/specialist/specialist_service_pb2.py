@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)proto/specialist/specialist_service.proto\x12\x08\x61nalysis\"U\n\x11SpecialistRequest\x12&\n\x08metadata\x18\x01 \x01(\x0b\x32\x12.analysis.MetadataH\x00\x12\x0f\n\x05\x63hunk\x18\x02 \x01(\x0cH\x00\x42\x07\n\x05\x65ntry\"D\n\x08Metadata\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x11\n\tfile_name\x18\x02 \x01(\t\x12\x11\n\tmime_type\x18\x03 \x01(\t\"\x9c\x01\n\x12SpecialistResponse\x12/\n\rdocument_data\x18\x01 \x01(\x0b\x32\x16.analysis.DocumentDataH\x00\x12 \n\x05score\x18\x02 \x01(\x0b\x32\x0f.analysis.ScoreH\x00\x12\'\n\x05\x61udio\x18\x03 \x01(\x0b\x32\x16.analysis.AudioDetailsH\x00\x42\n\n\x08response\"M\n\x0c\x41udioDetails\x12\x15\n\rtranscription\x18\x01 \x01(\t\x12\x14\n\x0c\x64uration_sec\x18\x02 \x01(\x01\x12\x10\n\x08language\x18\x03 \x01(\t\"%\n\x05Score\x12\r\n\x05score\x18\x01 \x01(\x01\x12\r\n\x05label\x18\x02 \x01(\t\"r\n\x0c\x44ocumentData\x12\r\n\x05title\x18\x01 \x01(\t\x12\x0e\n\x06\x61uthor\x18\x02 \x01(\t\x12\x12\n\npage_count\x18\x03 \x01(\x05\x12\x10\n\x08language\x18\x04 \x01(\t\x12\x1d\n\x05pages\x18\x05 \x03(\x0b\x32\x0e.analysis.Page\"\'\n\x04Page\x12\x0e\n\x06number\x18\x01 \x01(\x05\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t2a\n\x11SpecialistService\x12L\n\rAnalyzeStream\x12\x1b.analysis.SpecialistRequest\x1a\x1c.analysis.SpecialistResponse(\x01\x42\x06Z\x04./pbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)proto/specialist/specialist_service.proto\x12\x08\x61nalysis\"U\n\x11SpecialistRequest\x12&\n\x08metadata\x18\x01 \x01(\x0b\x32\x12.analysis.MetadataH\x00\x12\x0f\n\x05\x63hunk\x18\x02 \x01(\x0cH\x00\x42\x07\n\x05\x65ntry\"D\n\x08Metadata\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x11\n\tfile_name\x18\x02 \x01(\t\x12\x11\n\tmime_type\x18\x03 \x01(\t\"\xc2\x01\n\x12SpecialistResponse\x12/\n\rdocument_data\x18\x01 \x01(\x0b\x32\x16.analysis.DocumentDataH\x00\x12 \n\x05score\x18\x02 \x01(\x0b\x32\x0f.analysis.ScoreH\x00\x12\'\n\x05\x61udio\x18\x03 \x01(\x0b\x32\x16.analysis.AudioDetailsH\x00\x12$\n\x05image\x18\x04 \x01(\x0b\x32\x13.analysis.ImageDataH\x00\x42\n\n\x08response\"H\n\tImageData\x12\r\n\x05width\x18\x01 \x01(\x05\x12\x0e\n\x06height\x18\x02 \x01(\x05\x12\x0e\n\x06\x66ormat\x18\x03 \x01(\t\x12\x0c\n\x04mode\x18\x04 \x01(\t\"M\n\x0c\x41udioDetails\x12\x15\n\rtranscription\x18\x01 \x01(\t\x12\x14\n\x0c\x64uration_sec\x18\x02 \x01(\x01\x12\x10\n\x08language\x18\x03 \x01(\t\"%\n\x05Score\x12\r\n\x05score\x18\x01 \x01(\x01\x12\r\n\x05label\x18\x02 \x01(\t\"r\n\x0c\x44ocumentData\x12\r\n\x05title\x18\x01 \x01(\t\x12\x0e\n\x06\x61uthor\x18\x02 \x01(\t\x12\x12\n\npage_count\x18\x03 \x01(\x05\x12\x10\n\x08language\x18\x04 \x01(\t\x12\x1d\n\x05pages\x18\x05 \x03(\x0b\x32\x0e.analysis.Page\"\'\n\x04Page\x12\x0e\n\x06number\x18\x01 \x01(\x05\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t2a\n\x11SpecialistService\x12L\n\rAnalyzeStream\x12\x1b.analysis.SpecialistRequest\x1a\x1c.analysis.SpecialistResponse(\x01\x42\x06Z\x04./pbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,15 +37,17 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_METADATA']._serialized_start=142
   _globals['_METADATA']._serialized_end=210
   _globals['_SPECIALISTRESPONSE']._serialized_start=213
-  _globals['_SPECIALISTRESPONSE']._serialized_end=369
-  _globals['_AUDIODETAILS']._serialized_start=371
-  _globals['_AUDIODETAILS']._serialized_end=448
-  _globals['_SCORE']._serialized_start=450
-  _globals['_SCORE']._serialized_end=487
-  _globals['_DOCUMENTDATA']._serialized_start=489
-  _globals['_DOCUMENTDATA']._serialized_end=603
-  _globals['_PAGE']._serialized_start=605
-  _globals['_PAGE']._serialized_end=644
-  _globals['_SPECIALISTSERVICE']._serialized_start=646
-  _globals['_SPECIALISTSERVICE']._serialized_end=743
+  _globals['_SPECIALISTRESPONSE']._serialized_end=407
+  _globals['_IMAGEDATA']._serialized_start=409
+  _globals['_IMAGEDATA']._serialized_end=481
+  _globals['_AUDIODETAILS']._serialized_start=483
+  _globals['_AUDIODETAILS']._serialized_end=560
+  _globals['_SCORE']._serialized_start=562
+  _globals['_SCORE']._serialized_end=599
+  _globals['_DOCUMENTDATA']._serialized_start=601
+  _globals['_DOCUMENTDATA']._serialized_end=715
+  _globals['_PAGE']._serialized_start=717
+  _globals['_PAGE']._serialized_end=756
+  _globals['_SPECIALISTSERVICE']._serialized_start=758
+  _globals['_SPECIALISTSERVICE']._serialized_end=855
 # @@protoc_insertion_point(module_scope)

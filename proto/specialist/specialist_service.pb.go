@@ -171,6 +171,7 @@ type SpecialistResponse struct {
 	//	*SpecialistResponse_DocumentData
 	//	*SpecialistResponse_Score
 	//	*SpecialistResponse_Audio
+	//	*SpecialistResponse_Image
 	Response      isSpecialistResponse_Response `protobuf_oneof:"response"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -240,6 +241,15 @@ func (x *SpecialistResponse) GetAudio() *AudioDetails {
 	return nil
 }
 
+func (x *SpecialistResponse) GetImage() *ImageData {
+	if x != nil {
+		if x, ok := x.Response.(*SpecialistResponse_Image); ok {
+			return x.Image
+		}
+	}
+	return nil
+}
+
 type isSpecialistResponse_Response interface {
 	isSpecialistResponse_Response()
 }
@@ -256,11 +266,86 @@ type SpecialistResponse_Audio struct {
 	Audio *AudioDetails `protobuf:"bytes,3,opt,name=audio,proto3,oneof"`
 }
 
+type SpecialistResponse_Image struct {
+	Image *ImageData `protobuf:"bytes,4,opt,name=image,proto3,oneof"`
+}
+
 func (*SpecialistResponse_DocumentData) isSpecialistResponse_Response() {}
 
 func (*SpecialistResponse_Score) isSpecialistResponse_Response() {}
 
 func (*SpecialistResponse_Audio) isSpecialistResponse_Response() {}
+
+func (*SpecialistResponse_Image) isSpecialistResponse_Response() {}
+
+// What the image specialist reads from the picture itself.
+type ImageData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Width         int32                  `protobuf:"varint,1,opt,name=width,proto3" json:"width,omitempty"`
+	Height        int32                  `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	Format        string                 `protobuf:"bytes,3,opt,name=format,proto3" json:"format,omitempty"` // e.g. "PNG", "JPEG", "GIF"
+	Mode          string                 `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`     // e.g. "RGB", "RGBA", "L"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImageData) Reset() {
+	*x = ImageData{}
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImageData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImageData) ProtoMessage() {}
+
+func (x *ImageData) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImageData.ProtoReflect.Descriptor instead.
+func (*ImageData) Descriptor() ([]byte, []int) {
+	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ImageData) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *ImageData) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *ImageData) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *ImageData) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
 
 type AudioDetails struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -273,7 +358,7 @@ type AudioDetails struct {
 
 func (x *AudioDetails) Reset() {
 	*x = AudioDetails{}
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[3]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -285,7 +370,7 @@ func (x *AudioDetails) String() string {
 func (*AudioDetails) ProtoMessage() {}
 
 func (x *AudioDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[3]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -298,7 +383,7 @@ func (x *AudioDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AudioDetails.ProtoReflect.Descriptor instead.
 func (*AudioDetails) Descriptor() ([]byte, []int) {
-	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{3}
+	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AudioDetails) GetTranscription() string {
@@ -332,7 +417,7 @@ type Score struct {
 
 func (x *Score) Reset() {
 	*x = Score{}
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[4]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -344,7 +429,7 @@ func (x *Score) String() string {
 func (*Score) ProtoMessage() {}
 
 func (x *Score) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[4]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -357,7 +442,7 @@ func (x *Score) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Score.ProtoReflect.Descriptor instead.
 func (*Score) Descriptor() ([]byte, []int) {
-	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{4}
+	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Score) GetScore() float64 {
@@ -387,7 +472,7 @@ type DocumentData struct {
 
 func (x *DocumentData) Reset() {
 	*x = DocumentData{}
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[5]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +484,7 @@ func (x *DocumentData) String() string {
 func (*DocumentData) ProtoMessage() {}
 
 func (x *DocumentData) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[5]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +497,7 @@ func (x *DocumentData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DocumentData.ProtoReflect.Descriptor instead.
 func (*DocumentData) Descriptor() ([]byte, []int) {
-	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{5}
+	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DocumentData) GetTitle() string {
@@ -460,7 +545,7 @@ type Page struct {
 
 func (x *Page) Reset() {
 	*x = Page{}
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[6]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -472,7 +557,7 @@ func (x *Page) String() string {
 func (*Page) ProtoMessage() {}
 
 func (x *Page) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_specialist_specialist_service_proto_msgTypes[6]
+	mi := &file_proto_specialist_specialist_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -485,7 +570,7 @@ func (x *Page) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Page.ProtoReflect.Descriptor instead.
 func (*Page) Descriptor() ([]byte, []int) {
-	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{6}
+	return file_proto_specialist_specialist_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Page) GetNumber() int32 {
@@ -515,13 +600,19 @@ const file_proto_specialist_specialist_service_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x1b\n" +
 	"\tfile_name\x18\x02 \x01(\tR\bfileName\x12\x1b\n" +
-	"\tmime_type\x18\x03 \x01(\tR\bmimeType\"\xb8\x01\n" +
+	"\tmime_type\x18\x03 \x01(\tR\bmimeType\"\xe5\x01\n" +
 	"\x12SpecialistResponse\x12=\n" +
 	"\rdocument_data\x18\x01 \x01(\v2\x16.analysis.DocumentDataH\x00R\fdocumentData\x12'\n" +
 	"\x05score\x18\x02 \x01(\v2\x0f.analysis.ScoreH\x00R\x05score\x12.\n" +
-	"\x05audio\x18\x03 \x01(\v2\x16.analysis.AudioDetailsH\x00R\x05audioB\n" +
+	"\x05audio\x18\x03 \x01(\v2\x16.analysis.AudioDetailsH\x00R\x05audio\x12+\n" +
+	"\x05image\x18\x04 \x01(\v2\x13.analysis.ImageDataH\x00R\x05imageB\n" +
 	"\n" +
-	"\bresponse\"s\n" +
+	"\bresponse\"e\n" +
+	"\tImageData\x12\x14\n" +
+	"\x05width\x18\x01 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x02 \x01(\x05R\x06height\x12\x16\n" +
+	"\x06format\x18\x03 \x01(\tR\x06format\x12\x12\n" +
+	"\x04mode\x18\x04 \x01(\tR\x04mode\"s\n" +
 	"\fAudioDetails\x12$\n" +
 	"\rtranscription\x18\x01 \x01(\tR\rtranscription\x12!\n" +
 	"\fduration_sec\x18\x02 \x01(\x01R\vdurationSec\x12\x1a\n" +
@@ -554,29 +645,31 @@ func file_proto_specialist_specialist_service_proto_rawDescGZIP() []byte {
 	return file_proto_specialist_specialist_service_proto_rawDescData
 }
 
-var file_proto_specialist_specialist_service_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_specialist_specialist_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_proto_specialist_specialist_service_proto_goTypes = []any{
 	(*SpecialistRequest)(nil),  // 0: analysis.SpecialistRequest
 	(*Metadata)(nil),           // 1: analysis.Metadata
 	(*SpecialistResponse)(nil), // 2: analysis.SpecialistResponse
-	(*AudioDetails)(nil),       // 3: analysis.AudioDetails
-	(*Score)(nil),              // 4: analysis.Score
-	(*DocumentData)(nil),       // 5: analysis.DocumentData
-	(*Page)(nil),               // 6: analysis.Page
+	(*ImageData)(nil),          // 3: analysis.ImageData
+	(*AudioDetails)(nil),       // 4: analysis.AudioDetails
+	(*Score)(nil),              // 5: analysis.Score
+	(*DocumentData)(nil),       // 6: analysis.DocumentData
+	(*Page)(nil),               // 7: analysis.Page
 }
 var file_proto_specialist_specialist_service_proto_depIdxs = []int32{
 	1, // 0: analysis.SpecialistRequest.metadata:type_name -> analysis.Metadata
-	5, // 1: analysis.SpecialistResponse.document_data:type_name -> analysis.DocumentData
-	4, // 2: analysis.SpecialistResponse.score:type_name -> analysis.Score
-	3, // 3: analysis.SpecialistResponse.audio:type_name -> analysis.AudioDetails
-	6, // 4: analysis.DocumentData.pages:type_name -> analysis.Page
-	0, // 5: analysis.SpecialistService.AnalyzeStream:input_type -> analysis.SpecialistRequest
-	2, // 6: analysis.SpecialistService.AnalyzeStream:output_type -> analysis.SpecialistResponse
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	6, // 1: analysis.SpecialistResponse.document_data:type_name -> analysis.DocumentData
+	5, // 2: analysis.SpecialistResponse.score:type_name -> analysis.Score
+	4, // 3: analysis.SpecialistResponse.audio:type_name -> analysis.AudioDetails
+	3, // 4: analysis.SpecialistResponse.image:type_name -> analysis.ImageData
+	7, // 5: analysis.DocumentData.pages:type_name -> analysis.Page
+	0, // 6: analysis.SpecialistService.AnalyzeStream:input_type -> analysis.SpecialistRequest
+	2, // 7: analysis.SpecialistService.AnalyzeStream:output_type -> analysis.SpecialistResponse
+	7, // [7:8] is the sub-list for method output_type
+	6, // [6:7] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_proto_specialist_specialist_service_proto_init() }
@@ -592,6 +685,7 @@ func file_proto_specialist_specialist_service_proto_init() {
 		(*SpecialistResponse_DocumentData)(nil),
 		(*SpecialistResponse_Score)(nil),
 		(*SpecialistResponse_Audio)(nil),
+		(*SpecialistResponse_Image)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -599,7 +693,7 @@ func file_proto_specialist_specialist_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_specialist_specialist_service_proto_rawDesc), len(file_proto_specialist_specialist_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

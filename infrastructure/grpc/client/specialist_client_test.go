@@ -158,3 +158,13 @@ func TestSpecialist_Can_Handle_Mime_Type(t *testing.T) {
 	ok = sClient2.CanHandle(mimetypes.TextCSS)
 	ass.False(ok)
 }
+
+func TestFromPbSpecialistResponse_Image(t *testing.T) {
+	resp := fromPbSpecialistResponse(&pb.SpecialistResponse{
+		Response: &pb.SpecialistResponse_Image{
+			Image: &pb.ImageData{Width: 800, Height: 600, Format: "PNG", Mode: "RGB"},
+		},
+	})
+
+	assert.Equal(t, domain.ImageData{Width: 800, Height: 600, Format: "PNG", Mode: "RGB"}, resp.OneOf)
+}

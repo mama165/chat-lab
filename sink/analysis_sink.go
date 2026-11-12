@@ -145,6 +145,14 @@ func (a *AnalysisSink) handleAnalysisSegment(segment event.AnalysisSegment) erro
 				analysis.Payload = details
 			}
 
+		case domain.ImageData:
+			// A picture has no text: describe it, so that it can be found by its
+			// format, its size ("800x600") or its color mode.
+			if details, ok := analysis.Payload.(storage.FileDetails); ok {
+				details.Content = describeImage(data)
+				analysis.Payload = details
+			}
+
 		case domain.DocumentData:
 			if data.Title != "" {
 				analysis.Summary = data.Title
@@ -265,4 +273,17 @@ func (a *AnalysisSink) buildFinalAnalysis(evt event.FileAnalyse) storage.Analysi
 			Size:     evt.Size,
 		},
 	}
+}
+
+// describeImage turns what the image specialist read into searchable text,
+// for example "png image 800x600 RGB".
+func describeImage(img domain.ImageData) string {
+	description := fmt.Sprintf("image %dx%d", img.Width, img.Height)
+	if img.Format != "" {
+		description = strings.ToLower(img.Format) + " " + description
+	}
+	if img.Mode != "" {
+		description += " " + img.Mode
+	}
+	return description
 }
