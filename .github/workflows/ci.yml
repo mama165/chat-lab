@@ -129,3 +129,38 @@ jobs:
         run: |
           set -o pipefail
           go test -run='^$' -bench=. -benchmem ./... | tee bench_output.txt
+
+  specialists:
+    name: Specialists (real files)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install the specialists' dependencies
+        run: |
+          python -m venv venv
+          ./venv/bin/pip install -r requirements.txt
+
+      - name: Cache the Whisper model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-base-v1
+
+      - name: Run the specialists on real files
+        env:
+          # Fail instead of skipping when the Python environment is incomplete
+          REQUIRE_SPECIALISTS: '1'
+        run: go test -race -count=1 -v ./e2e/
