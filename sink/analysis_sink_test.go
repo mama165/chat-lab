@@ -1,12 +1,14 @@
 package sink_test
 
 import (
+	"chat-lab/domain"
 	"chat-lab/domain/event"
 	"chat-lab/domain/mimetypes"
 	"chat-lab/infrastructure/storage"
 	"chat-lab/mocks"
 	"chat-lab/sink"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -21,14 +23,13 @@ import (
 func setupSink(ctrl *gomock.Controller,
 	maxSize int,
 	timeout time.Duration,
-) (*sink.AnalysisSink, *mocks.MockIAnalysisRepository, *mocks.MockIFileTaskRepository) {
+) (*sink.AnalysisSink, *mocks.MockIAnalysisRepository, chan domain.AnalysisJob) {
 	mockRepoAnalysis := mocks.NewMockIAnalysisRepository(ctrl)
-	mockRepoFileTask := mocks.NewMockIFileTaskRepository(ctrl)
+	jobChan := make(chan domain.AnalysisJob, 10)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	// Updated constructor call to match the new asynchronous architecture.
-	s := sink.NewAnalysisSink(mockRepoAnalysis, mockRepoFileTask, logger, maxSize, timeout, timeout)
-	return s, mockRepoAnalysis, mockRepoFileTask
+	s := sink.NewAnalysisSink(mockRepoAnalysis, jobChan, logger, maxSize, timeout, timeout)
+	return s, mockRepoAnalysis, jobChan
 }
 
 func TestFlushTriggeredBySizeLimit(t *testing.T) {
@@ -75,38 +76,165 @@ func TestFlushTriggeredByTimeout(t *testing.T) {
 	time.Sleep(timeout + 50*time.Millisecond)
 }
 
-func TestTaskEnqueuingForSpecificMimeTypes(t *testing.T) {
+func TestJobQueuedOnlyForSupportedMimeTypes(t *testing.T) {
 	req := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	// Use maxSize 1 to trigger immediate flush on each consumption.
-	s, mockRepo, mockFileTaskRepo := setupSink(ctrl, 1, 1*time.Hour)
+	s, mockRepo, jobChan := setupSink(ctrl, 1, 1*time.Hour)
 
-	// SCENARIO 1: PDF File -> Should trigger task enqueuing.
-	mockFileTaskRepo.EXPECT().
-		EnqueueTask(gomock.Any()).
-		Return(nil).
-		Times(1)
-
-	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
+	// SCENARIO 1: PDF file -> stored, then queued for the specialists.
+	pdfID := uuid.New()
+	mockRepo.EXPECT().
+		StoreBatch(gomock.Any()).
+		DoAndReturn(func(analyses []storage.Analysis) error {
+			req.Len(analyses, 1)
+			// The record lives under the drive ID: it is the namespace used later
+			// to fetch it back and merge the specialist results.
+			req.Equal("drive-1", analyses[0].Namespace)
+			req.Empty(jobChan, "a file must not be queued before its record is stored")
+			return nil
+		}).Times(1)
 
 	err := s.Consume(context.Background(), event.FileAnalyse{
-		Id:          uuid.New(),
-		Path:        "/test/document.pdf",
-		RawMimeType: string(mimetypes.ApplicationPDF),
-		SourceType:  "file",
+		Id:                pdfID,
+		DriveID:           "drive-1",
+		Path:              "/test/document.pdf",
+		Size:              42,
+		RawMimeType:       string(mimetypes.ApplicationPDF),
+		EffectiveMimeType: mimetypes.ApplicationPDF,
+		SourceType:        "file",
 	})
 	req.NoError(err)
 
-	// SCENARIO 2: Text file -> Should NOT trigger task enqueuing.
+	req.Len(jobChan, 1)
+	job := <-jobChan
+	req.Equal(domain.AnalysisJob{
+		DriveID:           "drive-1",
+		FileID:            domain.FileID(pdfID.String()),
+		Path:              "/test/document.pdf",
+		Size:              42,
+		EffectiveMimeType: mimetypes.ApplicationPDF,
+	}, job)
+
+	// SCENARIO 2: Text file -> stored, but not queued.
 	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
 
 	err = s.Consume(context.Background(), event.FileAnalyse{
 		Id:          uuid.New(),
+		DriveID:     "drive-1",
 		Path:        "/test/notes.txt",
 		RawMimeType: string(mimetypes.TextPlain),
 		SourceType:  "file",
+	})
+	req.NoError(err)
+	req.Empty(jobChan)
+}
+
+func TestNoJobQueuedWhenStorageFails(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	s, mockRepo, jobChan := setupSink(ctrl, 1, 1*time.Hour)
+	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(errors.New("disk full")).Times(1)
+
+	err := s.Consume(context.Background(), event.FileAnalyse{
+		Id:          uuid.New(),
+		DriveID:     "drive-1",
+		Path:        "/test/document.pdf",
+		RawMimeType: string(mimetypes.ApplicationPDF),
+	})
+	req.Error(err)
+	req.Empty(jobChan)
+}
+
+// When the specialists are slower than the scan, the job queue fills up and the
+// sink waits. Close must release it so that the program can stop.
+func TestCloseReleasesSinkBlockedOnFullJobQueue(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockIAnalysisRepository(ctrl)
+	jobChan := make(chan domain.AnalysisJob) // unbuffered and never read: always full
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	s := sink.NewAnalysisSink(mockRepo, jobChan, logger, 1, 1*time.Hour, 1*time.Hour)
+
+	mockRepo.EXPECT().StoreBatch(gomock.Any()).Return(nil).Times(1)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Consume(context.Background(), event.FileAnalyse{
+			Id:          uuid.New(),
+			DriveID:     "drive-1",
+			Path:        "/test/document.pdf",
+			RawMimeType: string(mimetypes.ApplicationPDF),
+		})
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("the sink should be waiting for room in the job queue")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	s.Close()
+	s.Close() // safe to call twice
+
+	select {
+	case err := <-done:
+		req.NoError(err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Close did not release the blocked sink")
+	}
+}
+
+func TestSpecialistResultsAreMergedIntoStoredRecord(t *testing.T) {
+	req := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	s, mockRepo, _ := setupSink(ctrl, 1, 1*time.Hour)
+
+	fileID := uuid.New()
+	pdf := domain.MetricPDF
+	mockRepo.EXPECT().
+		FetchFullByEntityId("drive-1", fileID).
+		Return(storage.Analysis{
+			ID:        fileID,
+			EntityId:  fileID,
+			Namespace: "drive-1",
+			Summary:   "/test/document.pdf",
+			Payload:   storage.FileDetails{Filename: "/test/document.pdf"},
+		}, nil).Times(1)
+
+	mockRepo.EXPECT().
+		Store(gomock.Any()).
+		DoAndReturn(func(a storage.Analysis) error {
+			req.Equal("Annual report", a.Summary)
+			req.Contains(a.Tags, "author:Jane")
+			details, ok := a.Payload.(storage.FileDetails)
+			req.True(ok)
+			req.Equal("first page\nsecond page", details.Content)
+			return nil
+		}).Times(1)
+
+	err := s.Consume(context.Background(), event.AnalysisSegment{
+		DriveID: "drive-1",
+		FileID:  domain.FileID(fileID.String()),
+		Metrics: []event.AnalysisMetric{{
+			ID: &pdf,
+			Resp: &domain.Response{OneOf: domain.DocumentData{
+				Title:  "Annual report",
+				Author: "Jane",
+				Pages: []domain.Page{
+					{Number: 1, Content: "first page"},
+					{Number: 2, Content: "second page"},
+				},
+			}},
+		}},
 	})
 	req.NoError(err)
 }

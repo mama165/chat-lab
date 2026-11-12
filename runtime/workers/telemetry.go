@@ -33,9 +33,11 @@ func (w TelemetryWorker) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			return nil
 		case <-ticker.C:
 			select {
 			case <-ctx.Done():
+				return nil
 			case evt := <-w.telemetryChan:
 				w.handle(evt)
 			}

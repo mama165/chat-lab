@@ -13,32 +13,26 @@ type Config struct {
 	BufferTimeout     time.Duration `env:"BUFFER_TIMEOUT,required=true"`
 	SpecialistTimeout time.Duration `env:"SPECIALIST_TIMEOUT,required=true"`
 
-	RestartInterval                  time.Duration `env:"RESTART_INTERVAL,required=true"`
-	BadgerFilepath                   string        `env:"BADGER_FILEPATH,required=true"`
-	BlugeFilepath                    string        `env:"BLUGE_FILEPATH,required=true"`
-	LogLevel                         string        `env:"LOG_LEVEL,required=true"`
-	LowCapacityThreshold             int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
-	MaxAnalyzedEvent                 int           `env:"MAX_ANALYZED_EVENT,required=true"`
-	Host                             string        `env:"HOST,required=true"`
-	MasterPort                       int           `env:"MASTER_PORT,required=true"`
-	ScannerPort                      int           `env:"SCANNER_PORT,required=true"`
-	DebugPort                        int           `env:"DEBUG_PORT,required=true"`
-	MaxSpecialistBootDuration        time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION,required=true"`
-	EnableSpecialists                bool          `env:"ENABLE_SPECIALISTS,required=true"`
-	ScannerWorkerNb                  int           `env:"SCANNER_WORKER_NB,required=true"`
-	DownloaderWorkerNb               int           `env:"DOWNLOADER_WORKER_NB,required=true"`
-	FileTransferInterval             time.Duration `env:"FILE_TRANSFER_INTERVAL,required=true"`
-	PendingFileBatchSize             int           `env:"PENDING_FILE_BATCH_SIZE,required=true"`
-	DriveID                          string        `env:"DRIVE_ID,required=true"`
-	ScannerBackpressureLowThreshold  int           `env:"SCANNER_BACKPRESSURE_LOW_THRESHOLD_PERCENT,required=true"`
-	ScannerBackpressureHardThreshold int           `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`
-	ChunkSizeKb                      int           `env:"CHUNK_SIZE_KB,required=true"`
-	MaxFileSizeMb                    int           `env:"MAX_FILE_SIZE_MB,required=true"`
-	TmpDownloadingDir                string        `env:"TMP_DOWNLOADING_DIR,required=true"`
-	ProgressLogInterval              time.Duration `env:"PROGRESS_LOG_INTERVAL,required=true"`
+	RestartInterval           time.Duration `env:"RESTART_INTERVAL,required=true"`
+	BadgerFilepath            string        `env:"BADGER_FILEPATH,required=true"`
+	BlugeFilepath             string        `env:"BLUGE_FILEPATH,required=true"`
+	LogLevel                  string        `env:"LOG_LEVEL,required=true"`
+	LowCapacityThreshold      int           `env:"LOW_CAPACITY_THRESHOLD,required=true"`
+	MaxAnalyzedEvent          int           `env:"MAX_ANALYZED_EVENT,required=true"`
+	DebugPort                 int           `env:"DEBUG_PORT,required=true"`
+	MaxSpecialistBootDuration time.Duration `env:"MAX_SPECIALIST_BOOT_DURATION,required=true"`
+	EnableSpecialists         bool          `env:"ENABLE_SPECIALISTS,required=true"`
+	// ScanRootDir is the folder scanned at startup; the -dir flag overrides it.
+	ScanRootDir     string `env:"SCAN_ROOT_DIR"`
+	ScannerWorkerNb int    `env:"SCANNER_WORKER_NB,required=true"`
+	// AnalysisWorkerNb is the number of files sent to the specialists at the same time.
+	AnalysisWorkerNb                 int    `env:"ANALYSIS_WORKER_NB,required=true"`
+	MonitoringPort                   int    `env:"MONITORING_PORT,default=8092"`
+	DriveID                          string `env:"DRIVE_ID,required=true"`
+	ScannerBackpressureLowThreshold  int    `env:"SCANNER_BACKPRESSURE_LOW_THRESHOLD_PERCENT,required=true"`
+	ScannerBackpressureHardThreshold int    `env:"SCANNER_BACKPRESSURE_HARD_THRESHOLD_PERCENT,required=true"`
+	MaxFileSizeMb                    int    `env:"MAX_FILE_SIZE_MB,required=true"`
 	GrpcConfig                       GrpcConfig
-	MaxTmpFileToProcess              uint32        `env:"MAX_TMP_FILE_TO_PROCESS,required=true"`
-	FileTmpJobInterval               time.Duration `env:"FILE_TMP_JOB_INTERVAL,required=true"`
 }
 
 type GrpcConfig struct {

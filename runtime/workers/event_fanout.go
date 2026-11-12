@@ -38,22 +38,26 @@ func NewEventFanoutWorker(
 // Run starts the eventChan distribution loop.
 // It dispatches file analysis events to the analysis sink and forwards every
 // event to the telemetry channel for observability.
-// The range loop ensures all buffered events are processed before shutdown.
+// It stops when the context is canceled.
 func (w *EventFanoutWorker) Run(ctx context.Context) error {
-	for evt := range w.eventChan {
-		if e, ok := evt.Payload.(contract.FileAnalyzerEvent); ok {
-			w.handleFileEvent(ctx, e)
-		}
+	for {
 		select {
 		case <-ctx.Done():
-			w.log.Debug("Context done, skipping telemetry")
-		case w.telemetryChan <- evt:
-		default:
-			w.log.Debug("Observability telemetry eventChan lost")
+			return ctx.Err()
+		case evt, ok := <-w.eventChan:
+			if !ok {
+				return nil
+			}
+			if e, ok := evt.Payload.(contract.FileAnalyzerEvent); ok {
+				w.handleFileEvent(ctx, e)
+			}
+			select {
+			case w.telemetryChan <- evt:
+			default:
+				w.log.Debug("Observability telemetry eventChan lost")
+			}
 		}
 	}
-	w.log.Info("EventFanoutWorker: event channel drained and closed. Shutting down.")
-	return nil
 }
 
 func (w *EventFanoutWorker) handleFileEvent(ctx context.Context, evt contract.FileAnalyzerEvent) {

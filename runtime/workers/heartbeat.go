@@ -3,41 +3,43 @@ package workers
 import (
 	"chat-lab/domain"
 	"chat-lab/observability"
-	pb "chat-lab/proto/monitoring"
 	"context"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/shirou/gopsutil/process"
-	"google.golang.org/grpc"
 )
 
+// HeartbeatWorker periodically reports the health of this process (CPU, RAM,
+// status) and the scan progress to the global monitoring, next to the specialists.
 type HeartbeatWorker struct {
-	log        *slog.Logger
-	grpcClient pb.MonitoringServiceClient
-	monitoring *observability.MonitoringManager
+	log           *slog.Logger
+	globalMonitor *domain.GlobalMonitoring
+	monitoring    *observability.MonitoringManager
+	interval      time.Duration
 }
 
 func NewHeartbeatWorker(
 	log *slog.Logger,
-	conn *grpc.ClientConn,
+	globalMonitor *domain.GlobalMonitoring,
 	monitoring *observability.MonitoringManager,
+	interval time.Duration,
 ) *HeartbeatWorker {
 	return &HeartbeatWorker{
-		log:        log,
-		grpcClient: pb.NewMonitoringServiceClient(conn),
-		monitoring: monitoring,
+		log:           log,
+		globalMonitor: globalMonitor,
+		monitoring:    monitoring,
+		interval:      interval,
 	}
 }
 
-// Run executes the main loop of the worker, sending health metrics (CPU, RAM, Status) every 5 seconds.
 func (w *HeartbeatWorker) Run(ctx context.Context) error {
-	w.log.Info("Starting scanner heartbeat worker")
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 
-	p, err := process.NewProcess(int32(os.Getpid()))
+	pid := os.Getpid()
+	p, err := process.NewProcess(int32(pid))
 	if err != nil {
 		return err
 	}
@@ -47,34 +49,30 @@ func (w *HeartbeatWorker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			rss, cpu, status, err := getScannerSelfStats(p)
+			rss, cpu, status, err := getSelfStats(p)
 			if err != nil {
 				w.log.Error("Failed to collect self stats", "err", err)
 				continue
 			}
 
-			localStats := w.monitoring.GetLatest()
-
-			_, err = w.grpcClient.ReportStatus(ctx, &pb.NodeStatus{
-				NodeId:         "scanner-01",
-				NodeType:       string(domain.SCANNER),
-				Pid:            int64(os.Getpid()),
-				PidStatus:      status,
-				CpuPercent:     cpu,
-				RamBytes:       rss,
-				ItemsProcessed: localStats.FilesFound,
-				QueueSize:      uint32(localStats.CurrentQueueSize),
-				MaxCapacity:    localStats.MaxCapacity,
+			stats := w.monitoring.GetLatest()
+			w.globalMonitor.UpdateNode(domain.NodeHealth{
+				ID:             "master",
+				Type:           domain.MASTER,
+				PIDStatus:      domain.ToPIDStatus(status),
+				PID:            int64(pid),
+				CPU:            cpu,
+				RAM:            rss,
+				ItemsProcessed: stats.FilesFound,
+				QueueSize:      uint32(stats.CurrentQueueSize),
+				MaxCapacity:    stats.MaxCapacity,
 			})
-			if err != nil {
-				w.log.Warn("Master unreachable for heartbeat", "err", err)
-			}
 		}
 	}
 }
 
-// getScannerSelfStats retrieves technical metrics (Memory, CPU, and OS Status) for the given process.
-func getScannerSelfStats(p *process.Process) (uint64, float64, string, error) {
+// getSelfStats retrieves technical metrics (Memory, CPU, and OS Status) for the given process.
+func getSelfStats(p *process.Process) (uint64, float64, string, error) {
 	memInfo, err := p.MemoryInfo()
 	if err != nil {
 		return 0, 0, "", err
