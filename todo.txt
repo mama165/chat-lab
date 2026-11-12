@@ -1,5 +1,6 @@
-- Expose the search (the index is filled but nothing queries it for a user yet)
-- Incremental scan: skip files already indexed (key on path + modification time)
+- Search page in ui/ on top of /api/search
+- Authentication before exposing the HTTP server beyond this machine
+- Incremental scan: skip files already indexed (key on path + modification time); today a rescan duplicates search results
 - Stream files to the specialists instead of loading them in memory (500 MB PDF = out of memory risk)
 - .aiff files are not picked up by the scanner: detected type does not match audio/x-aiff
 - Use os.Lstat where symbolic links must really be excluded
