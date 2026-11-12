@@ -242,13 +242,11 @@ func buildFileWorkers(config internal.Config,
 
 	var allFileScannerWorkers = make([]contract.Worker, 0, config.ScannerWorkerNb)
 	for i := 0; i < config.ScannerWorkerNb; i++ {
-		workersWG.Add(1)
 		allFileScannerWorkers = append(allFileScannerWorkers,
 			workers.NewFileScannerWorker(
 				logger, config.DriveID, monitoring,
 				dirChan, fileChan,
 				scanWG,
-				workersWG,
 				config.ScannerBackpressureLowThreshold,
 				config.ScannerBackpressureHardThreshold,
 			),
