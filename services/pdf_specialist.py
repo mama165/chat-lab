@@ -53,7 +53,7 @@ class MonitorService(pb_grpc.SpecialistServiceServicer):
                 return pb.SpecialistResponse(
                     document_data=pb.DocumentData(
                         title=doc.metadata.get('title') or file_metadata["file_name"],
-                        author=doc.metadata.get('author') or "Unknown",
+                        author=doc.metadata.get('author') or "",
                         page_count=len(doc),
                         language="fr",
                         pages=pages_list
