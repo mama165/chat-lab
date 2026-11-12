@@ -208,6 +208,12 @@ func (m *Coordinator) Analyze(ctx context.Context, req domain.SpecialistRequest)
 		return nil, fmt.Errorf("file not found at : %s, err : %w", req.Path, err)
 	}
 
+	// The scan only reports regular files, but the file may have been replaced
+	// since: never read a directory, a device or a pipe.
+	if !fileInfo.Mode().IsRegular() {
+		return nil, fmt.Errorf("entry %s is not a regular file", req.Path)
+	}
+
 	size := fileInfo.Size()
 	if size > int64(m.maxFileSizeMB*domain.MB) {
 		return nil, fmt.Errorf("file %s is too large (%d bytes)", req.Path, size)
