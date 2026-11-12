@@ -1,65 +1,121 @@
-# 🚀 Chat-Lab | High-Performance Stream & Analysis Engine
+# Chat-Lab
 
-Chat-Lab is a robust, modular messaging and data processing platform built in Go. Beyond simple chat, it is designed as a **resilient data pipeline** capable of ingesting, moderating, and indexing streams of information with advanced congestion control and self-healing capabilities.
+Chat-Lab scans a folder and its subfolders, extracts the content of the files it finds, and indexes everything so that it can be searched later.
 
----
+It is written in Go. The heavy extraction work (reading PDFs, transcribing audio, describing images) is delegated to small Python programs, the *specialists*, which run next to the main program.
 
-## 🏗️ System Architecture
+> The name comes from the project's first life as a chat server. That version, with its rooms, moderation and authentication, is kept on the `archive/chat` branch.
 
-Chat-Lab follows a **Master-Worker-Sidecar** pattern to ensure total isolation between business logic and heavy processing (AI/Indexing).
+## What it does
 
+1. **Scan.** A pool of workers walks the folder tree. Symbolic links are skipped, and the type of each file is detected from its first bytes, not from its extension.
+2. **Store.** The metadata of every supported file (path, size, type) is stored and indexed straight away, so a file can be found by its name before its analysis is finished.
+3. **Analyze.** Each file is sent to the specialist that handles its type.
+4. **Enrich.** What the specialist returns (title, author, text of the pages, transcription) is merged into the stored record, which makes the file searchable by its content.
 
+Supported types today: PDF, audio (MP3, WAV, AIFF) and images (PNG, JPEG, GIF).
 
-### 1. The Orchestrator (The Brain)
-* **Wait-and-Fail Backpressure:** Protects the system from bursts by rejecting messages (`ErrServerOverloaded`) if the internal buffer is full.
-* **Fan-out Distribution:** Dispatches events to multiple Sinks (Storage, Search, Telemetry) in parallel without blocking the main flow.
+## Architecture
 
-### 2. The Supervisor (The Guardian)
-* **Fault Isolation:** Every worker (Moderation, PoolUnit, Fan-out) is supervised.
-* **Self-Healing:** In case of a `panic`, the Supervisor recovers, logs the failure, and restarts the worker automatically.
+A single Go program runs the whole pipeline. Each stage is a pool of supervised workers, and the stages are linked by bounded channels:
 
-### 3. AI Specialists (The Muscles)
-* **Cross-Language Sidecars:** Advanced analysis (Toxicity, Business Logic) is offloaded to specialized Python/C++ models.
-* **gRPC IPC:** Communication via Protobuf ensures low-latency and strict contract definition between the Go Master and the AI Specialists.
-* **Lead Time Monitoring:** Every analysis measures its own execution time to prevent pipeline congestion.
+```
+scanner -> ingest -> fan-out -> analysis sink (stores the file metadata)
+                                      |
+                                  job queue
+                                      v
+                  analysis workers -> specialists -> storage
+```
 
----
+- **Backpressure.** The channels are bounded and the flow never loops back. When the specialists are slow, the queues fill up and the scanner slows down on its own.
+- **Supervision.** Every worker runs under a supervisor. If one panics, it is restarted without stopping the others.
+- **Specialists.** Each specialist is a separate Python process, started by the Go program and reached over gRPC. Its CPU and memory use are monitored.
+- **Telemetry.** Queue levels, worker restarts and specialist health are collected and exposed over HTTP.
 
-## 🛠️ Technical Stack
+More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SEQUENCE.md](docs/SEQUENCE.md) and [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
+## Technical stack
 
 | Component | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Core Engine** | Go 1.21+ | Concurrency, Goroutines, & High-speed routing |
-| **Key-Value Store** | **BadgerDB** | Persistent storage for raw messages (LSM-tree) |
-| **Search Engine** | **Bluge** | Full-text indexing and multi-criteria querying |
-| **Communication** | **gRPC / Protobuf** | High-performance interface for AI sidecars |
-| **Moderation** | **Aho-Corasick** | O(n) complexity keyword filtering |
-| **Observability** | **Internal Telemetry** | Channel capacity monitoring & Restart health |
+| Core engine | Go 1.27 | Scan, pipeline, supervision |
+| Storage | BadgerDB | Embedded key-value store for the records |
+| Search | Bluge | Embedded full-text index |
+| Specialists | Python, gRPC / Protobuf | PDF (PyMuPDF), audio (faster-whisper), images (Pillow) |
+| Type detection | mimetype | File type from the first bytes |
 
----
+## Getting started
 
-## ⚡ Performance & Resilience
+Requirements: Go 1.27 or later, and Python 3 for the specialists.
 
-* **Concurrency-First:** Uses a pool of unit workers to decouple command reception from processing.
-* **Graceful Shutdown:** The Orchestrator ensures all internal channels are drained and repositories flushed before stopping.
-* **Memory Efficiency:** Heavy operations like Aho-Corasick automaton building are done during the "Preparation Phase" to avoid runtime locks.
-* **Modular Sinks:** Adding a new output (Kafka, S3, Webhook) is as simple as implementing the `EventSink` interface.
+**1. Install the specialists' dependencies** (creates a `venv` folder):
 
----
-
-## 📊 Telemetry Channels
-
-The system exposes 4 critical monitoring axes:
-1.  **Channel Capacity:** Real-time length/capacity ratio of internal Go channels.
-2.  **Censorship Hits:** Statistics on filtered words and moderated content.
-3.  **Supervisor Health:** Tracking `RestartedAfterPanic` events.
-4.  **Processing Latency:** Lead time measurement for gRPC Specialist calls.
-
----
-
-## 🚀 Getting Started
-
-### Load Testing
-To stress the backpressure and throughput:
 ```bash
-go test -v ./runtime/load_test.go
+./scripts/setup_env.sh
+```
+
+**2. Create the configuration.** The program reads a `.env` file in the folder it is started from:
+
+```bash
+cp internal/local.conf .env
+```
+
+The settings you are most likely to change:
+
+| Setting | Meaning |
+| :--- | :--- |
+| `SCAN_ROOT_DIR` | Folder scanned at startup |
+| `ANALYSIS_WORKER_NB` | Number of files sent to the specialists at the same time |
+| `MAX_FILE_SIZE_MB` | Files larger than this are not analyzed |
+| `ENABLE_SPECIALISTS` | Set to `false` to scan and index names only, without Python |
+| `BADGER_FILEPATH`, `BLUGE_FILEPATH` | Where the database and the index are stored |
+| `MONITORING_PORT` | Port of the monitoring pages (8092 by default) |
+
+**3. Run it:**
+
+```bash
+go run ./cmd/master
+```
+
+To scan another folder without editing the configuration:
+
+```bash
+go run ./cmd/master -dir /path/to/folder
+```
+
+The program scans the folder, then keeps running while the specialists work through the files. Stop it with Ctrl+C.
+
+## Monitoring
+
+While the program runs:
+
+- `http://localhost:8092/monitoring.html` shows the health of the program and of each specialist.
+- `http://localhost:8092/api/monitoring` returns the same data as JSON.
+- `http://localhost:8092/api/stats` returns the scan progress and throughput as JSON.
+
+## Development
+
+```bash
+go build ./...
+```
+
+```bash
+go test -race ./...
+```
+
+Add `-short` to skip the slow storage test that indexes several thousand documents.
+
+The CI runs six independent jobs on every pull request: build, code quality (vet, gofmt, golangci-lint), security (govulncheck), generated code (mocks), tests with the race detector, and benchmarks.
+
+After changing an interface that has a mock, regenerate the mocks:
+
+```bash
+go generate ./...
+```
+
+## Known limitations
+
+- **No search interface yet.** The index is filled, but nothing exposes it to a user for now.
+- **No incremental scan.** Every run scans the whole folder again and creates new records.
+- **Files are loaded in memory** before being sent to a specialist, up to `MAX_FILE_SIZE_MB` each.
+- **`.aiff` files are not picked up by the scanner**, although the audio specialist declares the type.

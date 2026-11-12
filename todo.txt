@@ -1,12 +1,11 @@
-- Add checksum to oneOf gRPC endpoint
-- Fix CI-Lint
-- Fix all tests
-- Careful with 500 Mo PDF File (Out ot memory risks)
-- Add E2E tests
+- Expose the search (the index is filled but nothing queries it for a user yet)
+- Incremental scan: skip files already indexed (key on path + modification time)
+- Stream files to the specialists instead of loading them in memory (500 MB PDF = out of memory risk)
+- .aiff files are not picked up by the scanner: detected type does not match audio/x-aiff
+- Use os.Lstat where symbolic links must really be excluded
+- Video files: MP4 is declared but not authorized, and there is no video specialist
+- Init specialists from configuration (ports and paths are hard-coded in cmd/master/main.go)
 - Remove all french comments
-- Use variable everywhere for FILE, AUDIO, PDF...
-- Add a validator for MIMETYPES (for now it's just required)
-- Spit events in FanoutWorker into ChatEvent, FileEvent, Technical event
-- Init specialists with NewConfig
-- Check mimetypes before sending files from file_downloader_service
-- Mutualize setupDB everywhere (use WithInMemory for BadgerDB)
+- Rename "room" to "namespace" in the analysis repository
+- Docker: the app image has no Python, so specialists cannot run in it
+- Replace the hand-made monitoring pages with Prometheus metrics and a Grafana dashboard
