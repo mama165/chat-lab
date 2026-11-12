@@ -1,22 +1,28 @@
+# Sequence
+
+What happens to one file, from the scan to the moment it can be found by its content.
+
 ```mermaid
 sequenceDiagram
-participant S as Scanner (Client)
-participant G as gRPC Server
-participant O as Orchestrator
-participant C as SpecialistCoordinator
-participant P as Python Sidecar
+    participant S as Scanner worker
+    participant I as Ingest worker
+    participant K as Analysis sink
+    participant DB as BadgerDB + Bluge
+    participant A as Analysis worker
+    participant C as Coordinator
+    participant P as Python specialist
 
-    S->>G: 1. Send Meta-data (FileAnalyse)
-    G->>O: 2. Dispatch to fileAnalyzeChan
-    O->>C: 3. ShouldRequestContent(mime)?
-    C-->>O: 4. Yes (is text/pdf)
-    O->>G: 5. Trigger Pull Command
-    G->>S: 6. SEND_CONTENT Command
-    S->>G: 7. Push Content (Bytes)
-    G->>O: 8. Update Event with Content
-    O->>C: 9. ProcessFileEnrichment()
-    C->>P: 10. AnalyzeAll (Fan-out)
-    P-->>C: 11. Analysis Results
-    C-->>O: 12. Enriched Event
-    O->>Sink: 13. Async Save (Upsert)
-````
+    S->>S: 1. Read directory, detect file type
+    S->>I: 2. File metadata (fileChan)
+    I->>K: 3. Validated file event (eventChan, fan-out)
+    K->>DB: 4. Store metadata in a batch
+    Note over DB: The file can now be found by name
+    K->>A: 5. Analysis job (jobChan)
+    A->>C: 6. Analyze(file)
+    C->>P: 7. Stream the file content (gRPC)
+    P-->>C: 8. Title, text, transcription...
+    C-->>A: 9. One result per specialist
+    A->>K: 10. Results for this file
+    K->>DB: 11. Merge results into the record
+    Note over DB: The file can now be found by content
+```
