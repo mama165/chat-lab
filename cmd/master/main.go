@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -222,13 +224,15 @@ func run() (int, error) {
 		}
 	}()
 
-	// Monitoring API and dashboard pages
-	monitoringServer := web.NewMonitoringServer(monitor, monitoringManager)
+	// Search API, monitoring API and dashboard pages
+	httpServer := web.NewServer(monitor, monitoringManager, analysisRepository)
+	httpAddr := net.JoinHostPort(config.MonitoringHost, strconv.Itoa(config.MonitoringPort))
 	go func() {
-		logger.Info("📊 Monitoring available",
-			"url", fmt.Sprintf("http://localhost:%d/monitoring.html", config.MonitoringPort))
-		if err := monitoringServer.Start(config.MonitoringPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("Monitoring server failed", "err", err)
+		logger.Info("🔎 Search and monitoring available",
+			"search", fmt.Sprintf("http://%s/api/search?q=...", httpAddr),
+			"monitoring", fmt.Sprintf("http://%s/monitoring.html", httpAddr))
+		if err := httpServer.Start(httpAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("HTTP server failed", "err", err)
 		}
 	}()
 
