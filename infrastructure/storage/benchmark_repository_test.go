@@ -25,7 +25,7 @@ import (
 
 func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -85,7 +85,7 @@ func TestAnalysisRepository_StoreBatch_Success(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_Empty(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -100,7 +100,7 @@ func TestAnalysisRepository_StoreBatch_Empty(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_LargeBatch(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -139,7 +139,7 @@ func TestAnalysisRepository_StoreBatch_LargeBatch(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -191,7 +191,7 @@ func TestAnalysisRepository_StoreBatch_WithScores(t *testing.T) {
 
 func TestAnalysisRepository_StoreBatch_DifferentRooms(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -251,7 +251,7 @@ func TestAnalysisRepository_StoreBatch_vs_Store_Performance(t *testing.T) {
 	const itemCount = 100
 
 	// Test StoreBatch
-	_, log1, badgerDB1, blugeWriter1, err := database.SetupBenchmark(database.DefaultPath)
+	_, log1, badgerDB1, blugeWriter1, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB1, blugeWriter1)
 
@@ -274,7 +274,7 @@ func TestAnalysisRepository_StoreBatch_vs_Store_Performance(t *testing.T) {
 	batchDuration := time.Since(startBatch)
 
 	// Test individual Store calls
-	_, log2, badgerDB2, blugeWriter2, err := database.SetupBenchmark(database.DefaultPath)
+	_, log2, badgerDB2, blugeWriter2, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB2, blugeWriter2)
 
@@ -505,9 +505,11 @@ func TestAnalysisRepository_Search_100kDocuments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Logf("Search for 100k docs took %v. Found: %d", time.Since(start), total)
-	if total != 5000 {
-		t.Errorf("Expected 5000 matches (5%% of 100k), got %d", total)
+	// One document out of 20 contains the keyword.
+	const expectedMatches = totalDocs / 20
+	t.Logf("Search over %d docs took %v. Found: %d", totalDocs, time.Since(start), total)
+	if total != expectedMatches {
+		t.Errorf("Expected %d matches (5%% of %d), got %d", expectedMatches, totalDocs, total)
 	}
 	if len(results) > 100 {
 		t.Errorf("Expected max 100 results (page limit), got %d", len(results))
@@ -519,9 +521,8 @@ func TestAnalysisRepository_Search_100kDocuments(t *testing.T) {
 // ============================================================================
 
 func initTest(t testing.TB) (context.Context, *slog.Logger, *badger.DB, *bluge.Writer) {
-	path := database.DefaultPath
-	// Usage de ta méthode SDK
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(path)
+	// Each test or benchmark gets its own database directory, removed when it ends.
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	if err != nil {
 		t.Fatalf("Failed to setup test: %v", err)
 	}

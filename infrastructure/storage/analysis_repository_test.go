@@ -16,7 +16,7 @@ var MetricTest domain.Metric = "test"
 
 func TestAnalysisRepository_DebugView(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -39,7 +39,6 @@ func TestAnalysisRepository_DebugView(t *testing.T) {
 	req.NoError(repo.Flush())
 	time.Sleep(50 * time.Millisecond)
 
-	fmt.Printf("Data stored in %s. You can now run the inspector !", database.DefaultPath)
 }
 
 // ============================================================================
@@ -48,7 +47,7 @@ func TestAnalysisRepository_DebugView(t *testing.T) {
 
 func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -97,7 +96,7 @@ func TestAnalysisRepository_Store_Text_Success(t *testing.T) {
 
 func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -140,7 +139,7 @@ func TestAnalysisRepository_Store_Audio_Success(t *testing.T) {
 
 func TestAnalysisRepository_Store_File_Success(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -185,7 +184,7 @@ func TestAnalysisRepository_Store_File_Success(t *testing.T) {
 
 func TestAnalysisRepository_SearchPaginated_MultipleResults(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -239,7 +238,7 @@ func TestAnalysisRepository_SearchPaginated_MultipleResults(t *testing.T) {
 
 func TestAnalysisRepository_SearchPaginated_CaseInsensitive(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -273,7 +272,7 @@ func TestAnalysisRepository_SearchPaginated_CaseInsensitive(t *testing.T) {
 
 func TestAnalysisRepository_SearchPaginated_RoomIsolation(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
@@ -315,7 +314,7 @@ func TestAnalysisRepository_SearchPaginated_RoomIsolation(t *testing.T) {
 
 func TestAnalysisRepository_SearchPaginated_EmptyQuery(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -344,7 +343,7 @@ func TestAnalysisRepository_SearchPaginated_EmptyQuery(t *testing.T) {
 
 func TestAnalysisRepository_SearchPaginated_NoResults(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -362,7 +361,7 @@ func TestAnalysisRepository_SearchPaginated_NoResults(t *testing.T) {
 
 func TestAnalysisRepository_SearchPaginated_Pagination(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -416,7 +415,7 @@ func TestAnalysisRepository_SearchPaginated_Pagination(t *testing.T) {
 
 func TestAnalysisRepository_SearchByScoreRange_SingleScore(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -464,7 +463,7 @@ func TestAnalysisRepository_SearchByScoreRange_SingleScore(t *testing.T) {
 
 func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -514,7 +513,7 @@ func TestAnalysisRepository_SearchByScoreRange_MultipleScores(t *testing.T) {
 
 func TestAnalysisRepository_SearchByScoreRange_EdgeCases(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -550,7 +549,7 @@ func TestAnalysisRepository_SearchByScoreRange_EdgeCases(t *testing.T) {
 
 func TestAnalysisRepository_SearchByScoreRange_NonExistentScore(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -581,7 +580,7 @@ func TestAnalysisRepository_SearchByScoreRange_NonExistentScore(t *testing.T) {
 
 func TestAnalysisRepository_ScanAnalysesByRoom_FirstPage(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -617,7 +616,7 @@ func TestAnalysisRepository_ScanAnalysesByRoom_FirstPage(t *testing.T) {
 
 func TestAnalysisRepository_ScanAnalysesByRoom_SubsequentPages(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -659,7 +658,7 @@ func TestAnalysisRepository_ScanAnalysesByRoom_SubsequentPages(t *testing.T) {
 
 func TestAnalysisRepository_ScanAnalysesByRoom_EmptyRoom(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -680,7 +679,7 @@ func TestAnalysisRepository_ScanAnalysesByRoom_EmptyRoom(t *testing.T) {
 
 func TestAnalysisRepository_FetchFullByEntityId_Success(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -718,7 +717,7 @@ func TestAnalysisRepository_FetchFullByEntityId_Success(t *testing.T) {
 
 func TestAnalysisRepository_FetchFullByEntityId_NotFound(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -733,7 +732,7 @@ func TestAnalysisRepository_FetchFullByEntityId_NotFound(t *testing.T) {
 }
 func TestAnalysisRepository_FetchFullByEntityId_WrongRoom(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -760,7 +759,7 @@ func TestAnalysisRepository_FetchFullByEntityId_WrongRoom(t *testing.T) {
 // ============================================================================
 func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -824,7 +823,7 @@ func TestAnalysisRepository_FullWorkflow_StoreSearchFetch(t *testing.T) {
 }
 func TestAnalysisRepository_Consistency_BadgerBlugeSync(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -865,7 +864,7 @@ func TestAnalysisRepository_Consistency_BadgerBlugeSync(t *testing.T) {
 // ============================================================================
 func TestAnalysisRepository_Store_ZeroValueTimestamp(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -894,7 +893,7 @@ func TestAnalysisRepository_Store_ZeroValueTimestamp(t *testing.T) {
 }
 func TestAnalysisRepository_Store_EmptyScores(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -924,7 +923,7 @@ func TestAnalysisRepository_Store_EmptyScores(t *testing.T) {
 }
 func TestAnalysisRepository_Store_LargeContent(t *testing.T) {
 	req := require.New(t)
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
@@ -964,7 +963,7 @@ func TestAnalysisRepository_Store_LargeContent(t *testing.T) {
 
 func TestAnalysisRepository_Flush_IdempotentExclamation(t *testing.T) {
 	req := require.New(t)
-	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	_, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 	repo := NewAnalysisRepository(badgerDB, blugeWriter, log, lo.ToPtr(50), 10)
@@ -983,7 +982,7 @@ func TestAnalysisRepository_Flush_IdempotentExclamation(t *testing.T) {
 func TestAnalysisRepository_StoreBatch_MultiplePayloadTypes(t *testing.T) {
 	req := require.New(t)
 	// Setup using your SDK helper
-	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(database.DefaultPath)
+	ctx, log, badgerDB, blugeWriter, err := database.SetupBenchmark(t.TempDir())
 	req.NoError(err)
 	defer database.CleanupDB(badgerDB, blugeWriter)
 
