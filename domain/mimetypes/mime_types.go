@@ -107,3 +107,37 @@ func ToMIME(m string) MIME {
 		return Unknown
 	}
 }
+
+// Kind groups MIME types into the families a user thinks in.
+type Kind string
+
+const (
+	KindPDF   Kind = "pdf"
+	KindAudio Kind = "audio"
+	KindImage Kind = "image"
+)
+
+// KindOf returns the family of a detected MIME type, or "" when the type is
+// not one the specialists handle.
+func KindOf(detected string) Kind {
+	if _, ok := IsPDF(detected); ok {
+		return KindPDF
+	}
+	if _, ok := IsAudio(detected); ok {
+		return KindAudio
+	}
+	if _, ok := IsImage(detected); ok {
+		return KindImage
+	}
+	return ""
+}
+
+// ParseKind validates a kind received from outside ("pdf", "audio", "image").
+func ParseKind(s string) (Kind, bool) {
+	switch Kind(s) {
+	case KindPDF, KindAudio, KindImage:
+		return Kind(s), true
+	default:
+		return "", false
+	}
+}

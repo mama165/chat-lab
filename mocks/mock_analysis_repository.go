@@ -103,6 +103,22 @@ func (mr *MockIAnalysisRepositoryMockRecorder) SearchByScoreRange(ctx, scoreName
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchByScoreRange", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchByScoreRange), ctx, scoreName, min, max, namespace)
 }
 
+// SearchFiles mocks base method.
+func (m *MockIAnalysisRepository) SearchFiles(ctx context.Context, query storage.FileSearchQuery) ([]storage.Analysis, uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchFiles", ctx, query)
+	ret0, _ := ret[0].([]storage.Analysis)
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// SearchFiles indicates an expected call of SearchFiles.
+func (mr *MockIAnalysisRepositoryMockRecorder) SearchFiles(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchFiles", reflect.TypeOf((*MockIAnalysisRepository)(nil).SearchFiles), ctx, query)
+}
+
 // SearchPaginated mocks base method.
 func (m *MockIAnalysisRepository) SearchPaginated(ctx context.Context, query, namespace string, offset int) ([]storage.Analysis, uint64, error) {
 	m.ctrl.T.Helper()
