@@ -95,3 +95,33 @@ func TestIsImage(t *testing.T) {
 		})
 	}
 }
+
+func TestKindOf(t *testing.T) {
+	cases := map[string]Kind{
+		"application/pdf":           KindPDF,
+		"audio/mpeg":                KindAudio,
+		"audio/wav":                 KindAudio,
+		"image/png":                 KindImage,
+		"image/jpeg; charset=utf-8": KindImage,
+		"text/plain":                "",
+		"not a mime type":           "",
+	}
+	for detected, want := range cases {
+		if got := KindOf(detected); got != want {
+			t.Errorf("KindOf(%q) = %q, want %q", detected, got, want)
+		}
+	}
+}
+
+func TestParseKind(t *testing.T) {
+	for _, valid := range []string{"pdf", "audio", "image"} {
+		if kind, ok := ParseKind(valid); !ok || string(kind) != valid {
+			t.Errorf("ParseKind(%q) should be accepted", valid)
+		}
+	}
+	for _, invalid := range []string{"", "video", "PDF"} {
+		if _, ok := ParseKind(invalid); ok {
+			t.Errorf("ParseKind(%q) should be rejected", invalid)
+		}
+	}
+}

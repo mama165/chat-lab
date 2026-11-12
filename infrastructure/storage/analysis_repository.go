@@ -3,6 +3,7 @@ package storage
 
 import (
 	"chat-lab/domain"
+	"chat-lab/domain/mimetypes"
 	pb "chat-lab/proto/storage"
 	"context"
 	"fmt"
@@ -26,6 +27,7 @@ type IAnalysisRepository interface {
 	FetchFullByEntityId(namespace string, entityID uuid.UUID) (Analysis, error)
 	SearchPaginated(ctx context.Context, query string, namespace string, offset int) ([]Analysis, uint64, error)
 	SearchByScoreRange(ctx context.Context, scoreName string, min, max float64, namespace string) ([]Analysis, uint64, error)
+	SearchFiles(ctx context.Context, query FileSearchQuery) ([]Analysis, uint64, error)
 	Flush() error
 }
 
@@ -91,7 +93,22 @@ const (
 	CONTENT   = "content"
 	NAMESPACE = "namespace"
 	TYPE      = "type"
+	// KIND is the family of a file (pdf, audio, image), used to filter a search.
+	KIND = "kind"
 )
+
+// FileSearchQuery describes a search over the indexed files.
+type FileSearchQuery struct {
+	// Text is what the user typed. A file matches when it contains every word.
+	Text string
+	// Namespace restricts the search to one drive; empty searches all of them.
+	Namespace string
+	// Kind restricts the search to one family of files; empty means all.
+	Kind mimetypes.Kind
+	// Offset and Limit select the page of results.
+	Offset int
+	Limit  int
+}
 
 // Store persists the analysis in BadgerDB and indexes its content in Bluge.
 // This dual-write approach ensures that the data is both durable (Source of Truth)
@@ -124,7 +141,7 @@ func (a *AnalysisRepository) Store(analysis Analysis) error {
 	fullSearchableText, category := a.prepareInternalData(analysis)
 
 	id := analysis.EntityId.String()
-	return a.upsertSearchIndex(id, fullSearchableText, analysis.Scores, category, analysis.Namespace)
+	return a.upsertSearchIndex(id, fullSearchableText, analysis.Scores, category, analysis.Namespace, fileKind(analysis))
 }
 
 // upsertSearchIndex maps and persists analysis metadata into the Bluge search engine.
@@ -133,13 +150,16 @@ func (a *AnalysisRepository) Store(analysis Analysis) error {
 // This method ensures the search index stays synchronized with the primary BadgerDB storage.
 func (a *AnalysisRepository) upsertSearchIndex(id, content string,
 	metadata map[domain.Metric]float64,
-	category domain.Category, namespace string) error {
+	category domain.Category, namespace string, kind mimetypes.Kind) error {
 	doc := bluge.NewDocument(id)
 	// TextField allows full-text search with tokenization (e.g., lowercase, stop words)
 	doc.AddField(bluge.NewTextField(CONTENT, content).StoreValue())
 	// KeywordField stores strings as-is for exact matching (IDs, enums)
 	doc.AddField(bluge.NewKeywordField(NAMESPACE, namespace).StoreValue())
 	doc.AddField(bluge.NewKeywordField(TYPE, string(category)).StoreValue())
+	if kind != "" {
+		doc.AddField(bluge.NewKeywordField(KIND, string(kind)).StoreValue())
+	}
 
 	// NumericField allows optimized range queries (e.g., toxicity > 0.8)
 	for name, score := range metadata {
@@ -201,6 +221,9 @@ func (a *AnalysisRepository) StoreBatch(analyses []Analysis) error {
 		doc.AddField(bluge.NewTextField(CONTENT, fullSearchableText).StoreValue())
 		doc.AddField(bluge.NewKeywordField(NAMESPACE, analysis.Namespace).StoreValue())
 		doc.AddField(bluge.NewKeywordField(TYPE, string(category)).StoreValue())
+		if kind := fileKind(analysis); kind != "" {
+			doc.AddField(bluge.NewKeywordField(KIND, string(kind)).StoreValue())
+		}
 
 		for name, score := range analysis.Scores {
 			fieldName := strings.ToLower(string(name))
@@ -305,6 +328,19 @@ func (a *AnalysisRepository) ScanAnalysesByRoom(Namespace string, cursor *string
 //	Even though the UUID lookup is global, the method validates that the retrieved
 //	record belongs to the requested Namespace to ensure data isolation. [cite: 2026-01-19]
 func (a *AnalysisRepository) FetchFullByEntityId(namespace string, entityID uuid.UUID) (Analysis, error) {
+	result, err := a.fetchByEntityID(entityID)
+	if err != nil {
+		return Analysis{}, err
+	}
+	// Security Check. Verify the record belongs to the requested room.
+	if result.Namespace != namespace {
+		return Analysis{}, fmt.Errorf("security violation: message %s does not belong to room %s", entityID, namespace)
+	}
+	return result, nil
+}
+
+// fetchByEntityID retrieves a record by its global identifier, whatever its namespace.
+func (a *AnalysisRepository) fetchByEntityID(entityID uuid.UUID) (Analysis, error) {
 	var result Analysis
 
 	// The secondary index key acts as a "shortcut" to the real data location.
@@ -336,11 +372,6 @@ func (a *AnalysisRepository) FetchFullByEntityId(namespace string, entityID uuid
 					return fmt.Errorf("failed to map protobuf to domain: %w", errMapping)
 				}
 
-				// STEP 3: Security Check. Verify the record belongs to the requested room.
-				if res.Namespace != namespace {
-					return fmt.Errorf("security violation: message %s does not belong to room %s", entityID, namespace)
-				}
-
 				result = res
 				return nil
 			})
@@ -348,6 +379,31 @@ func (a *AnalysisRepository) FetchFullByEntityId(namespace string, entityID uuid
 	})
 
 	return result, err
+}
+
+// SearchFiles runs a user search over the indexed files: every word of the text
+// must appear in the file (name, path or extracted content). It can be limited
+// to one drive and to one kind of file, and returns one page of results, best
+// matches first, with the total number of matching files.
+func (a *AnalysisRepository) SearchFiles(ctx context.Context, query FileSearchQuery) ([]Analysis, uint64, error) {
+	if query.Limit <= 0 {
+		query.Limit = a.blugeLimit
+	}
+	if query.Offset < 0 {
+		query.Offset = 0
+	}
+
+	bq := bluge.NewBooleanQuery()
+	bq.AddMust(bluge.NewMatchQuery(query.Text).SetField(CONTENT).SetOperator(bluge.MatchQueryOperatorAnd))
+	if query.Namespace != "" {
+		bq.AddMust(bluge.NewTermQuery(query.Namespace).SetField(NAMESPACE))
+	}
+	if query.Kind != "" {
+		bq.AddMust(bluge.NewTermQuery(string(query.Kind)).SetField(KIND))
+	}
+
+	request := bluge.NewTopNSearch(query.Limit, bq).SetFrom(query.Offset)
+	return a.searchAndHydrate(ctx, request, bq, query.Namespace)
 }
 
 // SearchPaginated performs a full-text search on the 'content' field, filtered by namespace.
@@ -455,7 +511,14 @@ func (a *AnalysisRepository) searchAndHydrate(ctx context.Context, request bluge
 			continue
 		}
 
-		fullAnalysis, fetchErr := a.FetchFullByEntityId(Namespace, msgID)
+		// An empty namespace means the search spans every drive.
+		var fullAnalysis Analysis
+		var fetchErr error
+		if Namespace == "" {
+			fullAnalysis, fetchErr = a.fetchByEntityID(msgID)
+		} else {
+			fullAnalysis, fetchErr = a.FetchFullByEntityId(Namespace, msgID)
+		}
 		if fetchErr != nil {
 			a.log.Warn("hydration_failed", "msg_id", msgID, "error", fetchErr)
 		} else {
@@ -674,4 +737,17 @@ func searchableFilename(filename string) string {
 		return filename
 	}
 	return filename + " " + strings.Join(words, " ")
+}
+
+// fileKind returns the family (pdf, audio, image) of a record describing a file.
+func fileKind(an Analysis) mimetypes.Kind {
+	switch p := an.Payload.(type) {
+	case FileDetails:
+		return mimetypes.KindOf(p.MimeType)
+	case *FileDetails:
+		if p != nil {
+			return mimetypes.KindOf(p.MimeType)
+		}
+	}
+	return ""
 }
