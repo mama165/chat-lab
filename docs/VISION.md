@@ -74,13 +74,14 @@ Each part was measured on a public benchmark, with nothing labelled here. Every 
 | Counting faces | The same, photographs whose faces are all 40 px or more | 1 971 photographs | Exact 77 %, within one 94.5 % |
 | Indoors or outdoors | IndoorOutdoorNet-20K | 2 000 photographs drawn at random | Answers 93 % of the time; right 99.4 % of the time when it answers; wrong way 0.5 % |
 | Reading words | TextOCR, words cut out of photographs | 1 986 words | Read exactly 47.5 %, within one letter in five 60.7 %, nothing read 24 % |
+| Reading words, other models | The same, 598 words for each | 598 words | PP-OCRv3 48.7 %, PP-OCRv4 mobile 49.8 %, PP-OCRv3 English reader 49.8 %. PP-OCRv4 server (200 MB) did not finish in 30 minutes: too slow to use. |
 
 What these numbers say:
 
 - **Finding a photograph from a description** works: this is the core of the search.
 - **Counting people from faces is approximate by nature**: right to the unit three times in four, to within one nineteen times in twenty, on a hard benchmark with crowds. That is why a search accepts a face more or less, and ranks the exact number first.
 - **Indoors or outdoors** is reliable enough to filter on, because it prefers to say nothing rather than guess.
-- **Reading text in photographs of real scenes is the weak part.** Signs, shop fronts, curved or tiny lettering: about half the words are read. The benchmark is hard and made of natural scenes; screenshots, posters and documents are easier, and were not measured. Text that is not read cannot be found.
+- **Reading text in photographs of real scenes is the weak part.** Signs, shop fronts, curved or tiny lettering: about half the words are read, with every model of this family that can run on a phone. The version of the model changes little (one point); the benchmark is what is hard. The benchmark is hard and made of natural scenes; screenshots, posters and documents are easier, and were not measured. Text that is not read cannot be found.
 
 WIDER FACE is licensed CC BY-NC-ND: it was read only to measure, from the archive, and is not copied anywhere. The three scripts that measure are `measure_retrieval.py`, `measure_faces.py`, `measure_setting.py` and `measure_text.py`.
 
