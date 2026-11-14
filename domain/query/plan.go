@@ -100,7 +100,15 @@ type TextQuery struct {
 // Count is a number of people. It ranks results, it never filters them.
 type Count struct {
 	Value int `json:"value"`
-	// Tolerance is how far a detected count may be and still rank first.
+	// Max is the upper end of a range ("deux ou trois personnes"); zero when
+	// one number was given.
+	Max int `json:"max,omitempty"`
+	// Counted is set when the user gave a number of people as such ("5
+	// personnes"), as opposed to people named in a description ("un homme
+	// avec une femme"). A counted number filters the pictures whose faces
+	// were counted; the others only rank.
+	Counted bool `json:"counted,omitempty"`
+	// Tolerance is how far a detected count may be and still be accepted.
 	Tolerance int `json:"tolerance,omitempty"`
 	// AtLeast means "Value or more".
 	AtLeast bool   `json:"at_least,omitempty"`
@@ -159,6 +167,12 @@ type SourceFilter struct {
 // location at all: those are kept, after the ones known to be at that place.
 type Place struct {
 	Name   string `json:"name"`
+	Origin Origin `json:"origin"`
+}
+
+// Setting says whether a picture was taken indoors or outdoors.
+type Setting struct {
+	Indoor bool   `json:"indoor"`
 	Origin Origin `json:"origin"`
 }
 
@@ -237,6 +251,7 @@ type Plan struct {
 	Position     *PositionHint `json:"position,omitempty"`
 	Source       *SourceFilter `json:"source,omitempty"`
 	Place        *Place        `json:"place,omitempty"`
+	Setting      *Setting      `json:"setting,omitempty"`
 	// Pages bounds the number of pages of a document.
 	Pages *Bound `json:"pages,omitempty"`
 	// Seconds bounds the duration of a video or a recording.
@@ -264,7 +279,7 @@ func (p Plan) IsEmpty() bool {
 	return len(p.Kinds) == 0 && p.Date == nil && len(p.ExcludeDates) == 0 &&
 		p.Visual == nil && p.Text == nil && p.People == nil && len(p.Features) == 0 &&
 		p.Size == nil && p.Duration == nil && p.Position == nil && p.Source == nil &&
-		p.Place == nil && p.Pages == nil && p.Seconds == nil && p.Language == nil
+		p.Place == nil && p.Pages == nil && p.Seconds == nil && p.Language == nil && p.Setting == nil
 }
 
 // Clone returns a deep copy, so that refining a plan never alters the previous one.
@@ -281,6 +296,7 @@ func (p Plan) Clone() Plan {
 	c.Position = clonePtr(p.Position)
 	c.Source = clonePtr(p.Source)
 	c.Place = clonePtr(p.Place)
+	c.Setting = clonePtr(p.Setting)
 	c.Pages = clonePtr(p.Pages)
 	c.Seconds = clonePtr(p.Seconds)
 	c.Language = clonePtr(p.Language)
@@ -355,6 +371,9 @@ func (p Plan) criteria() []criterion {
 	}
 	if p.Place != nil {
 		out = append(out, criterion{"place", p.Place.Origin})
+	}
+	if p.Setting != nil {
+		out = append(out, criterion{"setting", p.Setting.Origin})
 	}
 	if p.Pages != nil {
 		out = append(out, criterion{"pages", p.Pages.Origin})

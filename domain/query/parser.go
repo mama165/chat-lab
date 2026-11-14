@@ -124,6 +124,7 @@ func (p *Parser) analyze(sentence string, now time.Time, noise []string) *analys
 	a.extractSort()
 	a.extractEverything()
 	a.extractWritten()
+	a.extractSetting()
 	a.annotatePeople()
 	a.annotateFeatures()
 	a.extractFillers()
@@ -542,6 +543,8 @@ var (
 	notExclusion = wordSet("trop tres super forcement vraiment mal besoin encore si")
 )
 
+var nobodyWords = wordSet("personne personnes gens monde")
+
 // boundary reports whether punctuation separates word i from the one before.
 func (a *analysis) boundary(i int) bool {
 	if i <= 0 || i >= len(a.toks) {
@@ -598,6 +601,14 @@ func (a *analysis) extractExclusion() {
 		origin.Text = a.sentence[origin.Start:origin.End]
 		if a.excludedOrigin.Text == "" {
 			a.excludedOrigin = origin
+		}
+		// "sans personne" asks for pictures with nobody on them: a count, which
+		// the faces found can check.
+		if to-from == 1 && in(nobodyWords, a.toks[from].norm) && a.toks[i].norm == "sans" {
+			a.plan.People = &Count{Value: 0, Counted: true, Origin: origin}
+			use(a.toks, i, end-i)
+			i = end - 1
+			continue
 		}
 		// "sauf les vidéos" removes a kind of file, not something shown.
 		noun := from
@@ -732,6 +743,25 @@ func (a *analysis) extractAllFiles() {
 	})
 }
 
+var (
+	indoorPatterns  = compileAll("en interieur", "a l interieur", "d interieur", "de l interieur", "dedans")
+	outdoorPatterns = compileAll("en exterieur", "a l exterieur", "d exterieur", "de l exterieur", "dehors", "en plein air")
+)
+
+// extractSetting reads "en intérieur", "dehors": where the picture was taken.
+func (a *analysis) extractSetting() {
+	set := func(indoor bool) func(_, i, length int) bool {
+		return func(_, i, length int) bool {
+			if a.plan.Setting == nil {
+				a.plan.Setting = &Setting{Indoor: indoor, Origin: a.origin2(i, length, "setting")}
+			}
+			return true
+		}
+	}
+	a.scan(indoorPatterns, set(true))
+	a.scan(outdoorPatterns, set(false))
+}
+
 var everythingPatterns = compileAll(
 	"tous|toutes les|mes|ces",
 	"l ensemble de|des",
@@ -778,6 +808,37 @@ var (
 	groupNouns = wordSet("famille groupe foule equipe bande")
 )
 
+// genericPeople name people without describing them.
+var genericPeople = wordSet("personne personnes gens individu individus visage visages tete tetes")
+
+// peopleCount reads a count of people starting at word i, where a number n
+// spanning length words was read. It returns the range and the words covered.
+func (a *analysis) peopleCount(i, n, length int) (low, high, span int, ok bool) {
+	next := i + length
+	second := 0
+	if next < len(a.toks) && !a.toks[next].used {
+		at := next
+		if w := a.toks[at].norm; w == "ou" || w == "a" {
+			at++
+		}
+		if m, l, isNumber := parseNumber(a.toks, at); isNumber && at+l < len(a.toks) {
+			second, next = m, at+l
+		}
+	}
+	if next >= len(a.toks) || a.toks[next].used || !in(genericPeople, a.toks[next].norm) {
+		return 0, 0, 0, false
+	}
+	// "une personne âgée" describes someone; two or more is a count.
+	if second == 0 && n < 2 {
+		return 0, 0, 0, false
+	}
+	low, high = n, 0
+	if second > 0 {
+		low, high = min(n, second), max(n, second)
+	}
+	return low, high, next - i + 1, true
+}
+
 var weAre = compileAll("on est|etait <n>", "nous sommes|etions <n>")
 
 // annotatePeople counts the people named in the sentence: "5 personnes",
@@ -792,6 +853,9 @@ func (a *analysis) annotatePeople() {
 			first = i
 		}
 		last = end
+	}
+	if a.plan.People != nil {
+		return // already read as "sans personne"
 	}
 	for i := 0; i < len(a.toks); i++ {
 		if a.toks[i].used {
@@ -815,6 +879,14 @@ func (a *analysis) annotatePeople() {
 		}
 		if i > 0 && a.toks[i-1].norm == "sans" {
 			continue
+		}
+		// A number of people given as such: "5 personnes", "deux ou trois
+		// personnes", "2 à 3 personnes". It is a count to check against the
+		// faces found, not something to look for in the picture.
+		if low, high, span, ok := a.peopleCount(i, n, length); ok {
+			a.plan.People = &Count{Value: low, Max: high, Counted: true, Tolerance: 1, Origin: a.origin2(i, span, "people")}
+			use(a.toks, i, span)
+			return
 		}
 		noun := a.toks[i+length].norm
 		switch {

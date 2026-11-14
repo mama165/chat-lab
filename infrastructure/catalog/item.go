@@ -50,6 +50,8 @@ type Item struct {
 	Codes []string `json:"codes,omitempty"`
 	// Faces is the number of faces found; nil when the file was not examined.
 	Faces *int `json:"faces,omitempty"`
+	// Indoor says whether the picture was taken indoors; nil when not judged.
+	Indoor *bool `json:"indoor,omitempty"`
 	// Portrait is set when faces are the subject of the picture.
 	Portrait bool `json:"portrait,omitempty"`
 	// Signature is set when a signature was found.

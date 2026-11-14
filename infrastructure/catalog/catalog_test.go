@@ -235,3 +235,45 @@ func BenchmarkSearch(b *testing.B) {
 		})
 	}
 }
+
+func picture(id string, faces int, indoor *bool) Item {
+	return Item{ID: id, Name: id + ".jpg", Kind: query.KindImage, AddedAt: testNow, Faces: &faces, Indoor: indoor}
+}
+
+func TestSearch_CountedPeopleAndSetting(t *testing.T) {
+	c, err := Open("")
+	require.NoError(t, err)
+	defer c.Close()
+	yes, no := true, false
+	uncounted := Item{ID: "non-comptee", Name: "x.jpg", Kind: query.KindImage, AddedAt: testNow}
+	require.NoError(t, c.Put(
+		picture("salon-2", 2, &yes), picture("salon-1", 1, &yes), picture("salon-7", 7, &yes),
+		picture("studio-2", 2, nil), picture("parc-2", 2, &no), picture("vide", 0, &yes), uncounted,
+	))
+
+	results := find(t, c, "la photo prise en intérieur avec deux personnes")
+	// The exact number indoors first; then what cannot be ruled out: a face may
+	// have been missed, or nothing says where the picture was taken.
+	require.Equal(t, "salon-2", results.Hits[0].Item.ID)
+	require.Empty(t, results.Hits[0].Notes)
+	ids := matches(results)
+	require.ElementsMatch(t, []string{"salon-2", "studio-2", "salon-1", "non-comptee"}, ids)
+	// Seven people, or two people outdoors, are known not to match.
+	require.NotContains(t, ids, "salon-7")
+	require.NotContains(t, ids, "parc-2")
+
+	require.Equal(t, []string{"vide"}, matches(find(t, c, "les photos d'intérieur sans personne"))[:1])
+	require.Equal(t, "parc-2", find(t, c, "les photos de deux personnes prises dehors").Hits[0].Item.ID)
+
+	// Nobody is known to have twelve faces: only the picture whose faces were
+	// not counted cannot be ruled out, and it says why it is there.
+	twelve := find(t, c, "une photo avec 12 personnes")
+	require.Equal(t, []string{"non-comptee"}, matches(twelve))
+	require.Equal(t, []string{"personnes non comptées"}, twelve.Hits[0].Notes)
+
+	// Once every picture is counted, the number is loosened, closest first.
+	require.NoError(t, c.Delete("non-comptee"))
+	loosened := find(t, c, "une photo avec 12 personnes")
+	require.Equal(t, query.RelaxPeople, loosened.Relaxed[0].Step)
+	require.Equal(t, "salon-7", loosened.Hits[0].Item.ID)
+}

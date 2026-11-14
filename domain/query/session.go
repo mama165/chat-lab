@@ -341,6 +341,9 @@ func refine(current Plan, a *analysis, mode refinement) Plan {
 	if said.Place != nil {
 		next.Place = clonePtr(said.Place)
 	}
+	if said.Setting != nil {
+		next.Setting = clonePtr(said.Setting)
+	}
 	if said.Pages != nil {
 		next.Pages = clonePtr(said.Pages)
 	}

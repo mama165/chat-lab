@@ -169,3 +169,38 @@ func TestParse_BoundsExclusionsAndLanguage(t *testing.T) {
 		require.Empty(t, Validate(plan, testNow, sentence), sentence)
 	}
 }
+
+func TestParse_SettingAndCountedPeople(t *testing.T) {
+	parser := NewParser()
+	summaries := map[string]string{
+		"Je cherche la photo prise en intérieur avec deux personnes.":            "photos · en intérieur · environ 2 personnes",
+		"Je cherche l'image prise en intérieur contenant deux, trois personnes.": "photos · en intérieur · 2 à 3 personnes",
+		"une photo avec 2 ou 3 personnes":                                        "photos · 2 à 3 personnes",
+		"les photos de 2 à 4 personnes prises dehors":                            "photos · en extérieur · 2 à 4 personnes",
+		"les photos d'intérieur sans personne":                                   "photos · en intérieur · sans personne",
+		// "sept" is seven here, not September.
+		"Montre-moi la photo du groupe de sept personnes.": "photos · image : groupe · environ 7 personnes",
+		// A person who is described is not a count.
+		"une personne âgée dans un parc": "image : une personne âgée dans un parc · texte : personne, âgée, parc · au moins 1 personne",
+		// "un intérieur" is something to look at, not where the picture was taken.
+		"la photo d'un intérieur moderne": "photos · image : un intérieur moderne",
+	}
+	for sentence, summary := range summaries {
+		plan := parser.Parse(sentence, testNow).Plan
+		require.Equal(t, summary, plan.Summary(), sentence)
+		require.Empty(t, Validate(plan, testNow, sentence), sentence)
+	}
+
+	counted := parser.Parse("les photos avec 5 personnes", testNow).Plan
+	require.True(t, counted.People.Counted)
+	require.Nil(t, counted.Visual, "a count is checked against faces, not looked for in the picture")
+	described := parser.Parse("un homme avec une femme", testNow).Plan
+	require.False(t, described.People.Counted)
+	require.NotNil(t, described.Visual)
+
+	// A count nobody matches is loosened, and said so.
+	next, relaxation, ok := Relax(counted, testNow)
+	require.True(t, ok)
+	require.Equal(t, RelaxPeople, relaxation.Step)
+	require.False(t, next.People.Counted)
+}

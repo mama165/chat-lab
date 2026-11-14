@@ -298,6 +298,36 @@ func admit(item *Item, plan query.Plan) (tier int, notes []string, ok bool) {
 		return 0, nil, false
 	}
 
+	if people := plan.People; people != nil && people.Counted && item.Kind == query.KindImage {
+		switch {
+		case item.Faces == nil:
+			tier = 1
+			notes = append(notes, "personnes non comptées")
+		default:
+			high := people.Max
+			if high == 0 {
+				high = people.Value
+			}
+			if *item.Faces < people.Value-people.Tolerance || *item.Faces > high+people.Tolerance {
+				return 0, nil, false
+			}
+			if *item.Faces < people.Value || *item.Faces > high {
+				// Accepted because a face may have been missed, but not the
+				// number asked for: after the pictures that have it.
+				tier = 1
+				notes = append(notes, "nombre de personnes approché")
+			}
+		}
+	}
+	if plan.Setting != nil {
+		switch {
+		case item.Indoor == nil:
+			tier = 1
+			notes = append(notes, "intérieur ou extérieur inconnu")
+		case *item.Indoor != plan.Setting.Indoor:
+			return 0, nil, false
+		}
+	}
 	if plan.Place != nil {
 		wanted := query.Fold(plan.Place.Name)
 		located := item.Country != "" || item.City != ""
@@ -573,9 +603,12 @@ func applyHints(ranked []*candidate, plan query.Plan) {
 		factor := size(item) * duration(item)
 		if people := plan.People; people != nil && item.Faces != nil {
 			faces := *item.Faces
-			gap := faces - people.Value
-			if gap < 0 {
-				gap = -gap
+			high := max(people.Max, people.Value)
+			gap := 0
+			if faces < people.Value {
+				gap = people.Value - faces
+			} else if faces > high {
+				gap = faces - high
 			}
 			switch {
 			case people.AtLeast && faces >= people.Value:
@@ -584,6 +617,9 @@ func applyHints(ranked []*candidate, plan query.Plan) {
 				factor *= 1.5
 			case !people.AtLeast && gap <= people.Tolerance:
 				factor *= 1.25
+			case !people.AtLeast:
+				// The further from the number asked for, the lower.
+				factor *= 1 / float64(gap)
 			default:
 				factor *= 0.7
 			}
