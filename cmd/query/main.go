@@ -8,11 +8,20 @@
 //	> trouve-moi une photo de cuisine
 //	> pas celle de l'an dernier
 //	> et en vidéo ?
+//
+// With a library, the plan is run and the files found are listed:
+//
+//	go run ./cmd/query -library infrastructure/catalog/testdata/library.json -now 2026-11-14
+//
+// The library is a JSON list of entries. Pictures have no vision model here:
+// they are compared through their caption, which only stands in for one.
 package main
 
 import (
 	"bufio"
 	"chat-lab/domain/query"
+	"chat-lab/infrastructure/catalog"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -35,6 +44,7 @@ func run(args []string, in io.Reader, out io.Writer) error {
 	asJSON := flags.Bool("json", false, "print the full plan as JSON")
 	lexiconPath := flags.String("lexicon", "", "JSON file of personal expressions added to the default lexicon")
 	candidates := flags.Bool("candidates", false, "for each line read, print the free words a model may judge, as JSON")
+	libraryPath := flags.String("library", "", "JSON list of files to search, such as infrastructure/catalog/testdata/library.json")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -64,16 +74,25 @@ func run(args []string, in io.Reader, out io.Writer) error {
 		return printCandidates(parser, in, out, now)
 	}
 	session := query.NewSession(parser)
+	a := &assistant{session: session, now: now, asJSON: *asJSON}
+	if *libraryPath != "" {
+		library, err := openLibrary(*libraryPath)
+		if err != nil {
+			return err
+		}
+		defer library.Close()
+		a.library = library
+	}
 
 	if sentence := strings.TrimSpace(strings.Join(flags.Args(), " ")); sentence != "" {
-		return answer(out, session, sentence, now, *asJSON)
+		return a.answer(out, sentence)
 	}
 
 	scanner := bufio.NewScanner(in)
 	fmt.Fprint(out, "> ")
 	for scanner.Scan() {
 		if sentence := strings.TrimSpace(scanner.Text()); sentence != "" {
-			if err := answer(out, session, sentence, now, *asJSON); err != nil {
+			if err := a.answer(out, sentence); err != nil {
 				return err
 			}
 		}
@@ -83,10 +102,49 @@ func run(args []string, in io.Reader, out io.Writer) error {
 	return scanner.Err()
 }
 
-func answer(out io.Writer, session *query.Session, sentence string, now time.Time, asJSON bool) error {
-	turn := session.Interpret(sentence, now)
+// assistant answers sentences: it keeps the conversation, and the library
+// when one was given.
+type assistant struct {
+	session *query.Session
+	library *catalog.Catalog
+	now     time.Time
+	asJSON  bool
+	// shown is the number of results already listed for the current search.
+	shown int
+	last  []catalog.Hit
+}
+
+const pageSize = 5
+
+// openLibrary loads a list of entries in a catalog kept in memory.
+func openLibrary(path string) (*catalog.Catalog, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var items []catalog.Item
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	for i := range items {
+		catalog.WordEncoder{}.Describe(&items[i])
+	}
+	library, err := catalog.Open("")
+	if err != nil {
+		return nil, err
+	}
+	if err := library.Put(items...); err != nil {
+		library.Close()
+		return nil, err
+	}
+	return library, nil
+}
+
+func (a *assistant) answer(out io.Writer, sentence string) error {
+	turn := a.session.Interpret(sentence, a.now)
 	switch turn.Action {
 	case query.ActionReset:
+		a.shown, a.last = 0, nil
 		fmt.Fprintln(out, "Nouvelle recherche.")
 		return nil
 	case query.ActionNone:
@@ -94,31 +152,101 @@ func answer(out io.Writer, session *query.Session, sentence string, now time.Tim
 		return nil
 	case query.ActionMore:
 		fmt.Fprintln(out, "Suite des résultats de : "+turn.Plan.Summary())
-		return nil
+		return a.search(out, turn.Plan, a.shown)
 	case query.ActionSelect:
-		if turn.Index < 0 {
-			fmt.Fprintln(out, "Ouvrir le dernier résultat.")
-		} else {
-			fmt.Fprintf(out, "Ouvrir le résultat n° %d.\n", turn.Index)
-		}
-		return nil
+		return a.open(out, turn.Index)
 	case query.ActionRefine:
 		fmt.Fprintln(out, "Recherche affinée : "+turn.Plan.Summary())
 	default:
 		fmt.Fprintln(out, "Recherche : "+turn.Plan.Summary())
 	}
-	if turn.Then != nil {
-		fmt.Fprintln(out, "Puis : "+turn.Then.Summary())
-	}
-	for _, issue := range query.Validate(turn.Plan, now, session.Sentences()...) {
+	for _, issue := range query.Validate(turn.Plan, a.now, a.session.Sentences()...) {
 		fmt.Fprintln(out, "  à vérifier —", issue)
 	}
-	if !asJSON {
+	if a.asJSON {
+		encoder := json.NewEncoder(out)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(turn); err != nil {
+			return err
+		}
+	}
+	a.shown, a.last = 0, nil
+	if err := a.search(out, turn.Plan, 0); err != nil {
+		return err
+	}
+	if turn.Then != nil {
+		fmt.Fprintln(out, "Puis : "+turn.Then.Summary())
+		return a.search(out, *turn.Then, 0)
+	}
+	return nil
+}
+
+// search lists a page of the files found, when there is a library.
+func (a *assistant) search(out io.Writer, plan query.Plan, offset int) error {
+	if a.library == nil {
 		return nil
 	}
-	encoder := json.NewEncoder(out)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(turn)
+	results, err := a.library.Search(context.Background(), plan, catalog.Options{
+		Encoder: catalog.WordEncoder{}, Now: a.now, Offset: offset, Size: pageSize,
+	})
+	if err != nil {
+		return err
+	}
+	for _, relaxation := range results.Relaxed {
+		fmt.Fprintln(out, "  "+relaxation.Message)
+	}
+	if offset == 0 {
+		switch results.Total {
+		case 0:
+			fmt.Fprintln(out, "  Aucun résultat.")
+		case 1:
+			fmt.Fprintln(out, "  1 résultat")
+		default:
+			fmt.Fprintf(out, "  %d résultats\n", results.Total)
+		}
+	}
+	for i, hit := range results.Hits {
+		line := fmt.Sprintf("  %d. %s", offset+i+1, hit.Item.Name)
+		if hit.Page > 0 {
+			line += fmt.Sprintf(" — page %d", hit.Page)
+		}
+		if hit.Excerpt != "" {
+			line += " — « " + hit.Excerpt + " »"
+		} else if hit.Item.Caption != "" {
+			line += " — " + hit.Item.Caption
+		}
+		for _, note := range hit.Notes {
+			line += " (" + note + ")"
+		}
+		if hit.Beyond {
+			line += " (moins proche)"
+		}
+		fmt.Fprintln(out, line)
+	}
+	a.last = append(a.last[:min(offset, len(a.last))], results.Hits...)
+	a.shown = offset + len(results.Hits)
+	return nil
+}
+
+// open designates one of the results listed.
+func (a *assistant) open(out io.Writer, index int) error {
+	if a.library == nil {
+		if index < 0 {
+			fmt.Fprintln(out, "Ouvrir le dernier résultat.")
+		} else {
+			fmt.Fprintf(out, "Ouvrir le résultat n° %d.\n", index)
+		}
+		return nil
+	}
+	if index < 0 {
+		index = len(a.last)
+	}
+	if index < 1 || index > len(a.last) {
+		fmt.Fprintln(out, "Ce résultat n'est pas dans la liste.")
+		return nil
+	}
+	fmt.Fprintln(out, "Ouvrir : "+a.last[index-1].Item.Path)
+	return nil
 }
 
 // printCandidates writes, for each sentence read, the words of its description
