@@ -27,6 +27,9 @@ const (
 	IssueTooLong      IssueCode = "too_long"
 	// IssueUntraceable: a criterion that no word of the user accounts for.
 	IssueUntraceable IssueCode = "untraceable"
+	// IssueUnjustified: the words a criterion is traced to do not name it. A
+	// signature cannot be justified by "QR code", whatever was said.
+	IssueUnjustified IssueCode = "unjustified"
 )
 
 // Issue is one problem found in a plan.
@@ -132,6 +135,14 @@ func Validate(plan Plan, now time.Time, sentences ...string) []Issue {
 		add("cardinality", IssueUnknownValue, "unknown cardinality %q", plan.Cardinality)
 	}
 
+	// A criterion must be justified by a word naming it, not only by a word
+	// that was said somewhere in the sentence.
+	for _, f := range plan.Features {
+		if justifiers, known := featureWords[f.Name]; known && !mentions(f.Origin.Text, justifiers) {
+			add("features", IssueUnjustified, "%q does not name the feature %q", f.Origin.Text, f.Name)
+		}
+	}
+
 	said := make(map[string]struct{})
 	for _, sentence := range sentences {
 		for _, t := range tokenize(sentence) {
@@ -234,4 +245,24 @@ func Relax(plan Plan, now time.Time) (Plan, Relaxation, bool) {
 		return next, Relaxation{RelaxWritten, "Ce texte n'a été lu dans aucune image : recherche étendue à ce que les images montrent."}, true
 	}
 	return plan, Relaxation{}, false
+}
+
+// featureWords are the words that justify a feature.
+var featureWords = map[FeatureName][]string{
+	FeatureCode:      {"qr", "code", "codes", "barre", "barres", "flashcode"},
+	FeaturePortrait:  {"portrait", "portraits", "selfie", "selfies", "visage", "visages"},
+	FeatureSignature: {"signature", "signatures", "signé", "signée", "signés", "signées", "signe", "signee", "paraphe", "paraphes"},
+}
+
+// mentions reports whether the words of text include one of the justifiers,
+// once folded to the same form as the tokens.
+func mentions(text string, justifiers []string) bool {
+	for _, t := range tokenize(text) {
+		for _, j := range justifiers {
+			if t.norm == normalize(j) {
+				return true
+			}
+		}
+	}
+	return false
 }

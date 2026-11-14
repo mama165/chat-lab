@@ -222,3 +222,14 @@ func TestLexicon_Load(t *testing.T) {
 
 	require.Error(t, lexicon.Load(strings.NewReader(`{"phrase": "pas une liste"}`)))
 }
+
+func TestValidate_CriterionMustBeNamedByItsWords(t *testing.T) {
+	sentence := "trouve le QR code du mois dernier"
+	plan := NewParser().Parse(sentence, testNow).Plan
+	require.Empty(t, Validate(plan, testNow, sentence))
+
+	// Traced to words that were said, but not naming the feature: refused.
+	plan.Features = append(plan.Features, Feature{Name: FeatureSignature, Origin: Origin{Text: "QR code"}})
+	issues := Validate(plan, testNow, sentence)
+	require.Equal(t, []IssueCode{IssueUnjustified}, codes(issues))
+}
