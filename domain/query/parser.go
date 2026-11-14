@@ -667,11 +667,17 @@ func (a *analysis) extractBounds() {
 		if seconds, timed := secondsIn[unitWord]; timed {
 			factor = seconds
 		}
+		// Pages are counted: "moins de 2 pages" is one page, "plus de 50" is 51
+		// or more. A duration is not that sharp.
+		strict := 0
+		if _, timed := secondsIn[unitWord]; !timed {
+			strict = 1
+		}
 		switch index {
 		case 0:
-			bound.Min = c.n * factor
+			bound.Min = c.n*factor + strict
 		case 1:
-			bound.Max = c.n * factor
+			bound.Max = max(c.n*factor-strict, 1)
 			level = LevelSmall
 		default:
 			pages := c.n

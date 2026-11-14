@@ -360,3 +360,10 @@ func originOf(sentence string, toks []token, i, length int, rule string) Origin 
 	start, end := toks[i].start, toks[i+length-1].end
 	return Origin{Start: start, End: end, Text: sentence[start:end], Rule: rule}
 }
+
+// Fold returns the words of s in lower case and without accents, separated by
+// one space: the form under which names are compared ("États-Unis" and
+// "etats unis" are the same place).
+func Fold(s string) string {
+	return normalize(s)
+}

@@ -149,10 +149,10 @@ func TestSession_TheDayCanBeChanged(t *testing.T) {
 func TestParse_BoundsExclusionsAndLanguage(t *testing.T) {
 	parser := NewParser()
 	summaries := map[string]string{
-		"les vidéos de plus de 5 minutes":                "vidéos · plus de 5 minutes",
-		"les vidéos de moins de 30 secondes":             "vidéos · moins de 30 secondes",
-		"les vidéos de plus de 2 heures":                 "vidéos · plus de 2 heures",
-		"les PDF de moins de 2 pages":                    "PDF · moins de 2 pages",
+		"les vidéos de plus de 5 minutes":                "vidéos · au moins 5 minutes",
+		"les vidéos de moins de 30 secondes":             "vidéos · au plus 30 secondes",
+		"les vidéos de plus de 2 heures":                 "vidéos · au moins 2 heures",
+		"les PDF de moins de 2 pages":                    "PDF · au plus 1 page",
 		"un PDF de 3 pages":                              "PDF · 3 pages",
 		"un PDF d'une seule page":                        "PDF · 1 page",
 		"les photos de la ville, pas celles de la plage": "photos · image : la ville · sans la plage",

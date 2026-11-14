@@ -182,9 +182,9 @@ func boundLabel(b Bound, one, many string) string {
 	case b.Min > 0 && b.Max > 0:
 		return fmt.Sprintf("de %d à %s", b.Min, plural(b.Max, one, many))
 	case b.Min > 0:
-		return "plus de " + plural(b.Min, one, many)
+		return "au moins " + plural(b.Min, one, many)
 	default:
-		return "moins de " + plural(b.Max, one, many)
+		return "au plus " + plural(b.Max, one, many)
 	}
 }
 

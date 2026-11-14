@@ -9,7 +9,7 @@
   {"sentence": "Sors-moi toutes les photos de Marrakech sauf celles de nuit.", "want": {"kinds": ["image"], "place": "Marrakech", "cardinality": "all", "exclude": ["nuit"]}},
   {"sentence": "Les vidéos de moins d'une minute tournées en Espagne.", "want": {"kinds": ["video"], "seconds_max": 60, "place": "Espagne", "no_visual": true}},
   {"sentence": "Je voudrais la facture Amazon du 12 octobre.", "want": {"terms": ["facture", "amazon"], "date": ["2026-10-12", "2026-10-13"]}},
-  {"sentence": "Retrouve le PDF de plus de 20 pages sur l'assurance.", "want": {"kinds": ["pdf"], "pages_min": 20, "terms": ["assurance"]}},
+  {"sentence": "Retrouve le PDF de plus de 20 pages sur l'assurance.", "want": {"kinds": ["pdf"], "pages_min": 21, "terms": ["assurance"]}},
   {"sentence": "Montre-moi les photos avec un chien prises au Portugal l'été dernier.", "want": {"kinds": ["image"], "visual": "un chien", "place": "Portugal", "date": ["2026-06-01", "2026-10-01"]}},
   {"sentence": "C'était quoi déjà la photo avec le panneau de la rue ?", "want": {"kinds": ["image"], "visual": "le panneau de la rue"}},
   {"sentence": "Trouve une photo de moi devant la mer.", "want": {"kinds": ["image"], "visual": "moi devant la mer"}},

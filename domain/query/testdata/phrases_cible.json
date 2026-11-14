@@ -15,7 +15,7 @@
   {"sentence": "Trouve-moi la photo prise avec mon téléphone le 3 mars.", "must": true, "want": {"kinds": ["image"], "date": ["2026-03-03", "2026-03-04"], "no_visual": true}},
   {"sentence": "Trouve-moi les vidéos prises en 2025 à Paris.", "must": true, "want": {"kinds": ["video"], "date": ["2025-01-01", "2026-01-01"], "place": "Paris", "no_visual": true}},
   {"sentence": "Retrouve-moi les photos de ma fille prises à la plage cet été.", "must": true, "want": {"kinds": ["image"], "visual": "ma fille à la plage", "date": ["2026-06-01", "2026-10-01"], "no_place": true}},
-  {"sentence": "Trouve-moi les PDF de moins de 2 pages.", "must": true, "want": {"kinds": ["pdf"], "pages_max": 2, "no_text": true}},
+  {"sentence": "Trouve-moi les PDF de moins de 2 pages.", "must": true, "want": {"kinds": ["pdf"], "pages_max": 1, "no_text": true}},
   {"sentence": "Trouve-moi les captures d'écran où il y a une adresse mail.", "must": true, "want": {"kinds": ["image"], "source": "screenshot", "visual": "une adresse mail"}},
   {"sentence": "Montre-moi les documents que j'ai reçus sur WhatsApp la semaine dernière.", "must": true, "want": {"kinds": ["pdf"], "source": "messaging", "date": ["2026-11-02", "2026-11-09"], "no_text": true}},
   {"sentence": "Trouve-moi le contrat d'assurance habitation signé.", "must": true, "want": {"terms": ["contrat", "assurance", "habitation", "signé"], "features": ["signature"]}},
