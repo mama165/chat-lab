@@ -52,7 +52,9 @@ go run ./cmd/query "Trouve-moi le PDF de ces 6 derniers mois qui contient la not
 Recherche : PDF · depuis le 26 avril 2026 · texte : notice, lave-vaisselle
 ```
 
-Without a sentence, the command keeps the thread of a conversation (`pas celle de l'an dernier`, `et en vidéo ?`). The plan is not executed against the index yet. See [docs/QUERY.md](docs/QUERY.md).
+Without a sentence, the command keeps the thread of a conversation (`pas celle de l'an dernier`, `et en vidéo ?`). See [docs/QUERY.md](docs/QUERY.md).
+
+A plan is run on a catalog of the library, which returns the files, the page and an excerpt. With `-library`, the command searches a list of entries; a test library is provided. See [docs/CATALOG.md](docs/CATALOG.md).
 
 ## Technical stack
 

@@ -54,3 +54,35 @@ func TestRun_BadArguments(t *testing.T) {
 	require.Error(t, run([]string{"-now", "hier", "une rose"}, strings.NewReader(""), &out))
 	require.Error(t, run([]string{"-lexicon", filepath.Join(t.TempDir(), "absent.json"), "une rose"}, strings.NewReader(""), &out))
 }
+
+func TestRun_SearchesALibrary(t *testing.T) {
+	var out bytes.Buffer
+	in := strings.NewReader("Trouve-moi le PDF où il est question d'un notaire.\nle premier\nnouvelle recherche\nles trois dernières vidéos\nle PDF sur les licornes\n")
+
+	err := run([]string{"-now", "2026-11-14", "-library", "../../infrastructure/catalog/testdata/library.json"}, in, &out)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"> Recherche : PDF · texte : notaire",
+		"  1 résultat",
+		"  1. acte-vente.pdf — page 3 — « Maître Dupont, notaire à Lyon, atteste que l'acte a été reçu en son étude. »",
+		"> Ouvrir : /storage/emulated/0/Download/acte-vente.pdf",
+		"> Nouvelle recherche.",
+		"> Recherche : vidéos · plus récents d'abord · 3 résultats",
+		"  3 résultats",
+		"  1. VID_0003.mp4 — un appartement|un couloir",
+		"  2. VID_0004.mp4 — un concert sur une scène",
+		"  3. VID_0002.mp4 — un paysage en montagne|un lac",
+		"> Recherche : PDF · texte : licornes",
+		"  Aucun résultat.",
+		"> ",
+	}, strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n"))
+}
+
+func TestRun_UnreadableLibrary(t *testing.T) {
+	var out bytes.Buffer
+	require.Error(t, run([]string{"-library", filepath.Join(t.TempDir(), "absent.json"), "une rose"}, strings.NewReader(""), &out))
+	bad := filepath.Join(t.TempDir(), "bad.json")
+	require.NoError(t, os.WriteFile(bad, []byte(`{"pas": "une liste"}`), 0o600))
+	require.Error(t, run([]string{"-library", bad, "une rose"}, strings.NewReader(""), &out))
+}
