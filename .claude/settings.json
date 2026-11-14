@@ -1,9 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip install:*)",
-      "Bash(pip3 install:*)",
-      "Bash(hf download:*)"
+      "Bash(pip install llama-cpp-python:*)",
+      "Bash(pip install huggingface_hub:*)",
+      "Bash(hf download Qwen/Qwen3-0.6B-GGUF:*)",
+      "Bash(hf download Qwen/Qwen3-1.7B-GGUF:*)"
     ]
   }
 }
