@@ -20,7 +20,7 @@
   {"sentence": "le PDF le plus lourd", "want": {"kinds": ["pdf"], "sort": "largest", "no_text": true}},
   {"sentence": "un audio où on parle du loyer", "want": {"kinds": ["audio"], "terms": ["loyer"]}},
   {"sentence": "photo de groupe au restaurant", "want": {"kinds": ["image"], "visual": "groupe au restaurant", "people": 3, "people_at_least": true}},
-  {"sentence": "la notice du four en anglais", "want": {"terms": ["notice", "four", "anglais"]}},
+  {"sentence": "la notice du four en anglais", "want": {"terms": ["notice", "four"], "language": "en"}},
   {"sentence": "des photos de fleurs jaunes prises au printemps dernier", "want": {"kinds": ["image"], "visual": "fleurs jaunes", "date": ["2026-03-01", "2026-07-01"]}},
   {"sentence": "trouve moi le document avec un tampon rouge en bas de page", "want": {"kinds": ["pdf"], "terms": ["tampon", "rouge"], "position": "end"}},
   {"sentence": "vidéo courte du chat qui saute", "want": {"kinds": ["video"], "visual": "chat qui saute", "duration": "small"}}

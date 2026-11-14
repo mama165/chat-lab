@@ -108,6 +108,23 @@ func wholeMonth(now time.Time, month time.Month, year int) period {
 	return period{from: from, to: from.AddDate(0, 1, 0)}
 }
 
+// exactDay is one named day. Without a year, it is the most recent such day
+// that is not in the future. A day that does not exist (31 février) gives an
+// empty period, which is ignored.
+func exactDay(now time.Time, day int, month time.Month, year int) period {
+	if year == 0 {
+		year = now.Year()
+		if time.Date(year, month, day, 0, 0, 0, 0, now.Location()).After(now) {
+			year--
+		}
+	}
+	from := time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+	if from.Day() != day || from.Month() != month {
+		return period{}
+	}
+	return period{from: from, to: from.AddDate(0, 0, 1)}
+}
+
 func wholeYear(now time.Time, year int) period {
 	from := monthStart(year, time.January, now.Location())
 	return period{from: from, to: from.AddDate(1, 0, 0)}
@@ -223,8 +240,18 @@ var dateRules = []dateRule{
 	rule("today", "aujourd hui", func(_ captures, now time.Time) period { return singleDay(now, 0) }),
 	rule("today", "ce matin|midi|soir", func(_ captures, now time.Time) period { return singleDay(now, 0) }),
 	rule("today", "cet apres midi", func(_ captures, now time.Time) period { return singleDay(now, 0) }),
-	rule("yesterday", "hier", func(_ captures, now time.Time) period { return singleDay(now, -1) }),
+	rule("yesterday", "hier matin|midi|soir?", func(_ captures, now time.Time) period { return singleDay(now, -1) }),
 	rule("christmas", "noel dernier? <year>?", func(c captures, now time.Time) period { return christmas(now, c.year) }),
+	rule("day-range", "entre|du le? <day> et|au le? <day> <month> <year>?", func(c captures, now time.Time) period {
+		first := exactDay(now, c.day, c.month, c.year)
+		if first.from.IsZero() || c.day2 < c.day {
+			return period{}
+		}
+		return period{from: first.from, to: first.from.AddDate(0, 0, c.day2-c.day+1)}
+	}),
+	rule("day", "le? <day> <month> <year>?", func(c captures, now time.Time) period {
+		return exactDay(now, c.day, c.month, c.year)
+	}),
 	rule("month", "en|de|du|d|debut|fin|courant|mi <month> <year>?",
 		func(c captures, now time.Time) period { return wholeMonth(now, c.month, c.year) }),
 	rule("month", "mois de|d <month> <year>?",
@@ -237,7 +264,7 @@ var dateRules = []dateRule{
 		}
 		return wholeMonth(now, c.month, year)
 	}),
-	rule("year", "en|de|d|annee? <year>", func(c captures, now time.Time) period { return wholeYear(now, c.year) }),
+	rule("year", "en|de|d|annee|an? <year>", func(c captures, now time.Time) period { return wholeYear(now, c.year) }),
 }
 
 var seasonNames = map[string]struct{}{"printemps": {}, "ete": {}, "automne": {}, "hiver": {}}

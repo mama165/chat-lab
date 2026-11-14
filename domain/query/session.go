@@ -166,7 +166,7 @@ func (s *Session) Interpret(sentence string, now time.Time) Turn {
 		// "plutôt un salon" searches a living room.
 		mode = refineNone
 	}
-	a := s.parser.analyze(cleaned, now)
+	a := s.parser.analyze(cleaned, now, nil)
 	understood := !a.plan.IsEmpty() || a.plan.Sort != SortRelevance || a.plan.Cardinality == CardinalityAll
 
 	switch {
@@ -286,6 +286,9 @@ func refine(current Plan, a *analysis, mode refinement) Plan {
 			next.Source = nil
 		}
 		next.Features = slices.DeleteFunc(next.Features, func(f Feature) bool { return said.HasFeature(f.Name) })
+		if said.Place != nil && next.Place != nil && normalize(said.Place.Name) == normalize(next.Place.Name) {
+			next.Place = nil
+		}
 		if a.description != "" {
 			if next.Visual != nil {
 				next.Visual.Not = append(next.Visual.Not, a.description)
@@ -334,6 +337,18 @@ func refine(current Plan, a *analysis, mode refinement) Plan {
 	}
 	if said.Limit > 0 {
 		next.Limit = said.Limit
+	}
+	if said.Place != nil {
+		next.Place = clonePtr(said.Place)
+	}
+	if said.Pages != nil {
+		next.Pages = clonePtr(said.Pages)
+	}
+	if said.Seconds != nil {
+		next.Seconds = clonePtr(said.Seconds)
+	}
+	if said.Language != nil {
+		next.Language = clonePtr(said.Language)
 	}
 
 	switch {
