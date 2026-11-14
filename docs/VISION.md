@@ -65,18 +65,30 @@ Pictures past the margin are still listed, marked as less close and not counted.
 
 ## What was checked, and on how much
 
-| What | Checked on | Result |
-| :--- | :--- | :--- |
-| Description → picture, in French | 8 562 public descriptions, 3 600 photographs | Table above |
-| Faces | 9 pictures holding 16 faces | 16 found, none on the 3 pictures without people |
-| Indoors or outdoors | 9 photographs | 6 right, 3 studio pictures left unjudged, none wrong |
-| Text in pictures | 6 pictures | Dark text on light: read. Light text on colour: read after contrast and inversion. Heavily styled lettering: read in part. |
+Each part was measured on a public benchmark, with nothing labelled here. Every line is one run on a 4-core desktop CPU.
 
-The first line is a measure. The three others are checks on a handful of pictures: they show that the parts work together, not how good they are. Faces, scenes and text each have public benchmarks that were not run here.
+| What | Benchmark | Size | Result |
+| :--- | :--- | :--- | :--- |
+| Description → picture, in French | XM3600, descriptions written by people | 8 562 descriptions, 3 600 photographs | Right photograph first 67 %, in the first 5 89 %, in the first 10 94 % |
+| Faces | WIDER FACE, validation, faces marked by hand | 3 226 photographs, 19 925 faces | Found: 92 % at 80 px and more, 87 % at 40–80 px, 77 % at 20–40 px. Precision 94 %. |
+| Counting faces | The same, photographs whose faces are all 40 px or more | 1 971 photographs | Exact 77 %, within one 94.5 % |
+| Indoors or outdoors | IndoorOutdoorNet-20K | 2 000 photographs drawn at random | Answers 93 % of the time; right 99.4 % of the time when it answers; wrong way 0.5 % |
+| Reading words | TextOCR, words cut out of photographs | 1 986 words | Read exactly 47.5 %, within one letter in five 60.7 %, nothing read 24 % |
+
+What these numbers say:
+
+- **Finding a photograph from a description** works: this is the core of the search.
+- **Counting people from faces is approximate by nature**: right to the unit three times in four, to within one nineteen times in twenty, on a hard benchmark with crowds. That is why a search accepts a face more or less, and ranks the exact number first.
+- **Indoors or outdoors** is reliable enough to filter on, because it prefers to say nothing rather than guess.
+- **Reading text in photographs of real scenes is the weak part.** Signs, shop fronts, curved or tiny lettering: about half the words are read. The benchmark is hard and made of natural scenes; screenshots, posters and documents are easier, and were not measured. Text that is not read cannot be found.
+
+WIDER FACE is licensed CC BY-NC-ND: it was read only to measure, from the archive, and is not copied anywhere. The three scripts that measure are `measure_retrieval.py`, `measure_faces.py`, `measure_setting.py` and `measure_text.py`.
 
 ## Not measured
 
 - Anything on a phone: speed, memory, heat.
+- Text in screenshots, posters and documents: only the harder case, natural scenes, was measured.
+- Whole photographs for text: the benchmark gives words already cut out, so the finding of text in a photograph is not measured.
 - The image side in 16 or 8 bits.
 - Videos: the model is the same, one vector per sampled frame, but no video has been read.
 - Small faces, profiles, low light; people seen from behind are not faces.
