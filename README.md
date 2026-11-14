@@ -40,6 +40,20 @@ scanner -> ingest -> fan-out -> analysis sink (stores the file metadata)
 
 More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SEQUENCE.md](docs/SEQUENCE.md) and [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
+## Asking in plain French
+
+A free sentence is turned into a search plan by the `domain/query` package, without any model. It can be tried without an index:
+
+```bash
+go run ./cmd/query "Trouve-moi le PDF de ces 6 derniers mois qui contient la notice d'un lave-vaisselle."
+```
+
+```
+Recherche : PDF · depuis le 26 avril 2026 · texte : notice, lave-vaisselle
+```
+
+Without a sentence, the command keeps the thread of a conversation (`pas celle de l'an dernier`, `et en vidéo ?`). The plan is not executed against the index yet. See [docs/QUERY.md](docs/QUERY.md).
+
 ## Technical stack
 
 | Component | Technology | Purpose |
