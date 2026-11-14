@@ -54,13 +54,15 @@ def image_vectors(model_dir, data_dir, cache_dir):
 def main(argv):
     model_dir, data_dir, cache_dir = argv[:3]
     full = "--full" in argv[3:]
+    # --text=FILE measures another variant of the text model.
+    name = next((a.split("=", 1)[1] for a in argv[3:] if a.startswith("--text=")), None)
     os.makedirs(cache_dir, exist_ok=True)
     ids, images, image_seconds = image_vectors(model_dir, data_dir, cache_dir)
     position = {image_id: i for i, image_id in enumerate(ids)}
 
     queries = table(data_dir, "fr-queries").to_pylist()
     wanted = {row["query-id"]: row["corpus-id"] for row in table(data_dir, "fr-qrels").to_pylist()}
-    encoder = TextEncoder(model_dir, full=full)
+    encoder = TextEncoder(model_dir, full=full, name=name)
 
     ranks, own, best_other = [], [], []
     started = time.perf_counter()
@@ -78,7 +80,7 @@ def main(argv):
 
     ranks, own, best_other = np.array(ranks), np.array(own), np.array(best_other)
     report = {
-        "model": "siglip2-base-patch16-224, text " + ("32 bits" if full else "8 bits"),
+        "model": "siglip2-base-patch16-224, text " + (name or ("32 bits" if full else "8 bits")),
         "images": len(ids),
         "descriptions": len(queries),
         "recall_at_1": round(float((ranks <= 1).mean()), 4),

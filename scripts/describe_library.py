@@ -4,6 +4,7 @@ Nothing is labelled by hand. For every picture the script computes:
 
   - a vector of what the picture shows, with the image side of SigLIP 2
     (the text side of the same model encodes the user's description);
+  - whether it was taken indoors or outdoors, with the same model;
   - the number of faces, with the YuNet detector;
   - the text visible in the picture, with RapidOCR;
   - the contents of QR codes, with OpenCV;
@@ -57,6 +58,34 @@ class ImageEncoder:
         result = dict(zip(self.outputs, self.session.run(None, {self.input: batch})))
         vector = result["pooler_output"][0]
         return (vector / np.linalg.norm(vector)).astype(np.float32)
+
+
+class SettingJudge:
+    """Says whether a picture was taken indoors or outdoors.
+
+    No extra model: the picture's vector is compared with the vectors of two
+    sentences, with the text side of the same model. When the two are too
+    close to call, nothing is said rather than a guess recorded as a fact.
+    """
+
+    INDOOR = "une photo prise à l'intérieur, dans une pièce"
+    OUTDOOR = "une photo prise à l'extérieur, en plein air"
+    # A poster, a screenshot or a scanned page is neither.
+    NOT_A_SCENE = "une affiche, un document ou une capture d'écran avec du texte"
+    MIN_GAP = 0.01
+
+    def __init__(self, model_dir):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from encode_text import TextEncoder
+
+        encoder = TextEncoder(model_dir, full=True)
+        self.indoor, self.outdoor, self.flat = encoder.encode_many([self.INDOOR, self.OUTDOOR, self.NOT_A_SCENE])
+
+    def indoor_or_none(self, vector):
+        indoor, outdoor, flat = (float(vector @ v) for v in (self.indoor, self.outdoor, self.flat))
+        if flat >= max(indoor, outdoor) or abs(indoor - outdoor) < self.MIN_GAP:
+            return None
+        return indoor > outdoor
 
 
 class FaceCounter:
@@ -193,7 +222,7 @@ def kind_of(name):
     return None
 
 
-def describe(root, encoder, faces, reader):
+def describe(root, encoder, faces, reader, setting=None):
     entries, skipped = [], []
     for directory, _, names in sorted(os.walk(root)):
         for name in sorted(names):
@@ -213,7 +242,12 @@ def describe(root, encoder, faces, reader):
                     with Image.open(path) as opened:
                         entry.update(exif_facts(opened))
                         image = flatten(ImageOps.exif_transpose(opened))
-                        entry["vectors"] = [[round(float(x), 6) for x in encoder.encode(image)]]
+                        vector = encoder.encode(image)
+                        entry["vectors"] = [[round(float(x), 6) for x in vector]]
+                        if setting is not None:
+                            indoor = setting.indoor_or_none(vector)
+                            if indoor is not None:
+                                entry["indoor"] = indoor
                         if faces is not None:
                             entry["faces"], entry["portrait"] = faces.faces(image)
                         if reader is not None:
@@ -244,7 +278,7 @@ def main(argv=None):
     encoder = ImageEncoder(args.siglip)
     faces = FaceCounter(args.yunet) if args.yunet else None
     reader = None if args.no_text else TextReader()
-    entries, skipped = describe(args.folder, encoder, faces, reader)
+    entries, skipped = describe(args.folder, encoder, faces, reader, SettingJudge(args.siglip))
     with open(args.output, "w", encoding="utf-8") as out:
         json.dump(entries, out, ensure_ascii=False)
     print(f"{len(entries)} fichiers décrits, {len(skipped)} ignorés", file=sys.stderr)

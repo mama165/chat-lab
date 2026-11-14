@@ -27,8 +27,8 @@ ort.disable_telemetry_events()
 class TextEncoder:
     """The text side of SigLIP 2: a description becomes a vector."""
 
-    def __init__(self, model_dir, full=False):
-        name = "text_model.onnx" if full else "text_model_quantized.onnx"
+    def __init__(self, model_dir, full=False, name=None):
+        name = name or ("text_model.onnx" if full else "text_model_quantized.onnx")
         self.session = ort.InferenceSession(os.path.join(model_dir, "onnx", name), providers=["CPUExecutionProvider"])
         # The tokenizer file already pads to 64 tokens and ends with <eos>,
         # as the model was trained.

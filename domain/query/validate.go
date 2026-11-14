@@ -213,6 +213,7 @@ const (
 	RelaxDateDropped  RelaxStep = "date_dropped"
 	RelaxExcludedDate RelaxStep = "excluded_dates"
 	RelaxWritten      RelaxStep = "written"
+	RelaxPeople       RelaxStep = "people"
 )
 
 // Relaxation tells the user which filter was loosened, and why results appear
@@ -256,6 +257,10 @@ func Relax(plan Plan, now time.Time) (Plan, Relaxation, bool) {
 	case len(next.ExcludeDates) > 0:
 		next.ExcludeDates = nil
 		return next, Relaxation{RelaxExcludedDate, "Rien d'autre : les périodes écartées sont de nouveau incluses."}, true
+
+	case next.People != nil && next.People.Counted:
+		next.People.Counted = false
+		return next, Relaxation{RelaxPeople, "Aucune photo avec ce nombre de personnes : les autres sont montrées, les plus proches d'abord."}, true
 
 	case next.Text != nil && next.Text.Scope == ScopeWritten && next.Visual == nil && next.Text.Phrase != "":
 		next.Visual = &Visual{Description: next.Text.Phrase, Origin: next.Text.Origin}

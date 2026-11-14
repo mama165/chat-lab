@@ -40,6 +40,13 @@ func (p Plan) Chips() []Chip {
 			add("source", "reçu par messagerie")
 		}
 	}
+	if p.Setting != nil {
+		if p.Setting.Indoor {
+			add("setting", "en intérieur")
+		} else {
+			add("setting", "en extérieur")
+		}
+	}
 	if p.Place != nil {
 		add("place", "lieu : "+p.Place.Name)
 	}
@@ -89,6 +96,10 @@ func (p Plan) Chips() []Chip {
 			noun = "personne"
 		}
 		switch {
+		case p.People.Counted && p.People.Value == 0 && p.People.Max == 0:
+			add("people", "sans personne")
+		case p.People.Max > 0:
+			add("people", fmt.Sprintf("%d à %d personnes", p.People.Value, p.People.Max))
 		case p.People.AtLeast:
 			add("people", fmt.Sprintf("au moins %d %s", p.People.Value, noun))
 		case p.People.Tolerance > 0:

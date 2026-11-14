@@ -121,9 +121,10 @@ var months = map[string]time.Month{
 	"mai":     time.May,
 	"juin":    time.June,
 	"juillet": time.July, "juil": time.July,
-	"aout":      time.August,
-	"septembre": time.September, "sept": time.September,
-	"octobre": time.October, "oct": time.October,
+	"aout": time.August,
+	// "sept" is not listed as short for September: it is the number seven.
+	"septembre": time.September,
+	"octobre":   time.October, "oct": time.October,
 	"novembre": time.November, "nov": time.November,
 	"decembre": time.December, "dec": time.December,
 }

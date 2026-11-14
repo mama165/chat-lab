@@ -4,7 +4,7 @@
   {"sentence": "Trouve-moi l'image qui contient une rose.", "must": true,
    "want": {"kinds": ["image"], "visual": "une rose", "weak_text": true, "no_date": true, "cardinality": "one"}},
   {"sentence": "Trouve-moi l'image où il y a 5 personnes.", "must": true,
-   "want": {"kinds": ["image"], "visual": "5 personnes", "people": 5}},
+   "want": {"kinds": ["image"], "no_visual": true, "people": 5}},
   {"sentence": "Trouve-moi le PDF où il est question d'un notaire.", "must": true,
    "want": {"kinds": ["pdf"], "terms": ["notaire"], "no_visual": true, "cardinality": "one"}},
   {"sentence": "Trouve-moi le PDF de ces 6 derniers mois qui contient la notice d'un lave-vaisselle.", "must": true,
