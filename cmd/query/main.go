@@ -45,6 +45,9 @@ func run(args []string, in io.Reader, out io.Writer) error {
 	lexiconPath := flags.String("lexicon", "", "JSON file of personal expressions added to the default lexicon")
 	candidates := flags.Bool("candidates", false, "for each line read, print the free words a model may judge, as JSON")
 	libraryPath := flags.String("library", "", "JSON list of files to search, such as infrastructure/catalog/testdata/library.json")
+	encoderCommand := flags.String("encoder", "", "program giving the vector of a description, such as \"python3 scripts/encode_text.py MODELS/siglip2\"; without it, pictures are compared through their caption")
+	margin := flags.Float64("margin", 0, "how far below the best picture another one still counts as a match (default: set for the encoder)")
+	floor := flags.Float64("floor", 0, "resemblance below which a picture is never a match (default: set for the encoder)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -74,7 +77,24 @@ func run(args []string, in io.Reader, out io.Writer) error {
 		return printCandidates(parser, in, out, now)
 	}
 	session := query.NewSession(parser)
-	a := &assistant{session: session, now: now, asJSON: *asJSON}
+	a := &assistant{session: session, now: now, asJSON: *asJSON, encoder: catalog.WordEncoder{}}
+	if *encoderCommand != "" {
+		parts := strings.Fields(*encoderCommand)
+		encoder, err := catalog.StartProcessEncoder(parts[0], parts[1:]...)
+		if err != nil {
+			return err
+		}
+		defer encoder.Close()
+		a.encoder = encoder
+		// Measured for SigLIP 2 on a public benchmark: see docs/VISION.md.
+		a.margin, a.floor = catalog.SigLIP2Margin, catalog.SigLIP2Floor
+	}
+	if *margin > 0 {
+		a.margin = float32(*margin)
+	}
+	if *floor > 0 {
+		a.floor = float32(*floor)
+	}
 	if *libraryPath != "" {
 		library, err := openLibrary(*libraryPath)
 		if err != nil {
@@ -107,7 +127,11 @@ func run(args []string, in io.Reader, out io.Writer) error {
 type assistant struct {
 	session *query.Session
 	library *catalog.Catalog
-	now     time.Time
+	encoder catalog.TextEncoder
+	// margin and floor decide which pictures count as matches; zero keeps
+	// the defaults of the catalog.
+	margin, floor float32
+	now           time.Time
 	asJSON  bool
 	// shown is the number of results already listed for the current search.
 	shown int
@@ -187,7 +211,8 @@ func (a *assistant) search(out io.Writer, plan query.Plan, offset int) error {
 		return nil
 	}
 	results, err := a.library.Search(context.Background(), plan, catalog.Options{
-		Encoder: catalog.WordEncoder{}, Now: a.now, Offset: offset, Size: pageSize,
+		Encoder: a.encoder, Now: a.now, Offset: offset, Size: pageSize,
+		VisualMargin: a.margin, VisualFloor: a.floor,
 	})
 	if err != nil {
 		return err
