@@ -15,6 +15,13 @@ type token struct {
 	// used is set once a rule has taken the word, so that it is not also read
 	// as part of the free description.
 	used bool
+	// skip marks a word that carries no meaning where it stands ("prises" in
+	// "les photos prises à la plage"). Unlike a used word, it does not cut the
+	// description in two: the words around it stay together.
+	skip bool
+	// out marks a word of what the user does not want: it must not be read as
+	// something asked for ("sauf les selfies" does not ask for portraits).
+	out bool
 }
 
 // tokenize splits a sentence into words. Apostrophes, hyphens and punctuation
@@ -196,6 +203,8 @@ type captures struct {
 	unit  unit
 	month time.Month
 	year  int
+	// day and day2 are days of the month, in the order they were read.
+	day, day2 int
 }
 
 // element is one position of a pattern.
@@ -301,8 +310,30 @@ func (e element) consume(toks []token, i int, c *captures) (int, bool) {
 			c.year = y
 		}
 		return 1, ok
+	case "day":
+		d, ok := parseDay(word)
+		if ok {
+			if c.day == 0 {
+				c.day = d
+			} else {
+				c.day2 = d
+			}
+		}
+		return 1, ok
 	}
 	return 0, false
+}
+
+// parseDay reads a day of the month: "18", "1er", "premier".
+func parseDay(word string) (int, bool) {
+	if word == "1er" || word == "premier" {
+		return 1, true
+	}
+	if !isDigits(word) || len(word) > 2 {
+		return 0, false
+	}
+	day, _ := strconv.Atoi(word)
+	return day, day >= 1 && day <= 31
 }
 
 // findFirst returns the first pattern matching at position i, preferring the

@@ -9,6 +9,7 @@ import (
 // Parser translates a sentence into a search plan.
 type Parser struct {
 	lexicon *Lexicon
+	places  map[string][][]string
 }
 
 // Option configures a Parser.
@@ -21,7 +22,7 @@ func WithLexicon(l *Lexicon) Option {
 
 // NewParser returns a parser using the default lexicon.
 func NewParser(opts ...Option) *Parser {
-	p := &Parser{lexicon: DefaultLexicon()}
+	p := &Parser{lexicon: DefaultLexicon(), places: knownPlaces}
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -38,7 +39,35 @@ type Result struct {
 
 // Parse translates a sentence. now is the current time, used for relative dates.
 func (p *Parser) Parse(sentence string, now time.Time) Result {
-	a := p.analyze(sentence, now)
+	a := p.analyze(sentence, now, nil)
+	return Result{Plan: a.plan, Then: a.then}
+}
+
+// Candidates returns the free words of a sentence: what is left once the rules
+// have read the kinds, dates, places and so on. They are the words whose
+// meaning the rules cannot judge, and the only ones ParseDropping may remove.
+func (p *Parser) Candidates(sentence string, now time.Time) []string {
+	return p.analyze(sentence, now, nil).candidates
+}
+
+// ParseDropping translates a sentence while ignoring some of its free words,
+// judged to be noise by something that understands language better than rules
+// do, typically a small language model ("existants" in "tous les QR codes
+// existants").
+//
+// This is the whole of what a model is allowed to do to a plan: remove words
+// from the description. It cannot add a filter, change a date or pick a kind
+// of file, so it cannot invent anything. Words that are not candidates are
+// ignored, and if every candidate were dropped nothing is: an empty search is
+// worse than a noisy one.
+func (p *Parser) ParseDropping(sentence string, now time.Time, noise []string) Result {
+	if len(noise) == 0 {
+		return p.Parse(sentence, now)
+	}
+	a := p.analyze(sentence, now, noise)
+	if len(a.candidates) == 0 {
+		return p.Parse(sentence, now)
+	}
 	return Result{Plan: a.plan, Then: a.then}
 }
 
@@ -56,10 +85,19 @@ type analysis struct {
 	description string
 	terms       []Term
 	written     bool
-	origin      Origin
+	// writtenOrigin is the word that asked for text visible in a picture.
+	writtenOrigin Origin
+	origin        Origin
+	// excluded is what the user said is not wanted, in the same sentence.
+	excluded       []string
+	excludedOrigin Origin
+	excludedKinds  []Kind
+	// candidates are the free words of the description, the only ones a
+	// model is allowed to judge.
+	candidates []string
 }
 
-func (p *Parser) analyze(sentence string, now time.Time) *analysis {
+func (p *Parser) analyze(sentence string, now time.Time, noise []string) *analysis {
 	a := &analysis{sentence: sentence, toks: tokenize(sentence)}
 	a.plan.Sort = SortRelevance
 	a.plan.Cardinality = CardinalityMany
@@ -68,6 +106,7 @@ func (p *Parser) analyze(sentence string, now time.Time) *analysis {
 	}
 
 	alsoAll := a.extractAlsoAll()
+	a.extractExclusion()
 	a.extractCodes()
 	a.dates = extractDates(sentence, a.toks, now)
 	if len(a.dates) > 0 {
@@ -77,6 +116,9 @@ func (p *Parser) analyze(sentence string, now time.Time) *analysis {
 	a.extractPosition()
 	a.extractSource()
 	a.extractKinds()
+	a.extractPlace(p.places)
+	a.extractLanguage()
+	a.extractBounds()
 	a.extractDuration()
 	a.extractSort()
 	a.extractEverything()
@@ -84,6 +126,7 @@ func (p *Parser) analyze(sentence string, now time.Time) *analysis {
 	a.annotatePeople()
 	a.annotateFeatures()
 	a.extractFillers()
+	a.skipNoise(noise)
 	a.buildDescription(p.lexicon)
 
 	if alsoAll {
@@ -398,10 +441,10 @@ var sortRules = []struct {
 	spec string
 	sort Sort
 }{
-	{"le|la|les? plus recent|recente|recents|recentes", SortNewest},
-	{"le|la|les? plus ancien|ancienne|anciens|anciennes|vieux|vieille|vieilles", SortOldest},
-	{"le|la|les? plus gros|grosse|grosses|lourd|lourde|volumineux|volumineuse|grand|grande|long|longue", SortLargest},
-	{"le|la|les? plus petit|petite|leger|legere|court|courte", SortSmallest},
+	{"le|la|les? plus recent|recente|recents|recentes d? abord?", SortNewest},
+	{"le|la|les? plus ancien|ancienne|anciens|anciennes|vieux|vieille|vieilles d? abord?", SortOldest},
+	{"le|la|les? plus gros|grosse|grosses|lourd|lourde|lourds|lourdes|volumineux|volumineuse|grand|grande|long|longue|longs|longues d? abord?", SortLargest},
+	{"le|la|les? plus petit|petite|petits|petites|leger|legere|court|courte|courts|courtes d? abord?", SortSmallest},
 	{"recent|recente|recents|recentes|recemment|dernierement", SortNewest},
 	// Dates and positions have already taken their own "dernier": what is left
 	// qualifies the file itself, as in "le dernier relevé de compte".
@@ -469,6 +512,189 @@ var (
 	fewPages   = compileAll("de? moins de|d <n> page|pages", "d|de? une seule? page")
 )
 
+// captured participles say how a file was made, not what it shows.
+var captureWords = wordSet("pris prise prises tourne tournee tournes tournees filme filmee filmes filmees capture capturee captures capturees")
+
+// skipNoise marks the words that carry no meaning: participles of capture,
+// and the words a model judged to be noise.
+func (a *analysis) skipNoise(noise []string) {
+	dropped := make(map[string]struct{}, len(noise))
+	for _, word := range noise {
+		for _, t := range tokenize(word) {
+			dropped[t.norm] = struct{}{}
+		}
+	}
+	for i := range a.toks {
+		if a.toks[i].used {
+			continue
+		}
+		if in(captureWords, a.toks[i].norm) || in(dropped, a.toks[i].norm) {
+			a.toks[i].skip = true
+		}
+	}
+}
+
+var (
+	exclusionWords = wordSet("sauf hors excepte sans")
+	exclusionPairs = compileAll("mais|et pas|non", "a l exception de|d|du|des", "pas celles|celle|celui|ceux")
+	// notExclusion follow "pas" without excluding anything: "pas trop longue".
+	notExclusion = wordSet("trop tres super forcement vraiment mal besoin encore si")
+)
+
+// boundary reports whether punctuation separates word i from the one before.
+func (a *analysis) boundary(i int) bool {
+	if i <= 0 || i >= len(a.toks) {
+		return i >= len(a.toks)
+	}
+	return strings.ContainsAny(a.sentence[a.toks[i-1].end:a.toks[i].start], ",;.:!?")
+}
+
+// extractExclusion reads what is not wanted, said in the same sentence:
+// "les photos de la ville, pas celles de la plage", "sauf les selfies".
+func (a *analysis) extractExclusion() {
+	for i := 0; i < len(a.toks); i++ {
+		if a.toks[i].used {
+			continue
+		}
+		marker := 0
+		switch {
+		case in(exclusionWords, a.toks[i].norm):
+			marker = 1
+		default:
+			if length, _, _, ok := findFirst(exclusionPairs, a.toks, i); ok {
+				marker = length
+				if a.toks[i].norm == "pas" {
+					marker = 1 // the pronoun is dropped with the other leading words
+				}
+			} else if a.toks[i].norm == "pas" && a.boundary(i) && i+1 < len(a.toks) && !in(notExclusion, a.toks[i+1].norm) {
+				marker = 1
+			}
+		}
+		if marker == 0 {
+			continue
+		}
+		end := i + marker
+		for end < len(a.toks) && !a.boundary(end) {
+			// "sans sucre en photo": the kind of file is not part of what is excluded.
+			if a.toks[end].norm == "en" && end+1 < len(a.toks) {
+				if _, _, _, kind := findFirst(kindPatterns, a.toks, end+1); kind {
+					break
+				}
+			}
+			end++
+		}
+		from, to := i+marker, end
+		for from < to && in(leadWords, a.toks[from].norm) {
+			from++
+		}
+		for to > from && in(trailWords, a.toks[to-1].norm) {
+			to--
+		}
+		if from >= to {
+			continue
+		}
+		origin := Origin{Start: a.toks[i].start, End: a.toks[to-1].end, Rule: "exclusion"}
+		origin.Text = a.sentence[origin.Start:origin.End]
+		if a.excludedOrigin.Text == "" {
+			a.excludedOrigin = origin
+		}
+		// "sauf les vidéos" removes a kind of file, not something shown.
+		noun := from
+		for noun < to-1 && in(trailWords, a.toks[noun].norm) {
+			noun++ // the article before the kind of file
+		}
+		// A selfie is a kind of picture, not a kind of file: it stays a description.
+		selfie := strings.HasPrefix(a.toks[noun].norm, "selfie")
+		if length, _, index, ok := findFirst(kindPatterns, a.toks, noun); ok && !selfie && noun+length == to && kindRules[index].kind != "" {
+			a.excludedKinds = append(a.excludedKinds, kindRules[index].kind)
+		} else {
+			a.excluded = append(a.excluded, a.sentence[a.toks[from].start:a.toks[to-1].end])
+		}
+		use(a.toks, i, end-i)
+		for k := i; k < end; k++ {
+			a.toks[k].out = true
+		}
+		i = end - 1
+	}
+}
+
+var languages = map[string]string{
+	"francais": "fr", "anglais": "en", "allemand": "de", "espagnol": "es", "italien": "it",
+	"portugais": "pt", "neerlandais": "nl", "chinois": "zh", "japonais": "ja", "arabe": "ar",
+}
+
+// extractLanguage reads "en anglais": the language of the text of a file.
+func (a *analysis) extractLanguage() {
+	for i := 1; i < len(a.toks); i++ {
+		code, ok := languages[a.toks[i].norm]
+		if !ok || a.toks[i].used || a.toks[i-1].used || a.toks[i-1].norm != "en" || a.plan.Language != nil {
+			continue
+		}
+		a.plan.Language = &Language{Code: code, Origin: a.origin2(i-1, 2, "language")}
+		use(a.toks, i-1, 2)
+	}
+}
+
+var (
+	secondsIn = map[string]int{
+		"seconde": 1, "secondes": 1, "sec": 1, "minute": 60, "minutes": 60, "min": 60, "heure": 3600, "heures": 3600,
+	}
+	boundPatterns = compileAll(
+		"de? plus de|d <n> minute|minutes|min|heure|heures|seconde|secondes|sec|page|pages",
+		"de? moins de|d <n> minute|minutes|min|heure|heures|seconde|secondes|sec|page|pages",
+		"de|d <n> pages",
+		"de|d une seule? page",
+	)
+)
+
+// extractBounds reads numeric limits: "de plus de 5 minutes", "de moins de 2
+// pages", "de 3 pages". The rough size or duration is set as well, for an
+// index that only knows small from large.
+func (a *analysis) extractBounds() {
+	for i := 0; i < len(a.toks); i++ {
+		if a.toks[i].used {
+			continue
+		}
+		length, c, index, ok := findFirst(boundPatterns, a.toks, i)
+		if !ok {
+			continue
+		}
+		unitWord := a.toks[i+length-1].norm
+		origin := a.origin2(i, length, "bound")
+		bound := &Bound{Origin: origin}
+		level := LevelLarge
+		factor := 1
+		if seconds, timed := secondsIn[unitWord]; timed {
+			factor = seconds
+		}
+		switch index {
+		case 0:
+			bound.Min = c.n * factor
+		case 1:
+			bound.Max = c.n * factor
+			level = LevelSmall
+		default:
+			pages := c.n
+			if index == 3 {
+				pages = 1
+			}
+			bound.Min, bound.Max = pages, pages
+			if pages <= 2 {
+				level = LevelSmall
+			}
+		}
+		if _, timed := secondsIn[unitWord]; timed {
+			a.plan.Seconds = bound
+			a.plan.Duration = &Hint{Level: level, Origin: origin}
+		} else {
+			a.plan.Pages = bound
+			a.plan.Size = &Hint{Level: level, Origin: origin}
+		}
+		use(a.toks, i, length)
+		i += length - 1
+	}
+}
+
 var everythingPatterns = compileAll(
 	"tous|toutes les|mes|ces",
 	"l ensemble de|des",
@@ -498,6 +724,9 @@ func (a *analysis) extractWritten() {
 		// "marqué" only after a verb or "avec": "la marque" is a brand.
 		marked := (word == "marque" || word == "marquee") && i > 0 && in(markedLead, a.toks[i-1].norm)
 		if in(writtenWords, word) || marked {
+			if !a.written {
+				a.writtenOrigin = a.origin2(i, 1, "written")
+			}
 			a.toks[i].used = true
 			a.written = true
 		}
@@ -586,6 +815,7 @@ var (
 func (a *analysis) annotateFeatures() {
 	for i, t := range a.toks {
 		switch {
+		case t.out:
 		case in(portraitWords, t.norm) && !a.plan.HasFeature(FeaturePortrait):
 			origin := a.origin2(i, 1, "feature:portrait")
 			a.plan.Features = append(a.plan.Features, Feature{Name: FeaturePortrait, Origin: origin})
@@ -602,15 +832,17 @@ func (a *analysis) annotateFeatures() {
 // "montre" is a watch.
 var commandPatterns = compileAll(
 	"trouve|trouves|trouver|retrouve|retrouver|retourne|retourner|montre|montrer|cherche|chercher|recherche|rechercher|"+
-		"donne|donner|affiche|afficher|sors|ressors|renvoie|ouvre|liste|lister moi|nous?",
-	"je veux|voudrais|cherche|recherche|souhaite|souhaiterais voir|trouver|retrouver|avoir?",
-	"j aimerais voir|trouver|retrouver|avoir?",
+		"donne|donner|affiche|afficher|sors|sortir|ressors|ressortir|renvoie|ouvre|liste|lister|revoir moi|nous?",
+	"je veux|voudrais|cherche|recherche|souhaite|souhaiterais voir|revoir|trouver|retrouver|avoir?",
+	"j aimerais voir|revoir|trouver|retrouver|avoir?",
 	"est ce que tu peux|pourrais",
 	"peux|pourrais tu",
 	"tu peux|pourrais",
-	"j ai besoin de|d",
+	"j ai besoin de|d|du|des",
 	"il me faut",
 	"ou est|sont passe|passee|passes|passees?",
+	"il me|nous faudrait",
+	"quel|quelle|quels|quelles est|sont|etait|etaient",
 	"t|tu aurais|as pas?",
 	// Pronouns between two parts of an order: "tu peux me retrouver".
 	"me|m|moi|nous",
@@ -618,6 +850,13 @@ var commandPatterns = compileAll(
 
 var fillerPatterns = compileAll(
 	"s il te|vous plait",
+	// Being in the library is not a criterion: everything searched is in it.
+	"existant|existante|existants|existantes|present|presente|presents|presentes|disponible|disponibles",
+	"stocke|stockee|stockes|stockees|conserve|conservee|conserves|conservees|garde|gardee|gardes|gardees",
+	"dont la|les|sa? metadonnee|metadonnees|localisation|position est|sont? situee|situees|situe|situes|localisee|localisees",
+	"situe|situee|situes|situees|localise|localisee|localises|localisees|geolocalise|geolocalisee|geolocalises|geolocalisees",
+	"avec mon|le|un telephone|portable|iphone|pixel|appareil|smartphone",
+	"ou? on|j entend|entends",
 	"stp|svp|merci|bonjour|salut",
 	// Hesitations, frequent when the sentence is dictated.
 	"euh|heu|hum|hmm|ben|bah|alors|ok|oui|voila|bref",
@@ -691,6 +930,7 @@ func (a *analysis) buildDescription(lexicon *Lexicon) {
 		start, end = -1, -1
 	)
 	seen := make(map[string]struct{})
+	idle := func(k int) bool { return a.toks[k].skip }
 	for i := 0; i < len(a.toks); {
 		if a.toks[i].used {
 			i++
@@ -702,42 +942,62 @@ func (a *analysis) buildDescription(lexicon *Lexicon) {
 		}
 		from, to := i, j // run is [from, to)
 		i = j
-		for from < to && in(leadWords, a.toks[from].norm) {
+		for from < to && (idle(from) || in(leadWords, a.toks[from].norm)) {
 			from++
 		}
-		for to > from && in(trailWords, a.toks[to-1].norm) {
+		for to > from && (idle(to-1) || in(trailWords, a.toks[to-1].norm)) {
 			to--
 		}
+		// kept are the words of the run that carry meaning where they stand.
+		var kept []int
 		meaningful := false
 		for k := from; k < to; k++ {
+			if idle(k) {
+				continue
+			}
+			kept = append(kept, k)
 			if !in(stopWords, a.toks[k].norm) {
 				meaningful = true
-				break
 			}
 		}
 		if !meaningful {
 			continue
 		}
-		parts = append(parts, a.sentence[a.toks[from].start:a.toks[to-1].end])
-		if start < 0 {
-			start = a.toks[from].start
+		// The words are copied as written, in stretches around skipped ones.
+		var pieces []string
+		for p := 0; p < len(kept); {
+			q := p
+			for q+1 < len(kept) && kept[q+1] == kept[q]+1 {
+				q++
+			}
+			pieces = append(pieces, a.sentence[a.toks[kept[p]].start:a.toks[kept[q]].end])
+			p = q + 1
 		}
-		end = a.toks[to-1].end
+		parts = append(parts, strings.Join(pieces, " "))
+		if start < 0 {
+			start = a.toks[kept[0]].start
+		}
+		end = a.toks[kept[len(kept)-1]].end
 
-		words := make([]string, 0, to-from)
-		for k := from; k < to; k++ {
-			words = append(words, a.toks[k].norm)
+		words := make([]string, len(kept))
+		for k, index := range kept {
+			words[k] = a.toks[index].norm
 		}
 		for k := 0; k < len(words); {
 			term, length, ok := lexicon.match(words, k)
 			if !ok {
 				length = 1
-				tok := a.toks[from+k]
+				tok := a.toks[kept[k]]
 				if in(stopWords, tok.norm) || len(tok.norm) < 2 {
 					k++
 					continue
 				}
 				term = Term{Value: strings.ToLower(a.sentence[tok.start:tok.end])}
+			}
+			for c := k; c < k+length; c++ {
+				if tok := a.toks[kept[c]]; !in(stopWords, tok.norm) && len(tok.norm) >= 2 {
+					a.candidates = append(a.candidates, strings.ToLower(a.sentence[tok.start:tok.end]))
+				}
 			}
 			k += length
 			key := normalize(term.Value)
@@ -748,17 +1008,26 @@ func (a *analysis) buildDescription(lexicon *Lexicon) {
 			a.terms = append(a.terms, term)
 		}
 	}
-	if len(parts) == 0 {
-		return
+	if len(parts) > 0 {
+		a.description = strings.Join(parts, ", ")
+		a.origin = Origin{Start: start, End: end, Text: a.description, Rule: "description"}
 	}
-	a.description = strings.Join(parts, ", ")
-	a.origin = Origin{Start: start, End: end, Text: a.description, Rule: "description"}
 	a.applyDescription()
 }
 
 // applyDescription decides what the free words are compared with.
 func (a *analysis) applyDescription() {
 	plan := &a.plan
+	if len(a.excludedKinds) > 0 {
+		base := plan.Kinds
+		if len(base) == 0 {
+			base = AllKinds
+		}
+		plan.Kinds = slices.DeleteFunc(slices.Clone(base), func(k Kind) bool { return slices.Contains(a.excludedKinds, k) })
+		if plan.KindsOrigin == nil {
+			plan.KindsOrigin = &a.excludedOrigin
+		}
+	}
 	pictures := len(plan.Kinds) == 0 || plan.HasKind(KindImage) || plan.HasKind(KindVideo)
 	documents := len(plan.Kinds) == 0 || plan.HasKind(KindPDF) || plan.HasKind(KindAudio)
 
@@ -775,6 +1044,8 @@ func (a *analysis) applyDescription() {
 		plan.Visual = &Visual{Description: a.description, Origin: a.origin}
 	}
 	switch {
+	case a.description == "":
+		// Nothing describes what is searched: only filters were given.
 	case a.written:
 		// Words to read in the picture: looking for what the picture shows
 		// would bring back grass for the word "herbe".
@@ -788,5 +1059,21 @@ func (a *analysis) applyDescription() {
 		text(ScopeAny, true)
 	default:
 		text(ScopeAny, false)
+	}
+	if a.written && plan.Text == nil && !plan.HasFeature(FeatureText) {
+		// "les images qui contiennent du texte": any readable text will do.
+		plan.Features = append(plan.Features, Feature{Name: FeatureText, Origin: a.writtenOrigin})
+	}
+	if len(a.excluded) == 0 {
+		return
+	}
+	if plan.Visual == nil && pictures && !a.written {
+		plan.Visual = &Visual{Origin: a.excludedOrigin}
+	}
+	if plan.Visual != nil {
+		plan.Visual.Not = slices.Clone(a.excluded)
+	}
+	if plan.Text != nil && !plan.Text.Weak {
+		plan.Text.Not = slices.Clone(a.excluded)
 	}
 }

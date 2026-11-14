@@ -37,6 +37,14 @@ type expectation struct {
 	Sort          string   `json:"sort"`
 	Cardinality   string   `json:"cardinality"`
 	Then          bool     `json:"then"`
+	Place         *string  `json:"place"`
+	NoPlace       bool     `json:"no_place"`
+	PagesMin      *int     `json:"pages_min"`
+	PagesMax      *int     `json:"pages_max"`
+	SecondsMin    *int     `json:"seconds_min"`
+	SecondsMax    *int     `json:"seconds_max"`
+	Exclude       []string `json:"exclude"`
+	Language      string   `json:"language"`
 }
 
 type evaluationCase struct {
@@ -132,6 +140,41 @@ func differences(result Result, want expectation) []string {
 	if want.Cardinality != "" && string(plan.Cardinality) != want.Cardinality {
 		fail("cardinality: got %q, want %q", plan.Cardinality, want.Cardinality)
 	}
+	if want.Place != nil && (plan.Place == nil || plan.Place.Name != *want.Place) {
+		fail("place: got %+v, want %q", plan.Place, *want.Place)
+	}
+	if want.NoPlace && plan.Place != nil {
+		fail("place: got %q, want none", plan.Place.Name)
+	}
+	bound := func(field string, got *Bound, min, max *int) {
+		if min == nil && max == nil {
+			return
+		}
+		if got == nil {
+			fail("%s: got none", field)
+			return
+		}
+		if min != nil && got.Min != *min {
+			fail("%s: got min %d, want %d", field, got.Min, *min)
+		}
+		if max != nil && got.Max != *max {
+			fail("%s: got max %d, want %d", field, got.Max, *max)
+		}
+	}
+	bound("pages", plan.Pages, want.PagesMin, want.PagesMax)
+	bound("seconds", plan.Seconds, want.SecondsMin, want.SecondsMax)
+	if want.Exclude != nil {
+		var got []string
+		if plan.Visual != nil {
+			got = plan.Visual.Not
+		}
+		if !slices.Equal(got, want.Exclude) {
+			fail("exclude: got %v, want %v", got, want.Exclude)
+		}
+	}
+	if want.Language != "" && (plan.Language == nil || plan.Language.Code != want.Language) {
+		fail("language: want %q", want.Language)
+	}
 	if want.Then && result.Then == nil {
 		fail("then: the second search is missing")
 	}
@@ -149,7 +192,7 @@ func differences(result Result, want expectation) []string {
 // the description. They now guard against regressions; a new measure needs
 // new sentences.
 func TestEvaluationSet(t *testing.T) {
-	for _, file := range []string{"phrases.json", "phrases_holdout.json", "phrases_unseen.json"} {
+	for _, file := range []string{"phrases.json", "phrases_holdout.json", "phrases_unseen.json", "phrases_cible.json"} {
 		t.Run(file, func(t *testing.T) {
 			data, err := os.ReadFile("testdata/" + file)
 			require.NoError(t, err)

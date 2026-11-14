@@ -84,7 +84,7 @@ func Validate(plan Plan, now time.Time, sentences ...string) []Issue {
 	}
 	if plan.Visual != nil {
 		switch {
-		case strings.TrimSpace(plan.Visual.Description) == "":
+		case strings.TrimSpace(plan.Visual.Description) == "" && len(plan.Visual.Not) == 0:
 			add("visual", IssueEmpty, "the description is empty")
 		case len([]rune(plan.Visual.Description)) > maxDescriptionLength:
 			add("visual", IssueTooLong, "the description is longer than %d characters", maxDescriptionLength)
@@ -102,7 +102,7 @@ func Validate(plan Plan, now time.Time, sentences ...string) []Issue {
 		add("people", IssueCountRange, "a count of %d people is out of range", plan.People.Value)
 	}
 	for _, f := range plan.Features {
-		if !slices.Contains([]FeatureName{FeatureCode, FeaturePortrait, FeatureSignature}, f.Name) {
+		if !slices.Contains([]FeatureName{FeatureCode, FeaturePortrait, FeatureSignature, FeatureText}, f.Name) {
 			add("features", IssueUnknownValue, "unknown feature %q", f.Name)
 		}
 	}
@@ -120,6 +120,23 @@ func Validate(plan Plan, now time.Time, sentences ...string) []Issue {
 			}
 		default:
 			add("position", IssueUnknownValue, "unknown position %q", plan.Position.Where)
+		}
+	}
+	if plan.Place != nil && strings.TrimSpace(plan.Place.Name) == "" {
+		add("place", IssueEmpty, "the place has no name")
+	}
+	for field, bound := range map[string]*Bound{"pages": plan.Pages, "seconds": plan.Seconds} {
+		switch {
+		case bound == nil:
+		case bound.Min < 0 || bound.Max < 0 || (bound.Min == 0 && bound.Max == 0):
+			add(field, IssueCountRange, "the limit is empty or negative")
+		case bound.Max > 0 && bound.Min > bound.Max:
+			add(field, IssueCountRange, "the lower limit is above the upper one")
+		}
+	}
+	if plan.Language != nil {
+		if _, known := languageNames[plan.Language.Code]; !known {
+			add("language", IssueUnknownValue, "unknown language %q", plan.Language.Code)
 		}
 	}
 	if plan.Limit < 0 || plan.Limit > maxLimit {
@@ -252,6 +269,7 @@ var featureWords = map[FeatureName][]string{
 	FeatureCode:      {"qr", "code", "codes", "barre", "barres", "flashcode"},
 	FeaturePortrait:  {"portrait", "portraits", "selfie", "selfies", "visage", "visages"},
 	FeatureSignature: {"signature", "signatures", "signé", "signée", "signés", "signées", "signe", "signee", "paraphe", "paraphes"},
+	FeatureText:      {"texte", "mot", "mots", "écrit", "écrite", "écrits", "écrites", "inscription", "inscriptions", "inscrit", "inscrite", "marqué", "marquée"},
 }
 
 // mentions reports whether the words of text include one of the justifiers,
