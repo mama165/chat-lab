@@ -64,6 +64,7 @@ Recherche : PDF · signature · texte : signature, électricité · à la fin
 | Vectors of pictures | **Stand-in.** Here a picture is described by a caption, and `WordEncoder` turns words into vectors. No vision model has run on a single picture yet. |
 | `VisualMargin`, `VisualFloor` | Placeholders: they depend on the vision model and must be calibrated with it |
 | Filling the catalog from a folder | Real: `Ingest`, tested end to end on a folder written for the test |
+| Number of faces | Real, by `scripts/count_faces.py` (YuNet): 16 faces found out of 16 on the test pictures, none on pictures without people. Nine pictures and one run: a first measure, not a benchmark. |
 | Pictures' place and date from their metadata | Not read yet: the GPS data of a picture is not extracted |
 | Video and audio duration | Not read yet: entries must carry them, as in the test library |
 | The existing pipeline (`cmd/master`) | Still stores into the older store, not into the catalog |
