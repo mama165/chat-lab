@@ -34,6 +34,7 @@ func run(args []string, in io.Reader, out io.Writer) error {
 	nowFlag := flags.String("now", "", "date used as today, as 2026-11-14 (default: the real date)")
 	asJSON := flags.Bool("json", false, "print the full plan as JSON")
 	lexiconPath := flags.String("lexicon", "", "JSON file of personal expressions added to the default lexicon")
+	candidates := flags.Bool("candidates", false, "for each line read, print the free words a model may judge, as JSON")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -58,7 +59,11 @@ func run(args []string, in io.Reader, out io.Writer) error {
 			return err
 		}
 	}
-	session := query.NewSession(query.NewParser(query.WithLexicon(lexicon)))
+	parser := query.NewParser(query.WithLexicon(lexicon))
+	if *candidates {
+		return printCandidates(parser, in, out, now)
+	}
+	session := query.NewSession(parser)
 
 	if sentence := strings.TrimSpace(strings.Join(flags.Args(), " ")); sentence != "" {
 		return answer(out, session, sentence, now, *asJSON)
@@ -114,4 +119,27 @@ func answer(out io.Writer, session *query.Session, sentence string, now time.Tim
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(turn)
+}
+
+// printCandidates writes, for each sentence read, the words of its description
+// that the rules could not judge. A language model is given these words and
+// nothing else to decide on.
+func printCandidates(parser *query.Parser, in io.Reader, out io.Writer, now time.Time) error {
+	encoder := json.NewEncoder(out)
+	encoder.SetEscapeHTML(false)
+	scanner := bufio.NewScanner(in)
+	for scanner.Scan() {
+		sentence := strings.TrimSpace(scanner.Text())
+		if sentence == "" {
+			continue
+		}
+		words := parser.Candidates(sentence, now)
+		if words == nil {
+			words = []string{}
+		}
+		if err := encoder.Encode(map[string]any{"sentence": sentence, "candidates": words}); err != nil {
+			return err
+		}
+	}
+	return scanner.Err()
 }
