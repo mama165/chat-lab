@@ -7,7 +7,9 @@
       "Bash(hf download Qwen/Qwen3-1.7B-GGUF:*)",
       "Bash(pip install rapidocr-onnxruntime:*)",
       "Bash(pip install opencv-python-headless:*)",
-      "Bash(pip install mediapipe:*)"
+      "Bash(pip install mediapipe:*)",
+      "Bash(pip install tokenizers:*)",
+      "Bash(pip install pyarrow:*)"
     ]
   }
 }
