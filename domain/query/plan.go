@@ -58,7 +58,8 @@ func (d DateRange) Contains(t time.Time) bool {
 
 // Visual is a description compared with the pictures themselves.
 type Visual struct {
-	// Description is given as is to the text encoder.
+	// Description is given as is to the text encoder. It may be empty when the
+	// user only said what is not wanted.
 	Description string `json:"description"`
 	// Not lists what the user does not want to see; it lowers a score, it never
 	// excludes a file.
@@ -153,6 +154,27 @@ type SourceFilter struct {
 	Origin Origin `json:"origin"`
 }
 
+// Place is where a picture or a video was taken: a country or a city. It
+// ranks results and never excludes a file, because many files carry no
+// location at all: those are kept, after the ones known to be at that place.
+type Place struct {
+	Name   string `json:"name"`
+	Origin Origin `json:"origin"`
+}
+
+// Bound is a numeric limit; zero means that side is open.
+type Bound struct {
+	Min    int    `json:"min,omitempty"`
+	Max    int    `json:"max,omitempty"`
+	Origin Origin `json:"origin"`
+}
+
+// Language is the language of the text of a file, as an ISO 639-1 code.
+type Language struct {
+	Code   string `json:"code"`
+	Origin Origin `json:"origin"`
+}
+
 // FeatureName is a fact computed once, when a file is indexed.
 type FeatureName string
 
@@ -163,6 +185,8 @@ const (
 	FeaturePortrait FeatureName = "portrait"
 	// FeatureSignature is a signature, handwritten or electronic.
 	FeatureSignature FeatureName = "signature"
+	// FeatureText is readable text in a picture, whatever it says.
+	FeatureText FeatureName = "text"
 )
 
 // Feature is a required or preferred fact about a file.
@@ -212,8 +236,14 @@ type Plan struct {
 	Duration     *Hint         `json:"duration,omitempty"`
 	Position     *PositionHint `json:"position,omitempty"`
 	Source       *SourceFilter `json:"source,omitempty"`
-	Sort         Sort          `json:"sort"`
-	Cardinality  Cardinality   `json:"cardinality"`
+	Place        *Place        `json:"place,omitempty"`
+	// Pages bounds the number of pages of a document.
+	Pages *Bound `json:"pages,omitempty"`
+	// Seconds bounds the duration of a video or a recording.
+	Seconds     *Bound      `json:"seconds,omitempty"`
+	Language    *Language   `json:"language,omitempty"`
+	Sort        Sort        `json:"sort"`
+	Cardinality Cardinality `json:"cardinality"`
 	// Limit is the number of results asked for ("les trois dernières vidéos");
 	// zero means no limit was given.
 	Limit int `json:"limit,omitempty"`
@@ -233,7 +263,8 @@ func (p Plan) HasFeature(name FeatureName) bool {
 func (p Plan) IsEmpty() bool {
 	return len(p.Kinds) == 0 && p.Date == nil && len(p.ExcludeDates) == 0 &&
 		p.Visual == nil && p.Text == nil && p.People == nil && len(p.Features) == 0 &&
-		p.Size == nil && p.Duration == nil && p.Position == nil && p.Source == nil
+		p.Size == nil && p.Duration == nil && p.Position == nil && p.Source == nil &&
+		p.Place == nil && p.Pages == nil && p.Seconds == nil && p.Language == nil
 }
 
 // Clone returns a deep copy, so that refining a plan never alters the previous one.
@@ -249,6 +280,10 @@ func (p Plan) Clone() Plan {
 	c.Duration = clonePtr(p.Duration)
 	c.Position = clonePtr(p.Position)
 	c.Source = clonePtr(p.Source)
+	c.Place = clonePtr(p.Place)
+	c.Pages = clonePtr(p.Pages)
+	c.Seconds = clonePtr(p.Seconds)
+	c.Language = clonePtr(p.Language)
 	if p.Visual != nil {
 		v := *p.Visual
 		v.Not = slices.Clone(p.Visual.Not)
@@ -317,6 +352,18 @@ func (p Plan) criteria() []criterion {
 	}
 	if p.Source != nil {
 		out = append(out, criterion{"source", p.Source.Origin})
+	}
+	if p.Place != nil {
+		out = append(out, criterion{"place", p.Place.Origin})
+	}
+	if p.Pages != nil {
+		out = append(out, criterion{"pages", p.Pages.Origin})
+	}
+	if p.Seconds != nil {
+		out = append(out, criterion{"seconds", p.Seconds.Origin})
+	}
+	if p.Language != nil {
+		out = append(out, criterion{"language", p.Language.Origin})
 	}
 	return out
 }

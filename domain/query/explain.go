@@ -40,6 +40,9 @@ func (p Plan) Chips() []Chip {
 			add("source", "reçu par messagerie")
 		}
 	}
+	if p.Place != nil {
+		add("place", "lieu : "+p.Place.Name)
+	}
 	if p.Date != nil {
 		add("date", p.Date.Label)
 	}
@@ -54,10 +57,14 @@ func (p Plan) Chips() []Chip {
 			add("features", "portrait")
 		case FeatureSignature:
 			add("features", "signature")
+		case FeatureText:
+			add("features", "contient du texte")
 		}
 	}
 	if p.Visual != nil {
-		add("visual", "image : "+p.Visual.Description)
+		if p.Visual.Description != "" {
+			add("visual", "image : "+p.Visual.Description)
+		}
 		for _, not := range p.Visual.Not {
 			add("visual", "sans "+not)
 		}
@@ -90,14 +97,27 @@ func (p Plan) Chips() []Chip {
 			add("people", fmt.Sprintf("%d %s", p.People.Value, noun))
 		}
 	}
-	if p.Size != nil {
+	if p.Language != nil {
+		name, ok := languageNames[p.Language.Code]
+		if !ok {
+			name = p.Language.Code
+		}
+		add("language", "en "+name)
+	}
+	if p.Pages != nil {
+		add("pages", boundLabel(*p.Pages, "page", "pages"))
+	}
+	if p.Seconds != nil {
+		add("seconds", durationLabel(*p.Seconds))
+	}
+	if p.Size != nil && p.Pages == nil {
 		if p.Size.Level == LevelLarge {
 			add("size", "volumineux")
 		} else {
 			add("size", "léger")
 		}
 	}
-	if p.Duration != nil {
+	if p.Duration != nil && p.Seconds == nil {
 		if p.Duration.Level == LevelLarge {
 			add("duration", "longue durée")
 		} else {
@@ -141,4 +161,42 @@ func (p Plan) Summary() string {
 		labels[i] = c.Label
 	}
 	return strings.Join(labels, " · ")
+}
+
+var languageNames = map[string]string{
+	"fr": "français", "en": "anglais", "de": "allemand", "es": "espagnol", "it": "italien",
+	"pt": "portugais", "nl": "néerlandais", "zh": "chinois", "ja": "japonais", "ar": "arabe",
+}
+
+func plural(n int, one, many string) string {
+	if n > 1 {
+		return fmt.Sprintf("%d %s", n, many)
+	}
+	return fmt.Sprintf("%d %s", n, one)
+}
+
+func boundLabel(b Bound, one, many string) string {
+	switch {
+	case b.Min > 0 && b.Min == b.Max:
+		return plural(b.Min, one, many)
+	case b.Min > 0 && b.Max > 0:
+		return fmt.Sprintf("de %d à %s", b.Min, plural(b.Max, one, many))
+	case b.Min > 0:
+		return "plus de " + plural(b.Min, one, many)
+	default:
+		return "moins de " + plural(b.Max, one, many)
+	}
+}
+
+// durationLabel words a bound in seconds with the largest unit that fits.
+func durationLabel(b Bound) string {
+	unit, one, many := 1, "seconde", "secondes"
+	whole := func(size int) bool { return b.Min%size == 0 && b.Max%size == 0 }
+	switch {
+	case whole(3600):
+		unit, one, many = 3600, "heure", "heures"
+	case whole(60):
+		unit, one, many = 60, "minute", "minutes"
+	}
+	return boundLabel(Bound{Min: b.Min / unit, Max: b.Max / unit}, one, many)
 }
