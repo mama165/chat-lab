@@ -16,6 +16,8 @@ import (
 //
 //	{"sentence": "...", "plan": {...}}     plan written by a language model, as JSON
 //	{"sentence": "...", "rules": true}     the plan of the rules (baseline)
+//	{"sentence": "...", "rules": true, "drop": ["mot"]}
+//	                                       the rules, minus words a model judged to be noise
 //
 // Each plan goes through ParseJSON, which refuses anything untraceable, and the
 // fields of the reference that the plan format knows are compared. Fields the
@@ -49,6 +51,7 @@ func TestBenchmark(t *testing.T) {
 		var line struct {
 			Sentence string          `json:"sentence"`
 			Rules    bool            `json:"rules"`
+			Drop     []string        `json:"drop"`
 			Plan     json.RawMessage `json:"plan"`
 			Seconds  float64         `json:"seconds"`
 		}
@@ -65,7 +68,7 @@ func TestBenchmark(t *testing.T) {
 		var plan Plan
 		var issues []Issue
 		if line.Rules {
-			plan = parser.Parse(line.Sentence, testNow).Plan
+			plan = parser.ParseDropping(line.Sentence, testNow, line.Drop).Plan
 		} else {
 			plan, issues, err = ParseJSON(line.Plan, testNow, line.Sentence)
 			if err != nil {
@@ -118,7 +121,8 @@ var knownWant = map[string]bool{
 	"weak_text": true, "no_text": true, "date": true, "no_date": true, "people": true,
 	"people_at_least": true, "features": true, "size": true, "no_size": true,
 	"duration": true, "position": true, "source": true, "sort": true,
-	"cardinality": true, "then": true,
+	"cardinality": true, "then": true, "place": true, "no_place": true, "pages_min": true,
+	"pages_max": true, "seconds_min": true, "seconds_max": true, "exclude": true, "language": true,
 }
 
 func loadReference(t *testing.T, path string) map[string]referenceEntry {
