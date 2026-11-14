@@ -35,6 +35,12 @@ A criterion that relies on exact metadata filters. A criterion that a model judg
 - **What is not wanted** removes a file when it can be told: the file shows the excluded thing more than the wanted one.
 - **When nothing matches**, the plan is loosened one filter at a time (source, then period) and the answer says which. The kind of file is never dropped.
 
+## Filling it from a folder
+
+`Ingest` brings the catalog in line with a folder: new and changed files are read, unchanged ones (same size, same modification time) are skipped, and entries of files that disappeared are removed. Documents are read page by page with `pdftotext`; a picture must be a valid image. The source of a file (download, chat, screenshot) is taken from its folder.
+
+`e2e/carnet` tests the whole path on a real folder, written to disk for the test: a first pass, a second one that reads nothing again, a restart, a replaced file and a removed one.
+
 ## Trying it
 
 ```bash
@@ -57,7 +63,10 @@ Recherche : PDF · signature · texte : signature, électricité · à la fin
 | Filters, words, pages, excerpts, ranking, loosening, storage on disk | Real, tested |
 | Vectors of pictures | **Stand-in.** Here a picture is described by a caption, and `WordEncoder` turns words into vectors. No vision model has run on a single picture yet. |
 | `VisualMargin`, `VisualFloor` | Placeholders: they depend on the vision model and must be calibrated with it |
-| Filling the catalog from real files | Not written: the existing pipeline still stores into the older store |
+| Filling the catalog from a folder | Real: `Ingest`, tested end to end on a folder written for the test |
+| Pictures' place and date from their metadata | Not read yet: the GPS data of a picture is not extracted |
+| Video and audio duration | Not read yet: entries must carry them, as in the test library |
+| The existing pipeline (`cmd/master`) | Still stores into the older store, not into the catalog |
 | Place names | The entry must hold the country and the city in French; turning GPS coordinates into names is not written |
 
 ## Speed

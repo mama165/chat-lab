@@ -115,6 +115,7 @@ func (p *Parser) analyze(sentence string, now time.Time, noise []string) *analys
 	}
 	a.extractPosition()
 	a.extractSource()
+	a.extractAllFiles()
 	a.extractKinds()
 	a.extractPlace(p.places)
 	a.extractLanguage()
@@ -699,6 +700,36 @@ func (a *analysis) extractBounds() {
 		use(a.toks, i, length)
 		i += length - 1
 	}
+}
+
+// allFiles reads "tous les fichiers", "toute la bibliothèque": no kind is
+// asked for, so every kind is.
+var allFiles = compileAll(
+	"tous les fichiers",
+	"tous les documents",
+	"tous les elements",
+	"tous mes fichiers",
+	"tous mes documents",
+	"toute la bibliotheque",
+	"toute ma bibliotheque",
+	"tout ma bibliotheque",
+	"l ensemble de mes fichiers",
+	"l ensemble des fichiers",
+)
+
+// extractAllFiles gives a request for the whole library a plan, since a plan
+// with no criterion is refused: every kind of file is asked for.
+func (a *analysis) extractAllFiles() {
+	if len(a.plan.Kinds) > 0 {
+		return
+	}
+	a.scan(allFiles, func(_, i, length int) bool {
+		a.plan.Kinds = slices.Clone(AllKinds)
+		origin := a.origin2(i, length, "all-files")
+		a.plan.KindsOrigin = &origin
+		a.plan.Cardinality = CardinalityAll
+		return true
+	})
 }
 
 var everythingPatterns = compileAll(

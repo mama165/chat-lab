@@ -304,3 +304,14 @@ func (c *Catalog) Close() error {
 	defer c.mu.Unlock()
 	return firstError(c.flush(), c.writer.Close())
 }
+
+// All returns every entry, in no particular order.
+func (c *Catalog) All() []Item {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]Item, 0, len(c.items))
+	for _, item := range c.items {
+		out = append(out, *item)
+	}
+	return out
+}
