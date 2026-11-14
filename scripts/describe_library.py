@@ -8,7 +8,10 @@ Nothing is labelled by hand. For every picture the script computes:
   - the number of faces, with the YuNet detector;
   - the text visible in the picture, with RapidOCR;
   - the contents of QR codes, with OpenCV;
-  - the date it was taken and its GPS position, from its EXIF data.
+
+The date of a file is the date of the file itself (when it joined the library,
+or last changed): that is the date the phone holds for every file, and the one
+searches use. The date a picture was taken and its GPS position are not read.
 
 Documents are read page by page with pdftotext. The output is a JSON list of
 entries, the format `cmd/query -library` reads.
@@ -29,7 +32,7 @@ import sys
 
 import numpy as np
 import onnxruntime as ort
-from PIL import ExifTags, Image, ImageOps
+from PIL import Image, ImageOps
 
 ort.disable_telemetry_events()
 
@@ -165,37 +168,6 @@ def read_codes(image):
     return [text for text in (texts if found else []) if text]
 
 
-def exif_facts(image):
-    """Return the date a picture was taken and its GPS position, when it says so."""
-    facts = {}
-    try:
-        exif = image.getexif()
-    except Exception:  # a damaged EXIF block is not a reason to drop the picture
-        return facts
-    details = exif.get_ifd(ExifTags.IFD.Exif)
-    taken = details.get(ExifTags.Base.DateTimeOriginal) or exif.get(ExifTags.Base.DateTime)
-    if taken:
-        try:
-            when = datetime.datetime.strptime(str(taken), "%Y:%m:%d %H:%M:%S")
-            facts["taken_at"] = when.replace(tzinfo=datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-        except ValueError:
-            pass
-    gps = exif.get_ifd(ExifTags.IFD.GPSInfo)
-
-    def degrees(value, reference):
-        d, m, s = (float(x) for x in value)
-        sign = -1 if reference in ("S", "W") else 1
-        return sign * (d + m / 60 + s / 3600)
-
-    try:
-        if ExifTags.GPS.GPSLatitude in gps and ExifTags.GPS.GPSLongitude in gps:
-            facts["latitude"] = round(degrees(gps[ExifTags.GPS.GPSLatitude], gps.get(ExifTags.GPS.GPSLatitudeRef, "N")), 6)
-            facts["longitude"] = round(degrees(gps[ExifTags.GPS.GPSLongitude], gps.get(ExifTags.GPS.GPSLongitudeRef, "E")), 6)
-    except (TypeError, ValueError, ZeroDivisionError):
-        pass
-    return facts
-
-
 def pdf_pages(path):
     info = subprocess.run(["pdfinfo", path], capture_output=True, text=True, check=True).stdout
     count = next((int(line.split(":")[1]) for line in info.splitlines() if line.startswith("Pages:")), 0)
@@ -240,7 +212,6 @@ def describe(root, encoder, faces, reader, setting=None):
             try:
                 if kind == "image":
                     with Image.open(path) as opened:
-                        entry.update(exif_facts(opened))
                         image = flatten(ImageOps.exif_transpose(opened))
                         vector = encoder.encode(image)
                         entry["vectors"] = [[round(float(x), 6) for x in vector]]
