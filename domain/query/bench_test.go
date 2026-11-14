@@ -70,7 +70,7 @@ func TestBenchmark(t *testing.T) {
 			plan, issues, err = ParseJSON(line.Plan, testNow, line.Sentence)
 			if err != nil {
 				refused++
-				t.Logf("refused %q: %v", line.Sentence, issues)
+				t.Logf("refused %q: %v %v", line.Sentence, err, issues)
 				continue
 			}
 		}

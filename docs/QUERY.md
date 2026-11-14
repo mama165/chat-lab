@@ -89,6 +89,18 @@ A plan that invents a criterion is refused by `ParseJSON` and counted apart. Cri
 
 Baseline on the reference set, rules only: **15 of 37 fully right (41 %)**, not tuned on this set.
 
+First results with small Qwen3 models, run locally on CPU with `scripts/query_model_bench.py` (the output is constrained by a JSON schema):
+
+| Source | Fully right | Refused as invented | Mean time |
+|---|---|---|---|
+| Rules | 15 / 37 (41 %) | 0 | 50 µs |
+| Qwen3 0.6B, Q8 | 0 / 37 | 36 | 6.6 s |
+| Qwen3 1.7B, Q8 | 4 / 37 (11 %) | 19 | 8.0 s |
+
+What the models get wrong: they invent features (a QR code becomes a "signature" and a "portrait"), they miscompute dates (« les 6 derniers mois » taken from the wrong day), and they leave search words empty. The check caught the invented criteria: a feature must now be named by its own words, not only by a word said somewhere in the sentence.
+
+A model on its own is not yet better than the rules. The next step is to combine them: rules first, the model only where the rules cannot decide.
+
 ## Limits
 
 - French only.
