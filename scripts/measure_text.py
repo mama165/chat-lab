@@ -4,7 +4,9 @@ TextOCR_OCR (Hugging Face dataset MiXaiLL76/TextOCR_OCR, licence MIT) holds
 14 669 small pictures of single words cut out of photographs, with the word
 written under each. Nobody here labelled anything.
 
-    python scripts/measure_text.py PARQUET [--sample N]
+    python scripts/measure_text.py PARQUET [--sample N] [--det MODEL.onnx] [--rec MODEL.onnx]
+
+--det and --rec replace the models of the engine, to compare them on the same words.
 
 This measures the *reading* of a word that has already been found, not the
 finding of text in a whole photograph: it is the easier half. What a search
@@ -17,6 +19,7 @@ import io
 import json
 import random
 import sys
+import time
 import unicodedata
 
 import numpy as np
@@ -51,7 +54,12 @@ def main(argv):
     if sample and sample < len(rows):
         random.Random(1).shuffle(rows)
         rows = rows[:sample]
-    ocr = RapidOCR()
+    options = {}
+    for flag, key in (("--det", "det_model_path"), ("--rec", "rec_model_path")):
+        if flag in argv:
+            options[key] = argv[argv.index(flag) + 1]
+    ocr = RapidOCR(**options)
+    started = time.perf_counter()
 
     exact = close = silent = evaluated = 0
     errors = characters = 0
@@ -80,6 +88,7 @@ def main(argv):
         "read_within_one_letter_in_five": round(close / evaluated, 3),
         "nothing_read": round(silent / evaluated, 3),
         "character_error_rate": round(errors / characters, 3),
+        "seconds_per_word": round((time.perf_counter() - started) / evaluated, 3),
     }, indent=1))
     return 0
 
