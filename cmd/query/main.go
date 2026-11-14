@@ -132,7 +132,7 @@ type assistant struct {
 	// the defaults of the catalog.
 	margin, floor float32
 	now           time.Time
-	asJSON  bool
+	asJSON        bool
 	// shown is the number of results already listed for the current search.
 	shown int
 	last  []catalog.Hit
