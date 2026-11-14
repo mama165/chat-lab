@@ -2,7 +2,7 @@
 
 The `domain/query` package translates a free French sentence into a `Plan`: what kind of file, from when, showing what, containing which words. It uses rules only. It needs no model, no network and no phone, and it answers in microseconds.
 
-The plan is not executed against the index yet: this package is the first step, the one that can be written and tested on its own.
+A plan is executed by the catalog: see [CATALOG.md](CATALOG.md).
 
 ```mermaid
 graph LR
@@ -14,7 +14,7 @@ graph LR
     V --> P
     T --> P
     P --> C["Validate"]
-    C --> X["Search engine (to come)"]
+    C --> X["Catalog"]
 ```
 
 ## What is read by rules
