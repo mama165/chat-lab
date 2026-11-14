@@ -77,6 +77,18 @@ Every criterion records the words it comes from (`origin`). `Validate` refuses a
 
 A new measure needs new sentences: add them to a new file before changing any rule.
 
+### Measuring a language model
+
+`TestBenchmark` scores any source of plans against the owner's reference set (`testdata/phrases_cible.json`). Each line of its input is a sentence with the plan a model wrote for it, or the rules' own plan as a baseline:
+
+```bash
+QUERY_BENCH=run.jsonl go test ./domain/query/ -run TestBenchmark -v
+```
+
+A plan that invents a criterion is refused by `ParseJSON` and counted apart. Criteria the plan format cannot hold yet (place, page count, exclusions) are counted apart too, so a score is never flattered by what cannot be read.
+
+Baseline on the reference set, rules only: **15 of 37 fully right (41 %)**, not tuned on this set.
+
 ## Limits
 
 - French only.
