@@ -246,9 +246,16 @@ func (c *Catalog) searchOnce(ctx context.Context, plan query.Plan, opts Options)
 		hit := Hit{Item: *cand.item, Page: cand.page, Beyond: cand.beyond, Notes: cand.notes, Score: cand.score}
 		if plan.Text != nil {
 			docID := fileDocID(cand.item.ID)
-			if cand.page > 0 {
-				docID = pageDocID(cand.item.ID, cand.page)
+			page := cand.page
+			// A document found by its name has no page with the words: its
+			// first page stands for it.
+			if page == 0 && cand.item.Kind == query.KindPDF && cand.item.PageCount > 0 {
+				page = 1
 			}
+			if page > 0 {
+				docID = pageDocID(cand.item.ID, page)
+			}
+			hit.Page = page
 			hit.Excerpt = excerpt(storedBody(ctx, reader, docID), plan.Text)
 		}
 		results.Hits = append(results.Hits, hit)
