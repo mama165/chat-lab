@@ -1,0 +1,22 @@
+[
+  {"sentence": "je cherche la facture free du mois de mai", "want": {"terms": ["facture", "free"], "date": ["2026-05-01", "2026-06-01"]}},
+  {"sentence": "t'as une photo de la voiture rouge garée devant la maison", "want": {"kinds": ["image"], "visual": "la voiture rouge garée devant la maison"}},
+  {"sentence": "les trois dernières vidéos", "want": {"kinds": ["video"], "sort": "newest", "no_visual": true}},
+  {"sentence": "un pdf de plus de 50 pages", "want": {"kinds": ["pdf"], "size": "large", "no_text": true}},
+  {"sentence": "photo de mon passeport", "want": {"kinds": ["image"], "visual": "mon passeport"}},
+  {"sentence": "vidéos du concert de samedi dernier", "want": {"kinds": ["video"], "visual": "concert", "date": ["2026-11-07", "2026-11-08"]}},
+  {"sentence": "le certificat de scolarité de cette année", "want": {"terms": ["certificat", "scolarité"], "date": ["2026-01-01", "2026-11-15"]}},
+  {"sentence": "une photo avec un panneau stop", "want": {"kinds": ["image"], "visual": "un panneau stop"}},
+  {"sentence": "le mail de confirmation de la réservation d'hôtel en pdf", "want": {"kinds": ["pdf"], "terms": ["mail", "confirmation", "réservation", "hôtel"]}},
+  {"sentence": "montre les photos de l'année 2022 à la montagne", "want": {"kinds": ["image"], "date": ["2022-01-01", "2023-01-01"], "visual": "la montagne"}},
+  {"sentence": "une vidéo de moins de 30 secondes avec mon chien", "want": {"kinds": ["video"], "duration": "small", "visual": "mon chien"}},
+  {"sentence": "le dernier relevé de compte", "want": {"terms": ["relevé de compte"], "sort": "newest"}},
+  {"sentence": "photos où on est quatre devant un gâteau", "want": {"kinds": ["image"], "people": 4}},
+  {"sentence": "retrouve moi ce pdf avec un tableau de prix à la deuxième page", "want": {"kinds": ["pdf"], "terms": ["tableau", "prix"]}},
+  {"sentence": "des images de coucher de soleil sur la mer", "want": {"kinds": ["image"], "visual": "coucher de soleil sur la mer"}},
+  {"sentence": "le document signé par le propriétaire", "want": {"kinds": ["pdf"], "features": ["signature"], "terms": ["signé", "propriétaire"]}},
+  {"sentence": "une capture où il y a marqué erreur 404", "want": {"terms": ["erreur", "404"], "scope": "written"}},
+  {"sentence": "les factures d'eau de 2025", "want": {"terms": ["facture", "eau"], "date": ["2025-01-01", "2026-01-01"]}},
+  {"sentence": "la photo de classe de ma fille", "want": {"kinds": ["image"], "visual": "classe de ma fille"}},
+  {"sentence": "vidéo de la plage, pas trop longue", "want": {"kinds": ["video"], "visual": "la plage", "duration": "small"}}
+]

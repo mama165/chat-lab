@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install llama-cpp-python:*)",
+      "Bash(pip install huggingface_hub:*)",
+      "Bash(hf download Qwen/Qwen3-0.6B-GGUF:*)",
+      "Bash(hf download Qwen/Qwen3-1.7B-GGUF:*)",
+      "Bash(pip install rapidocr-onnxruntime:*)",
+      "Bash(pip install opencv-python-headless:*)",
+      "Bash(pip install mediapipe:*)"
+    ]
+  }
+}
