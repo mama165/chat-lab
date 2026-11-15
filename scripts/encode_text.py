@@ -19,7 +19,9 @@ import sys
 
 import numpy as np
 import onnxruntime as ort
-from tokenizers import Tokenizer
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from bpe_pure import PureTokenizer  # noqa: E402
 
 ort.disable_telemetry_events()
 
@@ -30,15 +32,12 @@ class TextEncoder:
     def __init__(self, model_dir, full=False, name=None):
         name = name or ("text_model.onnx" if full else "text_model_quantized.onnx")
         self.session = ort.InferenceSession(os.path.join(model_dir, "onnx", name), providers=["CPUExecutionProvider"])
-        # The tokenizer file already pads to 64 tokens and ends with <eos>,
-        # as the model was trained.
-        self.tokenizer = Tokenizer.from_file(os.path.join(model_dir, "tokenizer.json"))
-        self.tokenizer.enable_truncation(max_length=64)
+        # Pure Python tokenizer: the same ids as the `tokenizers` package
+        # (checked on the public descriptions), and no package to build on Termux.
+        self.tokenizer = PureTokenizer(os.path.join(model_dir, "tokenizer.json"), max_length=64)
 
     def encode_many(self, texts):
-        # The model was trained on lower-case text.
-        encoded = self.tokenizer.encode_batch([text.lower() for text in texts])
-        ids = np.array([e.ids for e in encoded], dtype=np.int64)
+        ids = np.array([self.tokenizer.encode(text) for text in texts], dtype=np.int64)
         outputs = self.session.run(["pooler_output"], {"input_ids": ids})[0]
         return outputs / np.linalg.norm(outputs, axis=1, keepdims=True)
 
