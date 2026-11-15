@@ -7,7 +7,7 @@ Nothing about a picture is labelled by hand. When a folder is read, each picture
 | What it shows (a vector) | SigLIP 2 base, 224 pixels, image side | Apache 2.0 | 372 MB |
 | Indoors or outdoors | The same model, compared with two sentences | — | — |
 | Number of faces | YuNet (OpenCV) | Apache 2.0 | 0.2 MB |
-| Text visible in it | RapidOCR | Apache 2.0 | in the package |
+| Text visible in it | RapidOCR (PP-OCR); three readings on a page of text, one on a photograph | Apache 2.0 | in the package |
 | QR codes | OpenCV | Apache 2.0 | in the package |
 | Date taken, GPS position | The picture's EXIF data | — | — |
 
@@ -74,6 +74,9 @@ Each part was measured on a public benchmark, with nothing labelled here. Every 
 | Counting faces | The same, photographs whose faces are all 40 px or more | 1 971 photographs | Exact 77 %, within one 94.5 % |
 | Indoors or outdoors | IndoorOutdoorNet-20K | 2 000 photographs drawn at random | Answers 93 % of the time; right 99.4 % of the time when it answers; wrong way 0.5 % |
 | Reading words | TextOCR, words cut out of photographs | 1 986 words | Read exactly 47.5 %, within one letter in five 60.7 %, nothing read 24 % |
+| Reading a whole page: screenshots | WebSight, web pages with their HTML | 54 pages, 1 345 words | **92.6 %** of the words found; 85 % of pages have nine words in ten found; 1.9 s per page |
+| Reading a whole page: scanned forms | FUNSD, forms marked by hand | 50 forms, 4 202 words | **76.5 %** of the words found; 3.3 s per page |
+| Text page or scene | The two above against IndoorOutdoorNet photographs | 170 pages, 300 photographs | Told apart almost perfectly: 99 % of web pages and 100 % of forms recognised, 0.7 % of scenes mistaken for text |
 | Reading words, other models | The same, 598 words for each | 598 words | PP-OCRv3 48.7 %, PP-OCRv4 mobile 49.8 %, PP-OCRv3 English reader 49.8 %. PP-OCRv4 server (200 MB) did not finish in 30 minutes: too slow to use. |
 
 What these numbers say:
@@ -81,14 +84,16 @@ What these numbers say:
 - **Finding a photograph from a description** works: this is the core of the search.
 - **Counting people from faces is approximate by nature**: right to the unit three times in four, to within one nineteen times in twenty, on a hard benchmark with crowds. That is why a search accepts a face more or less, and ranks the exact number first.
 - **Indoors or outdoors** is reliable enough to filter on, because it prefers to say nothing rather than guess.
+- **Reading text on pages is good where there is matter.** Screenshots of web pages: nine words in ten are found. Scanned forms, poor scans with handwriting: three in four. A search for a word on a page finds it nearly every time on a screenshot.
+- **Three readings are worth their cost on a page, not on a photograph.** Reading a page three ways (as is with a margin, in contrast, inverted) raises the words found from 81 to 91 % on screenshots and from 63 to 74 % on forms, at three times the time. The vision model tells a page of text from a photograph of a place or of people almost perfectly, so pages are read three ways and photographs once.
 - **Reading text in photographs of real scenes is the weak part.** Signs, shop fronts, curved or tiny lettering: about half the words are read, with every model of this family that can run on a phone. The version of the model changes little (one point); the benchmark is what is hard. The benchmark is hard and made of natural scenes; screenshots, posters and documents are easier, and were not measured. Text that is not read cannot be found.
 
-WIDER FACE is licensed CC BY-NC-ND: it was read only to measure, from the archive, and is not copied anywhere. The three scripts that measure are `measure_retrieval.py`, `measure_faces.py`, `measure_setting.py` and `measure_text.py`.
+WIDER FACE is licensed CC BY-NC-ND: it was read only to measure, from the archive, and is not copied anywhere. The three scripts that measure are `measure_retrieval.py`, `measure_faces.py`, `measure_setting.py`, `measure_text.py` (words) and `measure_pages.py` (whole pages).
 
 ## Not measured
 
 - Anything on a phone: speed, memory, heat.
-- Text in screenshots, posters and documents: only the harder case, natural scenes, was measured.
+- Screenshots of phone applications and photographs of paper documents: web pages and scanned forms stand in for them.
 - Whole photographs for text: the benchmark gives words already cut out, so the finding of text in a photograph is not measured.
 - The image side in 16 or 8 bits.
 - Videos: the model is the same, one vector per sampled frame, but no video has been read.

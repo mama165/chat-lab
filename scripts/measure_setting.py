@@ -7,7 +7,7 @@ prithivMLmods/IndoorOutdoorNet-20K. Nobody here labelled anything.
     python scripts/measure_setting.py MODELS/siglip2 PARQUET [--sample N]
 
 Each photograph goes through exactly the judgement the catalog uses (see
-SettingJudge in describe_library.py), which may answer "indoor", "outdoor" or
+ImageJudge in describe_library.py), which may answer "indoor", "outdoor" or
 nothing at all when the picture is too ambiguous. Three numbers matter:
 
   - how often it answers at all;
@@ -30,7 +30,7 @@ import pyarrow.parquet as pq
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from describe_library import ImageEncoder, SettingJudge, flatten  # noqa: E402
+from describe_library import ImageEncoder, ImageJudge, flatten  # noqa: E402
 
 INDOOR, OUTDOOR = 0, 1
 
@@ -43,7 +43,7 @@ def main(argv):
     if sample and sample < len(rows):
         random.Random(1).shuffle(rows)
         rows = rows[:sample]
-    encoder, judge = ImageEncoder(model_dir), SettingJudge(model_dir)
+    encoder, judge = ImageEncoder(model_dir), ImageJudge(model_dir)
 
     # [truth][answer]: answer is 0 indoor, 1 outdoor, 2 nothing
     table = np.zeros((2, 3), dtype=int)

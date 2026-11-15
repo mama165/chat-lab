@@ -63,26 +63,42 @@ class ImageEncoder:
         return (vector / np.linalg.norm(vector)).astype(np.float32)
 
 
-class SettingJudge:
-    """Says whether a picture was taken indoors or outdoors.
+class ImageJudge:
+    """Judges a picture from its vector, with no extra model.
 
-    No extra model: the picture's vector is compared with the vectors of two
-    sentences, with the text side of the same model. When the two are too
-    close to call, nothing is said rather than a guess recorded as a fact.
+    The vector is compared with the vectors of a few sentences, written with
+    the text side of the same model.
+
+    Indoors or outdoors: when the two are too close to call, nothing is said
+    rather than a guess recorded as a fact.
+
+    Page of text: a screenshot or a scanned document is told from a photograph
+    of a place or of people, so that the costly reading of text is spent where
+    it pays. On public benchmarks the two are separated almost perfectly (see
+    docs/VISION.md).
     """
 
     INDOOR = "une photo prise à l'intérieur, dans une pièce"
     OUTDOOR = "une photo prise à l'extérieur, en plein air"
     # A poster, a screenshot or a scanned page is neither.
     NOT_A_SCENE = "une affiche, un document ou une capture d'écran avec du texte"
+    TEXT_PAGE = "une page avec beaucoup de texte"
+    SCENE = "une photo d'un lieu ou de personnes"
     MIN_GAP = 0.01
+    # Measured: pages of text score above this, scenes below.
+    TEXT_PAGE_THRESHOLD = -0.017
 
     def __init__(self, model_dir):
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from encode_text import TextEncoder
 
         encoder = TextEncoder(model_dir, full=True)
-        self.indoor, self.outdoor, self.flat = encoder.encode_many([self.INDOOR, self.OUTDOOR, self.NOT_A_SCENE])
+        self.indoor, self.outdoor, self.flat, self.page, self.scene = encoder.encode_many(
+            [self.INDOOR, self.OUTDOOR, self.NOT_A_SCENE, self.TEXT_PAGE, self.SCENE]
+        )
+
+    def is_text_page(self, vector):
+        return float(vector @ self.page - vector @ self.scene) >= self.TEXT_PAGE_THRESHOLD
 
     def indoor_or_none(self, vector):
         indoor, outdoor, flat = (float(vector @ v) for v in (self.indoor, self.outdoor, self.flat))
@@ -128,19 +144,21 @@ class TextReader:
     word missed cannot be found.
     """
 
-    def __init__(self):
+    def __init__(self, passes=3):
         from rapidocr_onnxruntime import RapidOCR
 
         self.ocr = RapidOCR()
+        self.passes = passes
 
-    def read(self, image):
+    def read(self, image, passes=None):
+        passes = passes or self.passes
         image = flatten(image)
         grey = ImageOps.autocontrast(image.convert("L")).convert("RGB")
         variants = [
             ImageOps.expand(image, border=60, fill=image.getpixel((2, 2))),
             grey,
             ImageOps.invert(grey),
-        ]
+        ][:passes]
         words, seen = [], set()
         for variant in variants:
             result, _ = self.ocr(np.asarray(variant)[:, :, ::-1])
@@ -222,7 +240,9 @@ def describe(root, encoder, faces, reader, setting=None):
                         if faces is not None:
                             entry["faces"], entry["portrait"] = faces.faces(image)
                         if reader is not None:
-                            text = reader.read(image)
+                            # Pages of text are read three ways; photographs once, which
+                            # is enough to catch a sign and three times cheaper.
+                            text = reader.read(image, passes=3 if setting.is_text_page(vector) else 1)
                             if text:
                                 entry["text"] = text
                         codes = read_codes(image)
@@ -249,7 +269,7 @@ def main(argv=None):
     encoder = ImageEncoder(args.siglip)
     faces = FaceCounter(args.yunet) if args.yunet else None
     reader = None if args.no_text else TextReader()
-    entries, skipped = describe(args.folder, encoder, faces, reader, SettingJudge(args.siglip))
+    entries, skipped = describe(args.folder, encoder, faces, reader, ImageJudge(args.siglip))
     with open(args.output, "w", encoding="utf-8") as out:
         json.dump(entries, out, ensure_ascii=False)
     print(f"{len(entries)} fichiers décrits, {len(skipped)} ignorés", file=sys.stderr)
