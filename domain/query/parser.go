@@ -744,7 +744,9 @@ func (a *analysis) extractAllFiles() {
 }
 
 var (
-	indoorPatterns  = compileAll("en interieur", "a l interieur", "d interieur", "de l interieur", "dedans")
+	// "dedans" is not here: in "une cuillère dedans" it says where a spoon is,
+	// not where the picture was taken.
+	indoorPatterns  = compileAll("en interieur", "a l interieur", "d interieur", "de l interieur")
 	outdoorPatterns = compileAll("en exterieur", "a l exterieur", "d exterieur", "de l exterieur", "dehors", "en plein air")
 )
 
@@ -803,13 +805,14 @@ func (a *analysis) extractWritten() {
 var (
 	personNouns = wordSet("personne personnes gens homme hommes femme femmes enfant enfants bebe bebes fille filles " +
 		"garcon garcons monsieur messieurs dame dames ami amis amie amies copain copains copine copines adulte adultes " +
-		"visage visages tete tetes individu individus mec mecs gars invite invites collegue collegues")
+		"visage visages individu individus mec mecs gars invite invites collegue collegues")
 	pairNouns  = wordSet("couple couples")
 	groupNouns = wordSet("famille groupe foule equipe bande")
 )
 
 // genericPeople name people without describing them.
-var genericPeople = wordSet("personne personnes gens individu individus visage visages tete tetes")
+// A head can be a sculpture: only people and faces are counted.
+var genericPeople = wordSet("personne personnes gens individu individus visage visages")
 
 // peopleCount reads a count of people starting at word i, where a number n
 // spanning length words was read. It returns the range and the words covered.
@@ -883,6 +886,12 @@ func (a *analysis) annotatePeople() {
 		// A number of people given as such: "5 personnes", "deux ou trois
 		// personnes", "2 à 3 personnes". It is a count to check against the
 		// faces found, not something to look for in the picture.
+		// "plusieurs personnes" is not a number: it is two or more people.
+		if w := a.toks[i].norm; (w == "plusieurs" || w == "quelques") && length == 1 && in(genericPeople, a.toks[i+1].norm) {
+			a.plan.People = &Count{Value: 2, AtLeast: true, Origin: a.origin2(i, 2, "people")}
+			use(a.toks, i, 2)
+			return
+		}
 		if low, high, span, ok := a.peopleCount(i, n, length); ok {
 			a.plan.People = &Count{Value: low, Max: high, Counted: true, Tolerance: 1, Origin: a.origin2(i, span, "people")}
 			use(a.toks, i, span)
