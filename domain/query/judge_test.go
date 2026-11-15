@@ -204,3 +204,24 @@ func TestParse_SettingAndCountedPeople(t *testing.T) {
 	require.Equal(t, RelaxPeople, relaxation.Step)
 	require.False(t, next.People.Counted)
 }
+
+func TestParse_DescriptionsAreNotRequests(t *testing.T) {
+	parser := NewParser()
+	// Words that say what a picture shows, not how to search it.
+	for sentence, summary := range map[string]string{
+		"Une cuillère dans une assiette avec une boulette dedans": "image : une cuillère dans une assiette avec une boulette dedans",
+		"Trois têtes en bois sur une étagère":                     "image : trois têtes en bois sur une étagère",
+	} {
+		plan := parser.Parse(sentence, testNow).Plan
+		require.Nil(t, plan.Setting, sentence)
+		require.Nil(t, plan.People, sentence)
+		require.NotNil(t, plan.Visual, sentence)
+		_ = summary
+	}
+	// Several people is two or more, not exactly three.
+	plan := parser.Parse("des photos avec plusieurs personnes", testNow).Plan
+	require.NotNil(t, plan.People)
+	require.True(t, plan.People.AtLeast)
+	require.False(t, plan.People.Counted)
+	require.Equal(t, 2, plan.People.Value)
+}
