@@ -84,18 +84,20 @@ fun runAnalysis(context: Context): String = try {
             if (results.isEmpty()) appendLine("Aucune image trouvée dans le dossier test.")
             for (r in results) {
                 if (r.error != null) {
-                    appendLine("${r.name} : erreur, ${r.error}")
+                    appendLine("${r.file.name} : erreur, ${r.error}")
                 } else {
                     val place = when (r.indoor) {
                         true -> "intérieur"
                         false -> "extérieur"
                         null -> "inconnu"
                     }
-                    appendLine("${r.name} : $place, ${r.faces} visage(s), ${r.millis} ms")
+                    appendLine("${r.file.name} : $place, ${r.faces} visage(s), ${r.millis} ms")
                 }
             }
+            val library = analyzer.writeLibrary(results)
             appendLine()
             appendLine("Total : $total ms pour ${results.size} image(s).")
+            appendLine("Carnet écrit : ${library.path}")
         }
     }
 } catch (e: Exception) {
