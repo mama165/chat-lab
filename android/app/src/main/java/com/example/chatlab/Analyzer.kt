@@ -37,15 +37,15 @@ data class ImageResult(
  * demandent pas de lecture de texte : vecteur SigLIP 2, intérieur/extérieur,
  * nombre de visages (YuNet). La lecture du texte viendra dans une étape suivante.
  *
- * Les fichiers attendus sont dans le dossier propre à l'application :
+ * Les fichiers attendus sont dans le dossier privé de l'application :
  *   files/models/vision_model.onnx
  *   files/models/judge_vectors.json
  *   files/models/face_detection_yunet_2023mar.onnx
- *   files/test/   (les images à analyser)
+ *   files/test/                  (les images à analyser)
  */
 class Analyzer(context: Context) : AutoCloseable {
     private val env = OrtEnvironment.getEnvironment()
-    private val root = context.getExternalFilesDir(null) ?: error("stockage de l'application indisponible")
+    private val root = context.filesDir
     private val models = File(root, "models")
     private val tests = File(root, "test")
     private val vision: OrtSession
