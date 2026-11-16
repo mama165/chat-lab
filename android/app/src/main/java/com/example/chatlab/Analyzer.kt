@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import androidx.exifinterface.media.ExifInterface
+import org.json.JSONArray
 import org.json.JSONObject
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
@@ -19,29 +20,36 @@ import org.opencv.imgproc.Imgproc
 import org.opencv.objdetect.FaceDetectorYN
 import java.io.File
 import java.nio.FloatBuffer
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
 
 /** Résultat pour une image de test. */
 data class ImageResult(
-    val name: String,
+    val file: File,
     val indoor: Boolean?,
     val faces: Int,
+    val portrait: Boolean,
+    val vector: FloatArray?,
     val millis: Long,
     val error: String? = null,
 )
 
 /**
- * Reproduit, sur le téléphone, les étapes de describe_library.py qui ne
- * demandent pas de lecture de texte : vecteur SigLIP 2, intérieur/extérieur,
- * nombre de visages (YuNet). La lecture du texte viendra dans une étape suivante.
+ * Reproduit, sur le téléphone, les étapes de describe_library.py qui ne lisent
+ * pas le texte : vecteur SigLIP 2, intérieur/extérieur, nombre de visages (YuNet).
+ * Le texte est lu sur l'ordinateur et ajouté au carnet plus tard.
  *
- * Les fichiers attendus sont dans le dossier privé de l'application :
+ * Fichiers attendus, dans l'espace privé de l'application :
  *   files/models/vision_model.onnx
  *   files/models/judge_vectors.json
  *   files/models/face_detection_yunet_2023mar.onnx
- *   files/test/                  (les images à analyser)
+ *   files/test/     (les images à analyser)
+ * Le carnet produit est écrit dans files/library.json.
  */
 class Analyzer(context: Context) : AutoCloseable {
     private val env = OrtEnvironment.getEnvironment()
@@ -80,10 +88,36 @@ class Analyzer(context: Context) : AutoCloseable {
             val partial = try {
                 analyze(file)
             } catch (e: Exception) {
-                ImageResult(file.name, null, 0, 0, e.message ?: e.javaClass.simpleName)
+                ImageResult(file, null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
             }
             partial.copy(millis = (System.nanoTime() - started) / 1_000_000)
         }
+    }
+
+    /** Écrit le carnet au format attendu par cmd/query (-library). */
+    fun writeLibrary(results: List<ImageResult>): File {
+        val entries = JSONArray()
+        val added = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        for (r in results) {
+            if (r.error != null || r.vector == null) continue
+            val entry = JSONObject()
+                .put("id", r.file.name)
+                .put("path", r.file.path)
+                .put("name", r.file.name)
+                .put("kind", "image")
+                .put("size", r.file.length())
+                .put("added_at", added.format(Date(r.file.lastModified())))
+                .put("faces", r.faces)
+                .put("portrait", r.portrait)
+                .put("vectors", JSONArray().put(JSONArray(r.vector.toList())))
+            r.indoor?.let { entry.put("indoor", it) }
+            entries.put(entry)
+        }
+        val out = File(root, "library.json")
+        out.writeText(entries.toString(), Charsets.UTF_8)
+        return out
     }
 
     private fun analyze(file: File): ImageResult {
@@ -96,7 +130,8 @@ class Analyzer(context: Context) : AutoCloseable {
         val answer: Boolean? =
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
-        return ImageResult(file.name, answer, countFaces(bitmap), 0)
+        val (faces, portrait) = countFaces(bitmap)
+        return ImageResult(file, answer, faces, portrait, vector, 0)
     }
 
     /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
@@ -142,8 +177,11 @@ class Analyzer(context: Context) : AutoCloseable {
         }
     }
 
-    /** Même comptage que FaceCounter.faces() : nombre de visages trouvés par YuNet. */
-    private fun countFaces(bitmap: Bitmap): Int {
+    /**
+     * Même comptage que FaceCounter.faces() : nombre de visages trouvés par YuNet,
+     * et sujet principal si le plus grand visage couvre au moins 4 % de l'image.
+     */
+    private fun countFaces(bitmap: Bitmap): Pair<Int, Boolean> {
         val rgba = Mat()
         val bgr = Mat()
         val faces = Mat()
@@ -152,7 +190,16 @@ class Analyzer(context: Context) : AutoCloseable {
             Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR)
             detector.setInputSize(Size(bgr.cols().toDouble(), bgr.rows().toDouble()))
             detector.detect(bgr, faces)
-            return faces.rows()
+            val count = faces.rows()
+            var largest = 0.0
+            for (row in 0 until count) {
+                // Colonnes 2 et 3 : largeur et hauteur du visage.
+                val w = faces.get(row, 2)[0]
+                val h = faces.get(row, 3)[0]
+                largest = max(largest, w * h)
+            }
+            val area = bgr.cols().toDouble() * bgr.rows().toDouble()
+            return count to (count > 0 && largest / area >= 0.04)
         } finally {
             rgba.release()
             bgr.release()
