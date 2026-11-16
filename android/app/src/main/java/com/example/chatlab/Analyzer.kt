@@ -1,0 +1,182 @@
+package com.example.chatlab
+
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
+import androidx.exifinterface.media.ExifInterface
+import org.json.JSONObject
+import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.Mat
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
+import org.opencv.objdetect.FaceDetectorYN
+import java.io.File
+import java.nio.FloatBuffer
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.sqrt
+
+/** Résultat pour une image de test. */
+data class ImageResult(
+    val name: String,
+    val indoor: Boolean?,
+    val faces: Int,
+    val millis: Long,
+    val error: String? = null,
+)
+
+/**
+ * Reproduit, sur le téléphone, les étapes de describe_library.py qui ne
+ * demandent pas de lecture de texte : vecteur SigLIP 2, intérieur/extérieur,
+ * nombre de visages (YuNet). La lecture du texte viendra dans une étape suivante.
+ *
+ * Les fichiers attendus sont dans le dossier propre à l'application :
+ *   files/models/vision_model.onnx
+ *   files/models/judge_vectors.json
+ *   files/models/face_detection_yunet_2023mar.onnx
+ *   files/test/   (les images à analyser)
+ */
+class Analyzer(context: Context) : AutoCloseable {
+    private val env = OrtEnvironment.getEnvironment()
+    private val root = context.getExternalFilesDir(null) ?: error("stockage de l'application indisponible")
+    private val models = File(root, "models")
+    private val tests = File(root, "test")
+    private val vision: OrtSession
+    private val indoor: FloatArray
+    private val outdoor: FloatArray
+    private val flat: FloatArray
+    private val detector: FaceDetectorYN
+
+    init {
+        check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
+        vision = env.createSession(File(models, "vision_model.onnx").path, OrtSession.SessionOptions())
+        val judge = JSONObject(File(models, "judge_vectors.json").readText())
+        indoor = judge.floats("indoor")
+        outdoor = judge.floats("outdoor")
+        flat = judge.floats("flat")
+        detector = FaceDetectorYN.create(
+            File(models, "face_detection_yunet_2023mar.onnx").path,
+            "",
+            Size(320.0, 320.0),
+            0.6f,
+            0.3f,
+            5000,
+        )
+    }
+
+    fun analyzeAll(): List<ImageResult> {
+        val files = tests.listFiles { f ->
+            f.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp")
+        }?.sortedBy { it.name }.orEmpty()
+        return files.map { file ->
+            val started = System.nanoTime()
+            val partial = try {
+                analyze(file)
+            } catch (e: Exception) {
+                ImageResult(file.name, null, 0, 0, e.message ?: e.javaClass.simpleName)
+            }
+            partial.copy(millis = (System.nanoTime() - started) / 1_000_000)
+        }
+    }
+
+    private fun analyze(file: File): ImageResult {
+        val bitmap = loadUpright(file)
+        val vector = embed(bitmap)
+        val inScore = dot(vector, indoor)
+        val outScore = dot(vector, outdoor)
+        val flatScore = dot(vector, flat)
+        // Même règle que ImageJudge.indoor_or_none : sans réponse si incertain.
+        val answer: Boolean? =
+            if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
+            else inScore > outScore
+        return ImageResult(file.name, answer, countFaces(bitmap), 0)
+    }
+
+    /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
+    private fun loadUpright(file: File): Bitmap {
+        val raw = BitmapFactory.decodeFile(file.path) ?: error("image illisible")
+        val orientation = ExifInterface(file.path)
+            .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        val degrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        val turned = if (degrees == 0f) raw
+        else Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(degrees) }, true)
+        val out = Bitmap.createBitmap(turned.width, turned.height, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(turned, 0f, 0f, null)
+        }
+        return out
+    }
+
+    /** Même préparation que ImageEncoder.encode : 224 × 224, pixels ramenés à [-1, 1]. */
+    private fun embed(bitmap: Bitmap): FloatArray {
+        val size = 224
+        val resized = Bitmap.createScaledBitmap(bitmap, size, size, true)
+        val pixels = IntArray(size * size)
+        resized.getPixels(pixels, 0, size, 0, 0, size, size)
+        val plane = size * size
+        val data = FloatArray(3 * plane)
+        for (i in 0 until plane) {
+            val p = pixels[i]
+            data[i] = ((p shr 16 and 0xFF) / 255f - 0.5f) / 0.5f
+            data[plane + i] = ((p shr 8 and 0xFF) / 255f - 0.5f) / 0.5f
+            data[2 * plane + i] = ((p and 0xFF) / 255f - 0.5f) / 0.5f
+        }
+        OnnxTensor.createTensor(env, FloatBuffer.wrap(data), longArrayOf(1, 3, size.toLong(), size.toLong())).use { input ->
+            vision.run(mapOf(vision.inputNames.first() to input)).use { result ->
+                val output = (result.get("pooler_output").get().value as Array<FloatArray>)[0]
+                return normalize(output)
+            }
+        }
+    }
+
+    /** Même comptage que FaceCounter.faces() : nombre de visages trouvés par YuNet. */
+    private fun countFaces(bitmap: Bitmap): Int {
+        val rgba = Mat()
+        val bgr = Mat()
+        val faces = Mat()
+        try {
+            Utils.bitmapToMat(bitmap, rgba)
+            Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR)
+            detector.setInputSize(Size(bgr.cols().toDouble(), bgr.rows().toDouble()))
+            detector.detect(bgr, faces)
+            return faces.rows()
+        } finally {
+            rgba.release()
+            bgr.release()
+            faces.release()
+        }
+    }
+
+    private fun normalize(v: FloatArray): FloatArray {
+        val length = sqrt(v.fold(0f) { acc, x -> acc + x * x })
+        return FloatArray(v.size) { v[it] / length }
+    }
+
+    private fun dot(a: FloatArray, b: FloatArray): Float {
+        var sum = 0f
+        for (i in a.indices) sum += a[i] * b[i]
+        return sum
+    }
+
+    private fun JSONObject.floats(key: String): FloatArray {
+        val array = getJSONArray(key)
+        return FloatArray(array.length()) { array.getDouble(it).toFloat() }
+    }
+
+    override fun close() {
+        vision.close()
+    }
+}
