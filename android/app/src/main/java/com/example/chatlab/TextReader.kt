@@ -70,7 +70,9 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
             }
             for ((index, variant) in variants(reduced).withIndex()) {
                 try {
-                    for (line in readLines(variant, record = index == 0)) {
+                    // The contrast readings must be surer of a line than the normal one to add words.
+                    val minimum = if (index == 0) MIN_CONFIDENCE else CONTRAST_CONFIDENCE
+                    for (line in readLines(variant, record = index == 0, minimum = minimum)) {
                         // A capital I before an apostrophe is a misread l: "I'herbe".
                         val fixed = line.replace("I'", "l'").replace("I’", "l’")
                         for (word in fixed.split(Regex("\\s+"))) {
@@ -122,7 +124,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         }
     }
 
-    private fun readLines(image: Mat, record: Boolean): List<String> {
+    private fun readLines(image: Mat, record: Boolean, minimum: Float): List<String> {
         val boxes = detect(image)
         zones += boxes.size
         return boxes.mapNotNull { box ->
@@ -132,7 +134,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
                 val corners = box.joinToString(" ") { "[${it.x.roundToInt()},${it.y.roundToInt()}]" }
                 trace.add("$corners '$text' ${"%.3f".format(confidence)}")
             }
-            if (text.isNotBlank() && confidence >= MIN_CONFIDENCE) {
+            if (text.isNotBlank() && confidence >= minimum) {
                 kept++
                 text
             } else null
@@ -350,6 +352,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         const val REC_HEIGHT = 48
         const val REC_WIDTH = 320
         const val MIN_CONFIDENCE = 0.6f
+        const val CONTRAST_CONFIDENCE = 0.8f
         val MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
         val STD = floatArrayOf(0.229f, 0.224f, 0.225f)
     }
