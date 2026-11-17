@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# A new push cancels the build still running for the same branch.
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build debug APK and run unit tests
@@ -31,8 +36,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: gradle
-          cache-dependency-path: android/**/*.gradle*
+
+      - name: Set up Gradle with its caches
+        # Restores the Gradle user home (downloads, wrapper, build cache) between runs.
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Accept the Android SDK licenses
         # The runner has the SDK; Gradle downloads the missing platform itself.
@@ -44,11 +51,9 @@ jobs:
       - name: Make the Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Run unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
-
-      - name: Build the debug APK
-        run: ./gradlew --no-daemon assembleDebug
+      - name: Run unit tests and build the debug APK
+        # One Gradle invocation: the project is configured once, and both tasks share it.
+        run: ./gradlew testDebugUnitTest assembleDebug
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4
