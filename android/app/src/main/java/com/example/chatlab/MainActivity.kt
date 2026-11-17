@@ -124,7 +124,7 @@ fun runAnalysis(context: Context, folder: Uri): String = try {
                         null -> "inconnu"
                     }
                     appendLine("${r.file.name} : $place, ${r.faces} visage(s), ${r.millis} ms")
-                    if (r.text.isNotBlank()) appendLine("  texte : ${r.text}")
+                    if (r.text.isNotBlank()) appendLine("  texte : ${r.text}") else appendLine("  texte : rien lu (${r.textNote})")
                 }
             }
             val library = analyzer.writeLibrary(results)

@@ -38,15 +38,29 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
     private val vocabulary: List<String> =
         listOf("blank") + File(models, "ppocr_keys.txt").readText(Charsets.UTF_8).split("\n") + " "
 
+    private var zones = 0
+    private var kept = 0
+    private var best = 0f
+
     /** Le texte lu dans l'image, mots séparés par des espaces. */
     fun read(bitmap: Bitmap): String {
         val boxes = detect(bitmap)
+        zones = boxes.size
+        kept = 0
+        best = 0f
         val lines = boxes.mapNotNull { box ->
             val (text, confidence) = recognize(crop(bitmap, box))
-            if (text.isNotBlank() && confidence >= MIN_CONFIDENCE) text else null
+            best = max(best, confidence)
+            if (text.isNotBlank() && confidence >= MIN_CONFIDENCE) {
+                kept++
+                text
+            } else null
         }
         return lines.joinToString(" ")
     }
+
+    /** Résumé du dernier passage, pour le diagnostic. */
+    fun summary(): String = "zones trouvées $zones, lues $kept, meilleure confiance ${"%.2f".format(best)}"
 
     private fun detect(bitmap: Bitmap): List<Array<Point>> {
         val rgba = Mat()
@@ -54,7 +68,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         val resized = Mat()
         try {
             Utils.bitmapToMat(bitmap, rgba)
-            Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2RGB)
+            Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2BGR)
             val ratio = if (min(bitmap.width, bitmap.height) < LIMIT_SIDE) LIMIT_SIDE.toDouble() / min(bitmap.width, bitmap.height) else 1.0
             val width = roundTo32(bitmap.width * ratio)
             val height = roundTo32(bitmap.height * ratio)
@@ -143,7 +157,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         val rgb = Mat()
         try {
             Utils.bitmapToMat(bitmap, rgba)
-            Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2RGB)
+            Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2BGR)
             val (tl, tr, br, bl) = orderCorners(box)
             val width = max(sideLength(tl, tr), sideLength(bl, br)).roundToInt().coerceAtLeast(1)
             val height = max(sideLength(tl, bl), sideLength(tr, br)).roundToInt().coerceAtLeast(1)

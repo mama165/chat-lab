@@ -40,6 +40,7 @@ data class ImageResult(
     val millis: Long,
     val error: String? = null,
     val text: String = "",
+    val textNote: String = "",
 )
 
 /**
@@ -162,7 +163,8 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
         val (faces, portrait) = countFaces(bitmap)
-        return ImageResult(file, answer, faces, portrait, vector, 0, text = reader.read(bitmap))
+        val text = reader.read(bitmap)
+        return ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary())
     }
 
     /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
