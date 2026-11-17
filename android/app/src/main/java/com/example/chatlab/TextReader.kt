@@ -42,6 +42,10 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
     private var zones = 0
     private var kept = 0
     private var best = 0f
+    private val trace = ArrayList<String>()
+
+    /** Zones, texte et confiance de la première lecture, pour comparer avec l'ordinateur. */
+    fun trace(): String = trace.joinToString("\n")
 
     /** Le texte lu dans l'image, mots séparés par des espaces, sans doublons. */
     fun read(bitmap: Bitmap): String {
@@ -52,6 +56,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         zones = 0
         kept = 0
         best = 0f
+        trace.clear()
         try {
             Utils.bitmapToMat(bitmap, source)
             Imgproc.cvtColor(source, bgr, Imgproc.COLOR_RGBA2BGR)
@@ -62,9 +67,9 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
             } else {
                 bgr.copyTo(reduced)
             }
-            for (variant in variants(reduced)) {
+            for ((index, variant) in variants(reduced).withIndex()) {
                 try {
-                    for (line in readLines(variant)) {
+                    for (line in readLines(variant, record = index == 0)) {
                         // A capital I before an apostrophe is a misread l: "I'herbe".
                         val fixed = line.replace("I'", "l'").replace("I’", "l’")
                         for (word in fixed.split(Regex("\\s+"))) {
@@ -113,12 +118,16 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         }
     }
 
-    private fun readLines(image: Mat): List<String> {
+    private fun readLines(image: Mat, record: Boolean): List<String> {
         val boxes = detect(image)
         zones += boxes.size
         return boxes.mapNotNull { box ->
             val (text, confidence) = recognize(crop(image, box))
             best = max(best, confidence)
+            if (record) {
+                val corners = box.joinToString(" ") { "[${it.x.roundToInt()},${it.y.roundToInt()}]" }
+                trace.add("$corners '$text' ${"%.3f".format(confidence)}")
+            }
             if (text.isNotBlank() && confidence >= MIN_CONFIDENCE) {
                 kept++
                 text

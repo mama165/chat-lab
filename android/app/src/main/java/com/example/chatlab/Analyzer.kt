@@ -41,6 +41,7 @@ data class ImageResult(
     val error: String? = null,
     val text: String = "",
     val textNote: String = "",
+    val textTrace: String = "",
 )
 
 /**
@@ -166,7 +167,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
         // A failure while reading the text is reported, not allowed to stop the whole analysis.
         return try {
             val text = reader.read(bitmap)
-            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary())
+            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace())
         } catch (e: Throwable) {
             ImageResult(file, answer, faces, portrait, vector, 0, textNote = "lecture du texte impossible : ${e.javaClass.simpleName} ${e.message ?: ""}")
         }
