@@ -1,10 +1,14 @@
 package com.example.chatlab
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,12 +47,31 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private const val PREFERENCES = "chatlab"
+private const val KEY_FOLDER = "folder"
+
 @Composable
 fun TestScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var report by remember { mutableStateOf("Appuyez sur le bouton pour analyser les images de test.") }
+    val preferences = remember { context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE) }
+    var report by remember {
+        mutableStateOf(
+            if (preferences.getString(KEY_FOLDER, null) == null)
+                "Choisissez d'abord le dossier chatlab (models et test à l'intérieur)."
+            else "Appuyez sur le bouton pour analyser les images de test."
+        )
+    }
     var running by remember { mutableStateOf(false) }
+
+    val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            // Garde l'accès au dossier après un redémarrage de l'application.
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            preferences.edit().putString(KEY_FOLDER, uri.toString()).apply()
+            report = "Dossier enregistré. Appuyez sur le bouton pour analyser."
+        }
+    }
 
     Column(
         modifier = modifier
@@ -56,14 +79,23 @@ fun TestScreen(modifier: Modifier = Modifier) {
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
     ) {
+        Button(onClick = { chooseFolder.launch(null) }) {
+            Text("Choisir le dossier chatlab")
+        }
+        Spacer(Modifier.height(12.dp))
         Button(
             enabled = !running,
             onClick = {
-                running = true
-                report = "Analyse en cours..."
-                scope.launch {
-                    report = withContext(Dispatchers.Default) { runAnalysis(context) }
-                    running = false
+                val folder = preferences.getString(KEY_FOLDER, null)
+                if (folder == null) {
+                    report = "Choisissez d'abord le dossier chatlab."
+                } else {
+                    running = true
+                    report = "Analyse en cours..."
+                    scope.launch {
+                        report = withContext(Dispatchers.Default) { runAnalysis(context, Uri.parse(folder)) }
+                        running = false
+                    }
                 }
             },
         ) {
@@ -75,13 +107,13 @@ fun TestScreen(modifier: Modifier = Modifier) {
 }
 
 /** Lance l'analyse et met le compte rendu en forme, image par image. */
-fun runAnalysis(context: Context): String = try {
-    Analyzer(context).use { analyzer ->
+fun runAnalysis(context: Context, folder: Uri): String = try {
+    Analyzer(context, folder).use { analyzer ->
         val started = System.nanoTime()
         val results = analyzer.analyzeAll()
         val total = (System.nanoTime() - started) / 1_000_000
         buildString {
-            if (results.isEmpty()) appendLine("Aucune image trouvée dans le dossier test.")
+            if (results.isEmpty()) appendLine("Aucune image trouvée dans le sous-dossier test.")
             for (r in results) {
                 if (r.error != null) {
                     appendLine("${r.file.name} : erreur, ${r.error}")

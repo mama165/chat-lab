@@ -9,6 +9,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import androidx.exifinterface.media.ExifInterface
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,7 +53,7 @@ data class ImageResult(
  *   files/test/     (les images à analyser)
  * Le carnet produit est écrit dans files/library.json.
  */
-class Analyzer(context: Context) : AutoCloseable {
+class Analyzer(context: Context, tree: Uri) : AutoCloseable {
     private val env = OrtEnvironment.getEnvironment()
     private val root = context.filesDir
     private val models = File(root, "models")
@@ -63,6 +65,7 @@ class Analyzer(context: Context) : AutoCloseable {
     private val detector: FaceDetectorYN
 
     init {
+        importFiles(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
         vision = env.createSession(File(models, "vision_model.onnx").path, OrtSession.SessionOptions())
         val judge = JSONObject(File(models, "judge_vectors.json").readText())
@@ -77,6 +80,30 @@ class Analyzer(context: Context) : AutoCloseable {
             0.3f,
             5000,
         )
+    }
+
+    /**
+     * Copie les fichiers depuis le dossier choisi par l'utilisateur (sous-dossiers
+     * models et test) vers l'espace privé de l'application. Un fichier déjà copié
+     * et de même taille n'est pas recopié.
+     */
+    private fun importFiles(context: Context, tree: Uri) {
+        val root = DocumentFile.fromTreeUri(context, tree) ?: error("dossier choisi inaccessible")
+        val modelsSource = root.findFile("models") ?: error("sous-dossier models absent du dossier choisi")
+        importFolder(context, modelsSource, models)
+        root.findFile("test")?.let { importFolder(context, it, tests) }
+    }
+
+    private fun importFolder(context: Context, source: DocumentFile, target: File) {
+        target.mkdirs()
+        for (file in source.listFiles()) {
+            val name = file.name ?: continue
+            if (!file.isFile) continue
+            val destination = File(target, name)
+            if (destination.exists() && destination.length() == file.length()) continue
+            val input = context.contentResolver.openInputStream(file.uri) ?: error("lecture impossible : $name")
+            input.use { stream -> destination.outputStream().use { stream.copyTo(it) } }
+        }
     }
 
     fun analyzeAll(): List<ImageResult> {
