@@ -34,10 +34,8 @@ jobs:
           cache: gradle
           cache-dependency-path: android/**/*.gradle*
 
-      - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install the platform the app compiles against
+        # The runner already has the Android SDK and its sdkmanager.
         run: |
           yes | sdkmanager --licenses > /dev/null
           sdkmanager "platforms;android-37"
