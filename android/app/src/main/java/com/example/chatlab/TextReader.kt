@@ -72,7 +72,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
                 }
             }
             val map = OnnxTensor.createTensor(env, FloatBuffer.wrap(data), longArrayOf(1, 3, height.toLong(), width.toLong()))
-            val probabilities: Array<Array<FloatArray>> = map.use { input ->
+            val probabilities: Array<FloatArray> = map.use { input ->
                 detector.run(mapOf(detector.inputNames.first() to input)).use { result ->
                     @Suppress("UNCHECKED_CAST")
                     (result[0].value as Array<Array<Array<FloatArray>>>)[0][0]
@@ -112,7 +112,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         }
     }
 
-    private fun boxScore(rect: RotatedRect, probabilities: Array<Array<FloatArray>>): Double {
+    private fun boxScore(rect: RotatedRect, probabilities: Array<FloatArray>): Double {
         val corners = Array(4) { Point() }
         rect.points(corners)
         val left = max(0, corners.minOf { it.x }.toInt())
