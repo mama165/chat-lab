@@ -299,8 +299,8 @@ func admit(item *Item, plan query.Plan) (tier int, notes []string, ok bool) {
 	}
 
 	if people := plan.People; people != nil && people.Counted && item.Kind == query.KindImage {
-		switch {
-		case item.Faces == nil:
+		switch item.Faces {
+		case nil:
 			tier = 1
 			notes = append(notes, "personnes non comptées")
 		default:
