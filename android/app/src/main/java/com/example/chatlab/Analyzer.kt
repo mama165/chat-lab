@@ -39,6 +39,7 @@ data class ImageResult(
     val vector: FloatArray?,
     val millis: Long,
     val error: String? = null,
+    val text: String = "",
 )
 
 /**
@@ -63,6 +64,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
     private val outdoor: FloatArray
     private val flat: FloatArray
     private val detector: FaceDetectorYN
+    private val reader: TextReader
 
     init {
         importFiles(context, tree)
@@ -72,6 +74,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
+        reader = TextReader(env, models)
         detector = FaceDetectorYN.create(
             File(models, "face_detection_yunet_2023mar.onnx").path,
             "",
@@ -140,6 +143,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
                 .put("portrait", r.portrait)
                 .put("vectors", JSONArray().put(JSONArray(r.vector.toList())))
             r.indoor?.let { entry.put("indoor", it) }
+            if (r.text.isNotBlank()) entry.put("text", r.text)
             entries.put(entry)
         }
         val out = File(root, "library.json")
@@ -158,7 +162,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
         val (faces, portrait) = countFaces(bitmap)
-        return ImageResult(file, answer, faces, portrait, vector, 0)
+        return ImageResult(file, answer, faces, portrait, vector, 0, text = reader.read(bitmap))
     }
 
     /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
@@ -252,5 +256,6 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
 
     override fun close() {
         vision.close()
+        reader.close()
     }
 }
