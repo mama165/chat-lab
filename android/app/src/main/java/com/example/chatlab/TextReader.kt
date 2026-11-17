@@ -12,6 +12,7 @@ import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.RotatedRect
+import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import java.io.File
@@ -23,10 +24,10 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Lecture du texte d'une image, comme RapidOCR (PP-OCRv3) dans describe_library.py :
- * détection des zones de texte (DB), puis reconnaissance de chaque zone (CTC).
- * Les réglages reprennent ceux de RapidOCR : seuil 0,3, score de boîte 0,5,
- * élargissement 1,6, côté minimum 736, hauteur de lecture 48, confiance minimale 0,6.
+ * Lecture du texte d'une image, comme describe_library.py (RapidOCR, PP-OCRv3) :
+ * trois lectures de l'image (normale avec bordure, gris contrasté, inversé), chacune
+ * avec détection des zones de texte (DB) puis reconnaissance (CTC). Les mots sont
+ * dédoublonnés entre les lectures.
  *
  * Fichiers attendus dans le dossier models :
  *   ch_PP-OCRv3_det_infer.onnx, ch_PP-OCRv3_rec_infer.onnx, ppocr_keys.txt
@@ -42,39 +43,102 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
     private var kept = 0
     private var best = 0f
 
-    /** Le texte lu dans l'image, mots séparés par des espaces. */
+    /** Le texte lu dans l'image, mots séparés par des espaces, sans doublons. */
     fun read(bitmap: Bitmap): String {
-        val boxes = detect(bitmap)
-        zones = boxes.size
+        val source = Mat()
+        val bgr = Mat()
+        val reduced = Mat()
+        val words = LinkedHashMap<String, String>()
+        zones = 0
         kept = 0
         best = 0f
-        val lines = boxes.mapNotNull { box ->
-            val (text, confidence) = recognize(crop(bitmap, box))
+        try {
+            Utils.bitmapToMat(bitmap, source)
+            Imgproc.cvtColor(source, bgr, Imgproc.COLOR_RGBA2BGR)
+            // Une image très grande ne tient pas en mémoire sur le téléphone : on la réduit d'abord.
+            val shrink = min(1.0, MAX_SIDE.toDouble() / max(bgr.cols(), bgr.rows()))
+            if (shrink < 1.0) {
+                Imgproc.resize(bgr, reduced, Size(bgr.cols() * shrink, bgr.rows() * shrink))
+            } else {
+                bgr.copyTo(reduced)
+            }
+            for (variant in variants(reduced)) {
+                try {
+                    for (line in readLines(variant)) {
+                        // A capital I before an apostrophe is a misread l: "I'herbe".
+                        val fixed = line.replace("I'", "l'").replace("I’", "l’")
+                        for (word in fixed.split(Regex("\\s+"))) {
+                            if (word.isNotBlank()) words.putIfAbsent(word.lowercase(), word)
+                        }
+                    }
+                } finally {
+                    variant.release()
+                }
+            }
+        } finally {
+            source.release()
+            bgr.release()
+            reduced.release()
+        }
+        return words.values.joinToString(" ")
+    }
+
+    /** Résumé du dernier passage, pour le diagnostic. */
+    fun summary(): String = "zones trouvées $zones, lues $kept, meilleure confiance ${"%.2f".format(best)}"
+
+    /** Les trois lectures : bordure de la couleur du coin, gris contrasté, gris contrasté inversé. */
+    private fun variants(image: Mat): List<Mat> {
+        val border = Mat()
+        val gray = Mat()
+        val stretched = Mat()
+        val contrast = Mat()
+        val inverted = Mat()
+        val invertedGray = Mat()
+        try {
+            val corner = if (image.rows() > 2 && image.cols() > 2) image.get(2, 2) else doubleArrayOf(255.0, 255.0, 255.0)
+            Core.copyMakeBorder(image, border, BORDER, BORDER, BORDER, BORDER, Core.BORDER_CONSTANT, Scalar(corner[0], corner[1], corner[2]))
+            Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY)
+            Core.normalize(gray, stretched, 0.0, 255.0, Core.NORM_MINMAX)
+            Imgproc.cvtColor(stretched, contrast, Imgproc.COLOR_GRAY2BGR)
+            Core.bitwise_not(stretched, invertedGray)
+            Imgproc.cvtColor(invertedGray, inverted, Imgproc.COLOR_GRAY2BGR)
+            return listOf(border.clone(), contrast.clone(), inverted.clone())
+        } finally {
+            border.release()
+            gray.release()
+            stretched.release()
+            contrast.release()
+            inverted.release()
+            invertedGray.release()
+        }
+    }
+
+    private fun readLines(image: Mat): List<String> {
+        val boxes = detect(image)
+        zones += boxes.size
+        return boxes.mapNotNull { box ->
+            val (text, confidence) = recognize(crop(image, box))
             best = max(best, confidence)
             if (text.isNotBlank() && confidence >= MIN_CONFIDENCE) {
                 kept++
                 text
             } else null
         }
-        return lines.joinToString(" ")
     }
 
-    /** Résumé du dernier passage, pour le diagnostic. */
-    fun summary(): String = "zones trouvées $zones, lues $kept, meilleure confiance ${"%.2f".format(best)}"
-
-    private fun detect(bitmap: Bitmap): List<Array<Point>> {
-        val rgba = Mat()
-        val rgb = Mat()
+    /** Détection des zones de texte sur une image BVR (couleurs dans l'ordre d'OpenCV). */
+    private fun detect(image: Mat): List<Array<Point>> {
         val resized = Mat()
+        val mask = Mat()
         try {
-            Utils.bitmapToMat(bitmap, rgba)
-            Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2BGR)
-            val ratio = if (min(bitmap.width, bitmap.height) < LIMIT_SIDE) LIMIT_SIDE.toDouble() / min(bitmap.width, bitmap.height) else 1.0
-            val width = roundTo32(bitmap.width * ratio)
-            val height = roundTo32(bitmap.height * ratio)
-            Imgproc.resize(rgb, resized, Size(width.toDouble(), height.toDouble()))
+            val w = image.cols()
+            val h = image.rows()
+            val ratio = if (min(w, h) < LIMIT_SIDE) LIMIT_SIDE.toDouble() / min(w, h) else 1.0
+            val width = roundTo32(w * ratio)
+            val height = roundTo32(h * ratio)
+            Imgproc.resize(image, resized, Size(width.toDouble(), height.toDouble()))
 
-            // Normalisation ImageNet, en RVB puis en CHW.
+            // Normalisation ImageNet, par canal, puis mise en CHW.
             val pixels = ByteArray(width * height * 3)
             resized.get(0, 0, pixels)
             val plane = width * height
@@ -85,44 +149,39 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
                     data[c * plane + i] = (value - MEAN[c]) / STD[c]
                 }
             }
-            val map = OnnxTensor.createTensor(env, FloatBuffer.wrap(data), longArrayOf(1, 3, height.toLong(), width.toLong()))
-            val probabilities: Array<FloatArray> = map.use { input ->
+            val probabilities: Array<FloatArray> = OnnxTensor.createTensor(
+                env, FloatBuffer.wrap(data), longArrayOf(1, 3, height.toLong(), width.toLong())
+            ).use { input ->
                 detector.run(mapOf(detector.inputNames.first() to input)).use { result ->
                     @Suppress("UNCHECKED_CAST")
                     (result[0].value as Array<Array<Array<FloatArray>>>)[0][0]
                 }
             }
 
-            val mask = Mat(height, width, CvType.CV_8UC1)
-            try {
-                mask.put(0, 0, ByteArray(width * height) { i ->
-                    if (probabilities[i / width][i % width] > THRESHOLD) 255.toByte() else 0
-                })
-                val contours = ArrayList<MatOfPoint>()
-                Imgproc.findContours(mask, contours, Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
-                val scaleX = width.toDouble() / bitmap.width
-                val scaleY = height.toDouble() / bitmap.height
-                val boxes = ArrayList<Array<Point>>()
-                for (contour in contours) {
-                    val points = MatOfPoint2f(*contour.toArray())
-                    if (points.rows() < 3) continue
-                    val rect = Imgproc.minAreaRect(points)
-                    if (boxScore(rect, probabilities) < BOX_THRESHOLD) continue
-                    val grown = unclip(rect)
-                    val corners = Array(4) { Point() }
-                    grown.points(corners)
-                    val mapped = Array(4) { Point(corners[it].x / scaleX, corners[it].y / scaleY) }
-                    if (sideLength(mapped[0], mapped[1]) < 3 || sideLength(mapped[1], mapped[2]) < 3) continue
-                    boxes.add(mapped)
-                }
-                return boxes.sortedWith(compareBy({ box -> box.minOf { it.y } }, { box -> box.minOf { it.x } }))
-            } finally {
-                mask.release()
+            mask.create(height, width, CvType.CV_8UC1)
+            mask.put(0, 0, ByteArray(width * height) { i ->
+                if (probabilities[i / width][i % width] > THRESHOLD) 255.toByte() else 0
+            })
+            val contours = ArrayList<MatOfPoint>()
+            Imgproc.findContours(mask, contours, Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
+            val scaleX = width.toDouble() / w
+            val scaleY = height.toDouble() / h
+            val boxes = ArrayList<Array<Point>>()
+            for (contour in contours) {
+                val points = MatOfPoint2f(*contour.toArray())
+                if (points.rows() < 3) continue
+                val rect = Imgproc.minAreaRect(points)
+                if (boxScore(rect, probabilities) < BOX_THRESHOLD) continue
+                val corners = Array(4) { Point() }
+                unclip(rect).points(corners)
+                val mapped = Array(4) { Point(corners[it].x / scaleX, corners[it].y / scaleY) }
+                if (sideLength(mapped[0], mapped[1]) < 3 || sideLength(mapped[1], mapped[2]) < 3) continue
+                boxes.add(mapped)
             }
+            return boxes.sortedWith(compareBy<Array<Point>> { box -> box.minOf { it.y } }.thenBy { box -> box.minOf { it.x } })
         } finally {
-            rgba.release()
-            rgb.release()
             resized.release()
+            mask.release()
         }
     }
 
@@ -152,32 +211,31 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
     }
 
     /** Découpe la zone redressée, puis la tourne si elle est très haute. */
-    private fun crop(bitmap: Bitmap, box: Array<Point>): Mat {
-        val rgba = Mat()
-        val rgb = Mat()
+    private fun crop(image: Mat, box: Array<Point>): Mat {
+        val (tl, tr, br, bl) = orderCorners(box)
+        val width = max(sideLength(tl, tr), sideLength(bl, br)).roundToInt().coerceAtLeast(1)
+        val height = max(sideLength(tl, bl), sideLength(tr, br)).roundToInt().coerceAtLeast(1)
+        val source = MatOfPoint2f(tl, tr, br, bl)
+        val target = MatOfPoint2f(
+            Point(0.0, 0.0),
+            Point(width.toDouble(), 0.0),
+            Point(width.toDouble(), height.toDouble()),
+            Point(0.0, height.toDouble()),
+        )
+        val transform = Imgproc.getPerspectiveTransform(source, target)
+        val warped = Mat()
         try {
-            Utils.bitmapToMat(bitmap, rgba)
-            Imgproc.cvtColor(rgba, rgb, Imgproc.COLOR_RGBA2BGR)
-            val (tl, tr, br, bl) = orderCorners(box)
-            val width = max(sideLength(tl, tr), sideLength(bl, br)).roundToInt().coerceAtLeast(1)
-            val height = max(sideLength(tl, bl), sideLength(tr, br)).roundToInt().coerceAtLeast(1)
-            val source = MatOfPoint2f(tl, tr, br, bl)
-            val target = MatOfPoint2f(Point(0.0, 0.0), Point(width.toDouble(), 0.0), Point(width.toDouble(), height.toDouble()), Point(0.0, height.toDouble()))
-            val transform = Imgproc.getPerspectiveTransform(source, target)
-            val warped = Mat()
-            Imgproc.warpPerspective(rgb, warped, transform, Size(width.toDouble(), height.toDouble()))
-            transform.release()
-            if (height.toDouble() / width >= 1.5) {
-                val turned = Mat()
-                Core.rotate(warped, turned, Core.ROTATE_90_COUNTERCLOCKWISE)
-                warped.release()
-                return turned
-            }
-            return warped
+            Imgproc.warpPerspective(image, warped, transform, Size(width.toDouble(), height.toDouble()))
         } finally {
-            rgba.release()
-            rgb.release()
+            transform.release()
         }
+        if (height.toDouble() / width >= 1.5) {
+            val turned = Mat()
+            Core.rotate(warped, turned, Core.ROTATE_90_COUNTERCLOCKWISE)
+            warped.release()
+            return turned
+        }
+        return warped
     }
 
     /** Reconnaissance CTC d'une zone : texte et confiance moyenne des caractères retenus. */
@@ -185,9 +243,9 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         val height = piece.rows()
         val ratio = piece.cols().toDouble() / height
         val width = max(REC_WIDTH, ceil(REC_HEIGHT * ratio).toInt())
+        val newWidth = min(width, ceil(REC_HEIGHT * ratio).toInt()).coerceAtLeast(1)
         val resized = Mat()
         try {
-            val newWidth = min(width, ceil(REC_HEIGHT * ratio).toInt()).coerceAtLeast(1)
             Imgproc.resize(piece, resized, Size(newWidth.toDouble(), REC_HEIGHT.toDouble()))
             val pixels = ByteArray(newWidth * REC_HEIGHT * 3)
             resized.get(0, 0, pixels)
@@ -200,12 +258,10 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
                     data[c * plane + y * width + x] = (value - 0.5f) / 0.5f
                 }
             }
-            val input = OnnxTensor.createTensor(env, FloatBuffer.wrap(data), longArrayOf(1, 3, REC_HEIGHT.toLong(), width.toLong()))
-            input.use {
-                recognizer.run(mapOf(recognizer.inputNames.first() to it)).use { result ->
+            return OnnxTensor.createTensor(env, FloatBuffer.wrap(data), longArrayOf(1, 3, REC_HEIGHT.toLong(), width.toLong())).use { input ->
+                recognizer.run(mapOf(recognizer.inputNames.first() to input)).use { result ->
                     @Suppress("UNCHECKED_CAST")
-                    val steps = (result[0].value as Array<Array<FloatArray>>)[0]
-                    return decode(steps)
+                    decode((result[0].value as Array<Array<FloatArray>>)[0])
                 }
             }
         } finally {
@@ -249,6 +305,8 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
     }
 
     private companion object {
+        const val MAX_SIDE = 1280
+        const val BORDER = 60
         const val LIMIT_SIDE = 736
         const val THRESHOLD = 0.3f
         const val BOX_THRESHOLD = 0.5
