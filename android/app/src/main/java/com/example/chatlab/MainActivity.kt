@@ -1,9 +1,12 @@
 package com.example.chatlab
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
@@ -102,7 +106,33 @@ fun TestScreen(modifier: Modifier = Modifier) {
             Text("Analyser les images de test")
         }
         Spacer(Modifier.height(16.dp))
-        Text(report)
+        Button(
+            enabled = !running,
+            onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("compte rendu", report))
+                Toast.makeText(context, "Compte rendu copié", Toast.LENGTH_SHORT).show()
+            },
+        ) {
+            Text("Copier le compte rendu")
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            enabled = !running,
+            onClick = {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, report)
+                }
+                context.startActivity(Intent.createChooser(send, "Partager le compte rendu"))
+            },
+        ) {
+            Text("Partager le compte rendu")
+        }
+        Spacer(Modifier.height(16.dp))
+        SelectionContainer {
+            Text(report)
+        }
     }
 }
 
