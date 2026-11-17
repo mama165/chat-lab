@@ -35,10 +35,12 @@ jobs:
           cache-dependency-path: android/**/*.gradle*
 
       - name: Install the platform the app compiles against
-        # The runner already has the Android SDK and its sdkmanager.
+        # The runner already has the Android SDK; sdkmanager is not on the PATH.
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platforms;android-37"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(ls -d "$SDK"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "platforms;android-37"
 
       - name: Make the Gradle wrapper executable
         run: chmod +x ./gradlew
