@@ -9,6 +9,7 @@ import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint
+import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.RotatedRect
@@ -18,6 +19,7 @@ import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.nio.FloatBuffer
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -139,6 +141,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
     private fun detect(image: Mat): List<Array<Point>> {
         val resized = Mat()
         val mask = Mat()
+        val dilated = Mat()
         try {
             val w = image.cols()
             val h = image.rows()
@@ -171,8 +174,9 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
             mask.put(0, 0, ByteArray(width * height) { i ->
                 if (probabilities[i / width][i % width] > THRESHOLD) 255.toByte() else 0
             })
+            Imgproc.dilate(mask, dilated, Mat.ones(2, 2, CvType.CV_8U))
             val contours = ArrayList<MatOfPoint>()
-            Imgproc.findContours(mask, contours, Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
+            Imgproc.findContours(dilated, contours, Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
             val scaleX = width.toDouble() / w
             val scaleY = height.toDouble() / h
             val boxes = ArrayList<Array<Point>>()
@@ -180,35 +184,55 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
                 val points = MatOfPoint2f(*contour.toArray())
                 if (points.rows() < 3) continue
                 val rect = Imgproc.minAreaRect(points)
-                if (boxScore(rect, probabilities) < BOX_THRESHOLD) continue
+                // RapidOCR drops a zone whose short side is under 3 px, then again under 5 px once grown.
+                if (min(rect.size.width, rect.size.height) < MIN_SIDE) continue
+                if (polygonScore(rect, probabilities) < BOX_THRESHOLD) continue
+                val grown = unclip(rect)
+                if (min(grown.size.width, grown.size.height) < MIN_SIDE + 2) continue
                 val corners = Array(4) { Point() }
-                unclip(rect).points(corners)
-                val mapped = Array(4) { Point(corners[it].x / scaleX, corners[it].y / scaleY) }
-                if (sideLength(mapped[0], mapped[1]) < 3 || sideLength(mapped[1], mapped[2]) < 3) continue
-                boxes.add(mapped)
+                grown.points(corners)
+                boxes.add(Array(4) { Point(corners[it].x / scaleX, corners[it].y / scaleY) })
             }
             return boxes.sortedWith(compareBy<Array<Point>> { box -> box.minOf { it.y } }.thenBy { box -> box.minOf { it.x } })
         } finally {
             resized.release()
             mask.release()
+            dilated.release()
         }
     }
 
-    private fun boxScore(rect: RotatedRect, probabilities: Array<FloatArray>): Double {
+    /** Moyenne de la carte de probabilités à l'intérieur du polygone, comme box_score_fast de RapidOCR. */
+    private fun polygonScore(rect: RotatedRect, probabilities: Array<FloatArray>): Double {
         val corners = Array(4) { Point() }
         rect.points(corners)
-        val left = max(0, corners.minOf { it.x }.toInt())
-        val right = min(probabilities[0].size - 1, corners.maxOf { it.x }.toInt())
-        val top = max(0, corners.minOf { it.y }.toInt())
-        val bottom = min(probabilities.size - 1, corners.maxOf { it.y }.toInt())
-        if (right < left || bottom < top) return 0.0
-        var sum = 0.0
-        var count = 0
-        for (y in top..bottom) for (x in left..right) {
-            sum += probabilities[y][x]
-            count++
+        val h = probabilities.size
+        val w = probabilities[0].size
+        val xmin = floor(corners.minOf { it.x }).toInt().coerceIn(0, w - 1)
+        val xmax = ceil(corners.maxOf { it.x }).toInt().coerceIn(0, w - 1)
+        val ymin = floor(corners.minOf { it.y }).toInt().coerceIn(0, h - 1)
+        val ymax = ceil(corners.maxOf { it.y }).toInt().coerceIn(0, h - 1)
+        val cols = xmax - xmin + 1
+        val rows = ymax - ymin + 1
+        val mask = Mat.zeros(rows, cols, CvType.CV_8UC1)
+        try {
+            val polygon = MatOfPoint(*Array(4) {
+                Point((corners[it].x - xmin).toInt().toDouble(), (corners[it].y - ymin).toInt().toDouble())
+            })
+            Imgproc.fillPoly(mask, listOf(polygon), Scalar(1.0))
+            val inside = ByteArray(rows * cols)
+            mask.get(0, 0, inside)
+            var sum = 0.0
+            var count = 0
+            for (y in 0 until rows) for (x in 0 until cols) {
+                if (inside[y * cols + x].toInt() != 0) {
+                    sum += probabilities[ymin + y][xmin + x]
+                    count++
+                }
+            }
+            return if (count == 0) 0.0 else sum / count
+        } finally {
+            mask.release()
         }
-        return if (count == 0) 0.0 else sum / count
     }
 
     /** Élargit la zone, comme unclip_ratio dans RapidOCR. */
@@ -319,6 +343,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         const val LIMIT_SIDE = 736
         const val THRESHOLD = 0.3f
         const val BOX_THRESHOLD = 0.5
+        const val MIN_SIDE = 3.0
         const val UNCLIP_RATIO = 1.6
         const val REC_HEIGHT = 48
         const val REC_WIDTH = 320
