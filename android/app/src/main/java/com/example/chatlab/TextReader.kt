@@ -74,7 +74,10 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
                         // A capital I before an apostrophe is a misread l: "I'herbe".
                         val fixed = line.replace("I'", "l'").replace("I’", "l’")
                         for (word in fixed.split(Regex("\\s+"))) {
-                            if (word.isNotBlank()) words.putIfAbsent(word.lowercase(), word)
+                            // A lone symbol or digit is noise on a photograph ("%", "0"), not a word.
+                            if (word.isNotBlank() && (word.length > 1 || word[0].isLetter())) {
+                                words.putIfAbsent(word.lowercase(), word)
+                            }
                         }
                     }
                 } finally {
