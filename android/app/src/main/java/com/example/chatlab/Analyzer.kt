@@ -118,7 +118,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             val started = System.nanoTime()
             val partial = try {
                 analyze(file)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 ImageResult(file, null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
             }
             partial.copy(millis = (System.nanoTime() - started) / 1_000_000)
@@ -163,8 +163,13 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
         val (faces, portrait) = countFaces(bitmap)
-        val text = reader.read(bitmap)
-        return ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary())
+        // A failure while reading the text is reported, not allowed to stop the whole analysis.
+        return try {
+            val text = reader.read(bitmap)
+            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary())
+        } catch (e: Throwable) {
+            ImageResult(file, answer, faces, portrait, vector, 0, textNote = "lecture du texte impossible : ${e.javaClass.simpleName} ${e.message ?: ""}")
+        }
     }
 
     /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
