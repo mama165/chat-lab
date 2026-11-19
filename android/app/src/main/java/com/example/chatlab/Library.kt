@@ -13,13 +13,21 @@ data class LibraryEntry(
     val indoor: Boolean?,
     val faces: Int,
     val text: String,
+    val vector: FloatArray? = null,
 )
+
+/** Une image retenue par la recherche ; score présent seulement pour la recherche par description. */
+data class Match(val entry: LibraryEntry, val score: Float?)
 
 /** Filtre de lieu proposé dans la recherche. */
 enum class Place { ALL, INDOOR, OUTDOOR }
 
-/** Le carnet produit par l'analyse, et la recherche par mot-clé dedans. */
+/** Le carnet produit par l'analyse, et les deux façons de chercher dedans. */
 object Library {
+    /** Seuils de SigLIP 2, mesurés sur XM3600 (voir infrastructure/catalog/siglip.go). */
+    private const val MARGIN = 0.04f
+    private const val FLOOR = 0.08f
+
     fun load(context: Context): List<LibraryEntry> {
         val file = File(context.filesDir, "library.json")
         if (!file.exists()) return emptyList()
@@ -33,31 +41,55 @@ object Library {
                 indoor = if (item.has("indoor")) item.getBoolean("indoor") else null,
                 faces = item.optInt("faces", 0),
                 text = item.optString("text", ""),
+                vector = item.optJSONArray("vectors")?.optJSONArray(0)?.let { values ->
+                    FloatArray(values.length()) { values.getDouble(it).toFloat() }
+                },
             )
         }
     }
 
     /**
-     * Les images qui contiennent tous les mots de la recherche, dans le texte lu ou dans le nom.
-     * Insensible à la casse et aux accents ; un mot tapé partiellement suffit ("fact" trouve "facture").
-     * Les images où plus de mots apparaissent dans le texte viennent en premier.
+     * Recherche par mots : les images qui contiennent tous les mots dans le texte lu ou dans le nom.
+     * Insensible à la casse et aux accents ; un mot incomplet suffit ("fact" trouve "facture").
      */
-    fun search(entries: List<LibraryEntry>, query: String, place: Place): List<LibraryEntry> {
+    fun searchWords(entries: List<LibraryEntry>, query: String, place: Place): List<Match> {
         val words = fold(query).split(" ").filter { it.isNotBlank() }
         return entries
-            .filter { entry ->
-                when (place) {
-                    Place.ALL -> true
-                    Place.INDOOR -> entry.indoor == true
-                    Place.OUTDOOR -> entry.indoor == false
-                }
-            }
+            .filter { inPlace(it, place) }
             .filter { entry ->
                 val text = fold(entry.text)
                 val name = fold(entry.name)
                 words.all { word -> text.contains(word) || name.contains(word) }
             }
             .sortedByDescending { entry -> words.count { word -> fold(entry.text).contains(word) } }
+            .map { Match(it, null) }
+    }
+
+    /**
+     * Recherche par description : les images dont le vecteur ressemble à celui de la phrase.
+     * Une image est retenue si elle est à MARGIN du meilleur score, et au-dessus de FLOOR.
+     */
+    fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place): List<Match> {
+        val scored = entries
+            .filter { inPlace(it, place) }
+            .mapNotNull { entry -> entry.vector?.let { entry to dot(query, it) } }
+        val best = scored.maxOfOrNull { it.second } ?: return emptyList()
+        return scored
+            .filter { (_, score) -> score >= best - MARGIN && score >= FLOOR }
+            .sortedByDescending { it.second }
+            .map { (entry, score) -> Match(entry, score) }
+    }
+
+    private fun inPlace(entry: LibraryEntry, place: Place): Boolean = when (place) {
+        Place.ALL -> true
+        Place.INDOOR -> entry.indoor == true
+        Place.OUTDOOR -> entry.indoor == false
+    }
+
+    private fun dot(a: FloatArray, b: FloatArray): Float {
+        var sum = 0f
+        for (i in a.indices) sum += a[i] * b[i]
+        return sum
     }
 
     /** Minuscules, sans accents, ponctuation remplacée par des espaces. */

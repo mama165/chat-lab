@@ -11,11 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +28,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -45,9 +46,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** L'écran principal : deux onglets, Rechercher et Analyser. */
+/** L'écran principal : deux onglets, Rechercher et Analyser, tous deux toujours présents. */
 @Composable
 fun MainScreen() {
     var tab by remember { mutableIntStateOf(0) }
@@ -76,7 +78,7 @@ fun MainScreen() {
     }
 }
 
-/** Recherche par mot-clé dans le texte lu sur les images. */
+/** Recherche : par mots dans le texte lu, ou par description (la phrase est comparée aux images). */
 @Composable
 fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     val context = LocalContext.current
@@ -84,7 +86,29 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     val entries = remember(visible) { Library.load(context) }
     var query by remember { mutableStateOf("") }
     var place by remember { mutableStateOf(Place.ALL) }
-    val results = remember(query, place, entries) { Library.search(entries, query, place) }
+    var byDescription by remember { mutableStateOf(false) }
+    var queryVector by remember { mutableStateOf<FloatArray?>(null) }
+    var modelError by remember { mutableStateOf<String?>(null) }
+
+    // In description mode, the sentence is turned into a vector once the typing pauses.
+    LaunchedEffect(query, byDescription) {
+        queryVector = null
+        modelError = null
+        if (byDescription && query.isNotBlank()) {
+            delay(400)
+            try {
+                queryVector = withContext(Dispatchers.Default) { TextModels.get(context).encode(query) }
+            } catch (error: Exception) {
+                modelError = error.message ?: error.javaClass.simpleName
+            }
+        }
+    }
+
+    val matches: List<Match> = when {
+        query.isBlank() -> emptyList()
+        !byDescription -> Library.searchWords(entries, query, place)
+        else -> queryVector?.let { Library.searchDescription(entries, it, place) } ?: emptyList()
+    }
 
     Column(
         modifier = modifier
@@ -95,11 +119,29 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Ce que vous cherchez") },
-            placeholder = { Text("facture, wifi, sortie…") },
+            label = { Text(if (byDescription) "Décrivez ce que vous cherchez" else "Ce que vous cherchez") },
+            placeholder = {
+                Text(
+                    if (byDescription) "une cuisine, deux personnes, une plage…"
+                    else "facture, wifi, sortie…",
+                )
+            },
             singleLine = true,
         )
         Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = !byDescription,
+                onClick = { byDescription = false },
+                label = { Text("Mots") },
+            )
+            FilterChip(
+                selected = byDescription,
+                onClick = { byDescription = true },
+                label = { Text("Description") },
+            )
+        }
+        Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = place == Place.ALL,
@@ -124,23 +166,31 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 "Aucune image analysée pour l'instant. Ouvrez l'onglet Analyser, puis lancez l'analyse.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            query.isBlank() -> Text(
-                "${entries.size} image(s) dans le carnet. Tapez un mot pour chercher dans le texte des images.",
+            modelError != null -> Text(
+                "Recherche par description indisponible : $modelError",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            results.isEmpty() -> Text(
-                "Aucune image ne contient « $query ».",
+            byDescription && query.isNotBlank() && queryVector == null -> Text(
+                "Lecture de la description…",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            query.isBlank() -> Text(
+                "${entries.size} image(s) dans le carnet. Tapez un mot, ou une description.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            matches.isEmpty() -> Text(
+                "Aucune image ne correspond à « $query ».",
                 style = MaterialTheme.typography.bodyMedium,
             )
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
                     Text(
-                        "${results.size} résultat(s)",
+                        "${matches.size} résultat(s)",
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }
-                items(results, key = { it.id }) { entry ->
-                    ResultCard(entry)
+                items(matches, key = { it.entry.id }) { match ->
+                    ResultCard(match)
                 }
             }
         }
@@ -148,7 +198,8 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
 }
 
 @Composable
-private fun ResultCard(entry: LibraryEntry) {
+private fun ResultCard(match: Match) {
+    val entry = match.entry
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -167,6 +218,12 @@ private fun ResultCard(entry: LibraryEntry) {
                     summary(entry),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                match.score?.let {
+                    Text(
+                        "ressemblance ${"%.3f".format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 if (entry.text.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     Text(
