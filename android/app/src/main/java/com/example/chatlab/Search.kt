@@ -104,10 +104,11 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
         }
     }
 
+    val criteria = remember(query) { Library.criteria(query) }
     val matches: List<Match> = when {
         query.isBlank() -> emptyList()
         !byDescription -> Library.searchWords(entries, query, place)
-        else -> queryVector?.let { Library.searchDescription(entries, it, place) } ?: emptyList()
+        else -> queryVector?.let { Library.searchDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
     }
 
     Column(
@@ -160,6 +161,17 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             )
         }
         Spacer(Modifier.height(16.dp))
+        if (byDescription && (criteria.people != null || criteria.place != null)) {
+            val parts = listOfNotNull(
+                criteria.people?.let { "$it personne(s)" },
+                criteria.place?.let { if (it == Place.INDOOR) "en intérieur" else "en extérieur" },
+            )
+            Text(
+                "Critères compris : ${parts.joinToString(" · ")}",
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
 
         when {
             entries.isEmpty() -> Text(

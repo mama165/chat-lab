@@ -22,6 +22,9 @@ data class Match(val entry: LibraryEntry, val score: Float?)
 /** Filtre de lieu proposé dans la recherche. */
 enum class Place { ALL, INDOOR, OUTDOOR }
 
+/** Critères lus dans une phrase : nombre de personnes et lieu, si la phrase les nomme. */
+data class Criteria(val people: Int?, val place: Place?)
+
 /** Le carnet produit par l'analyse, et les deux façons de chercher dedans. */
 object Library {
     /** Seuils de SigLIP 2, mesurés sur XM3600 (voir infrastructure/catalog/siglip.go). */
@@ -69,15 +72,48 @@ object Library {
      * Recherche par description : les images dont le vecteur ressemble à celui de la phrase.
      * Une image est retenue si elle est à MARGIN du meilleur score, et au-dessus de FLOOR.
      */
-    fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place): List<Match> {
+    fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> {
         val scored = entries
             .filter { inPlace(it, place) }
             .mapNotNull { entry -> entry.vector?.let { entry to dot(query, it) } }
         val best = scored.maxOfOrNull { it.second } ?: return emptyList()
         return scored
             .filter { (_, score) -> score >= best - MARGIN && score >= FLOOR }
-            .sortedByDescending { it.second }
+            .filter { (entry, _) -> people == null || kotlin.math.abs(entry.faces - people) <= 1 }
+            // With a number of people asked, the pictures with exactly that number come first.
+            .sortedWith(compareBy<Pair<LibraryEntry, Float>> { (entry, _) -> people?.let { kotlin.math.abs(entry.faces - it) } ?: 0 }
+                .thenByDescending { (_, score) -> score })
             .map { (entry, score) -> Match(entry, score) }
+    }
+
+    /**
+     * Lit dans la phrase le nombre de personnes (« deux personnes », « 3 visages ») et le lieu
+     * (« en intérieur », « en extérieur »). Une phrase qui ne les nomme pas ne filtre pas.
+     */
+    fun criteria(sentence: String): Criteria {
+        val text = fold(sentence)
+        val people = Regex("\\b(\\d+|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix) (personnes?|visages?|gens)\\b")
+            .find(text)?.groupValues?.get(1)?.let { number(it) }
+        val place = when {
+            Regex("\\b(interieur|dans une piece)\\b").containsMatchIn(text) -> Place.INDOOR
+            Regex("\\b(exterieur|dehors|plein air)\\b").containsMatchIn(text) -> Place.OUTDOOR
+            else -> null
+        }
+        return Criteria(people, place)
+    }
+
+    private fun number(word: String): Int? = word.toIntOrNull() ?: when (word) {
+        "un", "une" -> 1
+        "deux" -> 2
+        "trois" -> 3
+        "quatre" -> 4
+        "cinq" -> 5
+        "six" -> 6
+        "sept" -> 7
+        "huit" -> 8
+        "neuf" -> 9
+        "dix" -> 10
+        else -> null
     }
 
     private fun inPlace(entry: LibraryEntry, place: Place): Boolean = when (place) {
