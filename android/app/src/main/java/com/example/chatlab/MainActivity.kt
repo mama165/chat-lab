@@ -43,9 +43,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AndroidTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    TestScreen(modifier = Modifier.padding(innerPadding))
-                }
+                MainScreen()
             }
         }
     }
