@@ -57,6 +57,10 @@ data class ImageResult(
  * Le carnet produit est écrit dans files/library.json.
  */
 class Analyzer(context: Context, tree: Uri) : AutoCloseable {
+    private companion object {
+        val PART = Regex("\\.part\\d+$")
+    }
+
     private val env = OrtEnvironment.getEnvironment()
     private val root = context.filesDir
     private val models = File(root, "models")
@@ -101,13 +105,36 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
 
     private fun importFolder(context: Context, source: DocumentFile, target: File) {
         target.mkdirs()
+        importParts(context, source, target)
         for (file in source.listFiles()) {
             val name = file.name ?: continue
-            if (!file.isFile) continue
+            if (!file.isFile || PART.containsMatchIn(name)) continue
             val destination = File(target, name)
             if (destination.exists() && destination.length() == file.length()) continue
             val input = context.contentResolver.openInputStream(file.uri) ?: error("lecture impossible : $name")
             input.use { stream -> destination.outputStream().use { stream.copyTo(it) } }
+        }
+    }
+
+    /**
+     * Un fichier trop gros pour être envoyé est découpé en morceaux « nom.partN » :
+     * ils sont recollés ici, dans l'ordre, en un seul fichier.
+     */
+    private fun importParts(context: Context, source: DocumentFile, target: File) {
+        val parts = source.listFiles()
+            .filter { it.isFile && PART.containsMatchIn(it.name ?: "") }
+            .groupBy { (it.name ?: "").substringBeforeLast(".part") }
+        for ((base, files) in parts) {
+            val ordered = files.sortedBy { (it.name ?: "").substringAfterLast(".part").toInt() }
+            val total = ordered.sumOf { it.length() }
+            val destination = File(target, base)
+            if (destination.exists() && destination.length() == total) continue
+            destination.outputStream().use { output ->
+                for (part in ordered) {
+                    val input = context.contentResolver.openInputStream(part.uri) ?: error("lecture impossible : ${part.name}")
+                    input.use { it.copyTo(output) }
+                }
+            }
         }
     }
 
