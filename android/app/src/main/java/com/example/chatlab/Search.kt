@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -61,20 +62,26 @@ fun MainScreen() {
             }
         },
     ) { innerPadding ->
-        if (tab == 0) {
-            SearchScreen(modifier = Modifier.padding(innerPadding))
-        } else {
-            TestScreen(modifier = Modifier.padding(innerPadding))
+        // Both screens stay in the composition, so an analysis keeps running while the search is open.
+        // The hidden one is shrunk to nothing and clipped, so it neither shows nor takes touches.
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            SearchScreen(
+                modifier = if (tab == 0) Modifier.fillMaxSize() else Modifier.size(0.dp).clipToBounds(),
+                visible = tab == 0,
+            )
+            TestScreen(
+                modifier = if (tab == 1) Modifier.fillMaxSize() else Modifier.size(0.dp).clipToBounds(),
+            )
         }
     }
 }
 
 /** Recherche par mot-clé dans le texte lu sur les images. */
 @Composable
-fun SearchScreen(modifier: Modifier = Modifier) {
+fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     val context = LocalContext.current
-    // Rechargé à chaque ouverture de l'onglet, pour voir la dernière analyse.
-    val entries = remember { Library.load(context) }
+    // Reloaded each time the tab is opened, to see the latest analysis.
+    val entries = remember(visible) { Library.load(context) }
     var query by remember { mutableStateOf("") }
     var place by remember { mutableStateOf(Place.ALL) }
     val results = remember(query, place, entries) { Library.search(entries, query, place) }
