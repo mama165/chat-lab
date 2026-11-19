@@ -27,9 +27,8 @@ data class Criteria(val people: Int?, val place: Place?)
 
 /** Le carnet produit par l'analyse, et les deux façons de chercher dedans. */
 object Library {
-    /** Seuils de SigLIP 2, mesurés sur XM3600 (voir infrastructure/catalog/siglip.go). */
-    private const val MARGIN = 0.04f
-    private const val FLOOR = 0.08f
+    /** Nombre d'images montrées pour une description. */
+    private const val TOP = 5
 
     fun load(context: Context): List<LibraryEntry> {
         val file = File(context.filesDir, "library.json")
@@ -69,42 +68,19 @@ object Library {
     }
 
     /**
-     * Recherche par description : les images dont le vecteur ressemble à celui de la phrase.
-     * Une image est retenue si elle est à MARGIN du meilleur score, et au-dessus de FLOOR.
+     * Recherche par description : les images dont le vecteur ressemble le plus à celui de la phrase.
+     * On montre les TOP premières, avec leur score, sans seuil caché. Le nombre de personnes et le lieu,
+     * s'ils sont nommés dans la phrase, filtrent explicitement (et l'écran l'affiche).
      */
     fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> {
-        val scored = entries
+        return entries
             .filter { inPlace(it, place) }
-            .mapNotNull { entry -> entry.vector?.let { entry to dot(query, it) } }
-        val best = scored.maxOfOrNull { it.second } ?: return emptyList()
-        return scored
-            .filter { (_, score) -> score >= best - MARGIN && score >= FLOOR }
-            .filter { (entry, _) -> people == null || kotlin.math.abs(entry.faces - people) <= 1 }
-            // With a number of people asked, the pictures with exactly that number come first.
-            .sortedWith(compareBy<Pair<LibraryEntry, Float>> { (entry, _) -> people?.let { kotlin.math.abs(entry.faces - it) } ?: 0 }
-                .thenByDescending { (_, score) -> score })
-            .map { (entry, score) -> Match(entry, score) }
+            .filter { entry -> people == null || kotlin.math.abs(entry.faces - people) <= 1 }
+            .mapNotNull { entry -> entry.vector?.let { Match(entry, dot(query, it)) } }
+            .sortedWith(compareBy<Match> { match -> people?.let { kotlin.math.abs(match.entry.faces - it) } ?: 0 }
+                .thenByDescending { match -> match.score })
+            .take(TOP)
     }
-
-    /**
-     * Si un mot de la phrase se retrouve dans le texte lu sur certaines images, on ne garde que
-     * celles-là : « une facture » ne montre pas les autres captures de texte. Sinon, rien ne change.
-     */
-    fun preferTextHits(matches: List<Match>, sentence: String): List<Match> {
-        val keywords = fold(sentence).split(" ").filter { it.length >= 4 && it !in STOP_WORDS }
-        if (keywords.isEmpty()) return matches
-        val hits = matches.filter { match ->
-            val text = fold(match.entry.text)
-            keywords.any { text.contains(it) }
-        }
-        return if (hits.isEmpty()) matches else hits
-    }
-
-    private val STOP_WORDS = setOf(
-        "avec", "dans", "photo", "photos", "image", "images", "personne", "personnes", "visage", "visages",
-        "sans", "pour", "tout", "tous", "sont", "cette", "cela", "dessus", "dehors", "interieur", "exterieur",
-        "plein", "autre", "entre", "sur", "les", "des", "une", "deux", "trois", "quatre", "cinq", "gens",
-    )
 
     /**
      * Lit dans la phrase le nombre de personnes (« deux personnes », « 3 visages ») et le lieu

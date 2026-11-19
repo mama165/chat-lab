@@ -109,9 +109,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     val matches: List<Match> = when {
         query.isBlank() -> emptyList()
         !byDescription -> Library.searchWords(entries, query, place)
-        else -> queryVector?.let {
-            Library.preferTextHits(Library.searchDescription(entries, it, criteria.place ?: place, criteria.people), query)
-        } ?: emptyList()
+        else -> queryVector?.let { Library.searchDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
     }
 
     Column(
@@ -208,7 +206,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
                     Text(
-                        "${matches.size} résultat(s)",
+                        if (byDescription) "Les ${matches.size} images les plus proches" else "${matches.size} résultat(s)",
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }
