@@ -87,6 +87,26 @@ object Library {
     }
 
     /**
+     * Si un mot de la phrase se retrouve dans le texte lu sur certaines images, on ne garde que
+     * celles-là : « une facture » ne montre pas les autres captures de texte. Sinon, rien ne change.
+     */
+    fun preferTextHits(matches: List<Match>, sentence: String): List<Match> {
+        val keywords = fold(sentence).split(" ").filter { it.length >= 4 && it !in STOP_WORDS }
+        if (keywords.isEmpty()) return matches
+        val hits = matches.filter { match ->
+            val text = fold(match.entry.text)
+            keywords.any { text.contains(it) }
+        }
+        return if (hits.isEmpty()) matches else hits
+    }
+
+    private val STOP_WORDS = setOf(
+        "avec", "dans", "photo", "photos", "image", "images", "personne", "personnes", "visage", "visages",
+        "sans", "pour", "tout", "tous", "sont", "cette", "cela", "dessus", "dehors", "interieur", "exterieur",
+        "plein", "autre", "entre", "sur", "les", "des", "une", "deux", "trois", "quatre", "cinq", "gens",
+    )
+
+    /**
      * Lit dans la phrase le nombre de personnes (« deux personnes », « 3 visages ») et le lieu
      * (« en intérieur », « en extérieur »). Une phrase qui ne les nomme pas ne filtre pas.
      */

@@ -109,7 +109,9 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     val matches: List<Match> = when {
         query.isBlank() -> emptyList()
         !byDescription -> Library.searchWords(entries, query, place)
-        else -> queryVector?.let { Library.searchDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
+        else -> queryVector?.let {
+            Library.preferTextHits(Library.searchDescription(entries, it, criteria.place ?: place, criteria.people), query)
+        } ?: emptyList()
     }
 
     Column(
