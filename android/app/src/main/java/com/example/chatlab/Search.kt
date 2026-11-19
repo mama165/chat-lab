@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,9 +52,12 @@ fun MainScreen() {
     var tab by remember { mutableIntStateOf(0) }
     Scaffold(
         topBar = {
-            TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Rechercher") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Analyser") })
+            // With edge-to-edge display, the tabs must start below the status bar.
+            Column(modifier = Modifier.statusBarsPadding()) {
+                TabRow(selectedTabIndex = tab) {
+                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Rechercher") })
+                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Analyser") })
+                }
             }
         },
     ) { innerPadding ->
