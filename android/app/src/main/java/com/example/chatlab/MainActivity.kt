@@ -160,6 +160,7 @@ fun runAnalysis(context: Context, folder: Uri): String = try {
             appendLine()
             appendLine("Total : $total ms pour ${results.size} image(s).")
             appendLine("Carnet écrit : ${library.path}")
+            appendLine(runCatching { TextModels.control(context) }.getOrElse { "contrôle texte : ${it.message}" })
         }
     }
 } catch (e: Exception) {
