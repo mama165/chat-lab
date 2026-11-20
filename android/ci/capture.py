@@ -18,6 +18,7 @@ PACKAGE = "com.example.chatlab"
 HERE = os.path.dirname(os.path.abspath(__file__))
 APK = os.environ.get("APK", os.path.join(HERE, "..", "..", "ci-apk", "app-debug.apk"))
 FIXTURE = os.path.join(HERE, "fixtures", "library.json")
+TEST_IMAGES = os.path.join(HERE, "fixtures", "test")
 OUT = os.path.join(HERE, "screens")
 
 
@@ -113,28 +114,52 @@ def relaunch():
     dismiss_system_dialogs()
 
 
+def clear_text():
+    tap(cls="android.widget.EditText")
+    adb("shell", "input", "keyevent", "KEYCODE_MOVE_END")
+    for _ in range(40):
+        adb("shell", "input", "keyevent", "KEYCODE_DEL")
+    time.sleep(1)
+
+
 def main():
     wait_for_boot()
     time.sleep(20)  # let the launcher finish its first start
     adb("install", "-r", "-g", APK)
-    # First launch creates the app's private storage, then the example library goes in.
+    # First launch creates the app's private storage; then the test data goes in.
     relaunch()
     adb("push", FIXTURE, "/data/local/tmp/library.json")
     adb("shell", "run-as", PACKAGE, "cp", "/data/local/tmp/library.json", "files/library.json")
+    adb("shell", "run-as", PACKAGE, "mkdir", "-p", "files/test")
+    for name in sorted(os.listdir(TEST_IMAGES)):
+        adb("push", os.path.join(TEST_IMAGES, name), f"/data/local/tmp/{name}")
+        adb("shell", "run-as", PACKAGE, "cp", f"/data/local/tmp/{name}", "files/test/")
+    adb("push", os.path.join(HERE, "fixtures", "query_vectors.json"), "/data/local/tmp/query_vectors.json")
+    adb("shell", "run-as", PACKAGE, "cp", "/data/local/tmp/query_vectors.json", "files/query_vectors.json")
     relaunch()
 
     shot("01-rechercher-vide.png")
-    tap(text="Mots")
-    type_text("facture")
-    shot("02-mots-facture.png")
+    # Ten searches, each with its own screenshot: words first, then descriptions.
+    searches = [
+        ("Mots", "facture"),
+        ("Mots", "wifi"),
+        ("Mots", "sortie"),
+        ("Mots", "herbe"),
+        ("Mots", "soldes"),
+        ("Description", "une facture"),
+        ("Description", "une sortie de secours"),
+        ("Description", "un ticket wifi"),
+        ("Description", "deux personnes"),
+        ("Description", "un paysage avec des nuages"),
+    ]
+    for index, (mode, query) in enumerate(searches, start=2):
+        tap(text=mode)
+        clear_text()
+        type_text(query)
+        shot(f"{index:02d}-{mode.lower()}-{query.replace(' ', '-')}.png")
 
     tap(text="Analyser")
-    shot("03-analyser.png")
-
-    tap(text="Rechercher")
-    tap(text="Description")
-    type_text("un paysage avec des nuages")
-    shot("04-description.png")
+    shot("12-analyser.png")
     return 0
 
 
