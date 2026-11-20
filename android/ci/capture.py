@@ -47,7 +47,8 @@ def screen_tree():
 
 def find(root, text=None, cls=None):
     for node in root.iter("node"):
-        same_text = text is None or text in (node.get("text"), node.get("content-desc"))
+        label = f"{node.get('text') or ''} {node.get('content-desc') or ''}"
+        same_text = text is None or text in label
         same_class = cls is None or node.get("class") == cls
         if same_text and same_class:
             return node
@@ -56,12 +57,18 @@ def find(root, text=None, cls=None):
 
 def tap(text=None, cls=None):
     node = None
-    for _ in range(5):
-        node = find(screen_tree(), text, cls)
+    tree = None
+    for _ in range(15):
+        tree = screen_tree()
+        node = find(tree, text, cls)
         if node is not None:
             break
         time.sleep(1)
     if node is None:
+        # Keep what was on screen, to see why the element was not there.
+        os.makedirs(OUT, exist_ok=True)
+        subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(os.path.join(OUT, "erreur.png"), "wb"))
+        ET.ElementTree(tree).write(os.path.join(OUT, "erreur-ecran.xml"))
         raise SystemExit(f"élément introuvable : {text or cls}")
     left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
     adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
