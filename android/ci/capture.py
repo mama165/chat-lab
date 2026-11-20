@@ -15,6 +15,7 @@ import time
 import xml.etree.ElementTree as ET
 
 PACKAGE = "com.example.chatlab"
+LAUNCHER = "com.google.android.apps.nexuslauncher"
 HERE = os.path.dirname(os.path.abspath(__file__))
 APK = os.environ.get("APK", os.path.join(HERE, "..", "..", "ci-apk", "app-debug.apk"))
 FIXTURE = os.path.join(HERE, "fixtures", "library.json")
@@ -105,6 +106,13 @@ def dismiss_system_dialogs():
         print("alerte système : on attend")
         tap(text="Wait")
         time.sleep(3)
+    if find(screen_tree(), "isn't responding") is not None:
+        # The alert keeps coming back: restart the launcher itself, then go to the home screen.
+        print("alerte système persistante : redémarrage du lanceur")
+        adb("shell", "am", "force-stop", LAUNCHER)
+        time.sleep(8)
+        adb("shell", "input", "keyevent", "KEYCODE_HOME")
+        time.sleep(5)
 
 
 def relaunch():
