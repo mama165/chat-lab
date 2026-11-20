@@ -69,6 +69,12 @@ def tap(text=None, cls=None):
         os.makedirs(OUT, exist_ok=True)
         subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(os.path.join(OUT, "erreur.png"), "wb"))
         ET.ElementTree(tree).write(os.path.join(OUT, "erreur-ecran.xml"))
+        # Print what is on screen, so the log shows why the element was not found.
+        print("écran au moment du blocage :")
+        for node in tree.iter("node"):
+            label = f"{node.get('text') or ''} | {node.get('content-desc') or ''}"
+            if label.strip(" |"):
+                print(f"  {node.get('class')} : {label}")
         raise SystemExit(f"élément introuvable : {text or cls}")
     left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
     adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
