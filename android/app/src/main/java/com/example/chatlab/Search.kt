@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -99,6 +100,9 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             delay(400)
             try {
                 queryVector = withContext(Dispatchers.Default) { TextModels.vectorFor(context, query) }
+            } catch (error: CancellationException) {
+                // The query changed again or the screen left the composition: not an error to show.
+                throw error
             } catch (error: Exception) {
                 modelError = error.message ?: error.javaClass.simpleName
             }
