@@ -32,6 +32,7 @@ data class Progress(
     val startedAt: Long = 0L,
     val errors: Int = 0,
     val message: String = "",
+    val report: String = "",
 )
 
 object AnalysisProgress {
@@ -73,6 +74,7 @@ class AnalysisService : Service() {
                     val images = listImages(this@AnalysisService, Uri.parse(source))
                     val total = images.size
                     val results = ArrayList<ImageResult>()
+                    val lines = StringBuilder()
                     var errors = 0
                     images.forEachIndexed { index, image ->
                         val name = image.name ?: "image"
@@ -84,11 +86,14 @@ class AnalysisService : Service() {
                         }
                         if (result.error != null) errors++
                         results += result
+                        lines.appendLine(describe(result))
                     }
                     analyzer.writeLibrary(results)
                     val ok = results.count { it.error == null }
+                    val elapsed = System.currentTimeMillis() - started
+                    val header = "Analyse complète : $total fichier(s), $ok ajouté(s), $errors erreur(s), durée ${clock(elapsed)}\n"
                     finish(
-                        Progress(false, total, total, "", started, errors),
+                        Progress(false, total, total, "", started, errors, report = header + lines),
                         "Analyse terminée : $ok image(s) ajoutée(s), $errors erreur(s).",
                     )
                 }
@@ -190,6 +195,18 @@ fun progressLine(progress: Progress, now: Long): String {
         if (progress.errors > 0) append(" · ${progress.errors} erreur(s)")
         if (progress.current.isNotBlank()) append("\n${progress.current}")
     }
+}
+
+/** Une ligne du compte rendu, dans le même format que l'analyse des images de test. */
+private fun describe(r: ImageResult): String {
+    if (r.error != null) return "${r.file.name} : erreur, ${r.error}"
+    val place = when (r.indoor) {
+        true -> "intérieur"
+        false -> "extérieur"
+        null -> "inconnu"
+    }
+    val text = if (r.text.isNotBlank()) "\n  texte : ${r.text}" else ""
+    return "${r.file.name} : $place, ${r.faces} visage(s), ${r.millis} ms$text"
 }
 
 private fun clock(millis: Long): String {
