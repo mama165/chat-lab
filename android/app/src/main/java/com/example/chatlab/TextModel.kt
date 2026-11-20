@@ -162,6 +162,23 @@ object TextModels {
         return model
     }
 
+    /**
+     * Le vecteur d'une phrase : celui du fichier de test query_vectors.json s'il le fournit
+     * (tests d'interface sur émulateur, sans le modèle de texte), sinon celui du modèle.
+     */
+    @Synchronized
+    fun vectorFor(context: Context, text: String): FloatArray {
+        val file = File(context.filesDir, "query_vectors.json")
+        if (file.exists()) {
+            val known = JSONObject(file.readText(Charsets.UTF_8))
+            if (known.has(text)) {
+                val array = known.getJSONArray(text)
+                return FloatArray(array.length()) { array.getDouble(it).toFloat() }
+            }
+        }
+        return get(context).encode(text)
+    }
+
     /** Ligne de contrôle pour le compte rendu : identifiants et premières valeurs, à comparer à l'ordinateur. */
     @Synchronized
     fun control(context: Context): String {
