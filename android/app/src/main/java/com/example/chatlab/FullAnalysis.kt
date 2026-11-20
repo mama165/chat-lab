@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.documentfile.provider.DocumentFile
+import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,8 +21,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** État de l'analyse complète, lu par l'écran pour afficher la progression. */
 data class Progress(
@@ -48,7 +54,9 @@ object AnalysisProgress {
  * Analyse tout le dossier choisi (sous-dossiers compris) dans un service de premier plan,
  * pour que le traitement continue quand on quitte l'application. Les images sont copiées
  * dans l'espace privé de l'application avant d'être analysées, afin que la recherche puisse
- * les afficher. Le carnet library.json est réécrit à la fin.
+ * les afficher. Une image déjà analysée et inchangée (même source, taille et date) est
+ * reprise du carnet existant sans être analysée de nouveau. Le carnet library.json est
+ * réécrit à la fin.
  */
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -73,14 +81,33 @@ class AnalysisService : Service() {
                 Analyzer(this@AnalysisService, Uri.parse(chatlab)).use { analyzer ->
                     val images = listImages(this@AnalysisService, Uri.parse(source))
                     val total = images.size
+                    val known = readKnown(this@AnalysisService)
                     val results = ArrayList<ImageResult>()
                     val lines = StringBuilder()
                     var errors = 0
+                    var reused = 0
                     images.forEachIndexed { index, image ->
                         val name = image.name ?: "image"
                         publish(Progress(true, index, total, name, started, errors))
+                        val sourceUri = image.uri.toString()
+                        val target = targetFor(this@AnalysisService, sourceUri, name)
+                        val previous = known[sourceUri]?.takeIf {
+                            it.optLong("size") == image.length() &&
+                                it.optLong("modified") == image.lastModified() &&
+                                target.exists()
+                        }
                         val result = try {
-                            analyzer.analyzeFile(copyOnce(this@AnalysisService, image, name))
+                            if (previous != null) {
+                                reused++
+                                fromLibrary(previous, target)
+                            } else {
+                                copyOnce(this@AnalysisService, image, target)
+                                analyzer.analyzeFile(target).copy(
+                                    source = sourceUri,
+                                    modified = image.lastModified(),
+                                    taken = takenDate(target) ?: fileDate(image.lastModified()),
+                                )
+                            }
                         } catch (e: Throwable) {
                             ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
                         }
@@ -91,7 +118,8 @@ class AnalysisService : Service() {
                     analyzer.writeLibrary(results)
                     val ok = results.count { it.error == null }
                     val elapsed = System.currentTimeMillis() - started
-                    val header = "Analyse complète : $total fichier(s), $ok ajouté(s), $errors erreur(s), durée ${clock(elapsed)}\n"
+                    val header = "Analyse complète : $total fichier(s), $reused repris du carnet, " +
+                        "$ok ajouté(s), $errors erreur(s), durée ${clock(elapsed)}\n"
                     finish(
                         Progress(false, total, total, "", started, errors, report = header + lines),
                         "Analyse terminée : $ok image(s) ajoutée(s), $errors erreur(s).",
@@ -231,19 +259,68 @@ private fun listImages(context: Context, tree: Uri): List<DocumentFile> {
 private fun isImage(name: String?): Boolean =
     name != null && name.substringAfterLast('.', "").lowercase() in setOf("jpg", "jpeg", "png", "webp")
 
-/**
- * Copie l'image dans filesDir/full/<empreinte>/<nom>. Une copie déjà présente et de même
- * taille n'est pas recopiée, pour qu'une nouvelle analyse du même dossier soit rapide.
- */
-private fun copyOnce(context: Context, image: DocumentFile, name: String): File {
+/** Emplacement privé d'une image : filesDir/full/<empreinte de la source>/<nom>. */
+private fun targetFor(context: Context, sourceUri: String, name: String): File {
     val key = MessageDigest.getInstance("SHA-1")
-        .digest(image.uri.toString().toByteArray())
+        .digest(sourceUri.toByteArray())
         .joinToString("") { "%02x".format(it) }
         .take(16)
-    val target = File(File(context.filesDir, "full/$key").apply { mkdirs() }, name)
-    if (!target.exists() || target.length() != image.length()) {
-        val input = context.contentResolver.openInputStream(image.uri) ?: error("lecture impossible : $name")
-        input.use { source -> target.outputStream().use { source.copyTo(it) } }
-    }
-    return target
+    return File(File(context.filesDir, "full/$key").apply { mkdirs() }, name)
 }
+
+/** Copie l'image vers target, sauf si une copie de même taille est déjà là. */
+private fun copyOnce(context: Context, image: DocumentFile, target: File) {
+    if (target.exists() && target.length() == image.length()) return
+    val input = context.contentResolver.openInputStream(image.uri) ?: error("lecture impossible : ${target.name}")
+    input.use { source -> target.outputStream().use { source.copyTo(it) } }
+}
+
+/** Les entrées du carnet existant qui ont une source, indexées par cette source. */
+private fun readKnown(context: Context): Map<String, JSONObject> {
+    val file = File(context.filesDir, "library.json")
+    if (!file.exists()) return emptyMap()
+    return try {
+        val array = JSONArray(file.readText(Charsets.UTF_8))
+        (0 until array.length())
+            .map { array.getJSONObject(it) }
+            .filter { it.has("source") }
+            .associateBy { it.getString("source") }
+    } catch (e: Exception) {
+        emptyMap()
+    }
+}
+
+/** Rebâtit un résultat à partir d'une entrée du carnet, sans relancer l'analyse. */
+private fun fromLibrary(item: JSONObject, target: File): ImageResult {
+    val values = item.optJSONArray("vectors")?.optJSONArray(0)?.let { array ->
+        FloatArray(array.length()) { array.getDouble(it).toFloat() }
+    }
+    return ImageResult(
+        file = target,
+        indoor = if (item.has("indoor")) item.getBoolean("indoor") else null,
+        faces = item.optInt("faces", 0),
+        portrait = item.optBoolean("portrait", false),
+        vector = values,
+        millis = 0,
+        text = item.optString("text", ""),
+        taken = item.optString("taken", ""),
+        source = item.optString("source", ""),
+        modified = item.optLong("modified", 0L),
+    )
+}
+
+/** Date de prise de vue (EXIF), au format jj/mm/aaaa hh:mm, ou null si absente. */
+private fun takenDate(file: File): String? {
+    val raw = try {
+        ExifInterface(file.path).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+    } catch (e: Exception) {
+        null
+    } ?: return null
+    val date = raw.substringBefore(' ').split(':')
+    val time = raw.substringAfter(' ', "").take(5)
+    return if (date.size == 3) "${date[2]}/${date[1]}/${date[0]} $time".trim() else null
+}
+
+/** Date de modification du fichier, utilisée quand la photo n'a pas de date EXIF. */
+private fun fileDate(millis: Long): String =
+    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE).format(Date(millis))

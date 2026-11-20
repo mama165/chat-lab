@@ -14,6 +14,7 @@ data class LibraryEntry(
     val faces: Int,
     val text: String,
     val vector: FloatArray? = null,
+    val taken: String = "",
 )
 
 /** Une image retenue par la recherche ; score présent seulement pour la recherche par description. */
@@ -43,6 +44,7 @@ object Library {
                 indoor = if (item.has("indoor")) item.getBoolean("indoor") else null,
                 faces = item.optInt("faces", 0),
                 text = item.optString("text", ""),
+                taken = item.optString("taken", ""),
                 vector = item.optJSONArray("vectors")?.optJSONArray(0)?.let { values ->
                     FloatArray(values.length()) { values.getDouble(it).toFloat() }
                 },
