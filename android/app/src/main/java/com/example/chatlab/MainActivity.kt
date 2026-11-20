@@ -1,12 +1,16 @@
 package com.example.chatlab
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -22,8 +26,11 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.chatlab.ui.theme.AndroidTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -51,6 +59,13 @@ class MainActivity : ComponentActivity() {
 
 private const val PREFERENCES = "chatlab"
 private const val KEY_FOLDER = "folder"
+private const val KEY_SOURCE = "source"
+
+private fun startFullAnalysis(context: Context, preferences: android.content.SharedPreferences) {
+    val chatlab = preferences.getString(KEY_FOLDER, null)
+    val source = preferences.getString(KEY_SOURCE, null)
+    if (chatlab != null && source != null) AnalysisService.start(context, chatlab, source)
+}
 
 @Composable
 fun TestScreen(modifier: Modifier = Modifier) {
@@ -65,6 +80,16 @@ fun TestScreen(modifier: Modifier = Modifier) {
         )
     }
     var running by remember { mutableStateOf(false) }
+    var sourceName by remember { mutableStateOf(preferences.getString(KEY_SOURCE, null)) }
+    val progress by AnalysisProgress.state.collectAsState()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(progress.running) {
+        while (progress.running) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
 
     val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -73,6 +98,19 @@ fun TestScreen(modifier: Modifier = Modifier) {
             preferences.edit().putString(KEY_FOLDER, uri.toString()).apply()
             report = "Dossier enregistré. Appuyez sur le bouton pour analyser."
         }
+    }
+
+    val chooseSource = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            preferences.edit().putString(KEY_SOURCE, uri.toString()).apply()
+            sourceName = uri.toString()
+        }
+    }
+
+    // Sur Android 13 et plus, les notifications doivent être autorisées ; le traitement part dans tous les cas.
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        startFullAnalysis(context, preferences)
     }
 
     Column(
@@ -126,6 +164,37 @@ fun TestScreen(modifier: Modifier = Modifier) {
             },
         ) {
             Text("Partager le compte rendu")
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("Analyse complète", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = { chooseSource.launch(null) }) {
+            Text("Choisir le dossier à analyser en entier")
+        }
+        Text(
+            if (sourceName == null) "Aucun dossier choisi (sous-dossiers inclus)."
+            else "Dossier choisi, ses sous-dossiers seront aussi analysés.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(8.dp))
+        Button(
+            enabled = !progress.running && sourceName != null,
+            onClick = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    startFullAnalysis(context, preferences)
+                }
+            },
+        ) {
+            Text("Analyser tout le dossier")
+        }
+        if (progress.running || progress.message.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(progressLine(progress, now))
         }
         Spacer(Modifier.height(16.dp))
         SelectionContainer {
