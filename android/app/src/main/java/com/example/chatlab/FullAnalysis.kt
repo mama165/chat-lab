@@ -16,7 +16,10 @@ import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +31,7 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 /** État de l'analyse complète, lu par l'écran pour afficher la progression. */
 data class Progress(
@@ -52,11 +56,12 @@ object AnalysisProgress {
 
 /**
  * Analyse tout le dossier choisi (sous-dossiers compris) dans un service de premier plan,
- * pour que le traitement continue quand on quitte l'application. Les images sont copiées
- * dans l'espace privé de l'application avant d'être analysées, afin que la recherche puisse
- * les afficher. Une image déjà analysée et inchangée (même source, taille et date) est
- * reprise du carnet existant sans être analysée de nouveau. Le carnet library.json est
- * réécrit à la fin.
+ * pour que le traitement continue quand on quitte l'application.
+ *
+ * Les images sont traitées par WORKERS travailleurs en parallèle ; chaque travailleur a son
+ * propre analyseur, donc ses propres modèles. Une image déjà analysée et inchangée (même
+ * source, taille et date) est reprise du carnet existant. Le carnet library.json est réécrit
+ * à la fin.
  */
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -78,64 +83,66 @@ class AnalysisService : Service() {
 
         scope.launch {
             try {
-                Analyzer(this@AnalysisService, Uri.parse(chatlab)).use { analyzer ->
-                    val images = listImages(this@AnalysisService, Uri.parse(source))
-                    val total = images.size
-                    val known = readKnown(this@AnalysisService)
-                    val results = ArrayList<ImageResult>()
-                    val lines = StringBuilder()
-                    var errors = 0
-                    var reused = 0
-                    images.forEachIndexed { index, image ->
-                        val name = image.name ?: "image"
-                        publish(Progress(true, index, total, name, started, errors))
-                        val sourceUri = image.uri.toString()
-                        val target = targetFor(this@AnalysisService, sourceUri, name)
-                        val previous = known[sourceUri]?.takeIf {
-                            it.optLong("size") == image.length() &&
-                                it.optLong("modified") == image.lastModified() &&
-                                target.exists()
-                        }
-                        val result = try {
-                            if (previous != null) {
-                                reused++
-                                fromLibrary(previous, target)
-                            } else {
-                                copyOnce(this@AnalysisService, image, target)
-                                analyzer.analyzeFile(target).copy(
-                                    source = sourceUri,
-                                    modified = image.lastModified(),
-                                    taken = takenDate(target) ?: fileDate(image.lastModified()),
-                                )
+                val images = listImages(this@AnalysisService, Uri.parse(source))
+                val total = images.size
+                val known = readKnown(this@AnalysisService)
+                val results = arrayOfNulls<ImageResult>(total)
+                val next = AtomicInteger(0)
+                val done = AtomicInteger(0)
+                val errors = AtomicInteger(0)
+                val reused = AtomicInteger(0)
+
+                // Un analyseur par travailleur : chacun charge ses modèles et travaille seul.
+                val analyzers = List(WORKERS) { Analyzer(this@AnalysisService, Uri.parse(chatlab)) }
+                try {
+                    coroutineScope {
+                        analyzers.map { analyzer ->
+                            async(Dispatchers.Default) {
+                                while (true) {
+                                    val index = next.getAndIncrement()
+                                    if (index >= total) break
+                                    val image = images[index]
+                                    val (result, wasReused) = analyzeOne(this@AnalysisService, analyzer, image, known)
+                                    results[index] = result
+                                    if (wasReused) reused.incrementAndGet()
+                                    if (result.error != null) errors.incrementAndGet()
+                                    val finished = done.incrementAndGet()
+                                    publish(
+                                        Progress(true, finished, total, image.name ?: "image", started, errors.get()),
+                                    )
+                                }
                             }
-                        } catch (e: Throwable) {
-                            ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
-                        }
-                        if (result.error != null) errors++
-                        results += result
-                        lines.appendLine(describe(result))
+                        }.awaitAll()
                     }
-                    analyzer.writeLibrary(results)
-                    val ok = results.count { it.error == null }
+                    val all = results.map { it ?: error("résultat manquant") }
+                    analyzers.first().writeLibrary(all)
+
+                    val lines = StringBuilder()
+                    all.forEach { lines.appendLine(describe(it)) }
+                    val ok = all.count { it.error == null }
                     val elapsed = System.currentTimeMillis() - started
-                    val header = "Analyse complète : $total fichier(s), $reused repris du carnet, " +
-                        "$ok ajouté(s), $errors erreur(s), durée ${clock(elapsed)}\n"
+                    val header = "Analyse complète : $total fichier(s), ${reused.get()} repris du carnet, " +
+                        "$ok ajouté(s), ${errors.get()} erreur(s), $WORKERS travailleurs, durée ${clock(elapsed)}\n"
                     finish(
-                        Progress(false, total, total, "", started, errors, report = header + lines),
-                        "Analyse terminée : $ok image(s) ajoutée(s), $errors erreur(s).",
+                        Progress(false, total, total, "", started, errors.get(), report = header + lines),
+                        "Analyse terminée : $ok image(s) ajoutée(s), ${errors.get()} erreur(s).",
                     )
+                } finally {
+                    analyzers.forEach { it.close() }
                 }
             } catch (e: Throwable) {
+                val message = "Analyse interrompue : ${e.message ?: e.javaClass.simpleName}"
                 finish(
                     Progress(false, AnalysisProgress.state.value.done, AnalysisProgress.state.value.total, "", started,
-                        AnalysisProgress.state.value.errors, "Analyse interrompue : ${e.message ?: e.javaClass.simpleName}"),
-                    "Analyse interrompue : ${e.message ?: e.javaClass.simpleName}",
+                        AnalysisProgress.state.value.errors, message),
+                    message,
                 )
             }
         }
         return START_NOT_STICKY
     }
 
+    @Synchronized
     private fun publish(progress: Progress) {
         AnalysisProgress.set(progress)
         val now = System.currentTimeMillis()
@@ -196,6 +203,10 @@ class AnalysisService : Service() {
     companion object {
         const val EXTRA_CHATLAB = "chatlab"
         const val EXTRA_SOURCE = "source"
+
+        /** Nombre d'images analysées en même temps. Chaque travailleur charge ses modèles. */
+        const val WORKERS = 2
+
         private const val CHANNEL = "analysis"
         private const val NOTIFICATION_ID = 1
         private const val DONE_ID = 2
@@ -206,6 +217,40 @@ class AnalysisService : Service() {
                 .putExtra(EXTRA_SOURCE, source)
             context.startForegroundService(intent)
         }
+    }
+}
+
+/**
+ * Analyse une image pour un travailleur : reprise du carnet si elle est inchangée, sinon copie
+ * puis analyse. Renvoie le résultat et s'il a été repris.
+ */
+private fun analyzeOne(
+    context: Context,
+    analyzer: Analyzer,
+    image: DocumentFile,
+    known: Map<String, JSONObject>,
+): Pair<ImageResult, Boolean> {
+    val name = image.name ?: "image"
+    val sourceUri = image.uri.toString()
+    val target = targetFor(context, sourceUri, name)
+    val previous = known[sourceUri]?.takeIf {
+        it.optLong("size") == image.length() &&
+            it.optLong("modified") == image.lastModified() &&
+            target.exists()
+    }
+    return try {
+        if (previous != null) {
+            fromLibrary(previous, target) to true
+        } else {
+            copyOnce(context, image, target)
+            analyzer.analyzeFile(target).copy(
+                source = sourceUri,
+                modified = image.lastModified(),
+                taken = takenDate(target) ?: fileDate(image.lastModified()),
+            ) to false
+        }
+    } catch (e: Throwable) {
+        ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName) to false
     }
 }
 
