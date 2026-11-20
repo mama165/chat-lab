@@ -42,6 +42,9 @@ data class ImageResult(
     val text: String = "",
     val textNote: String = "",
     val textTrace: String = "",
+    val taken: String = "",
+    val source: String = "",
+    val modified: Long = 0L,
 )
 
 /**
@@ -176,6 +179,11 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
                 .put("vectors", JSONArray().put(JSONArray(r.vector.toList())))
             r.indoor?.let { entry.put("indoor", it) }
             if (r.text.isNotBlank()) entry.put("text", r.text)
+            if (r.source.isNotBlank()) {
+                entry.put("source", r.source)
+                entry.put("modified", r.modified)
+            }
+            if (r.taken.isNotBlank()) entry.put("taken", r.taken)
             entries.put(entry)
         }
         val out = File(root, "library.json")

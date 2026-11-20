@@ -243,6 +243,12 @@ private fun ResultCard(match: Match) {
                     summary(entry),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                if (entry.taken.isNotBlank()) {
+                    Text(
+                        "Prise le ${entry.taken}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 match.score?.let {
                     Text(
                         "ressemblance ${"%.3f".format(it)}",
