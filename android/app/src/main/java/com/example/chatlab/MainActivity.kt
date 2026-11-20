@@ -84,6 +84,11 @@ fun TestScreen(modifier: Modifier = Modifier) {
     val progress by AnalysisProgress.state.collectAsState()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
+    // Quand l'analyse complète se termine, son compte rendu remplace celui affiché et copié.
+    LaunchedEffect(progress.report) {
+        if (progress.report.isNotBlank()) report = progress.report
+    }
+
     LaunchedEffect(progress.running) {
         while (progress.running) {
             now = System.currentTimeMillis()
