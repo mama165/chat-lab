@@ -107,6 +107,7 @@ jobs:
           script: python3 android/ci/capture.py
 
       - name: Upload the screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: chatlab-screenshots
