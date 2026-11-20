@@ -3,6 +3,7 @@ package com.example.chatlab
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -121,6 +122,7 @@ class AnalysisService : Service() {
                 .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
                 .setContentTitle("ChatLab")
                 .setContentText(text)
+                .setContentIntent(openAppIntent())
                 .setAutoCancel(true)
                 .build(),
         )
@@ -132,9 +134,18 @@ class AnalysisService : Service() {
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentTitle("Analyse en cours")
             .setContentText(progressLine(progress, System.currentTimeMillis()))
+            .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()
+
+    /** Un appui sur la notification ramène à l'écran principal de l'application. */
+    private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
