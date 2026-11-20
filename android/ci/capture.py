@@ -95,14 +95,27 @@ def shot(name):
     print("capture :", name)
 
 
+def dismiss_system_dialogs():
+    # On a first boot, the launcher may report that it is not responding and cover the app.
+    # "Wait" lets it finish starting.
+    for _ in range(3):
+        if find(screen_tree(), "isn't responding") is None:
+            return
+        print("alerte système : on attend")
+        tap(text="Wait")
+        time.sleep(3)
+
+
 def relaunch():
     adb("shell", "am", "force-stop", PACKAGE)
-    adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
+    adb("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
     time.sleep(4)
+    dismiss_system_dialogs()
 
 
 def main():
     wait_for_boot()
+    time.sleep(20)  # let the launcher finish its first start
     adb("install", "-r", "-g", APK)
     # First launch creates the app's private storage, then the example library goes in.
     relaunch()
