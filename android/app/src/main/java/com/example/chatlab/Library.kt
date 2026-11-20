@@ -75,7 +75,7 @@ object Library {
     fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> {
         return entries
             .filter { inPlace(it, place) }
-            .filter { entry -> people == null || kotlin.math.abs(entry.faces - people) <= 1 }
+            .filter { entry -> people == null || entry.faces == people }
             .mapNotNull { entry -> entry.vector?.let { Match(entry, dot(query, it)) } }
             .sortedWith(compareBy<Match> { match -> people?.let { kotlin.math.abs(match.entry.faces - it) } ?: 0 }
                 .thenByDescending { match -> match.score })
