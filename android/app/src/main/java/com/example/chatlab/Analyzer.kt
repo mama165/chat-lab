@@ -153,6 +153,9 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
         }
     }
 
+    /** Analyse une image quelconque, déjà copiée dans l'espace privé de l'application. */
+    fun analyzeFile(file: File): ImageResult = analyze(file)
+
     /** Écrit le carnet au format attendu par cmd/query (-library). */
     fun writeLibrary(results: List<ImageResult>): File {
         val entries = JSONArray()
