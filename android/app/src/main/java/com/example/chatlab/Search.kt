@@ -98,7 +98,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
         if (byDescription && query.isNotBlank()) {
             delay(400)
             try {
-                queryVector = withContext(Dispatchers.Default) { TextModels.get(context).encode(query) }
+                queryVector = withContext(Dispatchers.Default) { TextModels.vectorFor(context, query) }
             } catch (error: Exception) {
                 modelError = error.message ?: error.javaClass.simpleName
             }
