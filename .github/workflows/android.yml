@@ -62,3 +62,54 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+  # Runs only once the APK has been built: the screenshots show that exact build.
+  screenshots:
+    name: Screenshots on an Android emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Get the APK built by the previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: chatlab-debug-apk
+          path: ci-apk
+
+      - name: Allow the emulator to use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Restore the emulator image from the cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api34-x86_64-${{ hashFiles('android/ci/capture.py') }}
+
+      - name: Run the app on the emulator and take screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          disable-spellchecker: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 android/ci/capture.py
+
+      - name: Upload the screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatlab-screenshots
+          path: android/ci/screens
+          if-no-files-found: error
+          retention-days: 14
