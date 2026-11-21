@@ -91,15 +91,19 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     var byDescription by remember { mutableStateOf(false) }
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
+    var encodeMillis by remember { mutableStateOf<Long?>(null) }
 
     // In description mode, the sentence is turned into a vector once the typing pauses.
     LaunchedEffect(query, byDescription) {
         queryVector = null
         modelError = null
+        encodeMillis = null
         if (byDescription && query.isNotBlank()) {
             delay(400)
             try {
+                val started = System.nanoTime()
                 queryVector = withContext(Dispatchers.Default) { TextModels.vectorFor(context, query) }
+                encodeMillis = (System.nanoTime() - started) / 1_000_000
             } catch (error: CancellationException) {
                 // The query changed again or the screen left the composition: not an error to show.
                 throw error
@@ -110,10 +114,18 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     }
 
     val criteria = remember(query) { Library.criteria(query) }
+    val searchStart = System.nanoTime()
     val matches: List<Match> = when {
         query.isBlank() -> emptyList()
         !byDescription -> Library.searchWords(entries, query, place)
         else -> queryVector?.let { Library.searchDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
+    }
+    val matchMillis = (System.nanoTime() - searchStart) / 1_000_000
+    // Temps de la recherche, affiché sous le compteur de résultats.
+    val timingLine = when {
+        query.isBlank() || (byDescription && queryVector == null) -> ""
+        !byDescription -> "Recherche par mots : $matchMillis ms"
+        else -> "Lecture de la description : ${encodeMillis ?: 0} ms · classement : $matchMillis ms"
     }
 
     Column(
@@ -208,6 +220,9 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Text(timingLine, style = MaterialTheme.typography.labelSmall)
+                }
                 item {
                     Text(
                         if (byDescription) "Les ${matches.size} images les plus proches" else "${matches.size} résultat(s)",
