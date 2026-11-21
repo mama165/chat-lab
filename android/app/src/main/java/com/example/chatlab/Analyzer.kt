@@ -186,8 +186,15 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             if (r.taken.isNotBlank()) entry.put("taken", r.taken)
             entries.put(entry)
         }
+        // Écrit d'abord dans un fichier temporaire puis le remplace : une fermeture au milieu
+        // ne laisse pas un carnet tronqué.
         val out = File(root, "library.json")
-        out.writeText(entries.toString(), Charsets.UTF_8)
+        val temporary = File(root, "library.json.tmp")
+        temporary.writeText(entries.toString(), Charsets.UTF_8)
+        if (!temporary.renameTo(out)) {
+            out.writeText(entries.toString(), Charsets.UTF_8)
+            temporary.delete()
+        }
         return out
     }
 
