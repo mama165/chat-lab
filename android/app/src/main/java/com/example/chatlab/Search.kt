@@ -23,7 +23,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.activity.compose.BackHandler
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.compose.material3.Slider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -96,7 +101,13 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var encodeMillis by remember { mutableStateOf<Long?>(null) }
-    var selected by remember { mutableStateOf<Match?>(null) }
+    // Seuil réglé avec la jauge : le compte se met à jour tout de suite, la liste un peu après.
+    var threshold by remember { mutableStateOf(0.08f) }
+    var shownThreshold by remember { mutableStateOf(0.08f) }
+    LaunchedEffect(threshold) {
+        delay(300)
+        shownThreshold = threshold
+    }
 
     // In description mode, the sentence is turned into a vector once the typing pauses.
     LaunchedEffect(query, byDescription) {
@@ -120,10 +131,14 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
 
     val criteria = remember(query) { Library.criteria(query) }
     val searchStart = System.nanoTime()
+    val ranked: List<Match> = remember(queryVector, place, criteria, entries) {
+        queryVector?.let { Library.rankDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
+    }
+    val aboveNow = Library.aboveThreshold(ranked, threshold).size
     val matches: List<Match> = when {
         query.isBlank() -> emptyList()
         !byDescription -> Library.searchWords(entries, query, place)
-        else -> queryVector?.let { Library.searchDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
+        else -> Library.aboveThreshold(ranked, shownThreshold)
     }
     val matchMillis = (System.nanoTime() - searchStart) / 1_000_000
     // Temps de la recherche, affiché sous le compteur de résultats.
@@ -131,13 +146,6 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
         query.isBlank() || (byDescription && queryVector == null) -> ""
         !byDescription -> "Recherche par mots : $matchMillis ms"
         else -> "Lecture de la description : ${encodeMillis ?: 0} ms · classement : $matchMillis ms"
-    }
-
-    // Le détail remplace la liste ; la recherche reste en mémoire pour revenir au même endroit.
-    selected?.let { match ->
-        BackHandler { selected = null }
-        ResultDetail(match, modifier) { selected = null }
-        return
     }
 
     Column(
@@ -210,6 +218,25 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             Spacer(Modifier.height(8.dp))
         }
 
+        if (byDescription && queryVector != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Précision", style = MaterialTheme.typography.labelLarge)
+                    Text("$aboveNow image(s) au-dessus", style = MaterialTheme.typography.labelLarge)
+                }
+                Slider(
+                    value = threshold,
+                    onValueChange = { threshold = it },
+                    valueRange = 0.03f..0.15f,
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Plus de résultats", style = MaterialTheme.typography.labelSmall)
+                    Text("Plus strict", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         when {
             entries.isEmpty() -> Text(
                 "Aucune image analysée pour l'instant. Ouvrez l'onglet Analyser, puis lancez l'analyse.",
@@ -237,12 +264,12 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 }
                 item {
                     Text(
-                        if (byDescription) "Les ${matches.size} images les plus proches" else "${matches.size} résultat(s)",
+                        if (byDescription) "${matches.size} image(s) au-dessus du seuil" else "${matches.size} résultat(s)",
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }
                 items(matches, key = { it.entry.id }) { match ->
-                    ResultCard(match) { selected = match }
+                    ResultCard(match) { openInGallery(context, match.entry.source) }
                 }
             }
         }
@@ -316,6 +343,22 @@ private fun Thumbnail(path: String) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+/** Ouvre la photo d'origine dans l'application de galerie ou de bibliothèque du téléphone. */
+private fun openInGallery(context: Context, source: String) {
+    if (source.isBlank()) {
+        Toast.makeText(context, "Photo d'origine introuvable.", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW)
+        .setDataAndType(Uri.parse(source), "image/*")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    try {
+        context.startActivity(intent)
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "Aucune application pour afficher cette photo.", Toast.LENGTH_SHORT).show()
     }
 }
 
