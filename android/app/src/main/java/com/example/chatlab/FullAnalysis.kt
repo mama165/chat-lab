@@ -27,10 +27,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
 /** État de l'analyse complète, lu par l'écran pour afficher la progression. */
@@ -59,9 +59,9 @@ object AnalysisProgress {
  * pour que le traitement continue quand on quitte l'application.
  *
  * Les images sont traitées par WORKERS travailleurs en parallèle ; chaque travailleur a son
- * propre analyseur, donc ses propres modèles. Une image déjà analysée et inchangée (même
- * source, taille et date) est reprise du carnet existant. Le carnet library.json est réécrit
- * à la fin.
+ * propre analyseur. Une photo inchangée (même source, taille et date) est reprise du carnet
+ * sans être analysée de nouveau. Le carnet est enregistré dans le dossier chatlab, et les
+ * photos restent à leur place d'origine : rien n'est copié de façon permanente.
  */
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -115,9 +115,7 @@ class AnalysisService : Service() {
                                     // les dernières images, et la relance reprend là où on s'était arrêté.
                                     if (finished % SAVE_EVERY == 0) {
                                         synchronized(saveLock) {
-                                            analyzers.first().writeLibrary(
-                                                snapshot(this@AnalysisService, images, results, known),
-                                            )
+                                            analyzers.first().writeLibrary(snapshot(images, results, known))
                                         }
                                     }
                                 }
@@ -235,8 +233,9 @@ class AnalysisService : Service() {
 }
 
 /**
- * Analyse une image pour un travailleur : reprise du carnet si elle est inchangée, sinon copie
- * puis analyse. Renvoie le résultat et s'il a été repris.
+ * Analyse une image pour un travailleur. Une photo inchangée est reprise du carnet ; sinon
+ * elle est copiée provisoirement, analysée, puis la copie est supprimée.
+ * Renvoie le résultat et s'il a été repris.
  */
 private fun analyzeOne(
     context: Context,
@@ -245,49 +244,26 @@ private fun analyzeOne(
     known: Map<String, JSONObject>,
 ): Pair<ImageResult, Boolean> {
     val name = image.name ?: "image"
-    val sourceUri = image.uri.toString()
-    val target = targetFor(context, sourceUri, name)
-    val previous = previousResult(context, image, known)
+    val previous = previousResult(image, known)
+    if (previous != null) return previous to true
     return try {
-        if (previous != null) {
-            previous to true
-        } else {
-            copyOnce(context, image, target)
-            analyzer.analyzeFile(target).copy(
-                source = sourceUri,
+        // Le dossier provisoire porte le nom d'origine, pour que le carnet garde le bon nom.
+        val work = File(context.cacheDir, "analyse/${UUID.randomUUID()}").apply { mkdirs() }
+        val temp = File(work, name)
+        try {
+            copyTo(context, image, temp)
+            analyzer.analyzeFile(temp).copy(
+                source = image.uri.toString(),
                 modified = image.lastModified(),
-                taken = takenDate(target) ?: fileDate(image.lastModified()),
+                size = image.length(),
+                taken = takenDate(temp) ?: fileDate(image.lastModified()),
             ) to false
+        } finally {
+            work.deleteRecursively()
         }
     } catch (e: Throwable) {
         ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName) to false
     }
-}
-
-/** Le résultat déjà connu d'une image inchangée, ou null s'il faut l'analyser. */
-private fun previousResult(context: Context, image: DocumentFile, known: Map<String, JSONObject>): ImageResult? {
-    val name = image.name ?: "image"
-    val sourceUri = image.uri.toString()
-    val target = targetFor(context, sourceUri, name)
-    val item = known[sourceUri]?.takeIf {
-        it.optLong("size") == image.length() &&
-            it.optLong("modified") == image.lastModified() &&
-            target.exists()
-    } ?: return null
-    return fromLibrary(item, target)
-}
-
-/**
- * Carnet partiel : les résultats déjà obtenus, et les images connues pas encore atteintes,
- * pour qu'un enregistrement intermédiaire ne perde rien de ce qui était déjà dans le carnet.
- */
-private fun snapshot(
-    context: Context,
-    images: List<DocumentFile>,
-    results: Array<ImageResult?>,
-    known: Map<String, JSONObject>,
-): List<ImageResult> = images.indices.mapNotNull { index ->
-    results[index] ?: previousResult(context, images[index], known)
 }
 
 /** Ligne de texte affichée à l'écran et dans la notification. */
@@ -340,28 +316,17 @@ private fun listImages(context: Context, tree: Uri): List<DocumentFile> {
 private fun isImage(name: String?): Boolean =
     name != null && name.substringAfterLast('.', "").lowercase() in setOf("jpg", "jpeg", "png", "webp")
 
-/** Emplacement privé d'une image : filesDir/full/<empreinte de la source>/<nom>. */
-private fun targetFor(context: Context, sourceUri: String, name: String): File {
-    val key = MessageDigest.getInstance("SHA-1")
-        .digest(sourceUri.toByteArray())
-        .joinToString("") { "%02x".format(it) }
-        .take(16)
-    return File(File(context.filesDir, "full/$key").apply { mkdirs() }, name)
-}
-
-/** Copie l'image vers target, sauf si une copie de même taille est déjà là. */
-private fun copyOnce(context: Context, image: DocumentFile, target: File) {
-    if (target.exists() && target.length() == image.length()) return
+/** Copie provisoire d'une photo, pour l'analyser. */
+private fun copyTo(context: Context, image: DocumentFile, target: File) {
     val input = context.contentResolver.openInputStream(image.uri) ?: error("lecture impossible : ${target.name}")
     input.use { source -> target.outputStream().use { source.copyTo(it) } }
 }
 
 /** Les entrées du carnet existant qui ont une source, indexées par cette source. */
 private fun readKnown(context: Context): Map<String, JSONObject> {
-    val file = File(context.filesDir, "library.json")
-    if (!file.exists()) return emptyMap()
+    val text = LibraryStore.read(context) ?: return emptyMap()
     return try {
-        val array = JSONArray(file.readText(Charsets.UTF_8))
+        val array = JSONArray(text)
         (0 until array.length())
             .map { array.getJSONObject(it) }
             .filter { it.has("source") }
@@ -371,13 +336,33 @@ private fun readKnown(context: Context): Map<String, JSONObject> {
     }
 }
 
+/** Le résultat déjà connu d'une photo inchangée, ou null s'il faut l'analyser. */
+private fun previousResult(image: DocumentFile, known: Map<String, JSONObject>): ImageResult? {
+    val item = known[image.uri.toString()]?.takeIf {
+        it.optLong("size") == image.length() && it.optLong("modified") == image.lastModified()
+    } ?: return null
+    return fromLibrary(item, File(image.name ?: "image"))
+}
+
+/**
+ * Carnet partiel : les résultats déjà obtenus, et les photos connues pas encore atteintes,
+ * pour qu'un enregistrement intermédiaire ne perde rien de ce qui était déjà dans le carnet.
+ */
+private fun snapshot(
+    images: List<DocumentFile>,
+    results: Array<ImageResult?>,
+    known: Map<String, JSONObject>,
+): List<ImageResult> = images.indices.mapNotNull { index ->
+    results[index] ?: previousResult(images[index], known)
+}
+
 /** Rebâtit un résultat à partir d'une entrée du carnet, sans relancer l'analyse. */
-private fun fromLibrary(item: JSONObject, target: File): ImageResult {
+private fun fromLibrary(item: JSONObject, file: File): ImageResult {
     val values = item.optJSONArray("vectors")?.optJSONArray(0)?.let { array ->
         FloatArray(array.length()) { array.getDouble(it).toFloat() }
     }
     return ImageResult(
-        file = target,
+        file = file,
         indoor = if (item.has("indoor")) item.getBoolean("indoor") else null,
         faces = item.optInt("faces", 0),
         portrait = item.optBoolean("portrait", false),
@@ -387,6 +372,7 @@ private fun fromLibrary(item: JSONObject, target: File): ImageResult {
         taken = item.optString("taken", ""),
         source = item.optString("source", ""),
         modified = item.optLong("modified", 0L),
+        size = item.optLong("size", 0L),
     )
 }
 
