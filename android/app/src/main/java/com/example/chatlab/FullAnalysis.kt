@@ -121,11 +121,12 @@ class AnalysisService : Service() {
                     all.forEach { lines.appendLine(describe(it)) }
                     val ok = all.count { it.error == null }
                     val elapsed = System.currentTimeMillis() - started
-                    val header = "Analyse complète : $total fichier(s), ${reused.get()} repris du carnet, " +
+                    val header = "Compte rendu de l'analyse complète du dossier choisi, sous-dossiers compris.\n" +
+                        "Analyse complète : $total fichier(s), ${reused.get()} repris du carnet, " +
                         "$ok ajouté(s), ${errors.get()} erreur(s), $WORKERS travailleurs, durée ${clock(elapsed)}\n"
                     finish(
                         Progress(false, total, total, "", started, errors.get(), report = header + lines),
-                        "Analyse terminée : $ok image(s) ajoutée(s), ${errors.get()} erreur(s).",
+                        "Analyse terminée en ${clock(elapsed)} : $ok image(s) ajoutée(s), ${errors.get()} erreur(s).",
                     )
                 } finally {
                     analyzers.forEach { it.close() }
