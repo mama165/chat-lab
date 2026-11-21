@@ -15,6 +15,7 @@ data class LibraryEntry(
     val text: String,
     val vector: FloatArray? = null,
     val taken: String = "",
+    val source: String = "",
 )
 
 /** Une image retenue par la recherche ; score présent seulement pour la recherche par description. */
@@ -45,6 +46,7 @@ object Library {
                 faces = item.optInt("faces", 0),
                 text = item.optString("text", ""),
                 taken = item.optString("taken", ""),
+                source = item.optString("source", ""),
                 vector = item.optJSONArray("vectors")?.optJSONArray(0)?.let { values ->
                     FloatArray(values.length()) { values.getDouble(it).toFloat() }
                 },
@@ -74,6 +76,23 @@ object Library {
      * On montre les TOP premières, avec leur score, sans seuil caché. Le nombre de personnes et le lieu,
      * s'ils sont nommés dans la phrase, filtrent explicitement (et l'écran l'affiche).
      */
+    /** Tous les résultats classés, sans limite : le seuil choisit ensuite ce qui s'affiche. */
+    fun rankDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> =
+        entries
+            .filter { inPlace(it, place) }
+            .filter { entry -> people == null || entry.faces == people }
+            .mapNotNull { entry -> entry.vector?.let { Match(entry, dot(query, it)) } }
+            .sortedByDescending { it.score ?: 0f }
+
+    /** Les résultats au-dessus du plancher et assez proches du meilleur (à la marge près). */
+    fun aboveThreshold(ranked: List<Match>, floor: Float, margin: Float = 0.04f): List<Match> {
+        val best = ranked.firstOrNull()?.score ?: return emptyList()
+        return ranked.filter { match ->
+            val score = match.score ?: 0f
+            score >= floor && score >= best - margin
+        }
+    }
+
     fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> {
         return entries
             .filter { inPlace(it, place) }
