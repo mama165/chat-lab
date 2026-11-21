@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -92,6 +96,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var encodeMillis by remember { mutableStateOf<Long?>(null) }
+    var selected by remember { mutableStateOf<Match?>(null) }
 
     // In description mode, the sentence is turned into a vector once the typing pauses.
     LaunchedEffect(query, byDescription) {
@@ -126,6 +131,13 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
         query.isBlank() || (byDescription && queryVector == null) -> ""
         !byDescription -> "Recherche par mots : $matchMillis ms"
         else -> "Lecture de la description : ${encodeMillis ?: 0} ms · classement : $matchMillis ms"
+    }
+
+    // Le détail remplace la liste ; la recherche reste en mémoire pour revenir au même endroit.
+    selected?.let { match ->
+        BackHandler { selected = null }
+        ResultDetail(match, modifier) { selected = null }
+        return
     }
 
     Column(
@@ -230,7 +242,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                     )
                 }
                 items(matches, key = { it.entry.id }) { match ->
-                    ResultCard(match)
+                    ResultCard(match) { selected = match }
                 }
             }
         }
@@ -238,9 +250,9 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
 }
 
 @Composable
-private fun ResultCard(match: Match) {
+private fun ResultCard(match: Match, onClick: () -> Unit) {
     val entry = match.entry
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top,
@@ -305,6 +317,94 @@ private fun Thumbnail(path: String) {
             )
         }
     }
+}
+
+/** Écran de détail d'une photo : aperçu en grand, date de prise de vue, lieu, visages, texte lu. */
+@Composable
+private fun ResultDetail(match: Match, modifier: Modifier, onBack: () -> Unit) {
+    val entry = match.entry
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        TextButton(onClick = onBack) {
+            Text("‹ Retour aux résultats")
+        }
+        Preview(entry.path)
+        Text(entry.name, style = MaterialTheme.typography.titleMedium)
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                DetailLine("Prise le", entry.taken.ifBlank { "date inconnue" })
+                DetailLine(
+                    "Lieu",
+                    when (entry.indoor) {
+                        true -> "Intérieur"
+                        false -> "Extérieur"
+                        null -> "Inconnu"
+                    },
+                )
+                DetailLine("Visages", entry.faces.toString())
+                match.score?.let { DetailLine("Ressemblance", "%.3f".format(it)) }
+            }
+        }
+        if (entry.text.isNotBlank()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Texte lu sur la photo", style = MaterialTheme.typography.labelMedium)
+                    Text(entry.text, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Aperçu de la photo en grand : décodé à une taille raisonnable, pas en pleine résolution. */
+@Composable
+private fun Preview(path: String) {
+    val image by produceState<ImageBitmap?>(initialValue = null, path) {
+        value = withContext(Dispatchers.IO) { decodePreview(path)?.asImageBitmap() }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        image?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+private fun decodePreview(path: String): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= 1000 && bounds.outHeight / (sample * 2) >= 1000) {
+        sample *= 2
+    }
+    return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
 }
 
 /** Décode l'image à petite taille, pour que la liste reste fluide. */

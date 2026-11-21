@@ -166,6 +166,16 @@ def main():
         type_text(query)
         shot(f"{index:02d}-{mode.lower()}-{query.replace(' ', '-')}.png")
 
+    # Détail : on ouvre la photo « facture_fictive » depuis les résultats, puis on revient.
+    tap(text="Description")
+    clear_text()
+    type_text("une facture")
+    tap(text="facture_fictive")
+    time.sleep(2)
+    shot("13-detail.png")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(2)
+
     tap(text="Analyser")
     shot("12-analyser.png")
     return 0
