@@ -24,6 +24,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.withTimeoutOrNull
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -101,6 +107,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var encodeMillis by remember { mutableStateOf<Long?>(null) }
+    var selectedId by remember { mutableStateOf<String?>(null) }
     // Seuil réglé avec la jauge : le compte se met à jour tout de suite, la liste un peu après.
     var threshold by remember { mutableStateOf(0.08f) }
     var shownThreshold by remember { mutableStateOf(0.08f) }
@@ -258,7 +265,7 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 "Aucune image ne correspond à « $query ».",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            else -> LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
                     Text(timingLine, style = MaterialTheme.typography.labelSmall)
                 }
@@ -269,7 +276,12 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                     )
                 }
                 items(matches, key = { it.entry.id }) { match ->
-                    ResultCard(match) { openInGallery(context, match.entry.source) }
+                    ResultCard(
+                        match = match,
+                        selected = selectedId == match.entry.id,
+                        onTap = { selectedId = if (selectedId == match.entry.id) null else match.entry.id },
+                        onLongPress = { openInGallery(context, match.entry.source) },
+                    )
                 }
             }
         }
@@ -277,47 +289,82 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
 }
 
 @Composable
-private fun ResultCard(match: Match, onClick: () -> Unit) {
+private fun ResultCard(match: Match, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
     val entry = match.entry
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    val shape = RoundedCornerShape(14.dp)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+            .pointerInput(entry.id) {
+                detectTapGestures(onPress = {
+                    // Appui court : sélection. Appui maintenu : ouverture de la galerie.
+                    when (withTimeoutOrNull(LONG_PRESS_MS) { tryAwaitRelease() }) {
+                        null -> onLongPress()
+                        true -> onTap()
+                        false -> Unit
+                    }
+                })
+            },
+    ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Thumbnail(entry.source.ifBlank { entry.path })
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    summaryLine(match),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** Score (recherche par description) et date, sur une seule ligne. */
+private fun summaryLine(match: Match): String {
+    val score = match.score?.let { "%.3f".format(it) }
+    val date = match.entry.taken.ifBlank { "date inconnue" }
+    return listOfNotNull(score, date).joinToString(" · ")
+}
+
+/** Encart du bas : informations sur la photo sélectionnée, avec croix et actions. */
+@Composable
+private fun InfoPanel(
+    match: Match,
+    query: String,
+    byDescription: Boolean,
+    onClose: () -> Unit,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    val entry = match.entry
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
                     entry.name,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    summary(entry),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                if (entry.taken.isNotBlank()) {
-                    Text(
-                        "Prise le ${entry.taken}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                IconButton(onClick = onClose) {
+                    Text("✕")
                 }
-                match.score?.let {
-                    Text(
-                        "ressemblance ${"%.3f".format(it)}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                if (entry.text.isNotBlank()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        entry.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            }
+            Text(
+                if (byDescription) "Trouvée grâce à la description : ${"%.3f".format(match.score ?: 0f)}"
+                else "Trouvée grâce au mot : « $query »",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TextButton(onClick = onOpen) { Text("Ouvrir dans la galerie") }
+                TextButton(onClick = onCopy) { Text("Copier le nom") }
             }
         }
     }
@@ -344,8 +391,28 @@ private fun Thumbnail(location: String) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        // Encart du bas : seulement quand une photo est sélectionnée par un appui.
+        val selectedMatch = matches.firstOrNull { it.entry.id == selectedId }
+        if (selectedMatch != null) {
+            Spacer(Modifier.height(8.dp))
+            InfoPanel(
+                match = selectedMatch,
+                query = query,
+                byDescription = byDescription,
+                onClose = { selectedId = null },
+                onOpen = { openInGallery(context, selectedMatch.entry.source) },
+                onCopy = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("nom de la photo", selectedMatch.entry.name))
+                    Toast.makeText(context, "Nom copié", Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
     }
 }
+
+/** Durée d'un appui pour qu'il compte comme un appui maintenu (ouverture de la galerie). */
+private const val LONG_PRESS_MS = 1000L
 
 /** Ouvre la photo d'origine dans l'application de galerie ou de bibliothèque du téléphone. */
 private fun openInGallery(context: Context, source: String) {
