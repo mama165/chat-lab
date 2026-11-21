@@ -168,8 +168,11 @@ def main():
 
     # Détail : on ouvre la photo « facture_fictive » depuis les résultats, puis on revient.
     tap(text="Description")
+    time.sleep(2)
     clear_text()
+    time.sleep(2)
     type_text("une facture")
+    time.sleep(3)
     tap(text="facture_fictive")
     time.sleep(2)
     shot("13-detail.png")
