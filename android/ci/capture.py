@@ -173,11 +173,10 @@ def main():
     time.sleep(2)
     type_text("une facture")
     time.sleep(3)
-    tap(text="facture_fictive")
+    # La vignette n'affiche plus le nom : on touche son score, puis on capture l'encart du bas.
+    tap(text="0.1")
     time.sleep(2)
-    shot("13-detail.png")
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
-    time.sleep(2)
+    shot("13-selection.png")
 
     tap(text="Analyser")
     shot("12-analyser.png")
