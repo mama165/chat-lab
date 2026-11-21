@@ -172,6 +172,11 @@ fun TestScreen(modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(24.dp))
         Text("Analyse complète", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Analyse tout le dossier choisi, sous-dossiers compris. Vous pouvez quitter l'application : " +
+                "le traitement continue et une notification affiche la progression, puis la durée finale.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         Spacer(Modifier.height(8.dp))
         Button(onClick = { chooseSource.launch(null) }) {
             Text("Choisir le dossier à analyser en entier")
