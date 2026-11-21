@@ -66,8 +66,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private const val PREFERENCES = "chatlab"
-private const val KEY_FOLDER = "folder"
+const val PREFERENCES = "chatlab"
+const val KEY_FOLDER = "folder"
 private const val KEY_SOURCE = "source"
 
 private fun startFullAnalysis(context: Context, preferences: android.content.SharedPreferences) {
@@ -110,7 +110,11 @@ fun TestScreen(modifier: Modifier = Modifier) {
     val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             // Garde l'accès au dossier après un redémarrage de l'application.
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            // Lecture et écriture : le carnet est enregistré dans ce dossier.
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
             preferences.edit().putString(KEY_FOLDER, uri.toString()).apply()
             libraryFolder = uri.toString()
             report = "Dossier enregistré. Appuyez sur le bouton pour analyser."

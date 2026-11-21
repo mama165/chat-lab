@@ -284,7 +284,7 @@ private fun ResultCard(match: Match, onClick: () -> Unit) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Thumbnail(entry.path)
+            Thumbnail(entry.source.ifBlank { entry.path })
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -324,9 +324,10 @@ private fun ResultCard(match: Match, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Thumbnail(path: String) {
-    val image by produceState<ImageBitmap?>(initialValue = null, path) {
-        value = withContext(Dispatchers.IO) { decodeThumbnail(path)?.asImageBitmap() }
+private fun Thumbnail(location: String) {
+    val context = LocalContext.current
+    val image by produceState<ImageBitmap?>(initialValue = null, location) {
+        value = withContext(Dispatchers.IO) { decodeThumbnail(context, location)?.asImageBitmap() }
     }
     Box(
         modifier = Modifier
@@ -451,15 +452,25 @@ private fun decodePreview(path: String): Bitmap? {
 }
 
 /** Décode l'image à petite taille, pour que la liste reste fluide. */
-private fun decodeThumbnail(path: String): Bitmap? {
+private fun decodeThumbnail(context: Context, location: String): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(path, bounds)
+    openImage(context, location)?.use { BitmapFactory.decodeStream(it, null, bounds) }
     var sample = 1
     while (bounds.outWidth / (sample * 2) >= 160 && bounds.outHeight / (sample * 2) >= 160) {
         sample *= 2
     }
-    return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+    return openImage(context, location)?.use {
+        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
 }
+
+/** Une photo d'origine (adresse content://) ou un fichier de l'application. */
+private fun openImage(context: Context, location: String): java.io.InputStream? =
+    if (location.startsWith("content:")) {
+        context.contentResolver.openInputStream(Uri.parse(location))
+    } else {
+        java.io.File(location).takeIf { it.exists() }?.inputStream()
+    }
 
 private fun summary(entry: LibraryEntry): String {
     val place = when (entry.indoor) {

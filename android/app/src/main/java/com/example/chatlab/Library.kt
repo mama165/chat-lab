@@ -33,9 +33,8 @@ object Library {
     private const val TOP = 5
 
     fun load(context: Context): List<LibraryEntry> {
-        val file = File(context.filesDir, "library.json")
-        if (!file.exists()) return emptyList()
-        val array = JSONArray(file.readText(Charsets.UTF_8))
+        val text = LibraryStore.read(context) ?: return emptyList()
+        val array = JSONArray(text)
         return (0 until array.length()).map { index ->
             val item = array.getJSONObject(index)
             LibraryEntry(

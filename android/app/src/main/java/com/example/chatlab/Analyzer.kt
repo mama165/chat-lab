@@ -45,6 +45,7 @@ data class ImageResult(
     val taken: String = "",
     val source: String = "",
     val modified: Long = 0L,
+    val size: Long = 0L,
 )
 
 /**
@@ -60,6 +61,8 @@ data class ImageResult(
  * Le carnet produit est écrit dans files/library.json.
  */
 class Analyzer(context: Context, tree: Uri) : AutoCloseable {
+    private val appContext = context.applicationContext
+
     private companion object {
         val PART = Regex("\\.part\\d+$")
     }
@@ -169,10 +172,10 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             if (r.error != null || r.vector == null) continue
             val entry = JSONObject()
                 .put("id", r.file.name)
-                .put("path", r.file.path)
+                .put("path", if (r.source.isNotBlank()) r.source else r.file.path)
                 .put("name", r.file.name)
                 .put("kind", "image")
-                .put("size", r.file.length())
+                .put("size", if (r.source.isNotBlank()) r.size else r.file.length())
                 .put("added_at", added.format(Date(r.file.lastModified())))
                 .put("faces", r.faces)
                 .put("portrait", r.portrait)
@@ -188,14 +191,9 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
         }
         // Écrit d'abord dans un fichier temporaire puis le remplace : une fermeture au milieu
         // ne laisse pas un carnet tronqué.
-        val out = File(root, "library.json")
-        val temporary = File(root, "library.json.tmp")
-        temporary.writeText(entries.toString(), Charsets.UTF_8)
-        if (!temporary.renameTo(out)) {
-            out.writeText(entries.toString(), Charsets.UTF_8)
-            temporary.delete()
-        }
-        return out
+        // Le carnet va dans le dossier chatlab choisi (il survit à une réinstallation).
+        LibraryStore.write(appContext, entries.toString())
+        return File(root, "library.json")
     }
 
     private fun analyze(file: File): ImageResult {
