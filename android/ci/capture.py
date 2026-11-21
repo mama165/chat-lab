@@ -97,6 +97,32 @@ def shot(name):
     print("capture :", name)
 
 
+def app_running():
+    """Vrai si le processus de l'application existe encore."""
+    result = subprocess.run(["adb", "shell", "pidof", PACKAGE], capture_output=True, text=True)
+    return bool(result.stdout.strip())
+
+
+def crash_report(step):
+    """Enregistre les lignes de plantage du journal système, puis arrête le test."""
+    os.makedirs(OUT, exist_ok=True)
+    log = subprocess.run(["adb", "logcat", "-d"], capture_output=True, text=True).stdout
+    lines = [line for line in log.splitlines() if "FATAL" in line or "AndroidRuntime" in line or PACKAGE in line]
+    with open(os.path.join(OUT, "plantage.txt"), "w", encoding="utf-8") as file:
+        file.write(f"Plantage pendant l'étape : {step}\n\n" + "\n".join(lines[-200:]) + "\n")
+    print(f"PLANTAGE pendant : {step}")
+    raise SystemExit(1)
+
+
+def type_slowly(value, label):
+    """Tape le texte lettre par lettre, en vérifiant après chaque lettre que l'application tient."""
+    for index, letter in enumerate(value, start=1):
+        adb("shell", "input", "text", "%s" if letter == " " else letter)
+        time.sleep(1.5)
+        if not app_running():
+            crash_report(f"{label}, lettre {index} ({letter!r})")
+
+
 def dismiss_system_dialogs():
     # On a first boot, the launcher may report that it is not responding and cover the app.
     # "Wait" lets it finish starting.
@@ -177,6 +203,16 @@ def main():
     tap(text="0.1")
     time.sleep(2)
     shot("13-selection.png")
+
+    # Frappe lettre par lettre en mode Description : on vérifie qu'aucun plantage n'arrive.
+    tap(text="Description")
+    time.sleep(2)
+    clear_text()
+    type_slowly("une facture", "saisie en mode Description")
+    time.sleep(3)
+    if not app_running():
+        crash_report("après la saisie")
+    shot("14-saisie-lettre-a-lettre.png")
 
     tap(text="Analyser")
     shot("12-analyser.png")
