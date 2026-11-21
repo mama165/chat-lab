@@ -60,6 +60,12 @@ data class ImageResult(
  *   files/test/     (les images à analyser)
  * Le carnet produit est écrit dans files/library.json.
  */
+/**
+ * Version des réglages d'analyse (visages, lecture de texte). Une photo n'est reprise du carnet
+ * que si elle a été analysée avec la même version ; sinon elle est analysée de nouveau.
+ */
+const val ANALYSIS_VERSION = 2
+
 class Analyzer(context: Context, tree: Uri) : AutoCloseable {
     private val appContext = context.applicationContext
 
@@ -91,7 +97,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
             File(models, "face_detection_yunet_2023mar.onnx").path,
             "",
             Size(320.0, 320.0),
-            0.6f,
+            0.75f,
             0.3f,
             5000,
         )
@@ -175,6 +181,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
                 .put("path", if (r.source.isNotBlank()) r.source else r.file.path)
                 .put("name", r.file.name)
                 .put("kind", "image")
+                .put("analysis_version", ANALYSIS_VERSION)
                 .put("size", if (r.source.isNotBlank()) r.size else r.file.length())
                 .put("added_at", added.format(Date(r.file.lastModified())))
                 .put("faces", r.faces)

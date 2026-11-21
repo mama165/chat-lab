@@ -252,10 +252,14 @@ private fun analyzeOne(
         val temp = File(work, name)
         try {
             copyTo(context, image, temp)
-            analyzer.analyzeFile(temp).copy(
+            val started = System.nanoTime()
+            val analyzed = analyzer.analyzeFile(temp)
+            val millis = (System.nanoTime() - started) / 1_000_000
+            analyzed.copy(
                 source = image.uri.toString(),
                 modified = image.lastModified(),
                 size = image.length(),
+                millis = millis,
                 taken = takenDate(temp) ?: fileDate(image.lastModified()),
             ) to false
         } finally {
@@ -329,7 +333,7 @@ private fun readKnown(context: Context): Map<String, JSONObject> {
         val array = JSONArray(text)
         (0 until array.length())
             .map { array.getJSONObject(it) }
-            .filter { it.has("source") }
+            .filter { it.has("source") && it.optInt("analysis_version") == ANALYSIS_VERSION }
             .associateBy { it.getString("source") }
     } catch (e: Exception) {
         emptyMap()

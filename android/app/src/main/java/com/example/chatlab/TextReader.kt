@@ -351,7 +351,7 @@ class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable 
         const val UNCLIP_RATIO = 1.6
         const val REC_HEIGHT = 48
         const val REC_WIDTH = 320
-        const val MIN_CONFIDENCE = 0.6f
+        const val MIN_CONFIDENCE = 0.8f
         const val CONTRAST_CONFIDENCE = 0.8f
         val MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
         val STD = floatArrayOf(0.229f, 0.224f, 0.225f)
