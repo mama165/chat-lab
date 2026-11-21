@@ -18,6 +18,20 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.TextButton
@@ -265,18 +279,23 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 "Aucune image ne correspond à « $query ».",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            else -> LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                item {
+            else -> LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(timingLine, style = MaterialTheme.typography.labelSmall)
                 }
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         if (byDescription) "${matches.size} image(s) au-dessus du seuil" else "${matches.size} résultat(s)",
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }
                 items(matches, key = { it.entry.id }) { match ->
-                    ResultCard(
+                    ResultTile(
                         match = match,
                         selected = selectedId == match.entry.id,
                         onTap = { selectedId = if (selectedId == match.entry.id) null else match.entry.id },
@@ -284,6 +303,95 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Une vignette : photo seule, score et date en petit sur la photo. Un appui court la sélectionne
+ * (bordure bleue à l'extérieur de la photo). Un appui maintenu trace la bordure pendant une seconde,
+ * puis ouvre la galerie.
+ */
+@Composable
+private fun ResultTile(match: Match, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
+    val entry = match.entry
+    val ring = remember { Animatable(0f) }
+    var pressing by remember { mutableStateOf(false) }
+    LaunchedEffect(pressing) {
+        if (pressing) ring.animateTo(1f, tween(LONG_PRESS_MS.toInt())) else ring.snapTo(0f)
+    }
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .padding(4.dp)
+            .then(
+                if (selected) Modifier.border(2.dp, primary, RoundedCornerShape(16.dp)) else Modifier,
+            )
+            .pointerInput(entry.id) {
+                detectTapGestures(onPress = {
+                    pressing = true
+                    val result = withTimeoutOrNull(LONG_PRESS_MS) { tryAwaitRelease() }
+                    if (result == null) onLongPress() else if (result) onTap()
+                    pressing = false
+                })
+            },
+    ) {
+        GridThumb(
+            location = entry.source.ifBlank { entry.path },
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(12.dp)),
+        )
+        Text(
+            summaryLine(match),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(6.dp),
+        )
+        if (!selected && ring.value > 0f) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val w = size.width
+                val h = size.height
+                val perimeter = 2f * (w + h)
+                val path = Path().apply { addRect(Rect(0f, 0f, w, h)) }
+                drawPath(
+                    path = path,
+                    color = primary,
+                    style = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(maxOf(0.01f, perimeter * ring.value), perimeter * 2f),
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/** Vignette carrée d'une photo, décodée à petite taille. */
+@Composable
+private fun GridThumb(location: String, modifier: Modifier) {
+    val context = LocalContext.current
+    val image by produceState<ImageBitmap?>(initialValue = null, location) {
+        value = withContext(Dispatchers.IO) { decodeThumbnail(context, location)?.asImageBitmap() }
+    }
+    Box(
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        image?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
