@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -17,9 +18,16 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = Pink80
 )
 
+// Bleu foncé de l'application (maquettes), avec un fond bleu très pâle.
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
+    primary = Color(0xFF1F3A68),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD6E2F5),
+    onPrimaryContainer = Color(0xFF1F3A68),
+    secondary = Color(0xFF4A5A75),
+    secondaryContainer = Color(0xFFDCE4F0),
+    background = Color(0xFFF4F7FC),
+    surface = Color.White,
     tertiary = Pink40
 
     /* Other default colors to override
@@ -36,8 +44,8 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun AndroidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Couleurs fixes de l'application : le bleu des maquettes plutôt que la couleur du fond d'écran.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

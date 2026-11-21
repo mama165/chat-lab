@@ -16,8 +16,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -81,6 +90,8 @@ fun TestScreen(modifier: Modifier = Modifier) {
     }
     var running by remember { mutableStateOf(false) }
     var sourceName by remember { mutableStateOf(preferences.getString(KEY_SOURCE, null)) }
+    var libraryFolder by remember { mutableStateOf(preferences.getString(KEY_FOLDER, null)) }
+    var showTests by remember { mutableStateOf(false) }
     val progress by AnalysisProgress.state.collectAsState()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
@@ -101,6 +112,7 @@ fun TestScreen(modifier: Modifier = Modifier) {
             // Garde l'accès au dossier après un redémarrage de l'application.
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             preferences.edit().putString(KEY_FOLDER, uri.toString()).apply()
+            libraryFolder = uri.toString()
             report = "Dossier enregistré. Appuyez sur le bouton pour analyser."
         }
     }
@@ -118,97 +130,161 @@ fun TestScreen(modifier: Modifier = Modifier) {
         startFullAnalysis(context, preferences)
     }
 
+    val fraction = if (progress.total > 0) progress.done.toFloat() / progress.total else 0f
+    val startFull = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            startFullAnalysis(context, preferences)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Button(onClick = { chooseFolder.launch(null) }) {
-            Text("Choisir le dossier chatlab")
+        Text("Mes photos", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "Analysez un dossier pour retrouver vos images par mots ou par description.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("1 · Dossier de la bibliothèque", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    if (libraryFolder == null) "Non choisi" else "Choisi ✓",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("Il contient le sous-dossier models.", style = MaterialTheme.typography.bodySmall)
+                Button(onClick = { chooseFolder.launch(null) }) {
+                    Text("Choisir le dossier chatlab")
+                }
+            }
         }
-        Spacer(Modifier.height(12.dp))
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("2 · Dossier à analyser", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    if (sourceName == null) "Non choisi" else "Choisi ✓ (sous-dossiers inclus)",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Button(onClick = { chooseSource.launch(null) }) {
+                    Text("Choisir le dossier à analyser")
+                }
+            }
+        }
+
         Button(
-            enabled = !running,
-            onClick = {
-                val folder = preferences.getString(KEY_FOLDER, null)
-                if (folder == null) {
-                    report = "Choisissez d'abord le dossier chatlab."
-                } else {
-                    running = true
-                    report = "Analyse en cours..."
-                    scope.launch {
-                        report = withContext(Dispatchers.Default) { runAnalysis(context, Uri.parse(folder)) }
-                        running = false
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !progress.running && libraryFolder != null && sourceName != null,
+            onClick = startFull,
+        ) {
+            Text("Lancer l'analyse")
+        }
+
+        if (progress.running) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Analyse en cours : ${(fraction * 100).toInt()} %",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction)
+                                .height(8.dp)
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                    Text(progressLine(progress, now), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Vous pouvez quitter l'application : le traitement continue.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        } else if (progress.message.isNotBlank()) {
+            Text(progress.message, style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Dernier compte rendu", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        enabled = !running,
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("compte rendu", report))
+                            Toast.makeText(context, "Compte rendu copié", Toast.LENGTH_SHORT).show()
+                        },
+                    ) {
+                        Text("Copier")
+                    }
+                    Button(
+                        enabled = !running,
+                        onClick = {
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, report)
+                            }
+                            context.startActivity(Intent.createChooser(send, "Partager le compte rendu"))
+                        },
+                    ) {
+                        Text("Partager")
                     }
                 }
-            },
-        ) {
-            Text("Analyser les images de test")
-        }
-        Spacer(Modifier.height(16.dp))
-        Button(
-            enabled = !running,
-            onClick = {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("compte rendu", report))
-                Toast.makeText(context, "Compte rendu copié", Toast.LENGTH_SHORT).show()
-            },
-        ) {
-            Text("Copier le compte rendu")
-        }
-        Spacer(Modifier.height(8.dp))
-        Button(
-            enabled = !running,
-            onClick = {
-                val send = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, report)
+                SelectionContainer {
+                    Text(report, style = MaterialTheme.typography.bodySmall)
                 }
-                context.startActivity(Intent.createChooser(send, "Partager le compte rendu"))
-            },
-        ) {
-            Text("Partager le compte rendu")
+            }
         }
-        Spacer(Modifier.height(24.dp))
-        Text("Analyse complète", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Analyse tout le dossier choisi, sous-dossiers compris. Vous pouvez quitter l'application : " +
-                "le traitement continue et une notification affiche la progression, puis la durée finale.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(onClick = { chooseSource.launch(null) }) {
-            Text("Choisir le dossier à analyser en entier")
+
+        TextButton(onClick = { showTests = !showTests }) {
+            Text(if (showTests) "Masquer les outils de test" else "Outils de test ›")
         }
-        Text(
-            if (sourceName == null) "Aucun dossier choisi (sous-dossiers inclus)."
-            else "Dossier choisi, ses sous-dossiers seront aussi analysés.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(
-            enabled = !progress.running && sourceName != null,
-            onClick = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    startFullAnalysis(context, preferences)
+        if (showTests) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Analyse des images de test, dans le sous-dossier test du dossier chatlab.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Button(
+                        enabled = !running,
+                        onClick = {
+                            val folder = preferences.getString(KEY_FOLDER, null)
+                            if (folder == null) {
+                                report = "Choisissez d'abord le dossier chatlab."
+                            } else {
+                                running = true
+                                report = "Analyse en cours..."
+                                scope.launch {
+                                    report = withContext(Dispatchers.Default) { runAnalysis(context, Uri.parse(folder)) }
+                                    running = false
+                                }
+                            }
+                        },
+                    ) {
+                        Text("Analyser les images de test")
+                    }
                 }
-            },
-        ) {
-            Text("Analyser tout le dossier")
-        }
-        if (progress.running || progress.message.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(progressLine(progress, now))
-        }
-        Spacer(Modifier.height(16.dp))
-        SelectionContainer {
-            Text(report)
+            }
         }
     }
 }
