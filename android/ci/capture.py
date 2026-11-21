@@ -213,6 +213,10 @@ def main():
     if not app_running():
         crash_report("après la saisie")
     shot("14-saisie-lettre-a-lettre.png")
+    # La suite des captures repart d'une saisie standard, comme les étapes précédentes.
+    clear_text()
+    type_text("une facture")
+    time.sleep(3)
 
     tap(text="Analyser")
     shot("12-analyser.png")
