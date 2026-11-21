@@ -91,6 +91,7 @@ class AnalysisService : Service() {
                 val done = AtomicInteger(0)
                 val errors = AtomicInteger(0)
                 val reused = AtomicInteger(0)
+                val saveLock = Any()
 
                 // Un analyseur par travailleur : chacun charge ses modèles et travaille seul.
                 val analyzers = List(WORKERS) { Analyzer(this@AnalysisService, Uri.parse(chatlab)) }
@@ -110,6 +111,15 @@ class AnalysisService : Service() {
                                     publish(
                                         Progress(true, finished, total, image.name ?: "image", started, errors.get()),
                                     )
+                                    // Carnet enregistré régulièrement : une fermeture ne fait perdre que
+                                    // les dernières images, et la relance reprend là où on s'était arrêté.
+                                    if (finished % SAVE_EVERY == 0) {
+                                        synchronized(saveLock) {
+                                            analyzers.first().writeLibrary(
+                                                snapshot(this@AnalysisService, images, results, known),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }.awaitAll()
@@ -208,6 +218,9 @@ class AnalysisService : Service() {
         /** Nombre d'images analysées en même temps. Chaque travailleur charge ses modèles. */
         const val WORKERS = 2
 
+        /** Le carnet est enregistré toutes les SAVE_EVERY images traitées. */
+        const val SAVE_EVERY = 20
+
         private const val CHANNEL = "analysis"
         private const val NOTIFICATION_ID = 1
         private const val DONE_ID = 2
@@ -234,14 +247,10 @@ private fun analyzeOne(
     val name = image.name ?: "image"
     val sourceUri = image.uri.toString()
     val target = targetFor(context, sourceUri, name)
-    val previous = known[sourceUri]?.takeIf {
-        it.optLong("size") == image.length() &&
-            it.optLong("modified") == image.lastModified() &&
-            target.exists()
-    }
+    val previous = previousResult(context, image, known)
     return try {
         if (previous != null) {
-            fromLibrary(previous, target) to true
+            previous to true
         } else {
             copyOnce(context, image, target)
             analyzer.analyzeFile(target).copy(
@@ -253,6 +262,32 @@ private fun analyzeOne(
     } catch (e: Throwable) {
         ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName) to false
     }
+}
+
+/** Le résultat déjà connu d'une image inchangée, ou null s'il faut l'analyser. */
+private fun previousResult(context: Context, image: DocumentFile, known: Map<String, JSONObject>): ImageResult? {
+    val name = image.name ?: "image"
+    val sourceUri = image.uri.toString()
+    val target = targetFor(context, sourceUri, name)
+    val item = known[sourceUri]?.takeIf {
+        it.optLong("size") == image.length() &&
+            it.optLong("modified") == image.lastModified() &&
+            target.exists()
+    } ?: return null
+    return fromLibrary(item, target)
+}
+
+/**
+ * Carnet partiel : les résultats déjà obtenus, et les images connues pas encore atteintes,
+ * pour qu'un enregistrement intermédiaire ne perde rien de ce qui était déjà dans le carnet.
+ */
+private fun snapshot(
+    context: Context,
+    images: List<DocumentFile>,
+    results: Array<ImageResult?>,
+    known: Map<String, JSONObject>,
+): List<ImageResult> = images.indices.mapNotNull { index ->
+    results[index] ?: previousResult(context, images[index], known)
 }
 
 /** Ligne de texte affichée à l'écran et dans la notification. */
