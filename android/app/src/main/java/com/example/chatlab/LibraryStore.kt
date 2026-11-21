@@ -44,4 +44,15 @@ object LibraryStore {
         context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
             ?: error("impossible d'écrire le carnet dans le dossier chatlab")
     }
+
+    /** Écrit la trace d'un plantage dans erreur.txt, dans le dossier chatlab, pour pouvoir la lire. */
+    fun saveErrorReport(context: Context, text: String) {
+        try {
+            val dir = folder(context) ?: return
+            val target = dir.findFile("erreur.txt") ?: dir.createFile("text/plain", "erreur.txt") ?: return
+            context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+        } catch (e: Exception) {
+            // Rien à faire de plus : on ne veut pas provoquer un second plantage.
+        }
+    }
 }

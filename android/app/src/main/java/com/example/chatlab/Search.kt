@@ -293,7 +293,8 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }
-                items(matches, key = { it.entry.id }) { match ->
+                items(matches.size, key = { i -> "$i-${matches[i].entry.path}" }) { index ->
+                    val match = matches[index]
                     ResultTile(
                         match = match,
                         selected = selectedId == match.entry.id,
