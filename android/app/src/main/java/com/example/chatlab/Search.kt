@@ -22,7 +22,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -304,6 +303,23 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 }
             }
         }
+        // Encart du bas : seulement quand une photo est sélectionnée par un appui.
+        val selectedMatch = matches.firstOrNull { it.entry.id == selectedId }
+        if (selectedMatch != null) {
+            Spacer(Modifier.height(8.dp))
+            InfoPanel(
+                match = selectedMatch,
+                query = query,
+                byDescription = byDescription,
+                onClose = { selectedId = null },
+                onOpen = { openInGallery(context, selectedMatch.entry.source) },
+                onCopy = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("nom de la photo", selectedMatch.entry.name))
+                    Toast.makeText(context, "Nom copié", Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
     }
 }
 
@@ -497,23 +513,6 @@ private fun Thumbnail(location: String) {
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-            )
-        }
-        // Encart du bas : seulement quand une photo est sélectionnée par un appui.
-        val selectedMatch = matches.firstOrNull { it.entry.id == selectedId }
-        if (selectedMatch != null) {
-            Spacer(Modifier.height(8.dp))
-            InfoPanel(
-                match = selectedMatch,
-                query = query,
-                byDescription = byDescription,
-                onClose = { selectedId = null },
-                onOpen = { openInGallery(context, selectedMatch.entry.source) },
-                onCopy = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("nom de la photo", selectedMatch.entry.name))
-                    Toast.makeText(context, "Nom copié", Toast.LENGTH_SHORT).show()
-                },
             )
         }
     }
