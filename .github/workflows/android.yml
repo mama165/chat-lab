@@ -1,10 +1,8 @@
 name: Android APK
 
 on:
-  push:
-    paths:
-      - "android/**"
-      - ".github/workflows/android.yml"
+  # Only on pull requests: each push to a branch with an open PR already runs the PR check,
+  # so a push trigger would run every job twice.
   pull_request:
     paths:
       - "android/**"
