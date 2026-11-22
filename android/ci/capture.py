@@ -186,15 +186,13 @@ def main():
         ("Description", "deux personnes"),
         ("Description", "un paysage avec des nuages"),
     ]
+    # Plus de bouton Mots/Description : les deux recherches s'affichent ensemble.
     for index, (mode, query) in enumerate(searches, start=2):
-        tap(text=mode)
         clear_text()
         type_text(query)
         shot(f"{index:02d}-{mode.lower()}-{query.replace(' ', '-')}.png")
 
     # Détail : on ouvre la photo « facture_fictive » depuis les résultats, puis on revient.
-    tap(text="Description")
-    time.sleep(2)
     clear_text()
     time.sleep(2)
     type_text("une facture")
@@ -204,9 +202,7 @@ def main():
     time.sleep(2)
     shot("13-selection.png")
 
-    # Frappe lettre par lettre en mode Description : on vérifie qu'aucun plantage n'arrive.
-    tap(text="Description")
-    time.sleep(2)
+    # Frappe lettre par lettre : on vérifie qu'aucun plantage n'arrive.
     clear_text()
     type_slowly("une facture", "saisie en mode Description")
     time.sleep(3)
