@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+            Fournisseur de documents réservé aux tests sur émulateur : il sert un dossier de fichiers
+            réels et peut simuler un dossier refusé. Sans intent-filter, il n'apparaît jamais dans le
+            sélecteur de dossiers d'Android. Absent de la version release.
+        -->
+        <provider
+            android:name="com.example.chatlab.TestDocumentsProvider"
+            android:authorities="com.example.chatlab.testdocuments"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS" />
+    </application>
+</manifest>
