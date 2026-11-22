@@ -1,5 +1,18 @@
 package com.example.chatlab
 
+/** La progression d'un dossier : fichiers analysés sur fichiers à analyser. */
+data class FolderProgress(
+    val name: String,
+    val done: Int,
+    val total: Int,
+    /** Le fichier en cours dans ce dossier, vide si aucun. */
+    val current: String = "",
+) {
+    /** Rien de nouveau dans ce dossier : il n'est pas relu. */
+    val nothingNew: Boolean get() = total == 0
+    val finished: Boolean get() = done >= total
+}
+
 /** État de l'analyse complète, lu par l'écran pour afficher la progression. */
 data class Progress(
     val running: Boolean = false,
@@ -16,6 +29,8 @@ data class Progress(
     val pausedAt: Long = 0L,
     /** Durée totale des pauses déjà terminées. */
     val pausedTotal: Long = 0L,
+    /** La progression de chaque dossier, dans l'ordre de la liste. */
+    val folders: List<FolderProgress> = emptyList(),
 ) {
     /** Part faite, de 0 à 1. */
     val fraction: Float
@@ -31,6 +46,13 @@ data class Progress(
     fun remaining(now: Long): Long? {
         if (done <= 0 || total <= 0) return null
         return activeElapsed(now) * (total - done) / done
+    }
+
+    /** Un fichier de plus est fait dans le dossier [index] ; [name] est le fichier qui vient d'être traité. */
+    fun advancing(index: Int, name: String): Progress {
+        if (index !in folders.indices) return copy(done = done + 1, current = name)
+        val updated = folders.mapIndexed { i, f -> if (i == index) f.copy(done = f.done + 1, current = name) else f }
+        return copy(done = done + 1, current = name, folders = updated)
     }
 
     /** Met en pause : l'horloge s'arrête. */

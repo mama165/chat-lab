@@ -68,7 +68,7 @@ fun SettingsPage(
         foldersVersion++
         onFoldersChanged()
     }
-    val source = remember(foldersVersion) { folderName(context, KEY_SOURCE) }
+    val sources = remember(foldersVersion) { Sources.read(context) }
     val chatlab = remember(foldersVersion) { folderName(context, KEY_FOLDER) }
     val removals = remember(removalsVersion) { RemovalsJson.count(LibraryStore.readRemovals(context)) }
     val appSize by produceState<Long?>(initialValue = null, dataVersion) {
@@ -89,7 +89,15 @@ fun SettingsPage(
         PageHeader("Réglages", onBack = onBack)
         Column {
             SectionLabel("Dossiers")
-            SettingRow("Photos à analyser", source ?: "à choisir", onClick = pickers.chooseSource)
+            SettingRow(
+                "Photos à analyser",
+                when (sources.size) {
+                    0 -> "à choisir"
+                    1 -> sources.single().name
+                    else -> "${sources.size} dossiers"
+                },
+                onClick = pickers.addSource,
+            )
             SettingRow("Dossier chatlab", chatlab ?: "à choisir", onClick = pickers.chooseChatlab)
         }
         Column {
@@ -151,7 +159,7 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
         }
     }
     val chatlab = remember { folderName(context, KEY_FOLDER) ?: "chatlab" }
-    val source = remember { folderName(context, KEY_SOURCE) }
+    val sourceNames = remember { Sources.read(context).map { it.name } }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -181,7 +189,7 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
                 SectionLabel("Reste")
                 WipeRow("✓", "Vos photos", "Rien n'est supprimé dans la galerie", Palette.Muted, false)
                 WipeRow("✓", "Les modèles", "Dans $chatlab/models", Palette.Muted, false)
-                WipeRow("✓", "Les dossiers choisis", listOfNotNull(source, chatlab).joinToString(", "), Palette.Muted, false)
+                WipeRow("✓", "Les dossiers choisis", (sourceNames + chatlab).joinToString(", "), Palette.Muted, false)
             }
         }
         Column(modifier = Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -47,6 +47,12 @@ data class ImageResult(
     val source: String = "",
     val modified: Long = 0L,
     val size: Long = 0L,
+    /** Nom du dossier source (« Camera »), écrit dans le carnet pour le filtre par dossier. */
+    val folder: String = "",
+    /** Type MIME détecté d'après les octets du fichier. */
+    val mime: String = "",
+    /** Instant de prise de vue en millisecondes, 0 si inconnu. */
+    val takenMs: Long = 0L,
 )
 
 /**
@@ -139,39 +145,8 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     fun analyzeFile(file: File, checkpoint: () -> Unit = {}): ImageResult = analyze(file, checkpoint)
 
     /** Écrit le carnet au format attendu par cmd/query (-library). */
-    fun writeLibrary(results: List<ImageResult>): File {
-        val entries = JSONArray()
-        val added = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
-        for (r in results) {
-            if (r.error != null || r.vector == null) continue
-            val entry = JSONObject()
-                .put("id", r.file.name)
-                .put("path", if (r.source.isNotBlank()) r.source else r.file.path)
-                .put("name", r.file.name)
-                .put("kind", "image")
-                .put("analysis_version", ANALYSIS_VERSION)
-                .put("size", if (r.source.isNotBlank()) r.size else r.file.length())
-                .put("added_at", added.format(Date(if (r.modified > 0) r.modified else r.file.lastModified())))
-                .put("faces", r.faces)
-                .put("portrait", r.portrait)
-                .put("vectors", JSONArray().put(JSONArray(r.vector.toList())))
-            r.indoor?.let { entry.put("indoor", it) }
-            if (r.text.isNotBlank()) entry.put("text", r.text)
-            if (r.source.isNotBlank()) {
-                entry.put("source", r.source)
-                entry.put("modified", r.modified)
-            }
-            if (r.taken.isNotBlank()) entry.put("taken", r.taken)
-            entries.put(entry)
-        }
-        // Écrit d'abord dans un fichier temporaire puis le remplace : une fermeture au milieu
-        // ne laisse pas un carnet tronqué.
-        // Le carnet va dans le dossier chatlab choisi (il survit à une réinstallation).
-        LibraryStore.write(appContext, entries.toString())
-        return File(root, "library.json")
-    }
+    fun writeLibrary(results: List<ImageResult>, keep: List<JSONObject> = emptyList()): File =
+        LibraryWriter.write(appContext, results, keep)
 
     private fun analyze(file: File, checkpoint: () -> Unit = {}): ImageResult {
         val bitmap = loadUpright(file)
@@ -198,7 +173,7 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
 
     /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
     private fun loadUpright(file: File): Bitmap {
-        val raw = BitmapFactory.decodeFile(file.path) ?: error("image illisible")
+        val raw = ImageLoader.decode(file)
         val orientation = ExifInterface(file.path)
             .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         val degrees = when (orientation) {
