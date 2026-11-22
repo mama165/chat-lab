@@ -225,6 +225,16 @@ def main():
     tap(text="Filtres")
     time.sleep(1)
     shot("16-filtres.png")
+    adb("shell", "input", "swipe", "540", "1700", "540", "500", "300")
+    time.sleep(1)
+    shot("16-filtres-suite.png")
+    adb("shell", "input", "swipe", "540", "500", "540", "1700", "300")
+    time.sleep(1)
+    tap(text="Choisir des dates")
+    shot("16-dates.png")
+    tap(text="Ce mois")
+    shot("16-dates-ce-mois.png")
+    tap(text="Retour")
     tap(text="Retour")
 
     # Frappe lettre par lettre : on vérifie qu'aucun plantage n'arrive.
