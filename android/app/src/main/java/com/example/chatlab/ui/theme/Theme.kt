@@ -43,7 +43,8 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun AndroidTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Les écrans suivent les maquettes, en clair uniquement.
+    darkTheme: Boolean = false,
     // Couleurs fixes de l'application : le bleu des maquettes plutôt que la couleur du fond d'écran.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit

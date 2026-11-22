@@ -83,6 +83,17 @@ def tap(text=None, cls=None):
     time.sleep(1.5)
 
 
+def tap_if_present(text):
+    """Touche l'élément s'il est à l'écran, sans échouer s'il n'y est pas."""
+    node = find(screen_tree(), text)
+    if node is None:
+        return False
+    left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
+    adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+    time.sleep(1.5)
+    return True
+
+
 def type_text(value):
     tap(cls="android.widget.EditText")
     adb("shell", "input", "text", value.replace(" ", "%s"))
@@ -192,15 +203,29 @@ def main():
         type_text(query)
         shot(f"{index:02d}-{mode.lower()}-{query.replace(' ', '-')}.png")
 
-    # Détail : on ouvre la photo « facture_fictive » depuis les résultats, puis on revient.
+    # Sélection : un appui court sur la photo « facture_fictive » (trouvée par son nom).
     clear_text()
     time.sleep(2)
-    type_text("une facture")
+    type_text("facture")
     time.sleep(3)
-    # La vignette n'affiche plus le nom : on touche son score, puis on capture l'encart du bas.
-    tap(text="0.1")
+    tap(text="facture_fictive")
     time.sleep(2)
     shot("13-selection.png")
+    tap(text="Annuler la sélection")
+
+    # Photos moins proches, si la recherche en propose.
+    clear_text()
+    type_text("une facture")
+    time.sleep(3)
+    if tap_if_present("moins proches"):
+        time.sleep(2)
+        shot("15-moins-proches.png")
+
+    # Page Filtres, ouverte par le bouton à droite du champ, puis retour.
+    tap(text="Filtres")
+    time.sleep(1)
+    shot("16-filtres.png")
+    tap(text="Retour")
 
     # Frappe lettre par lettre : on vérifie qu'aucun plantage n'arrive.
     clear_text()
@@ -214,8 +239,16 @@ def main():
     type_text("une facture")
     time.sleep(3)
 
-    tap(text="Analyser")
-    shot("12-analyser.png")
+    # Réglages (molette), puis la page Tout effacer, sans appuyer sur le bouton rouge.
+    tap(text="Réglages")
+    shot("17-reglages.png")
+    tap(text="Tout effacer")
+    shot("18-tout-effacer.png")
+    tap(text="Retour")
+    tap(text="Retour")
+
+    tap(text="Photos")
+    shot("12-photos.png")
     return 0
 
 
