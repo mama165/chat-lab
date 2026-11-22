@@ -40,6 +40,15 @@ object AnalysisProgress {
     internal fun set(progress: Progress) {
         value.value = progress
     }
+
+    /** Modifie l'état en place, sans perdre les champs de pause. */
+    @Synchronized
+    internal fun update(change: (Progress) -> Progress) {
+        value.value = change(value.value)
+    }
+
+    /** Oublie le dernier message et le dernier compte rendu (Tout effacer). */
+    fun clearReport() = update { if (it.running) it else Progress() }
 }
 
 /**
@@ -58,6 +67,17 @@ class AnalysisService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val action = intent?.action
+        if (action == ACTION_PAUSE || action == ACTION_RESUME || action == ACTION_STOP) {
+            when (action) {
+                ACTION_PAUSE -> pause()
+                ACTION_RESUME -> resume()
+                else -> stop()
+            }
+            // Un bouton d'une ancienne notification, sans analyse en cours : rien à garder en vie.
+            if (current == null) stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val chatlab = intent?.getStringExtra(EXTRA_CHATLAB)
         val source = intent?.getStringExtra(EXTRA_SOURCE)
         if (chatlab == null || source == null || AnalysisProgress.state.value.running) {
@@ -66,6 +86,8 @@ class AnalysisService : Service() {
         }
         createChannel()
         val started = System.currentTimeMillis()
+        val control = AnalysisControl { state -> onControl(state) }
+        current = control
         AnalysisProgress.set(Progress(running = true, startedAt = started, message = "Préparation…"))
         startForeground(NOTIFICATION_ID, progressNotification(AnalysisProgress.state.value))
 
@@ -90,17 +112,26 @@ class AnalysisService : Service() {
                         analyzers.map { analyzer ->
                             async(Dispatchers.Default) {
                                 while (true) {
+                                    // Point d'arrêt avant chaque photo : en pause on attend ici, à l'arrêt on sort.
+                                    try {
+                                        control.checkpoint()
+                                    } catch (stopped: AnalysisStopped) {
+                                        break
+                                    }
                                     val index = next.getAndIncrement()
                                     if (index >= total) break
                                     val image = images[index]
-                                    val (result, wasReused) = analyzeOne(this@AnalysisService, analyzer, image, known)
+                                    val (result, wasReused) = try {
+                                        analyzeOne(this@AnalysisService, analyzer, image, known, control::checkpoint)
+                                    } catch (stopped: AnalysisStopped) {
+                                        // La photo en cours est abandonnée ; elle sera reprise à la prochaine analyse.
+                                        break
+                                    }
                                     results[index] = result
                                     if (wasReused) reused.incrementAndGet()
                                     if (result.error != null) errors.incrementAndGet()
                                     val finished = done.incrementAndGet()
-                                    publish(
-                                        Progress(true, finished, total, image.name ?: "image", started, errors.get()),
-                                    )
+                                    publish(finished, total, image.name ?: "image", errors.get())
                                     // Carnet enregistré régulièrement : une fermeture ne fait perdre que
                                     // les dernières images, et la relance reprend là où on s'était arrêté.
                                     synchronized(saveLock) {
@@ -113,16 +144,28 @@ class AnalysisService : Service() {
                             }
                         }.awaitAll()
                     }
+                    if (control.state == RunState.STOPPING) {
+                        // Arrêt demandé : ce qui est fait est gardé, le reste attendra la prochaine analyse.
+                        analyzers.first().writeLibrary(snapshot(results, previousAll))
+                        val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
+                        val text = "Analyse arrêtée : ${done.get()} sur $total photos faites, gardées dans le carnet."
+                        val report = "Analyse arrêtée à la demande après ${clock(elapsed)} : ${done.get()} sur $total fichier(s) traités, " +
+                            "${reused.get()} repris du carnet, ${errors.get()} erreur(s).\n"
+                        ReportStore.save(this@AnalysisService, report)
+                        finish(AnalysisProgress.state.value.copy(running = false, paused = false, report = report), text)
+                        return@launch
+                    }
                     val all = results.map { it ?: error("résultat manquant") }
                     analyzers.first().writeLibrary(all)
 
                     val lines = StringBuilder()
                     all.forEach { lines.appendLine(describe(it)) }
                     val ok = all.count { it.error == null }
-                    val elapsed = System.currentTimeMillis() - started
+                    val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
                     val header = "Compte rendu de l'analyse complète du dossier choisi, sous-dossiers compris.\n" +
                         "Analyse complète : $total fichier(s), ${reused.get()} repris du carnet, " +
                         "$ok ajouté(s), ${errors.get()} erreur(s), $WORKERS travailleurs, durée ${clock(elapsed)}\n"
+                    ReportStore.save(this@AnalysisService, header + lines)
                     finish(
                         Progress(false, total, total, "", started, errors.get(), report = header + lines),
                         "Analyse terminée en ${clock(elapsed)} : $ok image(s) ajoutée(s), ${errors.get()} erreur(s).",
@@ -131,6 +174,7 @@ class AnalysisService : Service() {
                     analyzers.forEach { it.close() }
                 }
             } catch (e: Throwable) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 val message = "Analyse interrompue : ${e.message ?: e.javaClass.simpleName}"
                 finish(
                     Progress(false, AnalysisProgress.state.value.done, AnalysisProgress.state.value.total, "", started,
@@ -143,18 +187,36 @@ class AnalysisService : Service() {
     }
 
     @Synchronized
-    private fun publish(progress: Progress) {
-        AnalysisProgress.set(progress)
+    private fun publish(done: Int, total: Int, name: String, errors: Int) {
+        AnalysisProgress.update { it.copy(running = true, done = done, total = total, current = name, errors = errors) }
         val now = System.currentTimeMillis()
-        if (now - lastNotified > 1000 || progress.done == progress.total) {
+        if (now - lastNotified > 1000 || done == total) {
             lastNotified = now
-            getSystemService(NotificationManager::class.java)
-                .notify(NOTIFICATION_ID, progressNotification(progress))
+            notifyProgress()
         }
     }
 
+    private fun notifyProgress() {
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, progressNotification(AnalysisProgress.state.value))
+    }
+
+    /** Pause et reprise se voient tout de suite à l'écran et dans la notification. */
+    private fun onControl(state: RunState) {
+        val now = System.currentTimeMillis()
+        AnalysisProgress.update { progress ->
+            when (state) {
+                RunState.PAUSED -> progress.pausing(now)
+                RunState.RUNNING -> progress.resuming(now)
+                RunState.STOPPING -> progress.resuming(now).copy(message = "Arrêt en cours…")
+            }
+        }
+        notifyProgress()
+    }
+
     private fun finish(progress: Progress, text: String) {
-        AnalysisProgress.set(progress.copy(message = text))
+        current = null
+        AnalysisProgress.set(progress.copy(message = text, paused = false))
         stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java).notify(
             DONE_ID,
@@ -169,15 +231,28 @@ class AnalysisService : Service() {
         stopSelf()
     }
 
-    private fun progressNotification(progress: Progress): Notification =
-        NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_notify_sync)
-            .setContentTitle("Analyse en cours")
+    private fun progressNotification(progress: Progress): Notification {
+        val builder = NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(if (progress.paused) android.R.drawable.ic_media_pause else android.R.drawable.stat_notify_sync)
+            .setContentTitle(if (progress.paused) "Analyse en pause · ${progress.done} / ${progress.total}" else "Analyse en cours")
             .setContentText(progressLine(progress, System.currentTimeMillis()))
             .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .build()
+        if (progress.running && current != null) {
+            if (progress.paused) builder.addAction(0, "Reprendre", actionIntent(ACTION_RESUME))
+            else builder.addAction(0, "Pause", actionIntent(ACTION_PAUSE))
+            builder.addAction(0, "Arrêter", actionIntent(ACTION_STOP))
+        }
+        return builder.build()
+    }
+
+    private fun actionIntent(action: String): PendingIntent = PendingIntent.getService(
+        this,
+        action.hashCode(),
+        Intent(this, AnalysisService::class.java).setAction(action),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     /** Un appui sur la notification ramène à l'écran principal de l'application. */
     private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
@@ -203,6 +278,22 @@ class AnalysisService : Service() {
     companion object {
         const val EXTRA_CHATLAB = "chatlab"
         const val EXTRA_SOURCE = "source"
+        const val ACTION_PAUSE = "com.example.chatlab.PAUSE"
+        const val ACTION_RESUME = "com.example.chatlab.RESUME"
+        const val ACTION_STOP = "com.example.chatlab.STOP"
+
+        /** La commande de l'analyse en cours, s'il y en a une. */
+        @Volatile
+        private var current: AnalysisControl? = null
+
+        /** Fige l'analyse en cours : plus aucun calcul jusqu'à [resume]. */
+        fun pause() = current?.pause() ?: false
+
+        /** Reprend une analyse en pause, exactement là où elle s'était figée. */
+        fun resume() = current?.resume() ?: false
+
+        /** Termine l'analyse en gardant tout ce qui est fait. */
+        fun stop() = current?.stop() ?: false
 
         /** Nombre d'images analysées en même temps. Chaque travailleur charge ses modèles. */
         const val WORKERS = 2
@@ -233,6 +324,7 @@ private fun analyzeOne(
     analyzer: Analyzer,
     image: DocumentFile,
     known: Map<String, JSONObject>,
+    checkpoint: () -> Unit,
 ): Pair<ImageResult, Boolean> {
     val name = image.name ?: "image"
     val previous = previousResult(image, known)
@@ -244,7 +336,7 @@ private fun analyzeOne(
         try {
             copyTo(context, image, temp)
             val started = System.nanoTime()
-            val analyzed = analyzer.analyzeFile(temp)
+            val analyzed = analyzer.analyzeFile(temp, checkpoint)
             val millis = (System.nanoTime() - started) / 1_000_000
             analyzed.copy(
                 source = image.uri.toString(),
@@ -256,6 +348,8 @@ private fun analyzeOne(
         } finally {
             work.deleteRecursively()
         }
+    } catch (stopped: AnalysisStopped) {
+        throw stopped
     } catch (e: Throwable) {
         ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName) to false
     }
@@ -364,3 +458,18 @@ private fun takenDate(file: File): String? {
 /** Date de modification du fichier, utilisée quand la photo n'a pas de date EXIF. */
 private fun fileDate(millis: Long): String =
     SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE).format(Date(millis))
+
+/**
+ * Nombre de photos du dossier choisi qui ne sont pas encore dans le carnet (nouvelles ou
+ * modifiées), ou null si les dossiers ne sont pas choisis ou illisibles.
+ */
+fun newPhotosCount(context: Context): Int? {
+    val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    val source = preferences.getString(KEY_SOURCE, null) ?: return null
+    return try {
+        val known = readKnown(context)
+        listImages(context, Uri.parse(source)).count { previousResult(it, known) == null }
+    } catch (e: Exception) {
+        null
+    }
+}
