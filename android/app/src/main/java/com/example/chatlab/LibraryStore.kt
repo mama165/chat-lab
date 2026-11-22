@@ -112,3 +112,29 @@ object LibraryStore {
 
 /** Le carnet enregistré, lu depuis le dossier chatlab (ou l'espace privé à défaut). */
 fun Library.load(context: Context): List<LibraryEntry> = parse(LibraryStore.read(context))
+
+/** Taille du carnet enregistré, en octets (0 s'il n'existe pas). */
+fun LibraryStore.librarySize(context: Context): Long = try {
+    val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
+    val inFolder = uri?.let { DocumentFile.fromTreeUri(context, Uri.parse(it))?.findFile("library.json") }
+    inFolder?.length() ?: File(context.filesDir, "library.json").takeIf { it.exists() }?.length() ?: 0L
+} catch (e: Exception) {
+    0L
+}
+
+/**
+ * Tout effacer : le carnet et les retraits, dans le dossier chatlab et dans l'espace privé.
+ * Les photos, les modèles et les dossiers choisis ne sont pas touchés.
+ */
+fun LibraryStore.wipeAnalysis(context: Context) {
+    val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
+    val folder = uri?.let { DocumentFile.fromTreeUri(context, Uri.parse(it)) }
+    for (name in listOf("library.json", "retraits.json")) {
+        try {
+            folder?.findFile(name)?.delete()
+        } catch (e: Exception) {
+            // Un fichier déjà absent ou en lecture seule ne bloque pas le reste.
+        }
+        File(context.filesDir, name).delete()
+    }
+}
