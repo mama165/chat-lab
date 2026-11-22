@@ -26,6 +26,8 @@ fun MainScreen() {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var page by remember { mutableStateOf(Page.TABS) }
+    // D'où l'on est venu pour choisir des dossiers : l'onglet Photos, ou les réglages.
+    var storageBack by remember { mutableStateOf(Page.TABS) }
     val search = remember { SearchUiState() }
     // Augmentent quand le carnet ou les retraits changent, pour relire ce qui est enregistré.
     var dataVersion by remember { mutableIntStateOf(0) }
@@ -56,6 +58,17 @@ fun MainScreen() {
                 onBack = { page = Page.TABS },
                 onOpen = { page = it },
                 onFoldersChanged = { dataVersion++ },
+                onAddFolders = {
+                    storageBack = Page.SETTINGS
+                    page = Page.STORAGE
+                },
+            )
+            Page.STORAGE -> StorageChooser(
+                onDone = {
+                    dataVersion++
+                    page = storageBack
+                },
+                onBack = { page = storageBack },
             )
             Page.REMOVED -> RemovedPage(onBack = { page = Page.SETTINGS }, onChanged = { removalsVersion++ })
             Page.WIPE -> WipePage(
@@ -84,6 +97,10 @@ fun MainScreen() {
                     PhotosScreen(
                         entries = entries,
                         onSettings = { page = Page.SETTINGS },
+                        onAddFolders = {
+                            storageBack = Page.TABS
+                            page = Page.STORAGE
+                        },
                         modifier = content,
                     )
                 }

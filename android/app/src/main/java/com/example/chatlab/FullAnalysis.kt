@@ -125,7 +125,7 @@ class AnalysisService : Service() {
         // 2. Ce qui est déjà au carnet est repris tel quel ; le reste est à analyser.
         val carried = plan.carried.map { item ->
             report.analyzed(item.folderIndex)
-            carriedResult(known.getValue(item.candidate.file.id), item, zone)
+            carriedResult(requireNotNull(known.find(item.candidate.file)), item, zone)
         }
         val total = plan.toProcess.size
         AnalysisProgress.update {
@@ -353,27 +353,40 @@ private fun parseArray(text: String?): JSONArray? = try {
 }
 
 /** Les entrées du carnet existant qui ont une source, indexées par cette source. */
-private fun readKnown(text: String?): Map<String, JSONObject> {
-    val array = parseArray(text) ?: return emptyMap()
-    return (0 until array.length())
-        .mapNotNull { array.optJSONObject(it) }
-        .filter { it.has("source") && it.optInt("analysis_version") == ANALYSIS_VERSION }
-        .associateBy { it.getString("source") }
+private fun readKnown(text: String?): KnownLibrary {
+    val array = parseArray(text) ?: return KnownLibrary(emptyMap())
+    return KnownLibrary(
+        (0 until array.length())
+            .mapNotNull { array.optJSONObject(it) }
+            .filter { it.has("source") && it.optInt("analysis_version") == ANALYSIS_VERSION }
+            .associateBy { it.getString("source") },
+    )
+}
+
+/**
+ * Les photos déjà analysées : par leur adresse, ou, si elle a changé, par leur nom, leur taille
+ * et leur date (voir [KnownFiles]).
+ */
+internal class KnownLibrary(private val byId: Map<String, JSONObject>) {
+    private val byIdentity = KnownFiles.byIdentity(byId.values)
+
+    fun find(file: FileNode): JSONObject? =
+        KnownFiles.find(byId, byIdentity, file.id, file.name, file.length, file.lastModified)
 }
 
 /** Le carnet connaît ce fichier tel qu'il est : même adresse, même taille, même date. */
-private fun unchanged(known: Map<String, JSONObject>, file: FileNode): JSONObject? {
-    val item = known[file.id] ?: return null
+private fun unchanged(known: KnownLibrary, file: FileNode): JSONObject? {
+    val item = known.find(file) ?: return null
     if (file.length < 0) return null
     return item.takeIf { it.optLong("size") == file.length && it.optLong("modified") == file.lastModified }
 }
 
 /** Le type déjà connu d'un fichier inchangé : il n'est alors pas relu pendant le listage. */
-internal fun reusableMime(known: Map<String, JSONObject>, file: FileNode): String? =
+internal fun reusableMime(known: KnownLibrary, file: FileNode): String? =
     unchanged(known, file)?.optString("mime")?.takeIf { it.isNotBlank() }
 
 /** Reprendre, compléter ou analyser : ce que l'analyse fait d'un fichier. */
-internal fun carry(known: Map<String, JSONObject>, file: FileNode): Carry {
+internal fun carry(known: KnownLibrary, file: FileNode): Carry {
     val item = unchanged(known, file) ?: return Carry.PROCESS
     return if (item.optString("mime").isNotBlank() && item.optString("folder").isNotBlank()) Carry.REUSE else Carry.BACKFILL
 }

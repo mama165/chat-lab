@@ -61,10 +61,11 @@ fun SettingsPage(
     onBack: () -> Unit,
     onOpen: (Page) -> Unit,
     onFoldersChanged: () -> Unit,
+    onAddFolders: () -> Unit,
 ) {
     val context = LocalContext.current
     var foldersVersion by remember { mutableIntStateOf(0) }
-    val pickers = rememberFolderPickers {
+    val pickers = rememberFolderPickers(onAddSource = onAddFolders) {
         foldersVersion++
         onFoldersChanged()
     }

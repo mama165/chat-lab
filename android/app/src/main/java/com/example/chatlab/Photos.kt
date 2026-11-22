@@ -67,13 +67,12 @@ import kotlinx.coroutines.withContext
 
 /** Onglet Photos : les dossiers à analyser, le bilan de la dernière analyse, puis la progression. */
 @Composable
-fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolders: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val progress by AnalysisProgress.state.collectAsState()
     val reading by ReadProgress.counts.collectAsState()
     var version by remember { mutableIntStateOf(0) }
-    var choosing by remember { mutableStateOf(false) }
-    val pickers = rememberFolderPickers(onAddSource = { choosing = true }) { version++ }
+    val pickers = rememberFolderPickers(onAddSource = onAddFolders) { version++ }
     val chatlab = remember(version) { folderName(context, KEY_FOLDER) }
     val sources = remember(version) { Sources.read(context) }
     // Ce que contiennent les dossiers, lu en arrière-plan : aucune analyse, seulement un listage.
@@ -113,13 +112,6 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, modifier: 
         Spacer(Modifier.height(0.dp))
         TabTitle("Photos", onSettings = onSettings)
         when {
-            choosing -> StorageChooser(
-                onDone = {
-                    choosing = false
-                    version++
-                },
-                onBack = { choosing = false },
-            )
             chatlab == null || sources.isEmpty() -> FirstSteps(chatlab, sources, pickers)
             progress.running -> Running(progress, now)
             else -> Idle(
@@ -400,16 +392,28 @@ private fun ProblemBox(title: String, items: List<Pair<String, String>>) {
 
 @Composable
 private fun AddFolderRow(onClick: () -> Unit) {
-    Box(
+    // Comme sur la maquette 1.3 : un carré bleu clair avec un plus, puis « Nouveau dossier ».
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.5.dp, Color(0xFFC4C9D1), RoundedCornerShape(12.dp))
+            .padding(top = 6.dp)
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center,
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("+ Ajouter un dossier", fontSize = 14.sp, color = Palette.Accent)
+        Box(
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Palette.Soft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(20.dp)) {
+                val w = size.width
+                val h = size.height
+                drawLine(Palette.Accent, Offset(w / 2, 0f), Offset(w / 2, h), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+                drawLine(Palette.Accent, Offset(0f, h / 2), Offset(w, h / 2), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Text("Nouveau dossier", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
     }
 }
 
