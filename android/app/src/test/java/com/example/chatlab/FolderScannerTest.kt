@@ -139,7 +139,7 @@ class FolderScannerTest {
                 override fun open(): InputStream? { opened++; return null }
             })
         }
-        val result = FolderScanner.scan(node) { FileSniffer.JPEG }
+        val result = FolderScanner.scan(node, reusable = { FileSniffer.JPEG })
         assertEquals(0, opened)
         assertEquals(FileSniffer.JPEG, result.candidates.single().mime)
     }
@@ -230,5 +230,15 @@ class FolderScannerTest {
         assertEquals(2, result.ignored.size)
         assertEquals(1, result.unreadable.size)
         assertEquals(0, result.refused.size)
+    }
+
+    @Test
+    fun theExaminedCountGrowsWithEveryFileAndEndsAtTheTotal() {
+        image("a.png", "png")
+        raw("sous/b.txt", "texte".toByteArray())
+        raw("sous/c.jpg", ByteArray(0))
+        val seen = ArrayList<Int>()
+        FolderScanner.scan(JavaDirNode(root), examined = { seen += it })
+        assertEquals(listOf(1, 2, 3), seen)
     }
 }

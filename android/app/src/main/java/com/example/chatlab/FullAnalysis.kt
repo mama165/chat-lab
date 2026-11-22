@@ -116,7 +116,7 @@ class AnalysisService : Service() {
         // 1. Lister chaque dossier. Un fichier déjà connu et inchangé n'est pas relu.
         val scans = sources.mapIndexed { index, folder ->
             control.checkpoint()
-            val scan = FolderScanner.scan(SafDir.root(this, folder)) { file -> reusableMime(known, file) }
+            val scan = FolderScanner.scan(SafDir.root(this, folder), reusable = { file -> reusableMime(known, file) })
             report.scanned(index, scan)
             scan
         }
@@ -417,10 +417,17 @@ fun overview(context: Context): List<FolderOverview> {
     val sources = Sources.read(context)
     val known = readKnown(LibraryStore.read(context))
     return sources.map { folder ->
+        ReadProgress.start(folder.uri)
         val scan = try {
-            FolderScanner.scan(SafDir.root(context, folder)) { file -> reusableMime(known, file) }
+            FolderScanner.scan(
+                SafDir.root(context, folder),
+                reusable = { file -> reusableMime(known, file) },
+                examined = { count -> ReadProgress.report(folder.uri, count) },
+            )
         } catch (e: Exception) {
             return@map FolderOverview(FolderStatus(folder, FolderStatus.State.REFUSED), 0, 0)
+        } finally {
+            ReadProgress.finish(folder.uri)
         }
         val fresh = scan.candidates.count { carry(known, it.file) == Carry.PROCESS }
         val state = when {

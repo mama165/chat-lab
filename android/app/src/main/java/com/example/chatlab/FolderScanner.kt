@@ -53,9 +53,15 @@ data class ScanResult(
 object FolderScanner {
     /**
      * [reusable] donne le type déjà connu d'un fichier inchangé : il n'est alors pas relu (le
-     * listage reste rapide quand le carnet est déjà plein).
+     * listage reste rapide quand le carnet est déjà plein). [examined] reçoit le nombre de
+     * fichiers vus jusqu'ici, pour afficher l'avancement.
      */
-    fun scan(root: DirNode, reusable: (FileNode) -> String? = { null }): ScanResult {
+    fun scan(
+        root: DirNode,
+        reusable: (FileNode) -> String? = { null },
+        examined: (Int) -> Unit = {},
+    ): ScanResult {
+        var count = 0
         val candidates = ArrayList<Candidate>()
         val ignored = ArrayList<IgnoredFile>()
         val unreadable = ArrayList<UnreadableFile>()
@@ -76,6 +82,8 @@ object FolderScanner {
                         if (inner == null) refused += label else walk(inner, label)
                     }
                     is FileNode -> {
+                        count++
+                        examined(count)
                         val known = reusable(child)
                         if (known != null) {
                             candidates += Candidate(child, known, root.name)

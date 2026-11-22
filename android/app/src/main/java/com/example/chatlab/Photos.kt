@@ -66,6 +66,7 @@ import kotlinx.coroutines.withContext
 fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val progress by AnalysisProgress.state.collectAsState()
+    val reading by ReadProgress.counts.collectAsState()
     var version by remember { mutableIntStateOf(0) }
     val pickers = rememberFolderPickers { version++ }
     val chatlab = remember(version) { folderName(context, KEY_FOLDER) }
@@ -112,6 +113,8 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, modifier: 
             else -> Idle(
                 entries = entries,
                 chatlab = chatlab,
+                sources = sources,
+                reading = reading,
                 overviews = overviews,
                 lastRun = lastRun,
                 message = progress.message,
@@ -169,6 +172,8 @@ private fun Step(number: Int, title: String, detail: String, chosen: String?, ac
 private fun Idle(
     entries: List<LibraryEntry>,
     chatlab: String,
+    sources: List<SourceFolder>,
+    reading: Map<String, Int>,
     overviews: List<FolderOverview>?,
     lastRun: RunReport?,
     message: String,
@@ -199,7 +204,8 @@ private fun Idle(
 
     SectionLabel("Dossiers à analyser", right = "sous-dossiers inclus")
     if (overviews == null) {
-        Text("Lecture des dossiers…", fontSize = 13.sp, color = Palette.Muted)
+        // La lecture n'est pas finie : chaque dossier s'affiche tout de suite, avec son avancement.
+        sources.forEach { folder -> ReadingCard(folder, reading[folder.uri] ?: 0) }
     } else {
         overviews.forEach { overview ->
             val failures = lastRun?.folders?.firstOrNull { it.uri == overview.status.folder.uri }?.failures.orEmpty()
@@ -221,6 +227,25 @@ private fun Idle(
     }
     if (message.isNotBlank()) {
         Text(message, fontSize = 13.sp, color = Palette.Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** Un dossier en cours de lecture : son nom, et le nombre de fichiers examinés jusqu'ici. */
+@Composable
+private fun ReadingCard(folder: SourceFolder, examined: Int) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .semantics { contentDescription = "Dossier ${folder.name}, lecture en cours" },
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        Text(
+            "Lecture en cours · $examined fichiers examinés",
+            fontSize = 12.sp,
+            color = Palette.Muted,
+        )
     }
 }
 
