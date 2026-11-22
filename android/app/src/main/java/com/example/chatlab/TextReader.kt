@@ -3,7 +3,9 @@ package com.example.chatlab
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
+import android.content.Context
 import android.graphics.Bitmap
+import androidx.documentfile.provider.DocumentFile
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -33,12 +35,12 @@ import kotlin.math.sqrt
  * Fichiers attendus dans le dossier models :
  *   ch_PP-OCRv3_det_infer.onnx, ch_PP-OCRv3_rec_infer.onnx, ppocr_keys.txt
  */
-class TextReader(private val env: OrtEnvironment, models: File) : AutoCloseable {
-    private val detector = env.createSession(File(models, "ch_PP-OCRv3_det_infer.onnx").path, OrtSession.SessionOptions())
-    private val recognizer = env.createSession(File(models, "ch_PP-OCRv3_rec_infer.onnx").path, OrtSession.SessionOptions())
+class TextReader(private val env: OrtEnvironment, context: Context, models: DocumentFile) : AutoCloseable {
+    private val detector = ModelFiles.session(env, context, models, "ch_PP-OCRv3_det_infer.onnx")
+    private val recognizer = ModelFiles.session(env, context, models, "ch_PP-OCRv3_rec_infer.onnx")
     // Index 0 is the CTC blank, the last index is the space.
     private val vocabulary: List<String> =
-        listOf("blank") + File(models, "ppocr_keys.txt").readText(Charsets.UTF_8).split("\n") + " "
+        listOf("blank") + ModelFiles.text(context, models, "ppocr_keys.txt").split("\n") + " "
 
     private var zones = 0
     private var kept = 0

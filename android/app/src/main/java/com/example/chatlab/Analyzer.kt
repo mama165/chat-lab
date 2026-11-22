@@ -17,6 +17,7 @@ import org.json.JSONObject
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.Mat
+import org.opencv.core.MatOfByte
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import org.opencv.objdetect.FaceDetectorYN
@@ -53,12 +54,12 @@ data class ImageResult(
  * pas le texte : vecteur SigLIP 2, intérieur/extérieur, nombre de visages (YuNet).
  * Le texte est lu sur l'ordinateur et ajouté au carnet plus tard.
  *
- * Fichiers attendus, dans l'espace privé de l'application :
- *   files/models/vision_model.onnx
- *   files/models/judge_vectors.json
- *   files/models/face_detection_yunet_2023mar.onnx
- *   files/test/     (les images à analyser)
- * Le carnet produit est écrit dans files/library.json.
+ * Fichiers attendus, lus directement dans le dossier chatlab choisi (sans copie) :
+ *   models/vision_model.onnx (ou ses morceaux vision_model.onnx.partN)
+ *   models/judge_vectors.json
+ *   models/face_detection_yunet_2023mar.onnx
+ *   test/     (les images de test, facultatif)
+ * Le carnet produit est écrit dans le dossier chatlab (library.json).
  */
 /**
  * Version des réglages d'analyse (visages, lecture de texte). Une photo n'est reprise du carnet
@@ -66,17 +67,11 @@ data class ImageResult(
  */
 const val ANALYSIS_VERSION = 2
 
-class Analyzer(context: Context, tree: Uri) : AutoCloseable {
+class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     private val appContext = context.applicationContext
-
-    private companion object {
-        val PART = Regex("\\.part\\d+$")
-    }
 
     private val env = OrtEnvironment.getEnvironment()
     private val root = context.filesDir
-    private val models = File(root, "models")
-    private val tests = File(root, "test")
     private val vision: OrtSession
     private val indoor: FloatArray
     private val outdoor: FloatArray
@@ -85,17 +80,20 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
     private val reader: TextReader
 
     init {
-        importFiles(context, tree)
+        // Les modèles sont lus dans chatlab/models : les anciennes copies privées ne servent plus.
+        ModelFiles.removeOldCopies(context)
+        val models = ModelFiles.folder(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
-        vision = env.createSession(File(models, "vision_model.onnx").path, OrtSession.SessionOptions())
-        val judge = JSONObject(File(models, "judge_vectors.json").readText())
+        vision = ModelFiles.session(env, context, models, "vision_model.onnx")
+        val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
-        reader = TextReader(env, models)
+        reader = TextReader(env, context, models)
         detector = FaceDetectorYN.create(
-            File(models, "face_detection_yunet_2023mar.onnx").path,
-            "",
+            "onnx",
+            MatOfByte(*ModelFiles.bytes(context, models, "face_detection_yunet_2023mar.onnx")),
+            MatOfByte(),
             Size(320.0, 320.0),
             0.75f,
             0.3f,
@@ -104,64 +102,33 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
     }
 
     /**
-     * Copie les fichiers depuis le dossier choisi par l'utilisateur (sous-dossiers
-     * models et test) vers l'espace privé de l'application. Un fichier déjà copié
-     * et de même taille n'est pas recopié.
+     * Analyse les images du sous-dossier test du dossier chatlab. Chaque image est copiée
+     * le temps de son analyse dans le cache, puis la copie est supprimée.
      */
-    private fun importFiles(context: Context, tree: Uri) {
-        val root = DocumentFile.fromTreeUri(context, tree) ?: error("dossier choisi inaccessible")
-        val modelsSource = root.findFile("models") ?: error("sous-dossier models absent du dossier choisi")
-        importFolder(context, modelsSource, models)
-        root.findFile("test")?.let { importFolder(context, it, tests) }
-    }
-
-    private fun importFolder(context: Context, source: DocumentFile, target: File) {
-        target.mkdirs()
-        importParts(context, source, target)
-        for (file in source.listFiles()) {
-            val name = file.name ?: continue
-            if (!file.isFile || PART.containsMatchIn(name)) continue
-            val destination = File(target, name)
-            if (destination.exists() && destination.length() == file.length()) continue
-            val input = context.contentResolver.openInputStream(file.uri) ?: error("lecture impossible : $name")
-            input.use { stream -> destination.outputStream().use { stream.copyTo(it) } }
-        }
-    }
-
-    /**
-     * Un fichier trop gros pour être envoyé est découpé en morceaux « nom.partN » :
-     * ils sont recollés ici, dans l'ordre, en un seul fichier.
-     */
-    private fun importParts(context: Context, source: DocumentFile, target: File) {
-        val parts = source.listFiles()
-            .filter { it.isFile && PART.containsMatchIn(it.name ?: "") }
-            .groupBy { (it.name ?: "").substringBeforeLast(".part") }
-        for ((base, files) in parts) {
-            val ordered = files.sortedBy { (it.name ?: "").substringAfterLast(".part").toInt() }
-            val total = ordered.sumOf { it.length() }
-            val destination = File(target, base)
-            if (destination.exists() && destination.length() == total) continue
-            destination.outputStream().use { output ->
-                for (part in ordered) {
-                    val input = context.contentResolver.openInputStream(part.uri) ?: error("lecture impossible : ${part.name}")
-                    input.use { it.copyTo(output) }
-                }
-            }
-        }
-    }
-
     fun analyzeAll(): List<ImageResult> {
-        val files = tests.listFiles { f ->
-            f.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp")
-        }?.sortedBy { it.name }.orEmpty()
-        return files.map { file ->
+        val folder = DocumentFile.fromTreeUri(appContext, tree)?.findFile("test") ?: return emptyList()
+        val images = folder.listFiles()
+            .filter { it.isFile && (it.name ?: "").substringAfterLast('.').lowercase() in setOf("jpg", "jpeg", "png", "webp") }
+            .sortedBy { it.name }
+        val work = File(appContext.cacheDir, "test").apply { mkdirs() }
+        return images.map { image ->
+            val temp = File(work, image.name ?: "image")
             val started = System.nanoTime()
             val partial = try {
-                analyze(file)
+                val input = appContext.contentResolver.openInputStream(image.uri) ?: error("lecture impossible")
+                input.use { source -> temp.outputStream().use { source.copyTo(it) } }
+                analyze(temp)
             } catch (e: Throwable) {
-                ImageResult(file, null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
+                ImageResult(temp, null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
+            } finally {
+                temp.delete()
             }
-            partial.copy(millis = (System.nanoTime() - started) / 1_000_000)
+            partial.copy(
+                millis = (System.nanoTime() - started) / 1_000_000,
+                source = image.uri.toString(),
+                size = image.length(),
+                modified = image.lastModified(),
+            )
         }
     }
 
@@ -183,7 +150,7 @@ class Analyzer(context: Context, tree: Uri) : AutoCloseable {
                 .put("kind", "image")
                 .put("analysis_version", ANALYSIS_VERSION)
                 .put("size", if (r.source.isNotBlank()) r.size else r.file.length())
-                .put("added_at", added.format(Date(r.file.lastModified())))
+                .put("added_at", added.format(Date(if (r.modified > 0) r.modified else r.file.lastModified())))
                 .put("faces", r.faces)
                 .put("portrait", r.portrait)
                 .put("vectors", JSONArray().put(JSONArray(r.vector.toList())))

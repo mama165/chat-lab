@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -15,7 +16,7 @@ import kotlin.math.sqrt
  * Découpeur BPE de SigLIP 2, le même que scripts/bpe_pure.py : il lit tokenizer.json
  * et produit les mêmes identifiants, complétés à [maxLength] et finis par <eos>.
  */
-class SigLipTokenizer(file: File, private val maxLength: Int = 64) {
+class SigLipTokenizer(json: String, private val maxLength: Int = 64) {
     private val vocab = HashMap<String, Int>()
     private val ranks = HashMap<String, Int>()
     private val eos: Int
@@ -23,7 +24,7 @@ class SigLipTokenizer(file: File, private val maxLength: Int = 64) {
     private val cache = HashMap<String, IntArray>()
 
     init {
-        val model = JSONObject(file.readText(Charsets.UTF_8)).getJSONObject("model")
+        val model = JSONObject(json).getJSONObject("model")
         val vocabJson = model.getJSONObject("vocab")
         val keys = vocabJson.keys()
         while (keys.hasNext()) {
@@ -111,19 +112,18 @@ class SigLipTokenizer(file: File, private val maxLength: Int = 64) {
 }
 
 /** Le côté texte de SigLIP 2 : une description devient un vecteur normalisé. */
-class TextModel(private val env: OrtEnvironment, models: File) : AutoCloseable {
+class TextModel(private val env: OrtEnvironment, context: Context, models: DocumentFile) : AutoCloseable {
     private val session: OrtSession
     private val tokenizer: SigLipTokenizer
 
     init {
-        val file = listOf("text_model_q4f16.onnx", "text_model_quantized.onnx")
-            .map { File(models, it) }
-            .firstOrNull { it.exists() }
-            ?: error("modèle de texte absent : copiez text_model_q4f16.onnx dans chatlab/models, puis lancez une analyse")
-        val tokenizerFile = File(models, "tokenizer.json")
-        if (!tokenizerFile.exists()) error("tokenizer.json absent de chatlab/models")
-        session = env.createSession(file.path, OrtSession.SessionOptions())
-        tokenizer = SigLipTokenizer(tokenizerFile)
+        // Lus directement dans chatlab/models, sans copie.
+        val name = listOf("text_model_q4f16.onnx", "text_model_quantized.onnx")
+            .firstOrNull { ModelFiles.exists(models, it) }
+            ?: error("modèle de texte absent : copiez text_model_q4f16.onnx dans chatlab/models")
+        if (!ModelFiles.exists(models, "tokenizer.json")) error("tokenizer.json absent de chatlab/models")
+        session = ModelFiles.session(env, context, models, name)
+        tokenizer = SigLipTokenizer(ModelFiles.text(context, models, "tokenizer.json"))
     }
 
     fun encode(text: String): FloatArray {
@@ -157,7 +157,7 @@ object TextModels {
     @Synchronized
     fun get(context: Context): TextModel {
         loaded?.let { return it }
-        val model = TextModel(OrtEnvironment.getEnvironment(), File(context.filesDir, "models"))
+        val model = TextModel(OrtEnvironment.getEnvironment(), context, ModelFiles.folder(context))
         loaded = model
         return model
     }
