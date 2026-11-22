@@ -132,8 +132,11 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
         }
     }
 
-    /** Analyse une image quelconque, déjà copiée dans l'espace privé de l'application. */
-    fun analyzeFile(file: File): ImageResult = analyze(file)
+    /**
+     * Analyse une image quelconque, déjà copiée dans l'espace privé de l'application.
+     * [checkpoint] est appelé entre les étapes : une pause y fige le calcul, un arrêt y sort.
+     */
+    fun analyzeFile(file: File, checkpoint: () -> Unit = {}): ImageResult = analyze(file, checkpoint)
 
     /** Écrit le carnet au format attendu par cmd/query (-library). */
     fun writeLibrary(results: List<ImageResult>): File {
@@ -170,9 +173,11 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
         return File(root, "library.json")
     }
 
-    private fun analyze(file: File): ImageResult {
+    private fun analyze(file: File, checkpoint: () -> Unit = {}): ImageResult {
         val bitmap = loadUpright(file)
+        checkpoint()
         val vector = embed(bitmap)
+        checkpoint()
         val inScore = dot(vector, indoor)
         val outScore = dot(vector, outdoor)
         val flatScore = dot(vector, flat)
@@ -181,6 +186,7 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
         val (faces, portrait) = countFaces(bitmap)
+        checkpoint()
         // A failure while reading the text is reported, not allowed to stop the whole analysis.
         return try {
             val text = reader.read(bitmap)
