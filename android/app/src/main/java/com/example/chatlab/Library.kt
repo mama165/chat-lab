@@ -1,8 +1,6 @@
 package com.example.chatlab
 
-import android.content.Context
 import org.json.JSONArray
-import java.io.File
 import java.text.Normalizer
 
 /** Une image du carnet, telle que l'analyse l'a écrite. */
@@ -29,19 +27,21 @@ data class Criteria(val people: Int?, val place: Place?)
 
 /** Le carnet produit par l'analyse, et les deux façons de chercher dedans. */
 object Library {
-    /** Nombre d'images montrées pour une description. */
-    private const val TOP = 5
-
-    fun load(context: Context): List<LibraryEntry> {
-        val text = LibraryStore.read(context) ?: return emptyList()
-        val array = JSONArray(text)
-        return (0 until array.length()).map { index ->
-            val item = array.getJSONObject(index)
+    /** Lit le texte du carnet (library.json). Un carnet illisible donne une liste vide. */
+    fun parse(text: String?): List<LibraryEntry> {
+        if (text.isNullOrBlank()) return emptyList()
+        val array = try {
+            JSONArray(text)
+        } catch (e: Exception) {
+            return emptyList()
+        }
+        return (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
             LibraryEntry(
-                id = item.getString("id"),
-                name = item.getString("name"),
-                path = item.getString("path"),
-                indoor = if (item.has("indoor")) item.getBoolean("indoor") else null,
+                id = item.optString("id", ""),
+                name = item.optString("name", ""),
+                path = item.optString("path", ""),
+                indoor = if (item.has("indoor")) item.optBoolean("indoor") else null,
                 faces = item.optInt("faces", 0),
                 text = item.optString("text", ""),
                 taken = item.optString("taken", ""),
@@ -70,11 +70,6 @@ object Library {
             .map { Match(it, null) }
     }
 
-    /**
-     * Recherche par description : les images dont le vecteur ressemble le plus à celui de la phrase.
-     * On montre les TOP premières, avec leur score, sans seuil caché. Le nombre de personnes et le lieu,
-     * s'ils sont nommés dans la phrase, filtrent explicitement (et l'écran l'affiche).
-     */
     /** Tous les résultats classés, sans limite : le seuil choisit ensuite ce qui s'affiche. */
     fun rankDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> =
         entries
@@ -90,16 +85,6 @@ object Library {
             val score = match.score ?: 0f
             score >= floor && score >= best - margin
         }
-    }
-
-    fun searchDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> {
-        return entries
-            .filter { inPlace(it, place) }
-            .filter { entry -> people == null || entry.faces == people }
-            .mapNotNull { entry -> entry.vector?.let { Match(entry, dot(query, it)) } }
-            .sortedWith(compareBy<Match> { match -> people?.let { kotlin.math.abs(match.entry.faces - it) } ?: 0 }
-                .thenByDescending { match -> match.score })
-            .take(TOP)
     }
 
     /**
@@ -132,13 +117,13 @@ object Library {
         else -> null
     }
 
-    private fun inPlace(entry: LibraryEntry, place: Place): Boolean = when (place) {
+    fun inPlace(entry: LibraryEntry, place: Place): Boolean = when (place) {
         Place.ALL -> true
         Place.INDOOR -> entry.indoor == true
         Place.OUTDOOR -> entry.indoor == false
     }
 
-    private fun dot(a: FloatArray, b: FloatArray): Float {
+    fun dot(a: FloatArray, b: FloatArray): Float {
         var sum = 0f
         for (i in a.indices) sum += a[i] * b[i]
         return sum

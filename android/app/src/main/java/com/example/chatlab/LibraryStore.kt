@@ -109,3 +109,6 @@ object LibraryStore {
             ?: error("impossible d'écrire retraits.json")
     }
 }
+
+/** Le carnet enregistré, lu depuis le dossier chatlab (ou l'espace privé à défaut). */
+fun Library.load(context: Context): List<LibraryEntry> = parse(LibraryStore.read(context))
