@@ -6,6 +6,9 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 
 /**
  * Les modèles sont lus directement dans le sous-dossier models du dossier chatlab,
@@ -40,8 +43,9 @@ object ModelFiles {
         String(bytes(context, models, name), Charsets.UTF_8)
 
     /**
-     * Ouvre une session ONNX sur le fichier du dossier, sans le copier : le modèle est lu
-     * par son descripteur de fichier, puis le descripteur est refermé.
+     * Ouvre une session ONNX sur le fichier du dossier, sans le copier : le contenu est projeté en
+     * mémoire depuis le descripteur ouvert par Android. Android refuse qu'on rouvre ce fichier par
+     * un chemin (/proc/self/fd/…, erreur 13), d'où le passage par la mémoire plutôt que par un nom.
      */
     fun session(
         env: OrtEnvironment,
@@ -53,7 +57,29 @@ object ModelFiles {
         val file = whole(context, models, name)
         val descriptor = context.contentResolver.openFileDescriptor(file.uri, "r")
             ?: error("lecture impossible : $name")
-        return descriptor.use { env.createSession("/proc/self/fd/${it.fd}", options) }
+        val buffer = descriptor.use { FileInputStream(it.fileDescriptor).use { input -> mapped(input.channel, name) } }
+        return env.createSession(buffer, options)
+    }
+
+    /**
+     * Le contenu du fichier dans une mémoire hors du tas Java : projection directe du fichier si
+     * le système l'accepte, sinon lecture dans un tampon direct.
+     */
+    private fun mapped(channel: FileChannel, name: String): ByteBuffer {
+        val size = channel.size()
+        require(size in 1..Int.MAX_VALUE) { "taille inattendue pour $name : $size" }
+        return try {
+            channel.map(FileChannel.MapMode.READ_ONLY, 0, size)
+        } catch (e: Exception) {
+            val buffer = ByteBuffer.allocateDirect(size.toInt())
+            channel.position(0)
+            while (buffer.hasRemaining()) {
+                if (channel.read(buffer) < 0) break
+            }
+            check(!buffer.hasRemaining()) { "lecture incomplète de $name" }
+            buffer.flip()
+            buffer
+        }
     }
 
     /**
