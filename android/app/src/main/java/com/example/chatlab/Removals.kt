@@ -24,6 +24,15 @@ object Removals {
         }.toList().sortedWith(compareBy<Removal>({ it.query }, { it.date }))
     }
 
+    /** Les photos retirées pour une recherche donnée (clés source ou chemin). */
+    fun sourcesFor(context: Context, query: String): Set<String> {
+        val array = LibraryStore.readRemovals(context).optJSONArray(query) ?: return emptySet()
+        return (0 until array.length()).map { index ->
+            val item = array.opt(index)
+            if (item is JSONObject) item.optString("source") else item.toString()
+        }.toSet()
+    }
+
     /** Ajoute des photos retirées pour une recherche, avec la date du jour. */
     fun add(context: Context, query: String, sources: Collection<String>) {
         val json = LibraryStore.readRemovals(context)
