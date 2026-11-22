@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -120,7 +121,8 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var encodeMillis by remember { mutableStateOf<Long?>(null) }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var showRemoved by remember { mutableStateOf(false) }
     // Seuil réglé avec la jauge : le compte se met à jour tout de suite, la liste un peu après.
     var threshold by remember { mutableStateOf(0.08f) }
     var shownThreshold by remember { mutableStateOf(0.08f) }
@@ -158,21 +160,29 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     // Photos retirées pour cette recherche : elles ne reviennent plus.
     var removals by remember { mutableStateOf(LibraryStore.readRemovals(context)) }
     val queryKey = query.trim().lowercase()
-    val removed = removals.optJSONArray(queryKey)?.let { array ->
-        (0 until array.length()).map { array.getString(it) }.toSet()
-    } ?: emptySet()
-    val found: List<Match> = when {
-        query.isBlank() -> emptyList()
-        !byDescription -> Library.searchWords(entries, query, place)
-        else -> Library.aboveThreshold(ranked, shownThreshold)
-    }
-    val matches: List<Match> = found.filter { (it.entry.source.ifBlank { it.entry.path }) !in removed }
+    val removed = remember(removals, queryKey) { Removals.sourcesFor(context, queryKey) }
+    fun keyOf(match: Match): String = match.entry.source.ifBlank { match.entry.path }
+    val wordFound: List<Match> = if (query.isBlank()) emptyList()
+        else Library.searchWords(entries, query, place).filter { keyOf(it) !in removed }
+    val wordKeys = wordFound.map { keyOf(it) }.toSet()
+    val descFound: List<Match> = if (!byDescription) emptyList()
+        else Library.aboveThreshold(ranked, shownThreshold).filter { keyOf(it) !in removed && keyOf(it) !in wordKeys }
+    val matches: List<Match> = wordFound + descFound
+    val totalRemoved = removals.keys().asSequence().sumOf { removals.optJSONArray(it)?.length() ?: 0 }
     val matchMillis = (System.nanoTime() - searchStart) / 1_000_000
     // Temps de la recherche, affiché sous le compteur de résultats.
     val timingLine = when {
         query.isBlank() || (byDescription && queryVector == null) -> ""
         !byDescription -> "Recherche par mots : $matchMillis ms"
         else -> "Lecture de la description : ${encodeMillis ?: 0} ms · classement : $matchMillis ms"
+    }
+
+    if (showRemoved) {
+        NonClassifiees(
+            onBack = { showRemoved = false },
+            onChanged = { removals = LibraryStore.readRemovals(context) },
+        )
+        return
     }
 
     Column(
@@ -233,6 +243,9 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             )
         }
         Spacer(Modifier.height(16.dp))
+        if (totalRemoved > 0) {
+            TextButton(onClick = { showRemoved = true }) { Text("Non classifiées ($totalRemoved)") }
+        }
         if (byDescription && (criteria.people != null || criteria.place != null)) {
             val parts = listOfNotNull(
                 criteria.people?.let { "$it personne(s)" },
@@ -294,47 +307,77 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(timingLine, style = MaterialTheme.typography.labelSmall)
                 }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        if (byDescription) "${matches.size} image(s) au-dessus du seuil" else "${matches.size} résultat(s)",
-                        style = MaterialTheme.typography.labelLarge,
-                    )
+                if (wordFound.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            "Correspondances du mot « $query » (${wordFound.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    items(wordFound.size, key = { i -> "w-$i-${keyOf(wordFound[i])}" }, span = { GridItemSpan(maxLineSpan) }) { index ->
+                        val match = wordFound[index]
+                        WordRow(
+                            match = match,
+                            selected = keyOf(match) in selected,
+                            onTap = { selected = toggled(selected, keyOf(match)) },
+                            onLongPress = { openInGallery(context, match.entry.source) },
+                        )
+                    }
                 }
-                items(matches.size, key = { i -> "$i-${matches[i].entry.path}" }) { index ->
-                    val match = matches[index]
-                    ResultTile(
-                        match = match,
-                        selected = selectedId == match.entry.id,
-                        onTap = { selectedId = if (selectedId == match.entry.id) null else match.entry.id },
-                        onLongPress = { openInGallery(context, match.entry.source) },
-                    )
+                if (descFound.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            "Photos proches de « $query » (${descFound.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    items(descFound.size, key = { i -> "d-$i-${keyOf(descFound[i])}" }) { index ->
+                        val match = descFound[index]
+                        ResultTile(
+                            match = match,
+                            selected = keyOf(match) in selected,
+                            onTap = { selected = toggled(selected, keyOf(match)) },
+                            onLongPress = { openInGallery(context, match.entry.source) },
+                        )
+                    }
                 }
             }
         }
-        // Encart du bas : seulement quand une photo est sélectionnée par un appui.
-        val selectedMatch = matches.firstOrNull { it.entry.id == selectedId }
-        if (selectedMatch != null) {
-            Spacer(Modifier.height(8.dp))
-            InfoPanel(
-                match = selectedMatch,
-                query = query,
-                byDescription = byDescription,
-                onClose = { selectedId = null },
-                onOpen = { openInGallery(context, selectedMatch.entry.source) },
-                onRemove = {
-                    LibraryStore.addRemoval(context, queryKey, selectedMatch.entry.source.ifBlank { selectedMatch.entry.path })
-                    removals = LibraryStore.readRemovals(context)
-                    selectedId = null
-                },
-                onCopy = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("nom de la photo", selectedMatch.entry.name))
-                    Toast.makeText(context, "Nom copié", Toast.LENGTH_SHORT).show()
-                },
-            )
+        // Barre du bas : dès qu'une ou plusieurs photos sont marquées.
+        if (selected.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("${selected.size} sélectionnée(s)", style = MaterialTheme.typography.labelLarge)
+                Row {
+                    TextButton(onClick = { selected = emptySet() }) { Text("Annuler") }
+                    TextButton(onClick = {
+                        Removals.add(context, queryKey, selected)
+                        removals = LibraryStore.readRemovals(context)
+                        selected = emptySet()
+                    }) { Text("Retirer de « $query »") }
+                }
+            }
         }
     }
 }
+
+private fun toggled(current: Set<String>, key: String): Set<String> =
+    if (key in current) current - key else current + key
+
+/** Appui court = sélection, appui maintenu = ouverture de la galerie. */
+private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -> Unit): Modifier =
+    this.pointerInput(key) {
+        detectTapGestures(onPress = {
+            val result = withTimeoutOrNull(LONG_PRESS_MS) { tryAwaitRelease() }
+            if (result == null) onLongPress() else if (result) onTap()
+        })
+    }
+
 
 /**
  * Une vignette : photo seule, score et date en petit sur la photo. Un appui court la sélectionne
@@ -353,9 +396,6 @@ private fun ResultTile(match: Match, selected: Boolean, onTap: () -> Unit, onLon
     Box(
         modifier = Modifier
             .padding(4.dp)
-            .then(
-                if (selected) Modifier.border(2.dp, primary, RoundedCornerShape(16.dp)) else Modifier,
-            )
             .pointerInput(entry.id) {
                 detectTapGestures(onPress = {
                     pressing = true
@@ -370,7 +410,8 @@ private fun ResultTile(match: Match, selected: Boolean, onTap: () -> Unit, onLon
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp)),
+                .clip(RoundedCornerShape(12.dp))
+                .alpha(if (selected) 0.4f else 1f),
         )
         Text(
             summaryLine(match),
@@ -382,6 +423,18 @@ private fun ResultTile(match: Match, selected: Boolean, onTap: () -> Unit, onLon
                 .align(Alignment.BottomStart)
                 .padding(6.dp),
         )
+        if (selected) {
+            Text(
+                "✓",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .background(primary, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 4.dp),
+            )
+        }
         if (!selected && ring.value > 0f) {
             Canvas(modifier = Modifier.matchParentSize()) {
                 val w = size.width
@@ -398,6 +451,111 @@ private fun ResultTile(match: Match, selected: Boolean, onTap: () -> Unit, onLon
                         ),
                     ),
                 )
+            }
+        }
+    }
+}
+
+/** Une correspondance par mot : vignette, date et extrait du texte lu. */
+@Composable
+private fun WordRow(match: Match, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
+    val entry = match.entry
+    val key = entry.source.ifBlank { entry.path }
+    val primary = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .padding(6.dp)
+            .pressGesture(key, onTap, onLongPress),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(56.dp)) {
+            GridThumb(
+                location = key,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(10.dp))
+                    .alpha(if (selected) 0.4f else 1f),
+            )
+            if (selected) {
+                Text(
+                    "✓",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(2.dp)
+                        .background(primary, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 4.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                entry.taken.ifBlank { "date inconnue" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                entry.text.take(90).ifBlank { entry.name },
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Vue « Non classifiées » : les photos retirées, par mot, avec la date et le bouton Rétablir. */
+@Composable
+private fun NonClassifiees(onBack: () -> Unit, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    var items by remember { mutableStateOf(Removals.all(context)) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        TextButton(onClick = onBack) { Text("‹ Retour à la recherche") }
+        Text("Non classifiées", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "${items.size} photo(s) retirée(s). Rétablir la remet dans la recherche d'origine.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        items.groupBy { it.query }.forEach { (query, group) ->
+            Text(
+                "« $query » (${group.size})",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            group.forEach { removal ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    GridThumb(
+                        location = removal.source,
+                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        if (removal.date.isBlank()) "Retirée" else "Retirée le ${removal.date}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = {
+                        Removals.restore(context, removal.query, removal.source)
+                        items = Removals.all(context)
+                        onChanged()
+                    }) { Text("Rétablir") }
+                }
             }
         }
     }

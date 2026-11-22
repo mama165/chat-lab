@@ -94,4 +94,18 @@ object LibraryStore {
         context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
             ?: error("impossible d'écrire retraits.json")
     }
+
+    /** Écrit l'ensemble des retraits, dans le dossier chatlab si possible. */
+    fun writeRemovals(context: Context, json: JSONObject) {
+        val text = json.toString()
+        val dir = folder(context)
+        if (dir == null) {
+            File(context.filesDir, REMOVALS).writeText(text, Charsets.UTF_8)
+            return
+        }
+        val target = dir.findFile(REMOVALS) ?: dir.createFile("application/json", REMOVALS)
+            ?: error("impossible de créer retraits.json dans le dossier chatlab")
+        context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+            ?: error("impossible d'écrire retraits.json")
+    }
 }
