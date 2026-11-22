@@ -92,6 +92,8 @@ class AnalysisService : Service() {
                 val errors = AtomicInteger(0)
                 val reused = AtomicInteger(0)
                 val saveLock = Any()
+                val previousAll = Array(total) { previousResult(images[it], known) }
+                var lastSave = System.currentTimeMillis()
 
                 // Un analyseur par travailleur : chacun charge ses modèles et travaille seul.
                 val analyzers = List(WORKERS) { Analyzer(this@AnalysisService, Uri.parse(chatlab)) }
@@ -113,9 +115,10 @@ class AnalysisService : Service() {
                                     )
                                     // Carnet enregistré régulièrement : une fermeture ne fait perdre que
                                     // les dernières images, et la relance reprend là où on s'était arrêté.
-                                    if (finished % SAVE_EVERY == 0) {
-                                        synchronized(saveLock) {
-                                            analyzers.first().writeLibrary(snapshot(images, results, known))
+                                    synchronized(saveLock) {
+                                        if (System.currentTimeMillis() - lastSave >= SAVE_INTERVAL_MS) {
+                                            lastSave = System.currentTimeMillis()
+                                            analyzers.first().writeLibrary(snapshot(results, previousAll))
                                         }
                                     }
                                 }
@@ -216,8 +219,8 @@ class AnalysisService : Service() {
         /** Nombre d'images analysées en même temps. Chaque travailleur charge ses modèles. */
         const val WORKERS = 2
 
-        /** Le carnet est enregistré toutes les SAVE_EVERY images traitées. */
-        const val SAVE_EVERY = 20
+        /** Le carnet est enregistré au plus toutes les deux minutes pendant l'analyse. */
+        const val SAVE_INTERVAL_MS = 120_000L
 
         private const val CHANNEL = "analysis"
         private const val NOTIFICATION_ID = 1
@@ -353,11 +356,10 @@ private fun previousResult(image: DocumentFile, known: Map<String, JSONObject>):
  * pour qu'un enregistrement intermédiaire ne perde rien de ce qui était déjà dans le carnet.
  */
 private fun snapshot(
-    images: List<DocumentFile>,
     results: Array<ImageResult?>,
-    known: Map<String, JSONObject>,
-): List<ImageResult> = images.indices.mapNotNull { index ->
-    results[index] ?: previousResult(images[index], known)
+    previous: Array<ImageResult?>,
+): List<ImageResult> = results.indices.mapNotNull { index ->
+    results[index] ?: previous[index]
 }
 
 /** Rebâtit un résultat à partir d'une entrée du carnet, sans relancer l'analyse. */
