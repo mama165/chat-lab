@@ -417,17 +417,17 @@ fun overview(context: Context): List<FolderOverview> {
     val sources = Sources.read(context)
     val known = readKnown(LibraryStore.read(context))
     return sources.map { folder ->
-        ReadProgress.start(folder.uri)
+        val number = ReadProgress.start(folder.uri)
         val scan = try {
             FolderScanner.scan(
                 SafDir.root(context, folder),
                 reusable = { file -> reusableMime(known, file) },
-                examined = { count -> ReadProgress.report(folder.uri, count) },
+                examined = { count -> ReadProgress.report(folder.uri, number, count) },
             )
         } catch (e: Exception) {
             return@map FolderOverview(FolderStatus(folder, FolderStatus.State.REFUSED), 0, 0)
         } finally {
-            ReadProgress.finish(folder.uri)
+            ReadProgress.finish(folder.uri, number)
         }
         val fresh = scan.candidates.count { carry(known, it.file) == Carry.PROCESS }
         val state = when {
