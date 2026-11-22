@@ -520,7 +520,7 @@ private fun Thumbnail(location: String) {
 }
 
 /** Durée d'un appui pour qu'il compte comme un appui maintenu (ouverture de la galerie). */
-private const val LONG_PRESS_MS = 1000L
+private const val LONG_PRESS_MS = 500L
 
 /** Ouvre la photo d'origine dans l'application de galerie ou de bibliothèque du téléphone. */
 private fun openInGallery(context: Context, source: String) {
