@@ -216,6 +216,8 @@ private fun Idle(
         } else {
             ReadingCard(folder, reading[folder.uri] ?: 0)
         }
+        // Le même trait gris entre chaque dossier, comme sur la maquette.
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
     }
     AddFolderRow(pickers.addSource)
     Text("Les photos restent dans leur dossier. Seules les nouvelles sont analysées.", fontSize = 12.sp, color = Palette.Muted)
