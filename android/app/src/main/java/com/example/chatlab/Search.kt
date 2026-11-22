@@ -265,15 +265,16 @@ fun SearchScreen(
                 "Ouvrez l'onglet Photos pour lancer l'analyse.",
             )
             query.isBlank() -> Recents(recents, onPick = { state.query = it })
+            outcome.isEmpty && chips.isNotEmpty() -> Message(
+                "Aucune photo ne correspond à « $query ».",
+                "Essayez de retirer un filtre.",
+            )
             outcome.isEmpty && modelError != null -> Message(
                 "Aucune photo ne correspond à « $query ».",
                 "Recherche par description indisponible : $modelError",
             )
             outcome.isEmpty && queryVector == null -> Message("Recherche en cours…", null)
-            outcome.isEmpty -> Message(
-                "Aucune photo ne correspond à « $query ».",
-                if (chips.isNotEmpty()) "Essayez de retirer un filtre." else "Essayez d'autres mots.",
-            )
+            outcome.isEmpty -> Message("Aucune photo ne correspond à « $query ».", "Essayez d'autres mots.")
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,

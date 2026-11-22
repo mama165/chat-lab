@@ -52,8 +52,9 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests and build the debug APK
-        # One Gradle invocation: the project is configured once, and both tasks share it.
-        run: ./gradlew testDebugUnitTest assembleDebug
+        # One Gradle invocation: the project is configured once, and the tasks share it.
+        # The test APK holds the Compose interface tests, run later on the emulator.
+        run: ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4
@@ -63,9 +64,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload the interface tests APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatlab-test-apk
+          path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 3
+
   # Runs only once the APK has been built: the screenshots show that exact build.
   screenshots:
-    name: Screenshots on an Android emulator
+    name: Screenshots, interface tests and monkey on an Android emulator
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -78,6 +87,12 @@ jobs:
         with:
           name: chatlab-debug-apk
           path: ci-apk
+
+      - name: Get the interface tests APK
+        uses: actions/download-artifact@v4
+        with:
+          name: chatlab-test-apk
+          path: ci-test-apk
 
       - name: Allow the emulator to use KVM
         run: |
@@ -94,7 +109,10 @@ jobs:
             ~/.android/adb*
           key: avd-api34-x86_64-${{ hashFiles('android/ci/capture.py') }}
 
-      - name: Run the app on the emulator and take screenshots
+      - name: Screenshots, then interface tests, then the monkey
+        # 1. capture.py installs the app and takes the screenshots of each screen.
+        # 2. instrumented.py runs the Compose tests: complete flows, with checks on what shows.
+        # 3. monkey.py sends thousands of random actions and fails on any crash.
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -104,9 +122,12 @@ jobs:
           disable-animations: true
           disable-spellchecker: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: python3 android/ci/capture.py
+          script: |
+            python3 android/ci/capture.py
+            python3 android/ci/instrumented.py
+            python3 android/ci/monkey.py
 
-      - name: Upload the screenshots
+      - name: Upload the screenshots and test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
