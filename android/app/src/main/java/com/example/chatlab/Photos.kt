@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -235,19 +236,27 @@ private fun Idle(
 /** Un dossier en cours de lecture : son nom, et le nombre de fichiers examinés jusqu'ici. */
 @Composable
 private fun ReadingCard(folder: SourceFolder, examined: Int) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .semantics { contentDescription = "Dossier ${folder.name}, lecture en cours" },
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-        Text(
-            "Lecture en cours · $examined fichiers examinés",
-            fontSize = 12.sp,
-            color = Palette.Muted,
+        // Une jauge qui tourne : elle dit qu'une lecture est en cours, sans prétendre à un pourcentage.
+        CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            color = Palette.Accent,
+            strokeWidth = 2.dp,
         )
+        Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+            Text(
+                if (examined == 0) "Lecture en cours…" else "Lecture en cours · $examined fichiers examinés",
+                fontSize = 12.sp,
+                color = Palette.Muted,
+            )
+        }
     }
 }
 
