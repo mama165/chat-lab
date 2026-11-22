@@ -320,7 +320,7 @@ private fun FolderCard(overview: FolderOverview, failures: List<FileFailure>, on
             contentAlignment = Alignment.Center,
         ) {
             if (problem) Text("!", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.Danger)
-            else Text("▣", fontSize = 18.sp, color = Palette.Accent)
+            else Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -339,6 +339,7 @@ private fun FolderCard(overview: FolderOverview, failures: List<FileFailure>, on
                     Text(
                         if (overview.fresh == 0) "Rien de nouveau" else if (overview.fresh == 1) "1 nouvelle" else "${overview.fresh} nouvelles",
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = Palette.Accent,
                     )
                     if (status.ignored > 0) Text("${status.ignored} fichiers ignorés (pas des images lisibles)", fontSize = 11.sp, color = Palette.Muted)
