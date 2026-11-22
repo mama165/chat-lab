@@ -117,7 +117,8 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
     val entries = remember(visible) { Library.load(context) }
     var query by remember { mutableStateOf("") }
     var place by remember { mutableStateOf(Place.ALL) }
-    var byDescription by remember { mutableStateOf(false) }
+    // Les deux recherches sont toujours affichées ensemble : par mots, puis par description.
+    val byDescription = true
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var encodeMillis by remember { mutableStateOf<Long?>(null) }
@@ -194,13 +195,8 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (byDescription) "Décrivez ce que vous cherchez" else "Ce que vous cherchez") },
-            placeholder = {
-                Text(
-                    if (byDescription) "une cuisine, deux personnes, une plage…"
-                    else "facture, wifi, sortie…",
-                )
-            },
+            label = { Text("Ce que vous cherchez") },
+            placeholder = { Text("facture, wifi, une cuisine, une plage…") },
             singleLine = true,
             // A small button to clear the text at once, shown only when there is some.
             trailingIcon = {
@@ -212,19 +208,6 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
             },
         )
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = !byDescription,
-                onClick = { byDescription = false },
-                label = { Text("Mots") },
-            )
-            FilterChip(
-                selected = byDescription,
-                onClick = { byDescription = true },
-                label = { Text("Description") },
-            )
-        }
-        Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = place == Place.ALL,
@@ -282,16 +265,17 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 "Aucune image analysée pour l'instant. Ouvrez l'onglet Analyser, puis lancez l'analyse.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            modelError != null -> Text(
+            query.isBlank() -> Text(
+                "${entries.size} image(s) dans le carnet. Tapez un mot, ou une description.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            // Les correspondances par mot s'affichent même si la description n'est pas encore prête.
+            matches.isEmpty() && modelError != null -> Text(
                 "Recherche par description indisponible : $modelError",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            byDescription && query.isNotBlank() && queryVector == null -> Text(
+            matches.isEmpty() && queryVector == null -> Text(
                 "Lecture de la description…",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            query.isBlank() -> Text(
-                "${entries.size} image(s) dans le carnet. Tapez un mot, ou une description.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             matches.isEmpty() -> Text(
