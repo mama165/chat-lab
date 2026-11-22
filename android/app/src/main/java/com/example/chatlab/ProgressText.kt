@@ -88,12 +88,25 @@ fun clock(millis: Long): String {
     return "%d:%02d".format(seconds / 60, seconds % 60)
 }
 
-/** « Environ 2 minutes restantes », pour l'écran d'analyse. */
+/** « Environ 2 minutes restantes », « Environ 1 heure et 52 minutes restantes », pour l'écran d'analyse. */
 fun remainingText(millis: Long?): String = when {
     millis == null -> "Estimation du temps restant…"
     millis < 60_000L -> "Moins d'une minute restante"
     else -> {
         val minutes = ((millis + 30_000L) / 60_000L).toInt()
-        if (minutes == 1) "Environ 1 minute restante" else "Environ $minutes minutes restantes"
+        if (minutes == 1) "Environ 1 minute restante" else "Environ ${durationText(minutes)} restantes"
+    }
+}
+
+/** Une durée en français, en minutes sous l'heure, puis en heures et minutes : « 50 minutes », « 2 heures et 13 minutes ». */
+fun durationText(totalMinutes: Int): String {
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    if (hours == 0) return if (minutes == 1) "1 minute" else "$minutes minutes"
+    val hoursText = if (hours == 1) "1 heure" else "$hours heures"
+    return when (minutes) {
+        0 -> hoursText
+        1 -> "$hoursText et 1 minute"
+        else -> "$hoursText et $minutes minutes"
     }
 }
