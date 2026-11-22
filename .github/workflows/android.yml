@@ -1,9 +1,14 @@
 name: Android APK
 
 on:
-  # Only on pull requests: each push to a branch with an open PR already runs the PR check,
-  # so a push trigger would run every job twice.
+  # On a pull request: build the APK and run the unit tests only.
+  # On main (after a merge) and by hand: the emulator checks too.
   pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  push:
+    branches: [main]
     paths:
       - "android/**"
       - ".github/workflows/android.yml"
@@ -70,9 +75,11 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  # Runs only once the APK has been built: the screenshots show that exact build.
+  # Runs only once the APK has been built, and only after a merge: the screenshots show that exact build.
   screenshots:
     name: Screenshots, interface tests and monkey on an Android emulator
+    # Only after a merge (or by hand): too slow to run on every pull request.
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 40
