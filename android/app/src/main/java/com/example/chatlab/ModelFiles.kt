@@ -15,8 +15,6 @@ import java.io.File
  * en « nom » dans ce même dossier ; les morceaux peuvent ensuite être supprimés.
  */
 object ModelFiles {
-    private val PART = Regex("\\.part(\\d+)$")
-
     /** Le sous-dossier models du dossier chatlab (celui passé, sinon celui enregistré). */
     fun folder(context: Context, tree: Uri? = null): DocumentFile {
         val uri = tree
@@ -95,10 +93,10 @@ object ModelFiles {
         return models.findFile(name) ?: error("$name introuvable après recollage")
     }
 
-    private fun parts(models: DocumentFile, name: String): List<DocumentFile> =
-        models.listFiles()
-            .filter { it.isFile && (it.name ?: "").startsWith("$name.part") && PART.containsMatchIn(it.name ?: "") }
-            .sortedBy { PART.find(it.name ?: "")?.groupValues?.get(1)?.toInt() ?: 0 }
+    private fun parts(models: DocumentFile, name: String): List<DocumentFile> {
+        val files = models.listFiles().filter { it.isFile && it.name != null }.associateBy { it.name!! }
+        return ModelParts.ordered(files.keys, name).map { files.getValue(it) }
+    }
 
     /** Supprime les anciennes copies des modèles et des images de test dans l'espace privé. */
     fun removeOldCopies(context: Context) {

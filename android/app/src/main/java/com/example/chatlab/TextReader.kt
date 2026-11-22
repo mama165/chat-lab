@@ -308,23 +308,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         }
     }
 
-    private fun decode(steps: Array<FloatArray>): Pair<String, Float> {
-        val text = StringBuilder()
-        var previous = -1
-        var confidence = 0.0
-        var kept = 0
-        for (step in steps) {
-            var best = 0
-            for (i in step.indices) if (step[i] > step[best]) best = i
-            if (best != 0 && best != previous && best < vocabulary.size) {
-                text.append(vocabulary[best])
-                confidence += step[best]
-                kept++
-            }
-            previous = best
-        }
-        return text.toString() to if (kept == 0) 0f else (confidence / kept).toFloat()
-    }
+    private fun decode(steps: Array<FloatArray>): Pair<String, Float> = OcrMath.decode(steps, vocabulary)
 
     private fun orderCorners(box: Array<Point>): List<Point> {
         val tl = box.minBy { it.x + it.y }
@@ -336,7 +320,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
 
     private fun sideLength(a: Point, b: Point): Double = sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
 
-    private fun roundTo32(value: Double): Int = max(32, (value / 32).roundToInt() * 32)
+    private fun roundTo32(value: Double): Int = OcrMath.roundTo32(value)
 
     override fun close() {
         detector.close()

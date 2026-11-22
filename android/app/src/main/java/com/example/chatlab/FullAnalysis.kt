@@ -33,18 +33,6 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
-/** État de l'analyse complète, lu par l'écran pour afficher la progression. */
-data class Progress(
-    val running: Boolean = false,
-    val done: Int = 0,
-    val total: Int = 0,
-    val current: String = "",
-    val startedAt: Long = 0L,
-    val errors: Int = 0,
-    val message: String = "",
-    val report: String = "",
-)
-
 object AnalysisProgress {
     private val value = MutableStateFlow(Progress())
     val state: StateFlow<Progress> = value.asStateFlow()
@@ -273,22 +261,6 @@ private fun analyzeOne(
     }
 }
 
-/** Ligne de texte affichée à l'écran et dans la notification. */
-fun progressLine(progress: Progress, now: Long): String {
-    if (!progress.running) return progress.message
-    if (progress.total == 0) return progress.message.ifBlank { "Recherche des images…" }
-    val elapsed = (now - progress.startedAt).coerceAtLeast(0L)
-    val percent = progress.done * 100 / progress.total
-    val remaining = if (progress.done > 0) elapsed * (progress.total - progress.done) / progress.done else 0L
-    return buildString {
-        append("${progress.done} / ${progress.total} fichiers ($percent %)")
-        append(" · écoulé ${clock(elapsed)}")
-        if (progress.done > 0) append(" · reste ~${clock(remaining)}")
-        if (progress.errors > 0) append(" · ${progress.errors} erreur(s)")
-        if (progress.current.isNotBlank()) append("\n${progress.current}")
-    }
-}
-
 /** Une ligne du compte rendu, dans le même format que l'analyse des images de test. */
 private fun describe(r: ImageResult): String {
     if (r.error != null) return "${r.file.name} : erreur, ${r.error}"
@@ -299,11 +271,6 @@ private fun describe(r: ImageResult): String {
     }
     val text = if (r.text.isNotBlank()) "\n  texte : ${r.text}" else ""
     return "${r.file.name} : $place, ${r.faces} visage(s), ${r.millis} ms$text"
-}
-
-private fun clock(millis: Long): String {
-    val seconds = millis / 1000
-    return "%d:%02d".format(seconds / 60, seconds % 60)
 }
 
 /** Toutes les images du dossier et de ses sous-dossiers. */
