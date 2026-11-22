@@ -15,7 +15,7 @@ RUNNER = "com.example.chatlab.test/androidx.test.runner.AndroidJUnitRunner"
 
 
 def main():
-    apks = glob.glob(os.path.join(os.getcwd(), "ci-test-apk", "*.apk"))
+    apks = glob.glob(os.path.join(HERE, "..", "..", "ci-test-apk", "*.apk"))
     if not apks:
         raise SystemExit("APK de test introuvable dans ci-test-apk")
     subprocess.run(["adb", "install", "-r", "-g", apks[0]], check=True)
