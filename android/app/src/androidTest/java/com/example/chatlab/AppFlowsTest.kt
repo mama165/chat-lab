@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -147,13 +148,15 @@ class AppFlowsTest {
     fun twoFiltersOfferReinitialiser() {
         type("facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
-        compose.onNodeWithText("Intérieur").performClick()
-        compose.onNodeWithText("Ce mois").performClick()
+        compose.onNodeWithText("Intérieur").performScrollTo().performClick()
+        compose.onNodeWithText("7 derniers jours").performScrollTo().performClick()
         back()
-        compose.onNodeWithText("2").assertExists()
-        compose.onNodeWithText("Réinitialiser").performClick()
+        compose.onNodeWithText("Intérieur ✕").assertExists()
+        compose.onNodeWithText("7 derniers jours ✕").assertExists()
+        // Deux filtres actifs : le lien Réinitialiser apparaît à côté du nombre de résultats.
+        compose.onNode(hasText("Réinitialiser") and hasClickAction()).performClick()
         compose.onNodeWithText("Intérieur ✕").assertDoesNotExist()
-        compose.onNodeWithText("Ce mois ✕").assertDoesNotExist()
+        compose.onNodeWithText("7 derniers jours ✕").assertDoesNotExist()
     }
 
     @Test
@@ -236,7 +239,8 @@ class AppFlowsTest {
     fun aFolderFilterKeepsOnlyItsPhotos() {
         type("facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
-        compose.onNodeWithText("Documents", substring = true).performClick()
+        // Le chip du dossier est en bas de la page : on le fait défiler avant de le toucher.
+        compose.onNodeWithText("Documents", substring = true).performScrollTo().performClick()
         back()
         compose.onNodeWithText("Documents ✕").assertExists()
         compose.onNodeWithContentDescription("facture_fictive.png").assertExists()
