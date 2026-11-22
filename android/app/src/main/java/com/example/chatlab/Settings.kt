@@ -175,7 +175,7 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
         ) {
             Text(
                 if (current != null && !current.canWipe) "Rien à effacer : l'application est déjà dans son état de départ."
-                else "L'application revient à son état de départ. La prochaine analyse reprendra toutes les photos depuis le début.",
+                else "Les dossiers à analyser sont vidés. Le dossier chatlab reste choisi. La prochaine analyse reprendra toutes les photos depuis le début.",
                 fontSize = 14.sp,
                 color = Palette.Muted,
             )
@@ -184,12 +184,17 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
                 current?.lines()?.forEach { line ->
                     WipeRow(if (line.empty) "–" else "✕", line.title, line.detail, if (line.empty) Palette.Disabled else Palette.Danger, line.empty)
                 }
+                if (sourceNames.isEmpty()) {
+                    WipeRow("–", "Les dossiers à analyser", "Aucun dossier choisi", Palette.Disabled, true)
+                } else {
+                    WipeRow("✕", "Les dossiers à analyser", sourceNames.joinToString(", "), Palette.Danger, false)
+                }
             }
             Column {
                 SectionLabel("Reste")
                 WipeRow("✓", "Vos photos", "Rien n'est supprimé dans la galerie", Palette.Muted, false)
                 WipeRow("✓", "Les modèles", "Dans $chatlab/models", Palette.Muted, false)
-                WipeRow("✓", "Les dossiers choisis", (sourceNames + chatlab).joinToString(", "), Palette.Muted, false)
+                WipeRow("✓", "Le dossier chatlab", chatlab, Palette.Muted, false)
             }
         }
         Column(modifier = Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -203,6 +208,7 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
                     RecentStore.clear(context)
                     ReportStore.clear(context)
                     AnalysisProgress.clearReport()
+                    Sources.clear(context)
                     Toast.makeText(context, "Tout est effacé.", Toast.LENGTH_SHORT).show()
                     onWiped()
                     version++

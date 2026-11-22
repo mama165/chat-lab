@@ -34,6 +34,9 @@ object Sources {
         return next
     }
 
+    /** Vide la liste des dossiers à analyser. Le dossier chatlab (modèles et carnet) reste choisi. */
+    fun clear(context: Context) = write(context, emptyList())
+
     fun remove(context: Context, uri: String): List<SourceFolder> {
         val next = SourceList.remove(read(context), uri)
         write(context, next)
