@@ -9,8 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
 
-/** Les deux choix de dossier, utilisables depuis l'onglet Photos et depuis les réglages. */
-class FolderPickers(val chooseChatlab: () -> Unit, val chooseSource: () -> Unit)
+/**
+ * Les choix de dossier : le dossier chatlab (modèles et carnet), et l'ajout d'un dossier à
+ * analyser. Android ne permet de choisir qu'un dossier à la fois : on en ajoute autant qu'on veut.
+ */
+class FolderPickers(val chooseChatlab: () -> Unit, val addSource: () -> Unit)
 
 @Composable
 fun rememberFolderPickers(onChanged: () -> Unit): FolderPickers {
@@ -29,15 +32,14 @@ fun rememberFolderPickers(onChanged: () -> Unit): FolderPickers {
     }
     val source = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            preferences.edit().putString(KEY_SOURCE, uri.toString()).apply()
+            Sources.add(context, uri)
             onChanged()
         }
     }
-    return FolderPickers(chooseChatlab = { chatlab.launch(null) }, chooseSource = { source.launch(null) })
+    return FolderPickers(chooseChatlab = { chatlab.launch(null) }, addSource = { source.launch(null) })
 }
 
-/** Le nom d'un dossier choisi (« chatlab », « Camera »), ou null s'il n'est pas choisi. */
+/** Le nom du dossier chatlab (« chatlab »), ou null s'il n'est pas choisi. */
 fun folderName(context: Context, key: String): String? {
     val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(key, null) ?: return null
     return try {

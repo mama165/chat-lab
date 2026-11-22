@@ -84,4 +84,41 @@ class ProgressTextTest {
         assertEquals("Environ 1 minute restante", remainingText(70_000L))
         assertEquals("Environ 2 minutes restantes", remainingText(110_000L))
     }
+
+    private val folders = listOf(FolderProgress("Camera", 0, 0), FolderProgress("Screenshots", 0, 14))
+
+    @Test
+    fun aFolderWithNothingToDoIsMarkedDone() {
+        assertTrue(FolderProgress("Camera", 0, 0).nothingNew)
+        assertTrue(FolderProgress("Camera", 0, 0).finished)
+        assertFalse(FolderProgress("Screenshots", 6, 14).finished)
+        assertTrue(FolderProgress("Screenshots", 14, 14).finished)
+    }
+
+    @Test
+    fun advancingMovesTheRightFolderAndTheTotal() {
+        val start = running.copy(done = 0, total = 14, folders = folders)
+        val next = start.advancing(1, "qr.png")
+        assertEquals(1, next.done)
+        assertEquals("qr.png", next.current)
+        assertEquals(1, next.folders[1].done)
+        assertEquals(0, next.folders[0].done)
+        assertEquals("qr.png", next.folders[1].current)
+    }
+
+    @Test
+    fun advancingSeveralTimesAddsUp() {
+        var progress = running.copy(done = 0, total = 14, folders = folders)
+        repeat(6) { progress = progress.advancing(1, "f$it") }
+        assertEquals(6, progress.done)
+        assertEquals(6, progress.folders[1].done)
+        assertEquals(14, progress.folders[1].total)
+    }
+
+    @Test
+    fun advancingAnUnknownFolderStillCountsTheFile() {
+        val next = running.copy(done = 3, folders = folders).advancing(9, "x")
+        assertEquals(4, next.done)
+        assertEquals(folders, next.folders)
+    }
 }

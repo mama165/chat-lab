@@ -22,8 +22,21 @@ object ReportStore {
         return if (millis > 0) SimpleDate.of(millis) else null
     }
 
+    private const val RUN_FILE = "derniere_analyse.json"
+
+    /** Enregistre le bilan d'une analyse (par dossier) et son compte rendu en texte. */
+    fun saveRun(context: Context, report: RunReport) {
+        File(context.filesDir, RUN_FILE).writeText(report.toJson(), Charsets.UTF_8)
+        save(context, report.toText(), report.finishedAt)
+    }
+
+    /** Le bilan de la dernière analyse, ou null s'il n'y en a pas. */
+    fun readRun(context: Context): RunReport? =
+        RunReport.fromJson(File(context.filesDir, RUN_FILE).takeIf { it.exists() }?.readText(Charsets.UTF_8))
+
     fun clear(context: Context) {
         File(context.filesDir, FILE).delete()
+        File(context.filesDir, RUN_FILE).delete()
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().remove(KEY_DATE).apply()
     }
 }

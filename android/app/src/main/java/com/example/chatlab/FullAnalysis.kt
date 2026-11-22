@@ -1,17 +1,10 @@
 package com.example.chatlab
 
-import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
-import androidx.documentfile.provider.DocumentFile
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,9 +20,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -52,13 +43,14 @@ object AnalysisProgress {
 }
 
 /**
- * Analyse tout le dossier choisi (sous-dossiers compris) dans un service de premier plan,
- * pour que le traitement continue quand on quitte l'application.
+ * Analyse les dossiers choisis (sous-dossiers compris) dans un service de premier plan, pour que
+ * le traitement continue quand on quitte l'application.
  *
- * Les images sont traitées par WORKERS travailleurs en parallèle ; chaque travailleur a son
- * propre analyseur. Une photo inchangée (même source, taille et date) est reprise du carnet
- * sans être analysée de nouveau. Le carnet est enregistré dans le dossier chatlab, et les
- * photos restent à leur place d'origine : rien n'est copié de façon permanente.
+ * Chaque fichier est reconnu par ses premiers octets (comme le scanner Go), jamais par son nom.
+ * Les images sont traitées par WORKERS travailleurs en parallèle. Une photo inchangée (même
+ * adresse, taille et date) est reprise du carnet sans calcul. Le carnet est enregistré dans le
+ * dossier chatlab, et les photos restent à leur place d'origine : rien n'est copié de façon
+ * permanente. À la fin, un bilan par dossier dit ce qui a été analysé et ce qui n'a pas pu l'être.
  */
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -79,118 +71,153 @@ class AnalysisService : Service() {
             return START_NOT_STICKY
         }
         val chatlab = intent?.getStringExtra(EXTRA_CHATLAB)
-        val source = intent?.getStringExtra(EXTRA_SOURCE)
-        if (chatlab == null || source == null || AnalysisProgress.state.value.running) {
+        if (chatlab == null || AnalysisProgress.state.value.running) {
             stopSelf()
             return START_NOT_STICKY
         }
-        createChannel()
+        val sources = Sources.read(this)
+        if (sources.isEmpty()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        Notifications.createChannel(this)
         val started = System.currentTimeMillis()
         val control = AnalysisControl { state -> onControl(state) }
         current = control
-        AnalysisProgress.set(Progress(running = true, startedAt = started, message = "Préparation…"))
-        startForeground(NOTIFICATION_ID, progressNotification(AnalysisProgress.state.value))
+        AnalysisProgress.set(
+            Progress(
+                running = true,
+                startedAt = started,
+                message = "Préparation…",
+                folders = sources.map { FolderProgress(it.name, 0, 0) },
+            ),
+        )
+        startForeground(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, true))
 
         scope.launch {
             try {
-                val images = listImages(this@AnalysisService, Uri.parse(source))
-                val total = images.size
-                val known = readKnown(this@AnalysisService)
-                val results = arrayOfNulls<ImageResult>(total)
-                val next = AtomicInteger(0)
-                val done = AtomicInteger(0)
-                val errors = AtomicInteger(0)
-                val reused = AtomicInteger(0)
-                val saveLock = Any()
-                val previousAll = Array(total) { previousResult(images[it], known) }
-                var lastSave = System.currentTimeMillis()
-
-                // Un analyseur par travailleur : chacun charge ses modèles et travaille seul.
-                val analyzers = List(WORKERS) { Analyzer(this@AnalysisService, Uri.parse(chatlab)) }
-                try {
-                    coroutineScope {
-                        analyzers.map { analyzer ->
-                            async(Dispatchers.Default) {
-                                while (true) {
-                                    // Point d'arrêt avant chaque photo : en pause on attend ici, à l'arrêt on sort.
-                                    try {
-                                        control.checkpoint()
-                                    } catch (stopped: AnalysisStopped) {
-                                        break
-                                    }
-                                    val index = next.getAndIncrement()
-                                    if (index >= total) break
-                                    val image = images[index]
-                                    val (result, wasReused) = try {
-                                        analyzeOne(this@AnalysisService, analyzer, image, known, control::checkpoint)
-                                    } catch (stopped: AnalysisStopped) {
-                                        // La photo en cours est abandonnée ; elle sera reprise à la prochaine analyse.
-                                        break
-                                    }
-                                    results[index] = result
-                                    if (wasReused) reused.incrementAndGet()
-                                    if (result.error != null) errors.incrementAndGet()
-                                    val finished = done.incrementAndGet()
-                                    publish(finished, total, image.name ?: "image", errors.get())
-                                    // Carnet enregistré régulièrement : une fermeture ne fait perdre que
-                                    // les dernières images, et la relance reprend là où on s'était arrêté.
-                                    synchronized(saveLock) {
-                                        if (System.currentTimeMillis() - lastSave >= SAVE_INTERVAL_MS) {
-                                            lastSave = System.currentTimeMillis()
-                                            analyzers.first().writeLibrary(snapshot(results, previousAll))
-                                        }
-                                    }
-                                }
-                            }
-                        }.awaitAll()
-                    }
-                    if (control.state == RunState.STOPPING) {
-                        // Arrêt demandé : ce qui est fait est gardé, le reste attendra la prochaine analyse.
-                        analyzers.first().writeLibrary(snapshot(results, previousAll))
-                        val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
-                        val text = "Analyse arrêtée : ${done.get()} sur $total photos faites, gardées dans le carnet."
-                        val report = "Analyse arrêtée à la demande après ${clock(elapsed)} : ${done.get()} sur $total fichier(s) traités, " +
-                            "${reused.get()} repris du carnet, ${errors.get()} erreur(s).\n"
-                        ReportStore.save(this@AnalysisService, report)
-                        finish(AnalysisProgress.state.value.copy(running = false, paused = false, report = report), text)
-                        return@launch
-                    }
-                    val all = results.map { it ?: error("résultat manquant") }
-                    analyzers.first().writeLibrary(all)
-
-                    val lines = StringBuilder()
-                    all.forEach { lines.appendLine(describe(it)) }
-                    val ok = all.count { it.error == null }
-                    val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
-                    val header = "Compte rendu de l'analyse complète du dossier choisi, sous-dossiers compris.\n" +
-                        "Analyse complète : $total fichier(s), ${reused.get()} repris du carnet, " +
-                        "$ok ajouté(s), ${errors.get()} erreur(s), $WORKERS travailleurs, durée ${clock(elapsed)}\n"
-                    ReportStore.save(this@AnalysisService, header + lines)
-                    finish(
-                        Progress(false, total, total, "", started, errors.get(), report = header + lines),
-                        "Analyse terminée en ${clock(elapsed)} : $ok image(s) ajoutée(s), ${errors.get()} erreur(s).",
-                    )
-                } finally {
-                    analyzers.forEach { it.close() }
-                }
+                run(chatlab, sources, started, control)
             } catch (e: Throwable) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 val message = "Analyse interrompue : ${e.message ?: e.javaClass.simpleName}"
-                finish(
-                    Progress(false, AnalysisProgress.state.value.done, AnalysisProgress.state.value.total, "", started,
-                        AnalysisProgress.state.value.errors, message),
-                    message,
-                )
+                val state = AnalysisProgress.state.value
+                finish(state.copy(running = false, message = message), message, null)
             }
         }
         return START_NOT_STICKY
     }
 
+    private suspend fun run(chatlab: String, sources: List<SourceFolder>, started: Long, control: AnalysisControl) {
+        val zone = TimeZone.getDefault()
+        val oldLibrary = LibraryStore.read(this)
+        val known = readKnown(oldLibrary)
+        val report = ReportBuilder(sources)
+
+        // 1. Lister chaque dossier. Un fichier déjà connu et inchangé n'est pas relu.
+        val scans = sources.mapIndexed { index, folder ->
+            control.checkpoint()
+            val scan = FolderScanner.scan(SafDir.root(this, folder)) { file -> reusableMime(known, file) }
+            report.scanned(index, scan)
+            scan
+        }
+        val plan = AnalysisPlan.build(sources, scans) { file -> carry(known, file) }
+
+        // 2. Ce qui est déjà au carnet est repris tel quel ; le reste est à analyser.
+        val carried = plan.carried.map { item ->
+            report.analyzed(item.folderIndex)
+            carriedResult(known.getValue(item.candidate.file.id), item, zone)
+        }
+        val total = plan.toProcess.size
+        AnalysisProgress.update {
+            it.copy(
+                total = total,
+                message = if (total == 0) "Rien de nouveau" else "",
+                folders = sources.mapIndexed { i, f -> FolderProgress(f.name, 0, plan.processCount(i)) },
+            )
+        }
+        notifyProgress()
+
+        val results = arrayOfNulls<ImageResult>(total)
+        val next = AtomicInteger(0)
+        val errors = AtomicInteger(0)
+        val saveLock = Any()
+        var lastSave = System.currentTimeMillis()
+        val keep = LibraryMerge.keepFromRemovedFolders(parseArray(oldLibrary), sources.map { it.name }.toSet())
+
+        // Un analyseur par travailleur : chacun charge ses modèles et travaille seul. Sans rien à
+        // analyser, on ne charge aucun modèle.
+        val workers = if (total == 0) 0 else WORKERS
+        val analyzers = List(workers) { Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) }
+        try {
+            coroutineScope {
+                analyzers.map { analyzer ->
+                    async(Dispatchers.Default) {
+                        while (true) {
+                            // Point d'arrêt avant chaque photo : en pause on attend ici, à l'arrêt on sort.
+                            try {
+                                control.checkpoint()
+                            } catch (stopped: AnalysisStopped) {
+                                break
+                            }
+                            val index = next.getAndIncrement()
+                            if (index >= total) break
+                            val item = plan.toProcess[index]
+                            val outcome = try {
+                                analyzeOne(this@AnalysisService, analyzer, item, sources[item.folderIndex].name, zone, control::checkpoint)
+                            } catch (stopped: AnalysisStopped) {
+                                // La photo en cours est abandonnée ; elle sera reprise à la prochaine analyse.
+                                break
+                            }
+                            when (outcome) {
+                                is Outcome.Done -> {
+                                    results[index] = outcome.result
+                                    report.analyzed(item.folderIndex)
+                                }
+                                is Outcome.Failed -> {
+                                    errors.incrementAndGet()
+                                    report.failed(item.folderIndex, outcome.name, outcome.reason)
+                                }
+                            }
+                            publish(item.folderIndex, item.candidate.file.name, errors.get())
+                            // Carnet enregistré régulièrement : une fermeture ne fait perdre que
+                            // les dernières images, et la relance reprend là où on s'était arrêté.
+                            synchronized(saveLock) {
+                                if (System.currentTimeMillis() - lastSave >= SAVE_INTERVAL_MS) {
+                                    lastSave = System.currentTimeMillis()
+                                    LibraryWriter.write(this@AnalysisService, carried + results.filterNotNull(), keep)
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+            val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
+            val stopped = control.state == RunState.STOPPING
+            val finalResults = carried + results.filterNotNull()
+            LibraryWriter.write(this@AnalysisService, finalResults, keep)
+            val runReport = report.build(System.currentTimeMillis(), elapsed, stopped)
+            ReportStore.saveRun(this@AnalysisService, runReport)
+            val text = when {
+                stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
+                runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
+                else -> "Analyse terminée · ${runReport.analyzed} photos analysées"
+            }
+            finish(
+                Progress(false, total, total, "", started, errors.get(), report = runReport.toText(), folders = AnalysisProgress.state.value.folders),
+                text,
+                runReport,
+            )
+        } finally {
+            analyzers.forEach { it.close() }
+        }
+    }
+
     @Synchronized
-    private fun publish(done: Int, total: Int, name: String, errors: Int) {
-        AnalysisProgress.update { it.copy(running = true, done = done, total = total, current = name, errors = errors) }
+    private fun publish(folderIndex: Int, name: String, errors: Int) {
+        AnalysisProgress.update { it.advancing(folderIndex, name).copy(running = true, errors = errors) }
         val now = System.currentTimeMillis()
-        if (now - lastNotified > 1000 || done == total) {
+        val state = AnalysisProgress.state.value
+        if (now - lastNotified > 1000 || state.done == state.total) {
             lastNotified = now
             notifyProgress()
         }
@@ -198,7 +225,7 @@ class AnalysisService : Service() {
 
     private fun notifyProgress() {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, progressNotification(AnalysisProgress.state.value))
+            .notify(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, current != null))
     }
 
     /** Pause et reprise se voient tout de suite à l'écran et dans la notification. */
@@ -214,60 +241,13 @@ class AnalysisService : Service() {
         notifyProgress()
     }
 
-    private fun finish(progress: Progress, text: String) {
+    private fun finish(progress: Progress, text: String, report: RunReport?) {
         current = null
-        AnalysisProgress.set(progress.copy(message = text, paused = false))
+        AnalysisProgress.set(progress.copy(message = text, paused = false, running = false))
         stopForeground(STOP_FOREGROUND_REMOVE)
-        getSystemService(NotificationManager::class.java).notify(
-            DONE_ID,
-            NotificationCompat.Builder(this, CHANNEL)
-                .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
-                .setContentTitle("ChatLab")
-                .setContentText(text)
-                .setContentIntent(openAppIntent())
-                .setAutoCancel(true)
-                .build(),
-        )
+        getSystemService(NotificationManager::class.java)
+            .notify(Notifications.DONE_ID, Notifications.done(this, text, report))
         stopSelf()
-    }
-
-    private fun progressNotification(progress: Progress): Notification {
-        val builder = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(if (progress.paused) android.R.drawable.ic_media_pause else android.R.drawable.stat_notify_sync)
-            .setContentTitle(if (progress.paused) "Analyse en pause · ${progress.done} / ${progress.total}" else "Analyse en cours")
-            .setContentText(progressLine(progress, System.currentTimeMillis()))
-            .setContentIntent(openAppIntent())
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-        if (progress.running && current != null) {
-            if (progress.paused) builder.addAction(0, "Reprendre", actionIntent(ACTION_RESUME))
-            else builder.addAction(0, "Pause", actionIntent(ACTION_PAUSE))
-            builder.addAction(0, "Arrêter", actionIntent(ACTION_STOP))
-        }
-        return builder.build()
-    }
-
-    private fun actionIntent(action: String): PendingIntent = PendingIntent.getService(
-        this,
-        action.hashCode(),
-        Intent(this, AnalysisService::class.java).setAction(action),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
-    /** Un appui sur la notification ramène à l'écran principal de l'application. */
-    private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
-        this,
-        0,
-        Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
-    private fun createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL, "Analyse des fichiers", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-        }
     }
 
     override fun onDestroy() {
@@ -277,14 +257,13 @@ class AnalysisService : Service() {
 
     companion object {
         const val EXTRA_CHATLAB = "chatlab"
-        const val EXTRA_SOURCE = "source"
         const val ACTION_PAUSE = "com.example.chatlab.PAUSE"
         const val ACTION_RESUME = "com.example.chatlab.RESUME"
         const val ACTION_STOP = "com.example.chatlab.STOP"
 
         /** La commande de l'analyse en cours, s'il y en a une. */
         @Volatile
-        private var current: AnalysisControl? = null
+        internal var current: AnalysisControl? = null
 
         /** Fige l'analyse en cours : plus aucun calcul jusqu'à [resume]. */
         fun pause() = current?.pause() ?: false
@@ -301,175 +280,158 @@ class AnalysisService : Service() {
         /** Le carnet est enregistré au plus toutes les deux minutes pendant l'analyse. */
         const val SAVE_INTERVAL_MS = 120_000L
 
-        private const val CHANNEL = "analysis"
-        private const val NOTIFICATION_ID = 1
-        private const val DONE_ID = 2
-
-        fun start(context: Context, chatlab: String, source: String) {
-            val intent = Intent(context, AnalysisService::class.java)
-                .putExtra(EXTRA_CHATLAB, chatlab)
-                .putExtra(EXTRA_SOURCE, source)
+        fun start(context: Context, chatlab: String) {
+            val intent = Intent(context, AnalysisService::class.java).putExtra(EXTRA_CHATLAB, chatlab)
             context.startForegroundService(intent)
         }
     }
 }
 
+/** Ce que devient un fichier après son analyse. */
+private sealed interface Outcome {
+    data class Done(val result: ImageResult) : Outcome
+    data class Failed(val name: String, val reason: FailureReason) : Outcome
+}
+
 /**
- * Analyse une image pour un travailleur. Une photo inchangée est reprise du carnet ; sinon
- * elle est copiée provisoirement, analysée, puis la copie est supprimée.
- * Renvoie le résultat et s'il a été repris.
+ * Analyse une image pour un travailleur : copie provisoire, analyse, puis la copie est supprimée.
+ * Une erreur est rangée dans l'une des raisons affichables ; l'arrêt demandé est relancé.
  */
 private fun analyzeOne(
     context: Context,
     analyzer: Analyzer,
-    image: DocumentFile,
-    known: Map<String, JSONObject>,
+    item: PlanItem,
+    folderName: String,
+    zone: TimeZone,
     checkpoint: () -> Unit,
-): Pair<ImageResult, Boolean> {
-    val name = image.name ?: "image"
-    val previous = previousResult(image, known)
-    if (previous != null) return previous to true
+): Outcome {
+    val file = item.candidate.file
+    val name = file.name
     return try {
-        // Le dossier provisoire porte le nom d'origine, pour que le carnet garde le bon nom.
         val work = File(context.cacheDir, "analyse/${UUID.randomUUID()}").apply { mkdirs() }
-        val temp = File(work, name)
+        // Le dossier provisoire porte le nom d'origine, pour que le carnet garde le bon nom.
+        val temp = File(work, name.replace('/', '_'))
         try {
-            copyTo(context, image, temp)
+            val input = file.open() ?: throw ImageFailure(FailureReason.INACCESSIBLE, "ouverture impossible")
+            input.use { source -> temp.outputStream().use { source.copyTo(it) } }
             val started = System.nanoTime()
             val analyzed = analyzer.analyzeFile(temp, checkpoint)
             val millis = (System.nanoTime() - started) / 1_000_000
-            analyzed.copy(
-                source = image.uri.toString(),
-                modified = image.lastModified(),
-                size = image.length(),
-                millis = millis,
-                taken = takenDate(temp) ?: fileDate(image.lastModified()),
-            ) to false
+            val taken = Dates.exifToTaken(exifDate(temp)) ?: Dates.formatTaken(file.lastModified, zone)
+            Outcome.Done(
+                analyzed.copy(
+                    source = file.id,
+                    modified = file.lastModified,
+                    size = if (file.length >= 0) file.length else temp.length(),
+                    millis = millis,
+                    taken = taken,
+                    takenMs = Dates.parseTakenMillis(taken, zone) ?: file.lastModified,
+                    folder = folderName,
+                    mime = item.candidate.mime,
+                ),
+            )
         } finally {
             work.deleteRecursively()
         }
     } catch (stopped: AnalysisStopped) {
         throw stopped
     } catch (e: Throwable) {
-        ImageResult(File(name), null, 0, false, null, 0, e.message ?: e.javaClass.simpleName) to false
+        Outcome.Failed(name, Failures.reasonOf(e))
     }
 }
 
-/** Une ligne du compte rendu, dans le même format que l'analyse des images de test. */
-private fun describe(r: ImageResult): String {
-    if (r.error != null) return "${r.file.name} : erreur, ${r.error}"
-    val place = when (r.indoor) {
-        true -> "intérieur"
-        false -> "extérieur"
-        null -> "inconnu"
-    }
-    val text = if (r.text.isNotBlank()) "\n  texte : ${r.text}" else ""
-    return "${r.file.name} : $place, ${r.faces} visage(s), ${r.millis} ms$text"
+private fun exifDate(file: File): String? = try {
+    ExifInterface(file.path).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+} catch (e: Exception) {
+    null
 }
 
-/** Toutes les images du dossier et de ses sous-dossiers. */
-private fun listImages(context: Context, tree: Uri): List<DocumentFile> {
-    val root = DocumentFile.fromTreeUri(context, tree) ?: error("dossier choisi inaccessible")
-    val found = ArrayList<DocumentFile>()
-    fun walk(folder: DocumentFile) {
-        for (child in folder.listFiles()) {
-            if (child.isDirectory) walk(child)
-            else if (child.isFile && isImage(child.name)) found += child
-        }
-    }
-    walk(root)
-    return found
-}
-
-private fun isImage(name: String?): Boolean =
-    name != null && name.substringAfterLast('.', "").lowercase() in setOf("jpg", "jpeg", "png", "webp")
-
-/** Copie provisoire d'une photo, pour l'analyser. */
-private fun copyTo(context: Context, image: DocumentFile, target: File) {
-    val input = context.contentResolver.openInputStream(image.uri) ?: error("lecture impossible : ${target.name}")
-    input.use { source -> target.outputStream().use { source.copyTo(it) } }
+private fun parseArray(text: String?): JSONArray? = try {
+    if (text == null) null else JSONArray(text)
+} catch (e: Exception) {
+    null
 }
 
 /** Les entrées du carnet existant qui ont une source, indexées par cette source. */
-private fun readKnown(context: Context): Map<String, JSONObject> {
-    val text = LibraryStore.read(context) ?: return emptyMap()
-    return try {
-        val array = JSONArray(text)
-        (0 until array.length())
-            .map { array.getJSONObject(it) }
-            .filter { it.has("source") && it.optInt("analysis_version") == ANALYSIS_VERSION }
-            .associateBy { it.getString("source") }
-    } catch (e: Exception) {
-        emptyMap()
-    }
+private fun readKnown(text: String?): Map<String, JSONObject> {
+    val array = parseArray(text) ?: return emptyMap()
+    return (0 until array.length())
+        .mapNotNull { array.optJSONObject(it) }
+        .filter { it.has("source") && it.optInt("analysis_version") == ANALYSIS_VERSION }
+        .associateBy { it.getString("source") }
 }
 
-/** Le résultat déjà connu d'une photo inchangée, ou null s'il faut l'analyser. */
-private fun previousResult(image: DocumentFile, known: Map<String, JSONObject>): ImageResult? {
-    val item = known[image.uri.toString()]?.takeIf {
-        it.optLong("size") == image.length() && it.optLong("modified") == image.lastModified()
-    } ?: return null
-    return fromLibrary(item, File(image.name ?: "image"))
+/** Le carnet connaît ce fichier tel qu'il est : même adresse, même taille, même date. */
+private fun unchanged(known: Map<String, JSONObject>, file: FileNode): JSONObject? {
+    val item = known[file.id] ?: return null
+    if (file.length < 0) return null
+    return item.takeIf { it.optLong("size") == file.length && it.optLong("modified") == file.lastModified }
 }
 
-/**
- * Carnet partiel : les résultats déjà obtenus, et les photos connues pas encore atteintes,
- * pour qu'un enregistrement intermédiaire ne perde rien de ce qui était déjà dans le carnet.
- */
-private fun snapshot(
-    results: Array<ImageResult?>,
-    previous: Array<ImageResult?>,
-): List<ImageResult> = results.indices.mapNotNull { index ->
-    results[index] ?: previous[index]
+/** Le type déjà connu d'un fichier inchangé : il n'est alors pas relu pendant le listage. */
+internal fun reusableMime(known: Map<String, JSONObject>, file: FileNode): String? =
+    unchanged(known, file)?.optString("mime")?.takeIf { it.isNotBlank() }
+
+/** Reprendre, compléter ou analyser : ce que l'analyse fait d'un fichier. */
+internal fun carry(known: Map<String, JSONObject>, file: FileNode): Carry {
+    val item = unchanged(known, file) ?: return Carry.PROCESS
+    return if (item.optString("mime").isNotBlank() && item.optString("folder").isNotBlank()) Carry.REUSE else Carry.BACKFILL
 }
 
-/** Rebâtit un résultat à partir d'une entrée du carnet, sans relancer l'analyse. */
-private fun fromLibrary(item: JSONObject, file: File): ImageResult {
+/** Rebâtit un résultat à partir d'une entrée du carnet, avec le dossier et le type d'aujourd'hui. */
+private fun carriedResult(item: JSONObject, planItem: PlanItem, zone: TimeZone): ImageResult {
     val values = item.optJSONArray("vectors")?.optJSONArray(0)?.let { array ->
         FloatArray(array.length()) { array.getDouble(it).toFloat() }
     }
+    val taken = item.optString("taken", "")
+    val file = planItem.candidate.file
     return ImageResult(
-        file = file,
+        file = File(file.name),
         indoor = if (item.has("indoor")) item.getBoolean("indoor") else null,
         faces = item.optInt("faces", 0),
         portrait = item.optBoolean("portrait", false),
         vector = values,
         millis = 0,
         text = item.optString("text", ""),
-        taken = item.optString("taken", ""),
+        taken = taken,
         source = item.optString("source", ""),
         modified = item.optLong("modified", 0L),
         size = item.optLong("size", 0L),
+        takenMs = item.optLong("taken_ms", 0L).takeIf { it > 0 } ?: Dates.parseTakenMillis(taken, zone) ?: 0L,
+        folder = planItem.candidate.folder,
+        mime = planItem.candidate.mime,
     )
 }
 
-/** Date de prise de vue (EXIF), au format jj/mm/aaaa hh:mm, ou null si absente. */
-private fun takenDate(file: File): String? {
-    val raw = try {
-        ExifInterface(file.path).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
-    } catch (e: Exception) {
-        null
-    } ?: return null
-    val date = raw.substringBefore(' ').split(':')
-    val time = raw.substringAfter(' ', "").take(5)
-    return if (date.size == 3) "${date[2]}/${date[1]}/${date[0]} $time".trim() else null
-}
+/** Ce que chaque dossier contient, avant toute analyse : pour l'écran Photos. */
+data class FolderOverview(
+    val status: FolderStatus,
+    /** Photos déjà dans le carnet et inchangées. */
+    val known: Int,
+    /** Photos nouvelles ou modifiées, à analyser. */
+    val fresh: Int,
+)
 
-/** Date de modification du fichier, utilisée quand la photo n'a pas de date EXIF. */
-private fun fileDate(millis: Long): String =
-    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE).format(Date(millis))
-
-/**
- * Nombre de photos du dossier choisi qui ne sont pas encore dans le carnet (nouvelles ou
- * modifiées), ou null si les dossiers ne sont pas choisis ou illisibles.
- */
-fun newPhotosCount(context: Context): Int? {
-    val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-    val source = preferences.getString(KEY_SOURCE, null) ?: return null
-    return try {
-        val known = readKnown(context)
-        listImages(context, Uri.parse(source)).count { previousResult(it, known) == null }
-    } catch (e: Exception) {
-        null
+/** Lit les dossiers sans rien analyser : combien de photos, lesquelles sont nouvelles, quels refus. */
+fun overview(context: Context): List<FolderOverview> {
+    val sources = Sources.read(context)
+    val known = readKnown(LibraryStore.read(context))
+    return sources.map { folder ->
+        val scan = try {
+            FolderScanner.scan(SafDir.root(context, folder)) { file -> reusableMime(known, file) }
+        } catch (e: Exception) {
+            return@map FolderOverview(FolderStatus(folder, FolderStatus.State.REFUSED), 0, 0)
+        }
+        val fresh = scan.candidates.count { carry(known, it.file) == Carry.PROCESS }
+        val state = when {
+            scan.rootRefused -> FolderStatus.State.REFUSED
+            scan.candidates.isEmpty() && scan.refused.isEmpty() -> FolderStatus.State.EMPTY
+            else -> FolderStatus.State.READABLE
+        }
+        FolderOverview(
+            FolderStatus(folder, state, scan.candidates.size, scan.ignored.size, scan.refused),
+            known = scan.candidates.size - fresh,
+            fresh = fresh,
+        )
     }
 }
