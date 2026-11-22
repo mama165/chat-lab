@@ -99,7 +99,14 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, right: String? = n
 
 /** Choix exclusif en segments, comme sur la page Filtres. */
 @Composable
-fun <T> Segmented(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+fun <T> Segmented(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    /** Une petite ligne sous le libellé, par exemple le nombre de photos de ce choix. */
+    sub: (T) -> String? = { null },
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,13 +126,16 @@ fun <T> Segmented(options: List<T>, selected: T, label: (T) -> String, onSelect:
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    label(option),
-                    fontSize = 13.sp,
-                    color = if (on) Palette.Accent else Palette.Muted,
-                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        label(option),
+                        fontSize = 13.sp,
+                        color = if (on) Palette.Accent else Palette.Muted,
+                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                    )
+                    sub(option)?.let { Text(it, fontSize = 11.sp, color = Palette.Muted, maxLines = 1) }
+                }
             }
         }
     }
@@ -246,3 +256,71 @@ fun BottomTabs(selected: Int, onSelect: (Int) -> Unit) {
 /** Bord coloré autour d'une vignette (photos nouvellement ajoutées). */
 fun Modifier.glow(alpha: Float): Modifier =
     if (alpha <= 0f) this else this.border(3.dp, Palette.Soft.copy(alpha = alpha), RoundedCornerShape(14.dp))
+
+
+/** Une ligne à choix unique : rond, libellé, nombre de photos à droite, chevron si elle ouvre une page. */
+@Composable
+fun RadioRow(label: String, count: String, selected: Boolean, onClick: () -> Unit, chevron: Boolean = false, detail: String? = null) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .border(2.dp, if (selected) Palette.Accent else Color(0xFFC4C9D1), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) Box(Modifier.size(10.dp).clip(CircleShape).background(Palette.Accent))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(label, fontSize = 15.sp, color = Palette.Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                if (detail != null) Text(detail, fontSize = 12.sp, color = Palette.Muted)
+            }
+            Text(count + if (chevron) " ›" else "", fontSize = 13.sp, color = Palette.Muted)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
+    }
+}
+
+/** Une pastille à choix multiple, avec le nombre de photos. Grisée et en pointillés si rien n'y correspond. */
+@Composable
+fun ChoiceChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
+    val empty = count == 0 && !selected
+    Text(
+        (if (selected) "✓ " else "") + label + " $count",
+        fontSize = 14.sp,
+        color = when {
+            selected -> Color.White
+            empty -> Color(0xFF9AA3AF)
+            else -> Palette.Ink
+        },
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (selected) Palette.Accent else Color.Transparent)
+            .border(1.dp, if (selected) Palette.Accent else Palette.Line, RoundedCornerShape(18.dp))
+            .clickable(enabled = !empty, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    )
+}
+
+/** Un interrupteur avec son explication. */
+@Composable
+fun SwitchRow(label: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, fontSize = 15.sp, color = Palette.Ink)
+            Text(detail, fontSize = 12.sp, color = Palette.Muted)
+        }
+        androidx.compose.material3.Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Palette.Accent),
+        )
+    }
+}
