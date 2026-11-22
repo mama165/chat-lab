@@ -191,20 +191,6 @@ private fun Idle(
     Text(subtitle, fontSize = 13.sp, color = Palette.Muted, modifier = Modifier.padding(top = 0.dp))
     if (lastRun != null) RunBanner(lastRun)
 
-    SectionLabel("Dossier chatlab", right = "modèles et carnet")
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Palette.Field)
-            .clickable(onClick = pickers.chooseChatlab)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(chatlab, fontSize = 15.sp, color = Palette.Ink, modifier = Modifier.weight(1f))
-        Text("Modifier ›", fontSize = 13.sp, color = Palette.Accent)
-    }
-
     SectionLabel("Dossiers à analyser", right = "sous-dossiers inclus")
     // Chaque dossier s'affiche tout de suite : sa carte si sa lecture est finie, sinon sa lecture en cours.
     // Un dossier qu'on vient d'ajouter n'attend donc pas que tous les autres soient relus.
