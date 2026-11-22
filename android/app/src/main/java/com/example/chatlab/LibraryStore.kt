@@ -3,6 +3,8 @@ package com.example.chatlab
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -12,6 +14,7 @@ import java.io.File
  */
 object LibraryStore {
     private const val NAME = "library.json"
+    private const val REMOVALS = "retraits.json"
 
     private fun folder(context: Context): DocumentFile? {
         val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
@@ -54,5 +57,41 @@ object LibraryStore {
         } catch (e: Exception) {
             // Rien à faire de plus : on ne veut pas provoquer un second plantage.
         }
+    }
+
+    /** Les retraits : pour chaque recherche, les photos écartées. */
+    fun readRemovals(context: Context): JSONObject {
+        val text = try {
+            val inFolder = folder(context)?.findFile(REMOVALS)
+            if (inFolder != null && inFolder.exists()) {
+                context.contentResolver.openInputStream(inFolder.uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+            } else {
+                File(context.filesDir, REMOVALS).takeIf { it.exists() }?.readText(Charsets.UTF_8)
+            }
+        } catch (e: Exception) {
+            null
+        }
+        return try {
+            JSONObject(text ?: "{}")
+        } catch (e: Exception) {
+            JSONObject()
+        }
+    }
+
+    /** Écarte une photo pour une recherche donnée ; le retrait est gardé d'un lancement à l'autre. */
+    fun addRemoval(context: Context, query: String, source: String) {
+        val all = readRemovals(context)
+        val list = all.optJSONArray(query) ?: JSONArray().also { all.put(query, it) }
+        list.put(source)
+        val text = all.toString()
+        val dir = folder(context)
+        if (dir == null) {
+            File(context.filesDir, REMOVALS).writeText(text, Charsets.UTF_8)
+            return
+        }
+        val target = dir.findFile(REMOVALS) ?: dir.createFile("application/json", REMOVALS)
+            ?: error("impossible de créer retraits.json dans le dossier chatlab")
+        context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+            ?: error("impossible d'écrire retraits.json")
     }
 }

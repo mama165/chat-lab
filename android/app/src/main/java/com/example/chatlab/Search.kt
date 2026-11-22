@@ -155,11 +155,18 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
         queryVector?.let { Library.rankDescription(entries, it, criteria.place ?: place, criteria.people) } ?: emptyList()
     }
     val aboveNow = Library.aboveThreshold(ranked, threshold).size
-    val matches: List<Match> = when {
+    // Photos retirées pour cette recherche : elles ne reviennent plus.
+    var removals by remember { mutableStateOf(LibraryStore.readRemovals(context)) }
+    val queryKey = query.trim().lowercase()
+    val removed = removals.optJSONArray(queryKey)?.let { array ->
+        (0 until array.length()).map { array.getString(it) }.toSet()
+    } ?: emptySet()
+    val found: List<Match> = when {
         query.isBlank() -> emptyList()
         !byDescription -> Library.searchWords(entries, query, place)
         else -> Library.aboveThreshold(ranked, shownThreshold)
     }
+    val matches: List<Match> = found.filter { (it.entry.source.ifBlank { it.entry.path }) !in removed }
     val matchMillis = (System.nanoTime() - searchStart) / 1_000_000
     // Temps de la recherche, affiché sous le compteur de résultats.
     val timingLine = when {
@@ -314,6 +321,11 @@ fun SearchScreen(modifier: Modifier = Modifier, visible: Boolean = true) {
                 byDescription = byDescription,
                 onClose = { selectedId = null },
                 onOpen = { openInGallery(context, selectedMatch.entry.source) },
+                onRemove = {
+                    LibraryStore.addRemoval(context, queryKey, selectedMatch.entry.source.ifBlank { selectedMatch.entry.path })
+                    removals = LibraryStore.readRemovals(context)
+                    selectedId = null
+                },
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("nom de la photo", selectedMatch.entry.name))
@@ -466,6 +478,7 @@ private fun InfoPanel(
     onClose: () -> Unit,
     onOpen: () -> Unit,
     onCopy: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val entry = match.entry
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -491,6 +504,7 @@ private fun InfoPanel(
                 TextButton(onClick = onOpen) { Text("Ouvrir dans la galerie") }
                 TextButton(onClick = onCopy) { Text("Copier le nom") }
             }
+            TextButton(onClick = onRemove) { Text("Retirer de « $query »") }
         }
     }
 }
