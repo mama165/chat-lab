@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -71,7 +72,8 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, modifier: 
     val progress by AnalysisProgress.state.collectAsState()
     val reading by ReadProgress.counts.collectAsState()
     var version by remember { mutableIntStateOf(0) }
-    val pickers = rememberFolderPickers { version++ }
+    var choosing by remember { mutableStateOf(false) }
+    val pickers = rememberFolderPickers(onAddSource = { choosing = true }) { version++ }
     val chatlab = remember(version) { folderName(context, KEY_FOLDER) }
     val sources = remember(version) { Sources.read(context) }
     // Ce que contiennent les dossiers, lu en arrière-plan : aucune analyse, seulement un listage.
@@ -111,6 +113,13 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, modifier: 
         Spacer(Modifier.height(0.dp))
         TabTitle("Photos", onSettings = onSettings)
         when {
+            choosing -> StorageChooser(
+                onDone = {
+                    choosing = false
+                    version++
+                },
+                onBack = { choosing = false },
+            )
             chatlab == null || sources.isEmpty() -> FirstSteps(chatlab, sources, pickers)
             progress.running -> Running(progress, now)
             else -> Idle(

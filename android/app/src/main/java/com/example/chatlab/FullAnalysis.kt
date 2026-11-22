@@ -116,7 +116,7 @@ class AnalysisService : Service() {
         // 1. Lister chaque dossier. Un fichier déjà connu et inchangé n'est pas relu.
         val scans = sources.mapIndexed { index, folder ->
             control.checkpoint()
-            val scan = FolderScanner.scan(SafDir.root(this, folder), reusable = { file -> reusableMime(known, file) })
+            val scan = FolderScanner.scan(Sources.rootOf(this, folder), reusable = { file -> reusableMime(known, file) })
             report.scanned(index, scan)
             scan
         }
@@ -420,7 +420,7 @@ fun overview(context: Context): List<FolderOverview> {
         val number = ReadProgress.start(folder.uri)
         val scan = try {
             FolderScanner.scan(
-                SafDir.root(context, folder),
+                Sources.rootOf(context, folder),
                 reusable = { file -> reusableMime(known, file) },
                 examined = { count -> ReadProgress.report(folder.uri, number, count) },
             )

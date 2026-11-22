@@ -5,7 +5,13 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
+import java.io.File
 import java.io.InputStream
+
+private const val PATH_PREFIX = "file:"
+
+/** L'adresse d'un dossier choisi par chemin : « file: » suivi du chemin absolu. */
+fun pathUri(path: String): String = PATH_PREFIX + path
 
 /** Les dossiers à analyser, gardés dans les préférences. L'ancien dossier unique est repris. */
 object Sources {
@@ -33,6 +39,18 @@ object Sources {
         write(context, next)
         return next
     }
+
+    /** Ajoute un dossier de l'arbre du stockage interne, par son chemin. */
+    fun addPath(context: Context, path: String): List<SourceFolder> {
+        val next = SourceList.add(read(context), pathUri(path), File(path).name)
+        write(context, next)
+        return next
+    }
+
+    /** La racine à lire pour un dossier choisi : par chemin (stockage interne) ou par le sélecteur. */
+    fun rootOf(context: Context, folder: SourceFolder): DirNode =
+        if (folder.uri.startsWith(PATH_PREFIX)) JavaDirNode(File(folder.uri.removePrefix(PATH_PREFIX)))
+        else SafDir.root(context, folder)
 
     /** Vide la liste des dossiers à analyser. Le dossier chatlab (modèles et carnet) reste choisi. */
     fun clear(context: Context) = write(context, emptyList())
@@ -141,7 +159,7 @@ object FolderCheck {
     /** Lit le dossier (sans l'analyser) pour dire s'il est lisible, refusé ou sans image. */
     fun check(context: Context, folder: SourceFolder): FolderStatus {
         val scan = try {
-            FolderScanner.scan(SafDir.root(context, folder))
+            FolderScanner.scan(Sources.rootOf(context, folder))
         } catch (e: Exception) {
             return FolderStatus(folder, FolderStatus.State.REFUSED)
         }

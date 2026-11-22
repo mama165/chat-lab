@@ -16,7 +16,7 @@ import androidx.documentfile.provider.DocumentFile
 class FolderPickers(val chooseChatlab: () -> Unit, val addSource: () -> Unit)
 
 @Composable
-fun rememberFolderPickers(onChanged: () -> Unit): FolderPickers {
+fun rememberFolderPickers(onAddSource: (() -> Unit)? = null, onChanged: () -> Unit): FolderPickers {
     val context = LocalContext.current
     val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     val chatlab = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -36,7 +36,11 @@ fun rememberFolderPickers(onChanged: () -> Unit): FolderPickers {
             onChanged()
         }
     }
-    return FolderPickers(chooseChatlab = { chatlab.launch(null) }, addSource = { source.launch(null) })
+    // Le parcours du stockage interne remplace le sélecteur quand la page le demande.
+    return FolderPickers(
+        chooseChatlab = { chatlab.launch(null) },
+        addSource = { if (onAddSource != null) onAddSource() else source.launch(null) },
+    )
 }
 
 /** Le nom du dossier chatlab (« chatlab »), ou null s'il n'est pas choisi. */
