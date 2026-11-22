@@ -137,7 +137,7 @@ fun SearchScreen(
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var recents by remember { mutableStateOf(RecentStore.read(context)) }
-    val today = remember { SimpleDate.of(System.currentTimeMillis()) }
+    val time = remember(query, state.filters, entries) { When(System.currentTimeMillis()) }
     val gridState = rememberLazyGridState()
 
     // Une nouvelle recherche ou d'autres filtres repartent du début : ni photos moins proches, ni sélection.
@@ -169,8 +169,8 @@ fun SearchScreen(
     }
 
     val removed = remember(queryKey, removalsVersion) { Removals.sourcesFor(context, queryKey) }
-    val outcome = remember(entries, query, state.ranked, state.filters, removed, state.shownExtra, today) {
-        SearchResults.compute(entries, query, state.ranked, state.filters, removed, state.shownExtra, today)
+    val outcome = remember(entries, query, state.ranked, state.filters, removed, state.shownExtra, time) {
+        SearchResults.compute(entries, query, state.ranked, state.filters, removed, state.shownExtra, time)
     }
     val rows = remember(outcome, state.newFrom, query) { resultItems(outcome, query, state.newFrom) }
     val latestOutcome by rememberUpdatedState(outcome)
@@ -230,7 +230,7 @@ fun SearchScreen(
         }
         Spacer(Modifier.height(10.dp))
 
-        val chips = state.filters.chips()
+        val chips = state.filters.chips(time)
         if (query.isNotBlank() && (!outcome.isEmpty || chips.isNotEmpty())) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(Formats.results(outcome.total), fontSize = 14.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
@@ -296,6 +296,7 @@ fun SearchScreen(
                             WordRow(
                                 match = item.match,
                                 query = query,
+                                time = time,
                                 selected = key in state.selected,
                                 onTap = { state.selected = toggled(state.selected, key) },
                                 onLongPress = { openInGallery(context, item.match.entry.source) },
@@ -493,75 +494,6 @@ private fun Message(title: String, detail: String?) {
     }
 }
 
-/** Page Filtres : lieu, personnes, période, ressemblance, et le nombre de résultats en direct. */
-@Composable
-fun FiltersPage(state: SearchUiState, entries: List<LibraryEntry>, removalsVersion: Int, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val today = remember { SimpleDate.of(System.currentTimeMillis()) }
-    val queryKey = state.query.trim().lowercase()
-    val removed = remember(queryKey, removalsVersion) { Removals.sourcesFor(context, queryKey) }
-    val filters = state.filters
-    val count = remember(filters, entries, state.ranked, removed) {
-        SearchResults.compute(entries, state.query, state.ranked, filters, removed, 0, today).total
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Palette.Page)
-            .padding(horizontal = 20.dp),
-    ) {
-        Spacer(Modifier.height(16.dp))
-        PageHeader("Filtres", onBack = onBack, action = "Réinitialiser", actionEnabled = !filters.isDefault) {
-            state.filters = Filters()
-        }
-        if (state.query.isNotBlank()) {
-            Text("Pour la recherche « ${state.query} »", fontSize = 14.sp, color = Palette.Muted, modifier = Modifier.padding(start = 8.dp))
-        }
-        Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            FilterGroup("Lieu") {
-                Segmented(Place.entries, filters.place, { Filters.placeLabel(it) }) { state.filters = filters.copy(place = it) }
-            }
-            FilterGroup("Personnes") {
-                Segmented(People.entries, filters.people, { it.label }) { state.filters = filters.copy(people = it) }
-            }
-            FilterGroup("Période") {
-                Segmented(Period.entries, filters.period, { it.label }) { state.filters = filters.copy(period = it) }
-            }
-            FilterGroup(
-                "Ressemblance",
-                "Point de départ des photos ressemblantes. « Voir des photos moins proches » permet ensuite d'aller plus loin, sans changer ce réglage.",
-            ) {
-                Segmented(Resemblance.entries, filters.resemblance, { it.label }) { state.filters = filters.copy(resemblance = it) }
-            }
-        }
-        Column(modifier = Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PrimaryButton(
-                if (state.query.isBlank()) "Appliquer" else "Afficher ${Formats.results(count)}",
-                onClick = onBack,
-            )
-            Text(
-                "Le nombre se met à jour à chaque choix. La flèche revient aussi aux résultats.",
-                fontSize = 12.sp,
-                color = Palette.Muted,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun FilterGroup(title: String, hint: String? = null, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionLabel(title)
-        content()
-        if (hint != null) Text(hint, fontSize = 12.sp, color = Palette.Muted)
-    }
-}
-
 /** Page « Non classifiées » : les photos retirées, par recherche, avec la date et Rétablir. */
 @Composable
 fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
@@ -637,7 +569,7 @@ private fun toggled(current: Set<String>, key: String): Set<String> =
 
 /** Une correspondance par mot : vignette, extrait du texte lu avec le mot surligné, date. */
 @Composable
-private fun WordRow(match: Match, query: String, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
+private fun WordRow(match: Match, query: String, time: When, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
     val entry = match.entry
     val key = SearchResults.keyOf(match)
     val excerpt = remember(entry.text, entry.name, query) {
@@ -675,7 +607,7 @@ private fun WordRow(match: Match, query: String, selected: Boolean, onTap: () ->
         Spacer(Modifier.width(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(text, fontSize = 14.sp, color = Palette.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(Dates.long(entry.taken), fontSize = 11.sp, color = Palette.Muted)
+            Text(Dates.display(entry.takenMs, entry.taken, time), fontSize = 11.sp, color = Palette.Muted)
         }
     }
 }

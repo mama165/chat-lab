@@ -14,6 +14,14 @@ data class LibraryEntry(
     val vector: FloatArray? = null,
     val taken: String = "",
     val source: String = "",
+    /** Nom du dossier source (« Camera », « Screenshots »), vide pour un ancien carnet. */
+    val folder: String = "",
+    /** Type MIME détecté par les octets du fichier (« image/jpeg »), vide pour un ancien carnet. */
+    val mime: String = "",
+    /** Instant de prise de vue en millisecondes, 0 si inconnu. */
+    val takenMs: Long = 0L,
+    /** Le visage principal occupe une bonne part de la photo (portrait). */
+    val closeUp: Boolean = false,
 )
 
 /** Une image retenue par la recherche ; score présent seulement pour la recherche par description. */
@@ -28,7 +36,7 @@ data class Criteria(val people: Int?, val place: Place?)
 /** Le carnet produit par l'analyse, et les deux façons de chercher dedans. */
 object Library {
     /** Lit le texte du carnet (library.json). Un carnet illisible donne une liste vide. */
-    fun parse(text: String?): List<LibraryEntry> {
+    fun parse(text: String?, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): List<LibraryEntry> {
         if (text.isNullOrBlank()) return emptyList()
         val array = try {
             JSONArray(text)
@@ -46,6 +54,11 @@ object Library {
                 text = item.optString("text", ""),
                 taken = item.optString("taken", ""),
                 source = item.optString("source", ""),
+                folder = item.optString("folder", ""),
+                mime = item.optString("mime", ""),
+                takenMs = item.optLong("taken_ms", 0L).takeIf { it > 0 }
+                    ?: Dates.parseTakenMillis(item.optString("taken", ""), zone) ?: 0L,
+                closeUp = item.optBoolean("portrait", false),
                 vector = item.optJSONArray("vectors")?.optJSONArray(0)?.let { values ->
                     FloatArray(values.length()) { values.getDouble(it).toFloat() }
                 },

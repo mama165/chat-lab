@@ -17,4 +17,10 @@ class NavigationTest {
         assertEquals(Page.TABS, Page.FILTERS.parent())
         assertEquals(Page.TABS, Page.TABS.parent())
     }
+
+    @Test
+    fun theDatesPageGoesBackToTheFilters() {
+        assertEquals(Page.FILTERS, Page.DATES.parent())
+        assertEquals(Page.TABS, Page.DATES.parent().parent())
+    }
 }

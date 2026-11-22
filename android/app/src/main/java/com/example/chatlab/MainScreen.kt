@@ -47,7 +47,8 @@ fun MainScreen() {
             .navigationBarsPadding(),
     ) {
         when (page) {
-            Page.FILTERS -> FiltersPage(search, entries, removalsVersion, onBack = { page = Page.TABS })
+            Page.FILTERS -> FiltersPage(search, entries, removalsVersion, onBack = { page = Page.TABS }, onDates = { page = Page.DATES })
+            Page.DATES -> DatesPage(search, entries, onBack = { page = Page.FILTERS })
             Page.SETTINGS -> SettingsPage(
                 entries = entries,
                 dataVersion = dataVersion,

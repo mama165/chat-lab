@@ -56,10 +56,10 @@ object SearchResults {
         filters: Filters,
         removed: Set<String>,
         shownExtra: Int,
-        today: SimpleDate,
+        time: When,
     ): SearchOutcome {
         if (query.isBlank()) return SearchOutcome.EMPTY
-        val kept = entries.filter { filters.matches(it, today) }
+        val kept = entries.filter { filters.matches(it, time) }
         val words = Library.searchWords(kept, query, Place.ALL).filter { keyOf(it) !in removed }
         val wordKeys = words.map { keyOf(it) }.toSet()
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()

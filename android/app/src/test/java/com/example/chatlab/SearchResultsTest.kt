@@ -1,6 +1,8 @@
 package com.example.chatlab
 
-import com.example.chatlab.TestData.NOV_2026
+import com.example.chatlab.TestData.TIME
+import com.example.chatlab.TestData.hoursAgo
+import com.example.chatlab.TestData.daysAgo
 import com.example.chatlab.TestData.entry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,7 +20,7 @@ class SearchResultsTest {
         filters: Filters = Filters(),
         removed: Set<String> = emptySet(),
         shown: Int = 0,
-    ) = SearchResults.compute(entries, query, ranked, filters, removed, shown, NOV_2026)
+    ) = SearchResults.compute(entries, query, ranked, filters, removed, shown, TIME)
 
     @Test
     fun blankQueryGivesNothing() {
@@ -71,11 +73,19 @@ class SearchResultsTest {
     }
 
     @Test
-    fun periodFilterExcludesOldPhotos() {
-        val recent = entry("recent", "gaufre", taken = "18/11/2026 10:00")
-        val old = entry("old", "gaufre", taken = "12/10/2026 10:00")
-        val outcome = compute(listOf(recent, old), filters = Filters(period = Period.THIS_MONTH))
+    fun dateFilterExcludesOldPhotos() {
+        val recent = entry("recent", "gaufre", takenMs = hoursAgo(3))
+        val old = entry("old", "gaufre", takenMs = daysAgo(40))
+        val outcome = compute(listOf(recent, old), filters = Filters(date = DateFilter(DatePreset.LAST_24H)))
         assertEquals(listOf("recent"), outcome.words.map { it.entry.id })
+    }
+
+    @Test
+    fun folderFilterKeepsOnlyThatFolder() {
+        val a = entry("a", "gaufre", folder = "Camera")
+        val b = entry("b", "gaufre", folder = "Screenshots")
+        val outcome = compute(listOf(a, b), filters = Filters(folders = setOf("Screenshots")))
+        assertEquals(listOf("b"), outcome.words.map { it.entry.id })
     }
 
     @Test

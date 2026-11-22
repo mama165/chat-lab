@@ -3,6 +3,7 @@ package com.example.chatlab
 import com.example.chatlab.TestData.entry
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -158,5 +159,31 @@ class LibraryTest {
         assertTrue(Library.inPlace(unknown, Place.ALL))
         assertTrue(!Library.inPlace(unknown, Place.INDOOR))
         assertTrue(!Library.inPlace(unknown, Place.OUTDOOR))
+    }
+
+    @Test
+    fun parseReadsFolderTypeAndExactTime() {
+        val text = """[{"id":"a","name":"a.jpg","path":"/p","folder":"Camera","mime":"image/jpeg","taken_ms":1700000000000,"portrait":true,"taken":"14/11/2023 22:13"}]"""
+        val a = Library.parse(text).single()
+        assertEquals("Camera", a.folder)
+        assertEquals("image/jpeg", a.mime)
+        assertEquals(1700000000000L, a.takenMs)
+        assertTrue(a.closeUp)
+    }
+
+    @Test
+    fun parseDerivesTheTimeFromAnOldCarnet() {
+        val text = """[{"id":"a","name":"a.jpg","path":"/p","taken":"18/11/2026 13:42"}]"""
+        val a = Library.parse(text, TestData.UTC).single()
+        assertEquals(TestData.utc(2026, 11, 18, 13, 42), a.takenMs)
+        assertEquals("", a.folder)
+        assertEquals("", a.mime)
+        assertFalse(a.closeUp)
+    }
+
+    @Test
+    fun parseGivesZeroWhenThereIsNoDate() {
+        assertEquals(0L, Library.parse("""[{"id":"a","name":"a","path":"/p"}]""").single().takenMs)
+        assertEquals(0L, Library.parse("""[{"id":"a","name":"a","path":"/p","taken":"nimporte quoi"}]""").single().takenMs)
     }
 }
