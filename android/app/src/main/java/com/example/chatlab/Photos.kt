@@ -203,13 +203,15 @@ private fun Idle(
     }
 
     SectionLabel("Dossiers à analyser", right = "sous-dossiers inclus")
-    if (overviews == null) {
-        // La lecture n'est pas finie : chaque dossier s'affiche tout de suite, avec son avancement.
-        sources.forEach { folder -> ReadingCard(folder, reading[folder.uri] ?: 0) }
-    } else {
-        overviews.forEach { overview ->
-            val failures = lastRun?.folders?.firstOrNull { it.uri == overview.status.folder.uri }?.failures.orEmpty()
-            FolderCard(overview, failures, onRemove = { onRemove(overview.status.folder.uri) })
+    // Chaque dossier s'affiche tout de suite : sa carte si sa lecture est finie, sinon sa lecture en cours.
+    // Un dossier qu'on vient d'ajouter n'attend donc pas que tous les autres soient relus.
+    sources.forEach { folder ->
+        val overview = overviews?.firstOrNull { it.status.folder.uri == folder.uri }
+        if (overview != null) {
+            val failures = lastRun?.folders?.firstOrNull { it.uri == folder.uri }?.failures.orEmpty()
+            FolderCard(overview, failures, onRemove = { onRemove(folder.uri) })
+        } else {
+            ReadingCard(folder, reading[folder.uri] ?: 0)
         }
     }
     AddFolderRow(pickers.addSource)
