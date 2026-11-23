@@ -1,5 +1,7 @@
 package com.example.chatlab
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
@@ -20,12 +22,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +50,8 @@ import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.RadioRow
 import com.example.chatlab.ui.SectionLabel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -75,6 +81,13 @@ private fun readRecords(context: Context): List<Pair<String, AnalysisRecord>> =
             null
         }
     }
+
+/** The text of an analysis file, exactly as it is saved, or null if it cannot be read. */
+private fun readText(context: Context, name: String): String? = try {
+    File(RunArchive.directory(context), name).readText()
+} catch (e: Exception) {
+    null
+}
 
 private fun readRecord(context: Context, name: String): AnalysisRecord? = try {
     AnalysisRecord.fromJson(JSONObject(File(RunArchive.directory(context), name).readText()))
@@ -215,6 +228,7 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         val state = loaded
         PageHeader(if (state is Loaded.Ready) analysisDateLabel(state.record.startMs) else "Analyse", onBack = onBack)
+        if (state is Loaded.Ready) CopyDataButton(name)
         when (state) {
             Loaded.Loading -> Text("Lecture du fichier…", fontSize = 14.sp, color = Palette.Muted)
             Loaded.Missing -> Text("Ce fichier d'analyse n'est plus là ou ne peut pas être lu.", fontSize = 14.sp, color = Palette.Muted)
@@ -260,6 +274,58 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+private enum class CopyPhase { IDLE, COPYING, COPIED, FAILED }
+
+/**
+ * "Copier les données": the analysis file, as saved, goes to the clipboard so that it can be
+ * shared. While it is copied the button says so; then it confirms, and returns to its usual state.
+ */
+@Composable
+private fun CopyDataButton(name: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var phase by remember { mutableStateOf(CopyPhase.IDLE) }
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .border(1.dp, Palette.Accent, shape)
+            .clickable(enabled = phase == CopyPhase.IDLE) {
+                phase = CopyPhase.COPYING
+                scope.launch {
+                    val text = withContext(Dispatchers.IO) { readText(context, name) }
+                    phase = if (text == null) {
+                        CopyPhase.FAILED
+                    } else {
+                        context.getSystemService(ClipboardManager::class.java)
+                            .setPrimaryClip(ClipData.newPlainText("Analyse ChatLab", text))
+                        CopyPhase.COPIED
+                    }
+                    delay(2_000)
+                    phase = CopyPhase.IDLE
+                }
+            }
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (phase == CopyPhase.COPYING) {
+            CircularProgressIndicator(modifier = Modifier.size(12.dp), color = Palette.Accent, strokeWidth = 2.dp)
+        }
+        Text(
+            when (phase) {
+                CopyPhase.IDLE -> "Copier les données"
+                CopyPhase.COPYING -> "Copie en cours…"
+                CopyPhase.COPIED -> "Copié dans le presse-papier"
+                CopyPhase.FAILED -> "Copie impossible"
+            },
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Palette.Accent,
+        )
     }
 }
 

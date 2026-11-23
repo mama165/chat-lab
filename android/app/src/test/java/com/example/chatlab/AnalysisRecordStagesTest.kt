@@ -65,4 +65,20 @@ class AnalysisRecordStagesTest {
         val back = AnalysisRecord.fromJson(JSONObject(original.toJson().toString()))
         assertEquals(parts, back.modelLoads.single().parts)
     }
+
+    @Test
+    fun the_text_copied_reads_back_as_the_same_analysis() {
+        val original = record(
+            loads = listOf(ModelLoad(reload = true, atMs = start + 9_000L, millis = 1_740L, parts = mapOf("Modèle des images" to 640L))),
+            types = mapOf("JPEG" to 812, "PNG" to 40),
+        )
+        // The clipboard gets exactly what the file holds: the pretty JSON written by the app.
+        val copied = original.toJson().toString(2)
+        val back = AnalysisRecord.fromJson(JSONObject(copied))
+        assertEquals(original.level, back.level)
+        assertEquals(original.types, back.types)
+        assertEquals(original.modelLoads.single().parts, back.modelLoads.single().parts)
+        assertEquals(original.analyzed, back.analyzed)
+        assertTrue(copied.contains("\n"))
+    }
 }
