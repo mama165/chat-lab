@@ -3,53 +3,53 @@ package com.example.chatlab
 import java.io.FileNotFoundException
 import java.io.IOException
 
-/** Pourquoi un fichier n'a pas pu être lu pendant l'analyse. Les libellés sont ceux de l'écran. */
+/** Why a file could not be read during the analysis. The labels are the ones of the screen. */
 enum class FailureReason(val label: String) {
-    /** Android refuse d'ouvrir le fichier, ou il a disparu entre le listage et la lecture. */
+    /** Android refuses to open the file, or it disappeared between the listing and the reading. */
     INACCESSIBLE("fichier inaccessible"),
 
-    /** Le fichier s'ouvre mais ce n'est pas une image qu'on peut décoder. */
+    /** The file opens but it is not an image we can decode. */
     UNREADABLE("image illisible"),
 
-    /** Le fichier ne contient aucun octet. */
+    /** The file contains no bytes. */
     EMPTY("fichier vide"),
 
-    /** Le fichier se lit, mais l'analyse elle-même a échoué : un problème de l'application. */
+    /** The file can be read, but the analysis itself failed: a problem of the application. */
     ANALYSIS("erreur d'analyse"),
 }
 
-/** Un échec dont la cause est connue : la raison affichée vient directement de [reason]. */
+/** A failure whose cause is known: the reason shown comes directly from [reason]. */
 class ImageFailure(val reason: FailureReason, message: String? = null, cause: Throwable? = null) :
     Exception(message ?: reason.label, cause)
 
 object Failures {
-    /** Classe une erreur dans l'une des raisons affichables. */
+    /** Classifies an error under one of the displayable reasons. */
     fun reasonOf(error: Throwable): FailureReason = when (error) {
         is ImageFailure -> error.reason
         is FileNotFoundException, is SecurityException -> FailureReason.INACCESSIBLE
         is IOException -> FailureReason.INACCESSIBLE
-        // Une mémoire insuffisante au décodage : le fichier n'est pas lisible tel quel.
+        // Insufficient memory when decoding: the file is not readable as it is.
         is OutOfMemoryError -> FailureReason.UNREADABLE
         else -> FailureReason.ANALYSIS
     }
 }
 
-/** Ce que l'analyse fait d'un fichier, décidé avant de l'ouvrir en entier. */
+/** What the analysis does with a file, decided before opening it fully. */
 sealed interface ScanDecision {
-    /** Une image qu'on sait lire : elle sera analysée. */
+    /** An image we can read: it will be analysed. */
     data class Analyze(val mime: String) : ScanDecision
 
-    /** Pas une image qu'on sait lire : écartée, mais comptée. [mime] est null si le type est inconnu. */
+    /** Not an image we can read: dropped, but counted. [mime] is null if the type is unknown.nconnu. */
     data class Ignore(val mime: String?) : ScanDecision
 
-    /** Impossible de décider ou de lire : signalé à l'utilisateur avec sa raison. */
+    /** Impossible to decide or to read: reported to the user with its reason. */
     data class Unreadable(val reason: FailureReason) : ScanDecision
 }
 
 object ScanRules {
     /**
-     * Décide du sort d'un fichier d'après sa taille et ses premiers octets.
-     * [head] vaut null quand le fichier n'a pas pu être ouvert.
+     * Decides the fate of a file from its size and its first bytes.
+     * [head] is null when the file could not be opened.
      */
     fun classify(size: Long, head: ByteArray?): ScanDecision {
         if (head == null) return ScanDecision.Unreadable(FailureReason.INACCESSIBLE)
@@ -59,14 +59,14 @@ object ScanRules {
     }
 }
 
-/** Calcul de réduction à la lecture d'une très grande image, sans la charger en entier. */
+/** Reduction computation when reading a very large image, without loading it entirely. */
 object ImageScale {
-    /** Plus grand côté accepté après décodage : au-delà, l'image est lue en réduction. */
+    /** Largest side accepted after decoding: beyond it, the image is read reduced. */
     const val MAX_SIDE = 4096
 
     /**
-     * Le facteur de réduction (puissance de 2, comme `inSampleSize`) pour que le plus grand côté
-     * ne dépasse pas [maxSide]. Une image déjà assez petite n'est pas réduite.
+     * The reduction factor (power of 2, like `inSampleSize`) so that the largest sideé
+     * does not exceed [maxSide]. An image already small enough is not reduced.
      */
     fun sampleSize(width: Int, height: Int, maxSide: Int = MAX_SIDE): Int {
         require(maxSide > 0) { "maxSide doit être positif" }

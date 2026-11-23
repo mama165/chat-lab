@@ -37,7 +37,7 @@ class ReadProgressTest {
         ReadProgress.report("dossier", newer, 50)
         ReadProgress.report("dossier", older, 500)
         assertEquals(50, ReadProgress.counts.value["dossier"])
-        // La lecture ancienne finit : elle ne retire pas la lecture en cours.
+        // The old reading ends: it does not remove the reading in progress.
         ReadProgress.finish("dossier", older)
         assertEquals(50, ReadProgress.counts.value["dossier"])
         ReadProgress.finish("dossier", newer)

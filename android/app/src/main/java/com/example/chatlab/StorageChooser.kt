@@ -52,21 +52,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** L'arbre, et le nombre de photos sous chaque dossier. [done] : le comptage est fini. */
+/** The tree, and the number of photos under each folder. [done]: the counting is finished. */
 private data class Counting(val tree: List<FolderNode>, val counts: Map<String, Int>, val done: Boolean)
 
 /**
- * Le choix des dossiers à analyser dans le stockage interne, comme sur la maquette 1.5 à 1.10 :
- * l'arbre des dossiers avec des cases, le nombre de photos à droite de chaque dossier, « Tout
- * cocher » et « Tout décocher ». Un dossier coché inclut ses sous-dossiers ; les dossiers déjà
- * ajoutés restent verrouillés.
+ * The choice of the folders to analyse in the internal storage, as in mockups 1.5 to 1.10:
+ * the folder tree with checkboxes, the number of photos on the right of each folder, "Tout
+ * cocher" and "Tout décocher". A ticked folder includes its subfolders; the folders already
+ * added stay locked.
  */
 @Composable
 fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(StorageAccess.granted()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    // Au retour des réglages Android, on vérifie de nouveau l'autorisation.
+    // When coming back from the Android settings, we check the permission again.
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) granted = StorageAccess.granted()
@@ -124,7 +124,7 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
             }
         }
 
-        // La ligne du stockage : nom, puis espace utilisé.
+        // The storage line: name, then space used.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -204,8 +204,8 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
 }
 
 /**
- * Les photos de chaque dossier de premier niveau, comptées en une passe : chaque dossier de
- * premier niveau est parcouru une fois, et chaque photo compte pour tous ses dossiers parents.
+ * The photos of each top-level folder, counted in one pass: each top-level folder
+ * is walked once, and each photo counts for all its parent folders.
  */
 private fun count(root: String): Counting {
     val tree = StorageTree.build(File(root))
@@ -218,7 +218,7 @@ private fun count(root: String): Counting {
     return Counting(tree, counts, done = true)
 }
 
-/** Les dossiers d'un niveau, puis leurs sous-dossiers si le parent est déplié. */
+/** The folders of one level, then their subfolders if the parent is expanded. */
 @Composable
 private fun FolderRows(
     nodes: List<FolderNode>,
@@ -248,7 +248,7 @@ private fun FolderRows(
                 color = if (open) Palette.Accent else Palette.Muted,
                 modifier = Modifier.width(22.dp),
             )
-            // Une case, avec le même dessin que la maquette : pleine, marquée, partielle ou vide.
+            // A checkbox, with the same drawing as the mockup: filled, ticked, partial or empty.
             Box(
                 modifier = Modifier
                     .size(22.dp)
@@ -293,7 +293,7 @@ private fun FolderRows(
     }
 }
 
-/** La barre de défilement fine à droite de la liste : sa position suit le défilement. */
+/** The thin scrollbar on the right of the list: its position follows the scrolling. */
 @Composable
 private fun ScrollThumb(scroll: ScrollState, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier = modifier.fillMaxHeight().width(4.dp)) {
@@ -313,7 +313,7 @@ private fun ScrollThumb(scroll: ScrollState, modifier: Modifier = Modifier) {
     }
 }
 
-/** « 84 Go utilisés sur 119 Go », lu sur le stockage interne. */
+/** "84 Go utilisés sur 119 Go", read from the internal storage. */
 private fun storageSummary(): String {
     return try {
         val stat = StatFs(Environment.getExternalStorageDirectory().path)
@@ -352,15 +352,15 @@ private fun AccessPanel(onOpenSettings: () -> Unit, onBack: () -> Unit) {
     }
 }
 
-/** Tous les dossiers de l'arbre, à plat. */
+/** All the folders of the tree, flat. */
 private fun flatten(node: FolderNode): List<FolderNode> = listOf(node) + node.children.flatMap(::flatten)
 
 private fun flatten(nodes: List<FolderNode>): List<FolderNode> = nodes.flatMap(::flatten)
 
-/** Vrai si un sous-dossier de [node] est coché. */
+/** True if a subfolder of [node] is ticked. */
 private fun selectedUnder(node: FolderNode, selected: Set<String>): Boolean =
     node.children.any { it.path in selected || selectedUnder(it, selected) }
 
-/** Le dossier parent d'un chemin, s'il est dans l'arbre. */
+/** The parent folder of a path, if it is in the tree. */
 private fun parentOf(path: String, all: List<FolderNode>): String? =
     File(path).parent?.takeIf { parent -> all.any { it.path == parent } }

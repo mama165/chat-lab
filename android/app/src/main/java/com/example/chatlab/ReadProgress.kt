@@ -6,25 +6,25 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Où en est la lecture de chaque dossier (nombre de fichiers examinés), pour l'afficher pendant
- * que la lecture se fait. Un dossier absent de la liste n'est pas en cours de lecture.
+ * Where the reading of each folder is (number of files examined), to show it while
+ * the reading goes on. A folder absent from the list is not being read.
  *
- * Une lecture reçoit un numéro au départ. Une lecture relancée (par exemple après « Tout
- * effacer ») ne peut plus être arrêtée : l'ancienne continue jusqu'au bout, mais ses chiffres
- * n'atteignent plus l'écran. Sans cela, deux lectures écrivaient dans le même compteur.
+ * A reading gets a number at the start. A reading started again (for example after "Tout
+ * effacer") can no longer be stopped: the old one goes on to the end, but its figures
+ * no longer reach the screen. Without this, two readings wrote into the same counter.
  */
 object ReadProgress {
-    /** Une mise à jour toutes les [EVERY] fichiers : l'écran reste fluide sur un gros dossier. */
+    /** An update every [EVERY] files: the screen stays smooth on a large folder. */
     const val EVERY = 50
 
     private val state = MutableStateFlow<Map<String, Int>>(emptyMap())
     val counts: StateFlow<Map<String, Int>> = state.asStateFlow()
 
-    /** La lecture en cours pour chaque dossier. */
+    /** The reading in progress for each folder. */
     private val current = HashMap<String, Int>()
     private var lastNumber = 0
 
-    /** Commence une lecture du dossier, et renvoie son numéro. */
+    /** Starts a reading of the folder, and returns its number. */
     @Synchronized
     fun start(folder: String): Int {
         val number = ++lastNumber

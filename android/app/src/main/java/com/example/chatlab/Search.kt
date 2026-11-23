@@ -96,14 +96,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * L'état de la recherche, partagé entre l'écran de recherche et la page Filtres pour que les
- * filtres choisis là-bas s'appliquent dès le retour.
+ * The state of the search, shared between the search screen and the Filtres page so that the
+ * filters chosen there apply as soon as we come back.
  */
 class SearchUiState {
     var query by mutableStateOf("")
     var filters by mutableStateOf(Filters())
     var shownExtra by mutableIntStateOf(0)
-    /** Position, dans les photos moins proches, du dernier paquet ajouté (pour le surligner). */
+    /** Position, in the photos less close, of the last batch added (to highlight it). */
     var newFrom by mutableIntStateOf(-1)
     var selected by mutableStateOf(emptySet<String>())
     var ranked by mutableStateOf(emptyList<Match>())
@@ -118,7 +118,7 @@ class SearchUiState {
     }
 }
 
-/** Onglet Rechercher : titre et molette, champ et filtres, puis les résultats. */
+/** Search tab: title and gear, field and filters, then the results. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
@@ -140,14 +140,14 @@ fun SearchScreen(
     val time = remember(query, state.filters, entries) { When(System.currentTimeMillis()) }
     val gridState = rememberLazyGridState()
 
-    // Une nouvelle recherche ou d'autres filtres repartent du début : ni photos moins proches, ni sélection.
+    // A new search or other filters start again from the beginning: neither photos less close, nor selection.
     LaunchedEffect(query, state.filters) {
         state.shownExtra = 0
         state.newFrom = -1
         state.selected = emptySet()
     }
 
-    // La phrase devient un vecteur une fois la frappe en pause, pour les photos ressemblantes.
+    // The sentence becomes a vector once typing pauses, for the similar photos.
     LaunchedEffect(query) {
         queryVector = null
         modelError = null
@@ -175,14 +175,14 @@ fun SearchScreen(
     val rows = remember(outcome, state.newFrom, query) { resultItems(outcome, query, state.newFrom) }
     val latestOutcome by rememberUpdatedState(outcome)
 
-    // Une recherche qui donne des résultats rejoint les recherches récentes après une pause de frappe.
+    // A search that gives results joins the recent searches after a pause ofrappe.
     LaunchedEffect(query) {
         if (query.isBlank()) return@LaunchedEffect
         delay(1500)
         if (!latestOutcome.isEmpty) recents = RecentStore.add(context, query)
     }
 
-    // Après « Voir des photos moins proches », la liste glisse jusqu'aux nouvelles photos.
+    // After "Voir des photos moins proches", the list slides down to the new photos.
     LaunchedEffect(state.shownExtra) {
         if (state.newFrom < 0) return@LaunchedEffect
         val index = rows.indexOfFirst { it is ResultItem.Tile && it.isNew }
@@ -410,7 +410,7 @@ private fun SearchField(
     }
 }
 
-/** En sélection, la barre du haut remplace le champ : nombre choisi, annuler, retirer. */
+/** When selecting, the top bar replaces the field: number chosen, cancel, remove. */
 @Composable
 private fun SelectionBar(count: Int, query: String, onCancel: () -> Unit, onRemove: () -> Unit) {
     Row(
@@ -494,7 +494,7 @@ private fun Message(title: String, detail: String?) {
     }
 }
 
-/** Page « Non classifiées » : les photos retirées, par recherche, avec la date et Rétablir. */
+/** "Non classifiées" page: the removed photos, per search, with the date and Rétablir. */
 @Composable
 fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
@@ -567,7 +567,7 @@ fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
 private fun toggled(current: Set<String>, key: String): Set<String> =
     if (key in current) current - key else current + key
 
-/** Une correspondance par mot : vignette, extrait du texte lu avec le mot surligné, date. */
+/** A match by word: thumbnail, excerpt of the text read with the word highlighted, date. */
 @Composable
 private fun WordRow(match: Match, query: String, time: When, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
     val entry = match.entry
@@ -628,7 +628,7 @@ private fun Check(modifier: Modifier, size: Int) {
     }
 }
 
-/** Appui court = sélection, appui maintenu = ouverture dans la galerie. */
+/** Short tap = selection, long press = opening in the gallery. */
 private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -> Unit): Modifier =
     this.pointerInput(key) {
         detectTapGestures(onPress = {
@@ -653,7 +653,7 @@ private fun ResultTile(
     LaunchedEffect(pressing) {
         if (pressing) ring.animateTo(1f, tween(LONG_PRESS_MS.toInt())) else ring.snapTo(0f)
     }
-    // Les photos qui viennent d'arriver sont entourées un instant.
+    // The photos that have just arrived are briefly outlined.
     val glow = remember { Animatable(0f) }
     LaunchedEffect(isNew, highlightKey) {
         if (isNew) {
@@ -727,7 +727,7 @@ fun GridThumb(location: String, modifier: Modifier) {
 
 private const val LONG_PRESS_MS = 500L
 
-/** Ouvre la photo d'origine dans l'application de galerie du téléphone. */
+/** Opens the original photo in the gallery application of the phone. */
 private fun openInGallery(context: Context, source: String) {
     if (source.isBlank()) {
         Toast.makeText(context, "Photo d'origine introuvable.", Toast.LENGTH_SHORT).show()
@@ -743,7 +743,7 @@ private fun openInGallery(context: Context, source: String) {
     }
 }
 
-/** Décode l'image à petite taille, pour que la liste reste fluide. */
+/** Decodes the image at a small size, so that the list stays smooth. */
 private fun decodeThumbnail(context: Context, location: String): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     openImage(context, location)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -756,7 +756,7 @@ private fun decodeThumbnail(context: Context, location: String): Bitmap? {
     }
 }
 
-/** Une photo d'origine (adresse content://) ou un fichier de l'application. */
+/** An original photo (content:// address) or a file of the application. */
 private fun openImage(context: Context, location: String): java.io.InputStream? =
     if (location.startsWith("content:")) {
         context.contentResolver.openInputStream(Uri.parse(location))

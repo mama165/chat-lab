@@ -3,11 +3,11 @@ package com.example.chatlab
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** Calculs de la lecture de texte qui ne dépendent ni d'OpenCV ni du modèle. */
+/** Text reading computations that depend neither on OpenCV nor on the model. */
 object OcrMath {
     /**
-     * Décodage CTC : à chaque pas, le symbole le plus probable ; les répétitions et le blanc
-     * (index 0) sont ignorés. Renvoie le texte et la confiance moyenne des caractères retenus.
+     * CTC decoding: at each step, the most probable symbol; repetitions and the blank
+     * (index 0) are ignored. Returns the text and the average confidence of the kept characters.
      */
     fun decode(steps: Array<FloatArray>, vocabulary: List<String>): Pair<String, Float> {
         val text = StringBuilder()
@@ -28,6 +28,6 @@ object OcrMath {
         return text.toString() to if (kept == 0) 0f else (confidence / kept).toFloat()
     }
 
-    /** Arrondi au multiple de 32 le plus proche, au moins 32, comme l'attend le détecteur. */
+    /** Rounded to the nearest multiple of 32, at least 32, as the detector expects. */
     fun roundTo32(value: Double): Int = max(32, (value / 32).roundToInt() * 32)
 }

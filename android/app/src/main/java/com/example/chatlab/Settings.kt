@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Page Réglages, ouverte par la molette : dossiers, non classifiées, espace, outils, tout effacer. */
+/** Settings page, opened by the gear: folders, unclassified, space, tools, erase everything. */
 @Composable
 fun SettingsPage(
     entries: List<LibraryEntry>,
@@ -127,7 +127,7 @@ fun SettingsPage(
     }
 }
 
-/** Taille de l'application selon Android (programme, données et cache), ou celle de l'APK à défaut. */
+/** Size of the application according to Android (program, data and cache), or that of the APK otherwise. */
 private fun measureAppSize(context: Context): Long {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         try {
@@ -141,7 +141,7 @@ private fun measureAppSize(context: Context): Long {
     return File(context.applicationInfo.sourceDir).length()
 }
 
-/** Page « Tout effacer » : ce qui disparaît, ce qui reste, et le bouton rouge. */
+/** "Tout effacer" page: what disappears, what stays, and the red button. */
 @Composable
 fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Unit) {
     val context = LocalContext.current
@@ -241,14 +241,14 @@ private fun WipeRow(icon: String, title: String, detail: String, iconColor: andr
     }
 }
 
-/** L'analyse des images de test tourne à part : quitter la page ne l'interrompt pas. */
+/** The analysis of the test images runs apart: leaving the page does not interrupt it. */
 private object TestRun {
     val running = MutableStateFlow(false)
     val report = MutableStateFlow<String?>(null)
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 }
 
-/** Page « Outils de test » : analyse des images de test et dernier compte rendu. */
+/** "Outils de test" page: analysis of the test images and last report. */
 @Composable
 fun TestsPage(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -311,7 +311,7 @@ fun TestsPage(onBack: () -> Unit) {
     }
 }
 
-/** Analyse les images de test et met le compte rendu en forme, image par image. */
+/** Analyses the test images and formats the report, image by image. */
 fun runAnalysis(context: Context, folder: Uri): String = try {
     Analyzer(context, folder).use { analyzer ->
         val started = System.nanoTime()

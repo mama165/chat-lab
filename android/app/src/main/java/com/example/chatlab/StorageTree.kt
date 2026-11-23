@@ -2,13 +2,13 @@ package com.example.chatlab
 
 import java.io.File
 
-/** Un dossier du stockage, avec ses sous-dossiers. Seuls les dossiers sont listés, jamais les fichiers. */
+/** A folder of the storage, with its subfolders. Only folders are listed, never files. */
 data class FolderNode(val path: String, val name: String, val children: List<FolderNode>)
 
 /**
- * L'arbre des dossiers du stockage interne, tel qu'il est proposé pour le choix.
- * Exclus : les dossiers cachés (nom qui commence par un point), et les dossiers qu'Android
- * bloque même avec l'accès à tous les fichiers (Android/data et Android/obb).
+ * The folder tree of the internal storage, as it is offered for the choice.
+ * Excluded: hidden folders (name starting with a dot), and the folders that Android
+ * blocks even with the all-files access (Android/data and Android/obb).
  */
 object StorageTree {
     private val BLOCKED_UNDER_ANDROID = setOf("data", "obb")
@@ -25,7 +25,7 @@ object StorageTree {
             .map { FolderNode(it.absolutePath, it.name, children(it, root, depthLeft - 1)) }
     }
 
-    /** Vrai pour Android/data et Android/obb, à la racine du stockage. */
+    /** True for Android/data and Android/obb, at the root of the storage. */
     private fun isBlocked(folder: File, root: File): Boolean =
         folder.parentFile?.absolutePath == File(root, "Android").absolutePath && folder.name in BLOCKED_UNDER_ANDROID
 }

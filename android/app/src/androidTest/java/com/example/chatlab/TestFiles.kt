@@ -8,7 +8,7 @@ import android.os.Build
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-/** De vraies images, créées sur l'émulateur, et de faux fichiers qui leur ressemblent. */
+/** Real images, created on the emulator, and fake files that look like them. */
 object TestFiles {
     private fun bitmap(width: Int, height: Int, config: Bitmap.Config = Bitmap.Config.ARGB_8888): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, config)
@@ -37,11 +37,11 @@ object TestFiles {
         if (Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP,
     )
 
-    /** Une très grande image : en 565, six mille pixels de large tiennent en mémoire sur l'émulateur. */
+    /** A very large image: in 565, six thousand pixels wide fit in memory on the emulator. */
     fun hugeJpeg(width: Int = 6000, height: Int = 4500): ByteArray =
         encode(bitmap(width, height, Bitmap.Config.RGB_565), Bitmap.CompressFormat.JPEG, 70)
 
-    /** Les premiers octets d'un JPEG suivis de n'importe quoi : le fichier annonce une image qui n'en est pas une. */
+    /** The first bytes of a JPEG followed by anything: the file claims to be an image but is not one. */
     fun fakeJpeg(): ByteArray = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte()) + ByteArray(200) { (it * 31).toByte() }
 
     fun gif(): ByteArray = "GIF89a".toByteArray() + ByteArray(40)

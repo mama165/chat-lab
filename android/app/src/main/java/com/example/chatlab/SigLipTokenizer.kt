@@ -5,8 +5,8 @@ import org.json.JSONObject
 import java.text.Normalizer
 
 /**
- * Découpeur BPE de SigLIP 2, le même que scripts/bpe_pure.py : il lit tokenizer.json
- * et produit les mêmes identifiants, complétés à [maxLength] et finis par <eos>.
+ * SigLIP 2 BPE tokenizer, the same as scripts/bpe_pure.py: it reads tokenizer.json
+ * and produces the same ids, padded to [maxLength] and ended by <eos>.
  */
 class SigLipTokenizer(json: String, private val maxLength: Int = 64) {
     private val vocab = HashMap<String, Int>()
@@ -70,7 +70,7 @@ class SigLipTokenizer(json: String, private val maxLength: Int = 64) {
         return result
     }
 
-    /** Une chaîne découpée en caractères (points de code Unicode). */
+    /** A string split into characters (Unicode code points). */
     private fun symbols(word: String): MutableList<String> {
         val list = ArrayList<String>()
         var index = 0
@@ -83,7 +83,7 @@ class SigLipTokenizer(json: String, private val maxLength: Int = 64) {
         return list
     }
 
-    /** Fusionne les paires de rang le plus bas, jusqu'à ce qu'il n'y en ait plus. */
+    /** Merges the pairs of lowest rank, until there are none left. */
     private fun merge(symbols: MutableList<String>): MutableList<String> {
         while (symbols.size > 1) {
             var best = -1

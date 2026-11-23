@@ -65,7 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** Onglet Photos : les dossiers à analyser, le bilan de la dernière analyse, puis la progression. */
+/** Photos tab: the folders to analyse, the report of the last analysis, then the progress. */
 @Composable
 fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolders: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -75,7 +75,7 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolde
     val pickers = rememberFolderPickers(onAddSource = onAddFolders) { version++ }
     val chatlab = remember(version) { folderName(context, KEY_FOLDER) }
     val sources = remember(version) { Sources.read(context) }
-    // Ce que contiennent les dossiers, lu en arrière-plan : aucune analyse, seulement un listage.
+    // What the folders contain, read in the background: no analysis, only a listing.
     val overviews by produceState<List<FolderOverview>?>(initialValue = null, version, entries, progress.running) {
         value = if (progress.running) null else withContext(Dispatchers.IO) { overview(context) }
     }
@@ -139,7 +139,7 @@ private fun startFullAnalysis(context: Context) {
     if (chatlab != null && Sources.read(context).isNotEmpty()) AnalysisService.start(context, chatlab)
 }
 
-/** Premier lancement : choisir le dossier chatlab, puis au moins un dossier de photos. */
+/** First launch: choose the chatlab folder, then at least one folder of photos. */
 @Composable
 private fun FirstSteps(chatlab: String?, sources: List<SourceFolder>, pickers: FolderPickers) {
     Text("Pour commencer, choisissez le dossier chatlab, puis les dossiers de photos.", fontSize = 15.sp, color = Palette.Ink)
@@ -171,7 +171,7 @@ private fun Step(number: Int, title: String, detail: String, chosen: String?, ac
     }
 }
 
-/** Au repos : bilan de la dernière analyse, dossiers et leur état, bouton d'analyse. */
+/** At rest: report of the last analysis, folders and their state, analysis button. */
 @Composable
 private fun Idle(
     entries: List<LibraryEntry>,
@@ -193,8 +193,8 @@ private fun Idle(
     if (lastRun != null) RunBanner(lastRun)
 
     SectionLabel("Dossiers à analyser", right = "sous-dossiers inclus")
-    // Chaque dossier s'affiche tout de suite : sa carte si sa lecture est finie, sinon sa lecture en cours.
-    // Un dossier qu'on vient d'ajouter n'attend donc pas que tous les autres soient relus.
+    // Each folder shows at once: its card if its reading is done, otherwise its reading in progress.
+    // So a folder just added does not wait for all the others to be read.
     sources.forEach { folder ->
         val overview = overviews?.firstOrNull { it.status.folder.uri == folder.uri }
         if (overview != null) {
@@ -203,7 +203,7 @@ private fun Idle(
         } else {
             ReadingCard(folder, reading[folder.uri] ?: 0)
         }
-        // Le même trait gris entre chaque dossier, comme sur la maquette.
+        // The same grey line between each folder, as in the mockup.
         Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
     }
     AddFolderRow(pickers.addSource)
@@ -224,7 +224,7 @@ private fun Idle(
     }
 }
 
-/** Un dossier en cours de lecture : son nom, et le nombre de fichiers examinés jusqu'ici. */
+/** A folder being read: its name, and the number of files examined so far. */
 @Composable
 private fun ReadingCard(folder: SourceFolder, examined: Int) {
     Row(
@@ -234,7 +234,7 @@ private fun ReadingCard(folder: SourceFolder, examined: Int) {
             .semantics { contentDescription = "Dossier ${folder.name}, lecture en cours" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Une jauge qui tourne : elle dit qu'une lecture est en cours, sans prétendre à un pourcentage.
+        // A spinning gauge: it says a reading is in progress, without claiming a percentage.
         CircularProgressIndicator(
             modifier = Modifier.size(20.dp),
             color = Palette.Accent,
@@ -292,7 +292,7 @@ private fun BannerLine(icon: String, color: Color, number: String, label: String
     }
 }
 
-/** Un dossier : son état (lisible, refusé, vide), ses problèmes, et de quoi le retirer de la liste. */
+/** A folder: its state (readable, refused, empty), its problems, and what is needed to remove it from the list. */
 @Composable
 private fun FolderCard(overview: FolderOverview, failures: List<FileFailure>, onRemove: () -> Unit) {
     val status = overview.status
@@ -369,7 +369,7 @@ private fun FolderCard(overview: FolderOverview, failures: List<FileFailure>, on
     }
 }
 
-/** Un encadré rouge : un titre, puis chaque fichier avec sa raison entre parenthèses. */
+/** A red box: a title, then each file with its reason in brackets. */
 @Composable
 private fun ProblemBox(title: String, items: List<Pair<String, String>>) {
     Column(
@@ -392,7 +392,7 @@ private fun ProblemBox(title: String, items: List<Pair<String, String>>) {
 
 @Composable
 private fun AddFolderRow(onClick: () -> Unit) {
-    // Comme sur la maquette 1.3 : un carré bleu clair avec un plus, puis « Nouveau dossier ».
+    // As in mockup 1.3: a light blue square with a plus, then "Nouveau dossier".
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -417,7 +417,7 @@ private fun AddFolderRow(onClick: () -> Unit) {
     }
 }
 
-/** Pendant l'analyse : anneau de progression, progression par dossier, Pause ou Reprendre, et Arrêter. */
+/** During the analysis: progress ring, progress per folder, Pause or Reprendre, and Arrêter. */
 @Composable
 private fun Running(progress: Progress, now: Long) {
     Column(

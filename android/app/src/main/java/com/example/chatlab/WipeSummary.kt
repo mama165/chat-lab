@@ -1,9 +1,9 @@
 package com.example.chatlab
 
-/** Une ligne de la page « Tout effacer » : titre, détail, et vide s'il n'y a rien à effacer. */
+/** A line of the "Tout effacer" page: title, detail, and empty if there is nothing to erase. */
 data class WipeLine(val title: String, val detail: String, val empty: Boolean)
 
-/** Ce que « Tout effacer » supprimerait, mesuré sur le téléphone de la personne. */
+/** What "Tout effacer" would delete, measured on the person's phone. */
 data class WipeSummary(
     val photos: Int,
     val librarySize: Long,

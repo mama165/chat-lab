@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.R
 
-/** Titre d'un onglet, avec la molette des réglages à droite. */
+/** Title of a tab, with the settings gear on the right. */
 @Composable
 fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -56,7 +56,7 @@ fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null) {
     }
 }
 
-/** En-tête d'une page à part : flèche de retour, titre, et une action facultative à droite. */
+/** Header of a separate page: back arrow, title, and an optional action on the right. */
 @Composable
 fun PageHeader(title: String, onBack: () -> Unit, action: String? = null, actionEnabled: Boolean = true, onAction: () -> Unit = {}) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -97,14 +97,14 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, right: String? = n
     }
 }
 
-/** Choix exclusif en segments, comme sur la page Filtres. */
+/** Exclusive choice in segments, as on the Filtres page. */
 @Composable
 fun <T> Segmented(
     options: List<T>,
     selected: T,
     label: (T) -> String,
     onSelect: (T) -> Unit,
-    /** Une petite ligne sous le libellé, par exemple le nombre de photos de ce choix. */
+    /** A small line under the label, for example the number of photos of this choice. */
     sub: (T) -> String? = { null },
 ) {
     Row(
@@ -141,7 +141,7 @@ fun <T> Segmented(
     }
 }
 
-/** Étiquette de filtre ; avec [onRemove], une croix la retire. */
+/** Filter label; with [onRemove], a cross removes it. */
 @Composable
 fun FilterTag(label: String, onRemove: (() -> Unit)?) {
     Text(
@@ -216,7 +216,7 @@ fun SettingRow(title: String, value: String = "", color: Color = Palette.Ink, on
     }
 }
 
-/** Séparation fine avec un texte au milieu (« Moins proches · 6 »). */
+/** Thin separator with a text in the middle ("Moins proches · 6"). */
 @Composable
 fun TextDivider(text: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -226,7 +226,7 @@ fun TextDivider(text: String) {
     }
 }
 
-/** Barre du bas : les deux onglets. */
+/** Bottom bar: the two tabs. */
 @Composable
 fun BottomTabs(selected: Int, onSelect: (Int) -> Unit) {
     Column {
@@ -253,12 +253,12 @@ fun BottomTabs(selected: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-/** Bord coloré autour d'une vignette (photos nouvellement ajoutées). */
+/** Coloured border around a thumbnail (newly added photos). */
 fun Modifier.glow(alpha: Float): Modifier =
     if (alpha <= 0f) this else this.border(3.dp, Palette.Soft.copy(alpha = alpha), RoundedCornerShape(14.dp))
 
 
-/** Une ligne à choix unique : rond, libellé, nombre de photos à droite, chevron si elle ouvre une page. */
+/** A single-choice line: circle, label, number of photos on the right, chevron if it opens a page. */
 @Composable
 fun RadioRow(label: String, count: String, selected: Boolean, onClick: () -> Unit, chevron: Boolean = false, detail: String? = null) {
     Column {
@@ -288,7 +288,7 @@ fun RadioRow(label: String, count: String, selected: Boolean, onClick: () -> Uni
     }
 }
 
-/** Une pastille à choix multiple, avec le nombre de photos. Grisée et en pointillés si rien n'y correspond. */
+/** A multiple-choice chip, with the number of photos. Greyed and dotted if nothing matches itrespond. */
 @Composable
 fun ChoiceChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     val empty = count == 0 && !selected
@@ -309,7 +309,7 @@ fun ChoiceChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit
     )
 }
 
-/** Un interrupteur avec son explication. */
+/** A switch with its explanation. */
 @Composable
 fun SwitchRow(label: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

@@ -9,7 +9,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Écrit le carnet (library.json). N'a besoin d'aucun modèle : on peut l'appeler sans rien analyser. */
+/** Writes the library (library.json). Needs no model: it can be called without analysing anything. */
 object LibraryWriter {
     fun write(context: Context, results: List<ImageResult>, keep: List<JSONObject> = emptyList()): File {
         val entries = JSONArray()
@@ -19,7 +19,7 @@ object LibraryWriter {
         for (r in results) {
             if (r.error != null || r.vector == null) continue
             val entry = JSONObject()
-                // Deux dossiers peuvent contenir un même nom de fichier : l'adresse d'origine est unique.
+                // Two folders can contain the same file name: the original address is unique.
                 .put("id", if (r.source.isNotBlank()) r.source else r.file.name)
                 .put("path", if (r.source.isNotBlank()) r.source else r.file.path)
                 .put("name", r.file.name)
@@ -42,9 +42,9 @@ object LibraryWriter {
             if (r.mime.isNotBlank()) entry.put("mime", r.mime)
             entries.put(entry)
         }
-        // Les photos des dossiers retirés de la liste restent dans le carnet, telles quelles.
+        // The photos of the folders removed from the list stay in the library, as they are.
         keep.forEach { entries.put(it) }
-        // Le carnet va dans le dossier chatlab choisi (il survit à une réinstallation).
+        // The library goes into the chosen chatlab folder (it survives a reinstall).
         LibraryStore.write(context, entries.toString())
         return File(context.filesDir, "library.json")
     }

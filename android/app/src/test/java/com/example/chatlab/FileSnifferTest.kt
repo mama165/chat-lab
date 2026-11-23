@@ -50,7 +50,7 @@ class FileSnifferTest {
             val head = bytes(0, 0, 0, 0x18) + ascii("ftyp") + ascii(brand) + bytes(0, 0, 0, 0)
             assertEquals(brand, FileSniffer.HEIC, FileSniffer.detect(head))
         }
-        // Un MP4 a aussi « ftyp », mais avec une autre marque.
+        // An MP4 also has "ftyp", but with another brand.
         val mp4 = bytes(0, 0, 0, 0x18) + ascii("ftyp") + ascii("isom") + bytes(0, 0, 0, 0)
         assertNull(FileSniffer.detect(mp4))
     }

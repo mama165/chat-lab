@@ -26,7 +26,7 @@ class ProgressTextTest {
     fun pausesAreNotCountedAsWork() {
         val paused = running.pausing(now = 60_000L)
         assertTrue(paused.paused)
-        // Figé à 60 s, quel que soit le moment où l'on regarde.
+        // Frozen at 60 s, whatever the moment we look.
         assertEquals(60_000L, paused.activeElapsed(500_000L))
         val resumed = paused.resuming(now = 160_000L)
         assertFalse(resumed.paused)

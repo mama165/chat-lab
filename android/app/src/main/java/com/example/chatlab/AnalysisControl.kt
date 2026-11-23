@@ -3,18 +3,18 @@ package com.example.chatlab
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** État de commande d'une analyse : en marche, figée (pause) ou en train de s'arrêter. */
+/** Control state of an analysis: running, frozen (paused) or stopping. */
 enum class RunState { RUNNING, PAUSED, STOPPING }
 
-/** Levée quand l'analyse doit s'arrêter : la photo en cours est abandonnée, le reste est gardé. */
+/** Thrown when the analysis must stop: the current photo is dropped, the rest is kept. */
 class AnalysisStopped : RuntimeException("analyse arrêtée")
 
 /**
- * Commande d'une analyse : pause, reprise et arrêt.
+ * Control of an analysis: pause, resume and stop.
  *
- * Les travailleurs appellent [checkpoint] entre deux étapes d'une photo. En pause, ils y restent
- * bloqués sans rien calculer, jusqu'à [resume] (uniquement sur demande) ou [stop]. Rien n'est
- * perdu : la photo en cours reprend à l'étape où elle s'était figée.
+ * Workers call [checkpoint] between two steps of a photo. When paused, they stay there
+ * blocked without computing anything, until [resume] (only on request) or [stop]. Nothing is
+ * lost: the current photo resumes at the step where it was frozen.
  */
 class AnalysisControl(private val onChange: (RunState) -> Unit = {}) {
     private val lock = ReentrantLock()
@@ -24,13 +24,13 @@ class AnalysisControl(private val onChange: (RunState) -> Unit = {}) {
     val state: RunState
         get() = lock.withLock { current }
 
-    /** Fige l'analyse. Sans effet si elle est déjà en pause ou en train de s'arrêter. */
+    /** Freezes the analysis. No effect if it is already paused or stopping. */
     fun pause(): Boolean = move(from = RunState.RUNNING, to = RunState.PAUSED)
 
-    /** Reprend une analyse en pause. */
+    /** Resumes a paused analysis. */
     fun resume(): Boolean = move(from = RunState.PAUSED, to = RunState.RUNNING)
 
-    /** Demande l'arrêt : les travailleurs, même en pause, sortent à leur prochain point d'arrêt. */
+    /** Requests a stop: the workers, even when paused, leave at their next stop point. */
     fun stop(): Boolean {
         val moved = lock.withLock {
             if (current == RunState.STOPPING) return false
@@ -42,7 +42,7 @@ class AnalysisControl(private val onChange: (RunState) -> Unit = {}) {
         return moved
     }
 
-    /** Attend tant que l'analyse est en pause ; lève [AnalysisStopped] si l'arrêt est demandé. */
+    /** Waits while the analysis is paused; throws [AnalysisStopped] if a stop is requested. */
     fun checkpoint() {
         lock.withLock {
             while (current == RunState.PAUSED) changed.await()

@@ -1,12 +1,12 @@
 package com.example.chatlab
 
 /**
- * Reconnaît le type d'un fichier d'après ses premiers octets (« magic bytes »), comme le scanner
- * Go (mimetype.Detect sur les 64 premiers octets). Le nom et l'extension ne comptent pas : un
- * JPEG renommé en .dat reste un JPEG, un texte renommé en .jpg n'en est pas un.
+ * Recognises the type of a file from its first bytes ("magic bytes"), like the scanner
+ * Go (mimetype.Detect on the first 64 bytes). The name and extension do not count: a
+ * JPEG renamed to .dat stays a JPEG, a text renamed to .jpg is not one.
  */
 object FileSniffer {
-    /** Nombre d'octets lus au début du fichier, comme dans le scanner Go. */
+    /** Number of bytes read at the start of the file, as in the Go scanner. */
     const val HEAD_SIZE = 64
 
     const val JPEG = "image/jpeg"
@@ -16,10 +16,10 @@ object FileSniffer {
     const val HEIC = "image/heic"
     const val PDF = "application/pdf"
 
-    /** Les types que l'analyse sait lire aujourd'hui. */
+    /** The types the analysis can read today. */
     val SUPPORTED: Set<String> = setOf(JPEG, PNG, WEBP)
 
-    /** Le type MIME détecté, ou null si les octets ne correspondent à aucun format connu. */
+    /** The MIME type detected, or null if the bytes match no known format. */
     fun detect(head: ByteArray): String? = when {
         isJpeg(head) -> JPEG
         isPng(head) -> PNG
@@ -32,7 +32,7 @@ object FileSniffer {
 
     fun isSupported(mime: String?): Boolean = mime != null && mime in SUPPORTED
 
-    /** L'étiquette courte d'un type, pour l'écran des filtres : JPG, PNG, WebP… */
+    /** The short label of a type, for the filters screen: JPG, PNG, WebP… */
     fun label(mime: String): String = when (mime) {
         JPEG -> "JPG"
         PNG -> "PNG"
@@ -43,7 +43,7 @@ object FileSniffer {
         else -> mime.substringAfter('/').uppercase()
     }
 
-    /** Le type MIME d'après l'étiquette d'un filtre : l'inverse de [label]. */
+    /** The MIME type from the label of a filter: the inverse of [label]. */
     fun mimeOf(label: String): String? = listOf(JPEG, PNG, WEBP, GIF, HEIC, PDF).firstOrNull { label(it) == label }
 
     private fun isJpeg(h: ByteArray) =
@@ -54,12 +54,12 @@ object FileSniffer {
     private fun isGif(h: ByteArray) = startsWith(h, "GIF87a".toByteArray(Charsets.ISO_8859_1)) ||
         startsWith(h, "GIF89a".toByteArray(Charsets.ISO_8859_1))
 
-    /** « RIFF », quatre octets de taille, puis « WEBP » : un WAV ou un AVI ne passent pas. */
+    /** "RIFF", four bytes of size, then "WEBP": a WAV or an AVI does not pass. */
     private fun isWebp(h: ByteArray) = h.size >= 12 &&
         startsWith(h, "RIFF".toByteArray(Charsets.ISO_8859_1)) &&
         h.copyOfRange(8, 12).contentEquals("WEBP".toByteArray(Charsets.ISO_8859_1))
 
-    /** Les photos des téléphones récents : « ftyp » puis une marque heic, heix ou mif1. */
+    /** The photos of recent phones: "ftyp" then a heic, heix or mif1 brand. */
     private fun isHeic(h: ByteArray): Boolean {
         if (h.size < 12) return false
         if (!h.copyOfRange(4, 8).contentEquals("ftyp".toByteArray(Charsets.ISO_8859_1))) return false

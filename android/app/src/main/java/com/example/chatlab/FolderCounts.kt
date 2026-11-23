@@ -3,9 +3,9 @@ package com.example.chatlab
 import java.io.File
 
 /**
- * Le nombre de photos sous chaque dossier, calculé en une seule passe sur les photos trouvées.
- * Une photo compte pour chacun de ses dossiers parents, jusqu'à la racine du stockage. Un dossier
- * sans photo n'apparaît pas dans le résultat : son nombre est zéro.
+ * The number of photos under each folder, computed in a single pass over the photos found.
+ * A photo counts for each of its parent folders, up to the root of the storage. A folder
+ * without photos does not appear in the result: its count is zero.
  */
 object FolderCounts {
     fun countByFolder(photoPaths: Collection<String>, root: String): Map<String, Int> {

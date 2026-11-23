@@ -5,8 +5,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Les photos ne sont jamais modifiées : l'analyse ne voit un fichier qu'à travers [FileNode],
- * qui ne sait que le lire. Ce test échoue si une méthode d'écriture y est ajoutée.
+ * Photos are never modified: the analysis only sees a file through [FileNode],
+ * which can only read it. This test fails if a write method is added to it.
  */
 class FileNodeReadOnlyTest {
     private val writing = listOf("write", "delete", "rename", "set", "create", "move", "truncate", "append", "remove", "update")

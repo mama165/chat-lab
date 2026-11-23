@@ -8,9 +8,9 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Le carnet (library.json) vit dans le dossier chatlab que vous avez choisi : il survit à une
- * désinstallation ou à une réinstallation de l'application. Sans dossier utilisable, il reste
- * dans l'espace privé de l'application.
+ * The library (library.json) lives in the chatlab folder you chose: it survives an
+ * uninstall or a reinstall of the application. Without a usable folder, it stays
+ * in the private space of the application.
  */
 object LibraryStore {
     private const val NAME = "library.json"
@@ -22,7 +22,7 @@ object LibraryStore {
         return DocumentFile.fromTreeUri(context, Uri.parse(uri))?.takeIf { it.canWrite() }
     }
 
-    /** Le contenu du carnet, ou null s'il n'existe pas encore. */
+    /** The content of the library, or null if it does not exist yet. */
     fun read(context: Context): String? {
         val inFolder = folder(context)?.findFile(NAME)
         if (inFolder != null && inFolder.exists()) {
@@ -48,18 +48,18 @@ object LibraryStore {
             ?: error("impossible d'écrire le carnet dans le dossier chatlab")
     }
 
-    /** Écrit la trace d'un plantage dans erreur.txt, dans le dossier chatlab, pour pouvoir la lire. */
+    /** Writes the trace of a crash to erreur.txt, in the chatlab folder, so it can be read. */
     fun saveErrorReport(context: Context, text: String) {
         try {
             val dir = folder(context) ?: return
             val target = dir.findFile("erreur.txt") ?: dir.createFile("text/plain", "erreur.txt") ?: return
             context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
         } catch (e: Exception) {
-            // Rien à faire de plus : on ne veut pas provoquer un second plantage.
+            // Nothing more to do: we do not want to cause a second crash.
         }
     }
 
-    /** Les retraits : pour chaque recherche, les photos écartées. */
+    /** The removals: for each search, the photos set aside. */
     fun readRemovals(context: Context): JSONObject {
         val text = try {
             val inFolder = folder(context)?.findFile(REMOVALS)
@@ -78,7 +78,7 @@ object LibraryStore {
         }
     }
 
-    /** Écarte une photo pour une recherche donnée ; le retrait est gardé d'un lancement à l'autre. */
+    /** Sets a photo aside for a given search; the removal is kept from one launch to the next. */
     fun addRemoval(context: Context, query: String, source: String) {
         val all = readRemovals(context)
         val list = all.optJSONArray(query) ?: JSONArray().also { all.put(query, it) }
@@ -95,7 +95,7 @@ object LibraryStore {
             ?: error("impossible d'écrire retraits.json")
     }
 
-    /** Écrit l'ensemble des retraits, dans le dossier chatlab si possible. */
+    /** Writes all the removals, in the chatlab folder if possible. */
     fun writeRemovals(context: Context, json: JSONObject) {
         val text = json.toString()
         val dir = folder(context)
@@ -110,10 +110,10 @@ object LibraryStore {
     }
 }
 
-/** Le carnet enregistré, lu depuis le dossier chatlab (ou l'espace privé à défaut). */
+/** The saved library, read from the chatlab folder (or the private space otherwise). */
 fun Library.load(context: Context): List<LibraryEntry> = parse(LibraryStore.read(context))
 
-/** Taille du carnet enregistré, en octets (0 s'il n'existe pas). */
+/** Size of the saved library, in bytes (0 if it does not exist). */
 fun LibraryStore.librarySize(context: Context): Long = try {
     val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
     val inFolder = uri?.let { DocumentFile.fromTreeUri(context, Uri.parse(it))?.findFile("library.json") }
@@ -123,8 +123,8 @@ fun LibraryStore.librarySize(context: Context): Long = try {
 }
 
 /**
- * Tout effacer : le carnet et les retraits, dans le dossier chatlab et dans l'espace privé.
- * Les photos, les modèles et les dossiers choisis ne sont pas touchés.
+ * Tout effacer: the library and the removals, in the chatlab folder and in the private space.
+ * The photos, the models and the chosen folders are not touched.
  */
 fun LibraryStore.wipeAnalysis(context: Context) {
     val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
@@ -133,7 +133,7 @@ fun LibraryStore.wipeAnalysis(context: Context) {
         try {
             folder?.findFile(name)?.delete()
         } catch (e: Exception) {
-            // Un fichier déjà absent ou en lecture seule ne bloque pas le reste.
+            // A file already missing or read-only does not block the rest.
         }
         File(context.filesDir, name).delete()
     }

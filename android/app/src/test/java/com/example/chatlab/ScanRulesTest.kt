@@ -47,7 +47,7 @@ class ScanRulesTest {
 
     @Test
     fun theExtensionNeverMatters() {
-        // Le nom n'entre même pas dans la règle : seuls la taille et les octets comptent.
+        // The name is not even part of the rule: only the size and the bytes count.
         assertEquals(ScanDecision.Analyze(FileSniffer.JPEG), ScanRules.classify(5, jpegHead))
         assertEquals(ScanDecision.Ignore(null), ScanRules.classify(5, textHead))
     }

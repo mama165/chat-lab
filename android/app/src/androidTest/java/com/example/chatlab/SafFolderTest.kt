@@ -12,9 +12,9 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * La lecture d'un dossier choisi par l'utilisateur, par le même chemin que le vrai sélecteur
- * (DocumentsContract) : un fournisseur de documents de test sert de vraies images, un dossier
- * refusé et un fichier qui ne s'ouvre pas.
+ * Reading a folder chosen by the user, through the same path as the real picker
+ * (DocumentsContract): a test documents provider serves real images, a refused folder,
+ * and a file that cannot be opened.
  */
 @RunWith(AndroidJUnit4::class)
 class SafFolderTest {

@@ -12,7 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/** De vraies images sur le vrai système de fichiers d'Android : ce qui est pris, ce qui ne l'est pas, et pourquoi. */
+/** Real images on the real Android file system: what is taken, what is not, and why. */
 @RunWith(AndroidJUnit4::class)
 class ImageFilesTest {
     private lateinit var root: File
@@ -129,9 +129,9 @@ class ImageFilesTest {
     @Test
     fun anImageThatIsNotOneIsUnreadable() {
         val file = TestFiles.write(root, "faux.jpg", TestFiles.fakeJpeg())
-        // Les octets annoncent un JPEG : le listage le garde...
+        // The bytes announce a JPEG: the listing keeps it...
         assertEquals(FileSniffer.JPEG, scan().candidates.single().mime)
-        // ... mais le décodage échoue, avec la raison « image illisible ».
+        // ... but decoding fails, with the reason "image illisible".
         assertNull(ImageLoader.bounds(file))
         val failure = runCatching { ImageLoader.decode(file) }.exceptionOrNull()
         assertNotNull(failure)
@@ -145,7 +145,7 @@ class ImageFilesTest {
 
     @Test
     fun theSnifferAgreesWithAndroidsOwnDecoder() {
-        // Chaque image réelle reconnue par ses octets est aussi décodable par Android.
+        // Every real image recognised by its bytes can also be decoded by Android.
         val files = listOf(
             TestFiles.write(root, "1.jpg", TestFiles.jpeg()),
             TestFiles.write(root, "2.png", TestFiles.png()),

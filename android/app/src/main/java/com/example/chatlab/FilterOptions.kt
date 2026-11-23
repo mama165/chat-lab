@@ -5,9 +5,9 @@ import java.util.TimeZone
 data class FolderOption(val name: String, val count: Int)
 data class TypeOption(val mime: String, val count: Int)
 
-/** Les choix proposés par la page Filtres : seulement ce qui existe vraiment dans le carnet. */
+/** The choices offered by the Filtres page: only what really exists in the library. */
 object FilterOptions {
-    /** Les dossiers qui ont au moins une photo dans le carnet, avec leur nombre de photos. */
+    /** The folders that have at least one photo in the library, with their number of photos. */
     fun folders(entries: List<LibraryEntry>): List<FolderOption> =
         entries.filter { it.folder.isNotBlank() }
             .groupingBy { it.folder }.eachCount()
@@ -15,8 +15,8 @@ object FilterOptions {
             .sortedBy { it.name.lowercase() }
 
     /**
-     * Les types trouvés dans le carnet et que l'application sait lire. Un type absent du carnet,
-     * ou qu'on ne sait pas analyser (PDF aujourd'hui), n'est jamais proposé.
+     * The types found in the library and that the application can read. A type absent from the library,
+     * or that we cannot analyse (PDF today), is never offered.
      */
     fun types(entries: List<LibraryEntry>): List<TypeOption> =
         entries.filter { FileSniffer.isSupported(it.mime) }
@@ -24,19 +24,19 @@ object FilterOptions {
             .map { TypeOption(it.key, it.value) }
             .sortedBy { FileSniffer.label(it.mime) }
 
-    /** Les jours qui ont au moins une photo : les points du calendrier. */
+    /** The days that have at least one photo: the dots of the calendar. */
     fun photoDays(entries: List<LibraryEntry>, zone: TimeZone): Set<SimpleDate> =
         entries.filter { it.takenMs > 0 }.map { SimpleDate.of(it.takenMs, zone) }.toSet()
 }
 
-/** Une case du calendrier : un jour, ou du vide avant le premier du mois. */
+/** A cell of the calendar: a day, or empty space before the first of the month. */
 data class CalendarCell(val day: SimpleDate?, val hasPhotos: Boolean = false)
 
-/** Un mois du calendrier, semaines du lundi au dimanche. */
+/** A month of the calendar, weeks from Monday to Sunday. */
 object CalendarGrid {
     val WEEKDAYS = listOf("L", "M", "M", "J", "V", "S", "D")
 
-    /** Les semaines du mois, chacune de 7 cases ; la dernière est complétée de vide. */
+    /** The weeks of the month, each of 7 cells; the last one is padded with empty cells. */
     fun month(year: Int, month: Int, photoDays: Set<SimpleDate>, zone: TimeZone): List<List<CalendarCell>> {
         val first = SimpleDate(year, month, 1)
         val cells = ArrayList<CalendarCell>()
@@ -56,23 +56,23 @@ object CalendarGrid {
     fun title(year: Int, month: Int): String = "${Dates.MONTH_NAMES[month - 1]} $year"
 }
 
-/** Le choix des dates sur le calendrier : un appui pose le début, le suivant la fin. */
+/** The choice of dates on the calendar: a tap sets the start, the next one the end. */
 data class DateSelection(val from: SimpleDate? = null, val to: SimpleDate? = null) {
-    /** Un appui sur un jour : début, puis fin (échangés si on remonte), puis un nouveau début. */
+    /** A tap on a day: start, then end (swapped if we go backwards), then a new start. */
     fun tap(day: SimpleDate): DateSelection = when {
         from == null || to != null -> DateSelection(day, null)
         day >= from -> DateSelection(from, day)
         else -> DateSelection(day, from)
     }
 
-    /** Vrai si le jour est dans la sélection (début seul : ce jour-là). */
+    /** True if the day is in the selection (start only: that day). */
     fun contains(day: SimpleDate): Boolean {
         val start = from ?: return false
         val end = to ?: start
         return day >= start && day <= end
     }
 
-    /** Les dates choisies, ou null tant qu'aucun jour n'est posé. Un seul jour vaut un jour entier. */
+    /** The chosen dates, or null while no day is set. A single day means a whole day. */
     fun toRange(dayPart: DayPart = DayPart.ALL): DateRange? =
         from?.let { DateRange(it, to ?: it, dayPart) }
 
@@ -81,7 +81,7 @@ data class DateSelection(val from: SimpleDate? = null, val to: SimpleDate? = nul
     }
 }
 
-/** Les raccourcis au-dessus du calendrier. */
+/** The shortcuts above the calendar. */
 enum class DateShortcut(val label: String) {
     TODAY("Aujourd'hui"),
     YESTERDAY("Hier"),
@@ -95,7 +95,7 @@ enum class DateShortcut(val label: String) {
             TODAY -> DateRange(today, today)
             YESTERDAY -> today.plusDays(-1, time.zone).let { DateRange(it, it) }
             WEEKEND -> {
-                // Le week-end en cours s'il est commencé (samedi ou dimanche), sinon le dernier.
+                // The current weekend if it has started (Saturday or Sunday), otherwise the last one.
                 val weekday = today.weekday(time.zone)
                 val saturday = when {
                     weekday == 5 -> today

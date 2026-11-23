@@ -10,8 +10,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
 
 /**
- * Les choix de dossier : le dossier chatlab (modèles et carnet), et l'ajout d'un dossier à
- * analyser. Android ne permet de choisir qu'un dossier à la fois : on en ajoute autant qu'on veut.
+ * The folder choices: the chatlab folder (models and library), and adding a folder to
+ * analyse. Android only lets you choose one folder at a time: we add as many as we want.
  */
 class FolderPickers(val chooseChatlab: () -> Unit, val addSource: () -> Unit)
 
@@ -21,7 +21,7 @@ fun rememberFolderPickers(onAddSource: (() -> Unit)? = null, onChanged: () -> Un
     val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     val chatlab = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            // Lecture et écriture, gardées après un redémarrage : le carnet est enregistré dans ce dossier.
+            // Read and write, kept after a restart: the library is saved in this folder.
             context.contentResolver.takePersistableUriPermission(
                 uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
@@ -36,14 +36,14 @@ fun rememberFolderPickers(onAddSource: (() -> Unit)? = null, onChanged: () -> Un
             onChanged()
         }
     }
-    // Le parcours du stockage interne remplace le sélecteur quand la page le demande.
+    // The internal storage page replaces the picker when the page asks for it.
     return FolderPickers(
         chooseChatlab = { chatlab.launch(null) },
         addSource = { if (onAddSource != null) onAddSource() else source.launch(null) },
     )
 }
 
-/** Le nom du dossier chatlab (« chatlab »), ou null s'il n'est pas choisi. */
+/** The name of the chatlab folder ("chatlab"), or null if it is not chosen. */
 fun folderName(context: Context, key: String): String? {
     val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(key, null) ?: return null
     return try {

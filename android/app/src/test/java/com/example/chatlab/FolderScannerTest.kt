@@ -13,7 +13,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import javax.imageio.ImageIO
 
-/** Parcours de dossiers sur de vrais fichiers : images créées par ImageIO, faux fichiers, dossiers vides. */
+/** Folder walks on real files: images created by ImageIO, fake files, empty folderses. */
 class FolderScannerTest {
     private lateinit var root: File
 
@@ -203,7 +203,7 @@ class FolderScannerTest {
 
     @Test
     fun aShortReadStillClassifiesTheFile() {
-        // Un flux qui ne rend les octets que par petits morceaux reste bien lu en entier.
+        // A stream that returns the bytes only in small pieces is still read in full.
         val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3, 4)
         val slow = object : InputStream() {
             var i = 0

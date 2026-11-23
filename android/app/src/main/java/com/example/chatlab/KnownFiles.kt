@@ -3,14 +3,14 @@ package com.example.chatlab
 import org.json.JSONObject
 
 /**
- * Reconnaître les photos déjà analysées. Le carnet les retrouve par leur adresse ; une photo
- * ajoutée depuis le stockage interne n'a pas la même adresse que dans l'ancien sélecteur. Elle
- * est alors reconnue par son nom, sa taille et sa date de modification, sans être relue.
+ * Recognising the photos already analysed. The library finds them by their address; a photo
+ * added from the internal storage does not have the same address as in the old picker. It
+ * is then recognised by its name, size and modification date, without being read again.
  */
 object KnownFiles {
     data class Identity(val name: String, val size: Long, val modified: Long)
 
-    /** L'identité d'une entrée du carnet, si elle en a une. */
+    /** The identity of an entry of the library, if it has one. */
     fun identityOf(item: JSONObject): Identity? {
         if (!item.has("name") || !item.has("modified")) return null
         return Identity(item.getString("name"), item.optLong("size", -1L), item.optLong("modified", -1L))
@@ -19,7 +19,7 @@ object KnownFiles {
     fun byIdentity(items: Collection<JSONObject>): Map<Identity, JSONObject> =
         items.mapNotNull { item -> identityOf(item)?.let { it to item } }.toMap()
 
-    /** L'entrée du carnet qui correspond au fichier : d'abord par adresse, sinon par identité. */
+    /** The library entry that matches the file: first by address, otherwise by identity. */
     fun find(
         byId: Map<String, JSONObject>,
         byIdentity: Map<Identity, JSONObject>,

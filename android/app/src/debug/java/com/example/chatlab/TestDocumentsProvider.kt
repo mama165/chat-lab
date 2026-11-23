@@ -13,11 +13,11 @@ import java.io.FileNotFoundException
 import java.net.URLConnection
 
 /**
- * Un fournisseur de documents de test (version debug seulement). Il sert le dossier [base] comme un
- * arbre de documents, exactement comme le ferait la galerie ou un stockage cloud, pour tester la
- * lecture des dossiers choisis par l'utilisateur sans passer par le sélecteur d'Android.
+ * A test documents provider (debug version only). It serves the folder [base] as a
+ * document tree, exactly as the gallery or a cloud storage would, to test the
+ * reading of folders chosen by the user, without going through the Android picker.
  *
- * Les identifiants de documents sont des chemins relatifs à [base], préfixés par « root ».
+ * Document ids are paths relative to [base], prefixed by "root".
  */
 class TestDocumentsProvider : DocumentsProvider() {
     override fun onCreate(): Boolean = true
@@ -39,7 +39,7 @@ class TestDocumentsProvider : DocumentsProvider() {
     }
 
     override fun queryChildDocuments(parentDocumentId: String, projection: Array<out String>?, sortOrder: String?): Cursor {
-        // Un dossier refusé : le fournisseur lève la même erreur que le système pour un accès interdit.
+        // A refused folder: the provider raises the same error as the system for a forbidden access.
         if (parentDocumentId in refused) throw SecurityException("accès refusé : $parentDocumentId")
         val cursor = MatrixCursor(projection ?: DEFAULT_DOCUMENT_COLUMNS)
         val folder = fileOf(parentDocumentId)
@@ -86,14 +86,14 @@ class TestDocumentsProvider : DocumentsProvider() {
         @Volatile
         var base: File = File("/nonexistent")
 
-        /** Le nom affiché pour la racine (« Camera »). */
+        /** The name shown for the root ("Camera"). */
         @Volatile
         var rootName: String = "Camera"
 
-        /** Identifiants de dossiers dont la lecture est refusée, par exemple « root/Privé ». */
+        /** Ids of folders whose reading is refused, for example "root/Privé". */
         val refused: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
 
-        /** Identifiants de fichiers qui ne peuvent pas être ouverts. */
+        /** Ids of files that cannot be opened. */
         val unreadable: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
 
         fun reset() {
@@ -102,7 +102,7 @@ class TestDocumentsProvider : DocumentsProvider() {
             rootName = "Camera"
         }
 
-        /** L'adresse de l'arbre, comme celle que renvoie le sélecteur de dossiers. */
+        /** The address of the tree, as the folder picker returns it. */
         fun treeUri(): android.net.Uri = DocumentsContract.buildTreeDocumentUri(AUTHORITY, ROOT)
 
         private val DEFAULT_ROOT_COLUMNS = arrayOf(Root.COLUMN_ROOT_ID, Root.COLUMN_DOCUMENT_ID, Root.COLUMN_TITLE, Root.COLUMN_FLAGS)

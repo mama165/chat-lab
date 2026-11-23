@@ -3,10 +3,10 @@ package com.example.chatlab
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Un dossier à analyser : l'adresse donnée par le sélecteur d'Android, et son nom. */
+/** A folder to analyse: the address given by the Android picker, and its name. */
 data class SourceFolder(val uri: String, val name: String)
 
-/** La liste des dossiers à analyser, gardée dans les préférences. */
+/** The list of folders to analyse, kept in the preferences. */
 object SourceList {
     fun decode(text: String?): List<SourceFolder> {
         if (text.isNullOrBlank()) return emptyList()
@@ -29,8 +29,8 @@ object SourceList {
     }
 
     /**
-     * Ajoute un dossier. Un dossier déjà présent n'est pas doublé ; un nom déjà pris reçoit un
-     * numéro (« Camera (2) »), pour que le carnet distingue deux dossiers de même nom.
+     * Adds a folder. A folder already present is not doubled; a name already taken gets a
+     * number ("Camera (2)"), so that the library tells apart two folders with the same name.
      */
     fun add(list: List<SourceFolder>, uri: String, name: String): List<SourceFolder> {
         if (list.any { it.uri == uri }) return list
@@ -40,7 +40,7 @@ object SourceList {
 
     fun remove(list: List<SourceFolder>, uri: String): List<SourceFolder> = list.filter { it.uri != uri }
 
-    /** L'ancien réglage, un seul dossier, devient une liste d'un dossier. */
+    /** The old setting, a single folder, becomes a list of one folder. */
     fun fromLegacy(uri: String?, name: String?): List<SourceFolder> =
         if (uri.isNullOrBlank()) emptyList() else listOf(SourceFolder(uri, name?.ifBlank { null } ?: "Dossier"))
 

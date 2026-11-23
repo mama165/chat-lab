@@ -10,10 +10,10 @@ import java.io.InputStream
 
 private const val PATH_PREFIX = "file:"
 
-/** L'adresse d'un dossier choisi par chemin : « file: » suivi du chemin absolu. */
+/** The address of a folder chosen by path: "file:" followed by the absolute path. */
 fun pathUri(path: String): String = PATH_PREFIX + path
 
-/** Les dossiers à analyser, gardés dans les préférences. L'ancien dossier unique est repris. */
+/** The folders to analyse, kept in the preferences. The old single folder is taken back. */
 object Sources {
     private const val KEY = "sources"
 
@@ -21,38 +21,38 @@ object Sources {
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val stored = SourceList.decode(preferences.getString(KEY, null))
         if (stored.isNotEmpty() || preferences.contains(KEY)) return stored
-        // Première lecture après la mise à jour : le dossier unique d'avant devient une liste d'un dossier.
+        // First reading after the update: the old single folder becomes a list of one folder.
         val legacy = preferences.getString(KEY_SOURCE, null)
         val migrated = SourceList.fromLegacy(legacy, legacy?.let { nameOf(context, Uri.parse(it)) })
         if (migrated.isNotEmpty()) write(context, migrated)
         return migrated
     }
 
-    /** Ajoute le dossier choisi dans le sélecteur d'Android et garde l'accès après un redémarrage. */
+    /** Adds the folder chosen in the Android picker and keeps the access after a restart. */
     fun add(context: Context, uri: Uri): List<SourceFolder> {
         try {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (e: SecurityException) {
-            // Un dossier qui n'accepte pas l'accès durable sera signalé à l'analyse.
+            // A folder that does not accept durable access will be reported to the analysis.
         }
         val next = SourceList.add(read(context), uri.toString(), nameOf(context, uri))
         write(context, next)
         return next
     }
 
-    /** Ajoute un dossier de l'arbre du stockage interne, par son chemin. */
+    /** Adds a folder of the internal storage tree, by its path. */
     fun addPath(context: Context, path: String): List<SourceFolder> {
         val next = SourceList.add(read(context), pathUri(path), File(path).name)
         write(context, next)
         return next
     }
 
-    /** La racine à lire pour un dossier choisi : par chemin (stockage interne) ou par le sélecteur. */
+    /** The root to read for a chosen folder: by path (internal storage) or through the picker. */
     fun rootOf(context: Context, folder: SourceFolder): DirNode =
         if (folder.uri.startsWith(PATH_PREFIX)) JavaDirNode(File(folder.uri.removePrefix(PATH_PREFIX)))
         else SafDir.root(context, folder)
 
-    /** Vide la liste des dossiers à analyser. Le dossier chatlab (modèles et carnet) reste choisi. */
+    /** Empties the list of folders to analyse. The chatlab folder (models and library) stays chosen. */
     fun clear(context: Context) = write(context, emptyList())
 
     fun remove(context: Context, uri: String): List<SourceFolder> {
@@ -73,7 +73,7 @@ object Sources {
     } ?: uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/') ?: "Dossier"
 }
 
-/** Un fichier d'un dossier choisi, lu par le fournisseur de documents d'Android. */
+/** A file of a chosen folder, read by the Android documents provider. */
 class SafFile(
     private val context: Context,
     tree: Uri,
@@ -88,9 +88,9 @@ class SafFile(
 }
 
 /**
- * Un dossier d'un arbre choisi. Le contenu est lu en une seule requête (nom, type, taille, date)
- * au lieu d'une par fichier, ce qui est beaucoup plus rapide. Une requête refusée ou impossible
- * donne null : le dossier est « refusé ».
+ * A folder of a chosen tree. The content is read in a single query (name, type, size, date)
+ * instead of one per file, which is much faster. A refused or impossible query
+ * gives null: the folder is "refusé".
  */
 class SafDir(
     private val context: Context,
@@ -135,7 +135,7 @@ class SafDir(
     }
 
     companion object {
-        /** La racine d'un dossier choisi : son contenu est lu à partir de là. */
+        /** The root of a chosen folder: its content is read from there. */
         fun root(context: Context, folder: SourceFolder): SafDir {
             val tree = Uri.parse(folder.uri)
             return SafDir(context, tree, DocumentsContract.getTreeDocumentId(tree), folder.name)
@@ -143,11 +143,11 @@ class SafDir(
     }
 }
 
-/** Ce qu'on sait d'un dossier au moment où on le choisit. */
+/** What we know of a folder at the moment we choose it. */
 data class FolderStatus(
     val folder: SourceFolder,
     val state: State,
-    /** Nombre d'images lisibles trouvées, quand le dossier est lisible. */
+    /** Number of readable images found, when the folder is readable. */
     val photos: Int = 0,
     val ignored: Int = 0,
     val refused: List<String> = emptyList(),
@@ -156,7 +156,7 @@ data class FolderStatus(
 }
 
 object FolderCheck {
-    /** Lit le dossier (sans l'analyser) pour dire s'il est lisible, refusé ou sans image. */
+    /** Reads the folder (without analysing it) to say whether it is readable, refused or without image. */
     fun check(context: Context, folder: SourceFolder): FolderStatus {
         val scan = try {
             FolderScanner.scan(Sources.rootOf(context, folder))

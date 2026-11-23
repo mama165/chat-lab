@@ -20,16 +20,16 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
 
-/** L'écran principal : deux onglets (Rechercher, Photos) et les pages à part. */
+/** The main screen: two tabs (Rechercher, Photos) and the separate pages. */
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var page by remember { mutableStateOf(Page.TABS) }
-    // D'où l'on est venu pour choisir des dossiers : l'onglet Photos, ou les réglages.
+    // Where we came from to choose folders: the Photos tab, or the settings.
     var storageBack by remember { mutableStateOf(Page.TABS) }
     val search = remember { SearchUiState() }
-    // Augmentent quand le carnet ou les retraits changent, pour relire ce qui est enregistré.
+    // Increase when the library or the removals change, to read again what is saved.
     var dataVersion by remember { mutableIntStateOf(0) }
     var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()

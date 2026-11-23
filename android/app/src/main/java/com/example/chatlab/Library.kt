@@ -3,7 +3,7 @@ package com.example.chatlab
 import org.json.JSONArray
 import java.text.Normalizer
 
-/** Une image du carnet, telle que l'analyse l'a écrite. */
+/** An image of the library, as the analysis wrote it. */
 data class LibraryEntry(
     val id: String,
     val name: String,
@@ -14,28 +14,28 @@ data class LibraryEntry(
     val vector: FloatArray? = null,
     val taken: String = "",
     val source: String = "",
-    /** Nom du dossier source (« Camera », « Screenshots »), vide pour un ancien carnet. */
+    /** Name of the source folder ("Camera", "Screenshots"), empty for an old library. */
     val folder: String = "",
-    /** Type MIME détecté par les octets du fichier (« image/jpeg »), vide pour un ancien carnet. */
+    /** MIME type detected from the bytes of the file ("image/jpeg"), empty for an old library. */
     val mime: String = "",
     /** Instant de prise de vue en millisecondes, 0 si inconnu. */
     val takenMs: Long = 0L,
-    /** Le visage principal occupe une bonne part de la photo (portrait). */
+    /** The main face takes up a good part of the photo (portrait). */
     val closeUp: Boolean = false,
 )
 
-/** Une image retenue par la recherche ; score présent seulement pour la recherche par description. */
+/** An image kept by the search; score present only for the search by description. */
 data class Match(val entry: LibraryEntry, val score: Float?)
 
-/** Filtre de lieu proposé dans la recherche. */
+/** Place filter offered in the search. */
 enum class Place { ALL, INDOOR, OUTDOOR }
 
-/** Critères lus dans une phrase : nombre de personnes et lieu, si la phrase les nomme. */
+/** Criteria read from a sentence: number of people and place, if the sentence names them. */
 data class Criteria(val people: Int?, val place: Place?)
 
-/** Le carnet produit par l'analyse, et les deux façons de chercher dedans. */
+/** The library produced by the analysis, and the two ways to search in it. */
 object Library {
-    /** Lit le texte du carnet (library.json). Un carnet illisible donne une liste vide. */
+    /** Reads the text of the library (library.json). An unreadable library gives an empty list. */
     fun parse(text: String?, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): List<LibraryEntry> {
         if (text.isNullOrBlank()) return emptyList()
         val array = try {
@@ -67,8 +67,8 @@ object Library {
     }
 
     /**
-     * Recherche par mots : les images qui contiennent tous les mots dans le texte lu ou dans le nom.
-     * Insensible à la casse et aux accents ; un mot incomplet suffit ("fact" trouve "facture").
+     * Search by words: the images that contain all the words in the text read or in the name.
+     * Case and accent insensitive; an incomplete word is enough ("fact" finds "facture").
      */
     fun searchWords(entries: List<LibraryEntry>, query: String, place: Place): List<Match> {
         val words = fold(query).split(" ").filter { it.isNotBlank() }
@@ -83,7 +83,7 @@ object Library {
             .map { Match(it, null) }
     }
 
-    /** Tous les résultats classés, sans limite : le seuil choisit ensuite ce qui s'affiche. */
+    /** All the results ranked, without limit: the threshold then chooses what is shown. */
     fun rankDescription(entries: List<LibraryEntry>, query: FloatArray, place: Place, people: Int?): List<Match> =
         entries
             .filter { inPlace(it, place) }
@@ -91,7 +91,7 @@ object Library {
             .mapNotNull { entry -> entry.vector?.let { Match(entry, dot(query, it)) } }
             .sortedByDescending { it.score ?: 0f }
 
-    /** Les résultats au-dessus du plancher et assez proches du meilleur (à la marge près). */
+    /** The results above the floor and close enough to the best (within the margin). */
     fun aboveThreshold(ranked: List<Match>, floor: Float, margin: Float = 0.04f): List<Match> {
         val best = ranked.firstOrNull()?.score ?: return emptyList()
         return ranked.filter { match ->
@@ -101,8 +101,8 @@ object Library {
     }
 
     /**
-     * Lit dans la phrase le nombre de personnes (« deux personnes », « 3 visages ») et le lieu
-     * (« en intérieur », « en extérieur »). Une phrase qui ne les nomme pas ne filtre pas.
+     * Reads in the sentence the number of people ("deux personnes", "3 visages") and the place
+     * ("en intérieur", "en extérieur"). A sentence that does not name them does not filter.
      */
     fun criteria(sentence: String): Criteria {
         val text = fold(sentence)
@@ -142,7 +142,7 @@ object Library {
         return sum
     }
 
-    /** Minuscules, sans accents, ponctuation remplacée par des espaces. */
+    /** Lowercase, without accents, punctuation replaced by spaces. */
     fun fold(text: String): String =
         Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")

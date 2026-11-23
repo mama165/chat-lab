@@ -2,11 +2,11 @@ package com.example.chatlab
 
 import java.text.Normalizer
 
-/** Un extrait du texte lu, et les passages à surligner (les mots cherchés). */
+/** An excerpt of the text read, and the passages to highlight (the words searched). */
 data class Excerpt(val text: String, val marks: List<IntRange>)
 
 object Highlight {
-    /** Chaque caractère en minuscule sans accent, en gardant la longueur du texte. */
+    /** Each character in lowercase without accent, keeping the length of the text. */
     fun foldChars(text: String): String = buildString(text.length) {
         for (char in text) {
             val plain = Normalizer.normalize(char.toString(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
@@ -14,7 +14,7 @@ object Highlight {
         }
     }
 
-    /** Les passages du texte qui contiennent un des mots cherchés, sans accent ni casse. */
+    /** The passages of the text that contain one of the words searched, without accent or case. */
     fun ranges(text: String, query: String): List<IntRange> {
         val haystack = foldChars(text)
         val words = Library.fold(query).split(" ").filter { it.isNotBlank() }
@@ -30,8 +30,8 @@ object Highlight {
     }
 
     /**
-     * Un extrait d'au plus [max] caractères autour du premier mot trouvé, avec « … » quand le
-     * texte est coupé. Sans mot trouvé, le début du texte.
+     * An excerpt of at most [max] characters around the first word found, with "…" when the
+     * text is cut. Without a word found, the start of the text.
      */
     fun excerpt(text: String, query: String, max: Int = 90): Excerpt {
         val clean = text.replace(Regex("\\s+"), " ").trim()
