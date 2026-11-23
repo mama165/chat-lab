@@ -763,7 +763,8 @@ private fun RunningDetail(progress: Progress, now: Long) {
 private fun FolderProgressRow(folder: FolderProgress) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.Top,
+        // The mark sits on the middle of the text: of the name alone, or between the name and its detail.
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // La marque de gauche dit l'état du dossier : une coche, une jauge qui suit ses photos, ou un sablier.
