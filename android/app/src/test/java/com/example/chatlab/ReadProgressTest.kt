@@ -43,4 +43,12 @@ class ReadProgressTest {
         ReadProgress.finish("dossier", newer)
         assertNull(ReadProgress.counts.value["dossier"])
     }
+
+    @Test
+    fun theTotalOfAFolderIsKeptWhileItIsRead() {
+        val lecture = ReadProgress.start("dossier-total", total = 40)
+        assertEquals(40, ReadProgress.totalCounts.value["dossier-total"])
+        ReadProgress.finish("dossier-total", lecture)
+        assertNull(ReadProgress.totalCounts.value["dossier-total"])
+    }
 }

@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -71,6 +73,7 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolde
     val context = LocalContext.current
     val progress by AnalysisProgress.state.collectAsState()
     val reading by ReadProgress.counts.collectAsState()
+    val totals by ReadProgress.totalCounts.collectAsState()
     var version by remember { mutableIntStateOf(0) }
     val pickers = rememberFolderPickers(onAddSource = onAddFolders) { version++ }
     val chatlab = remember(version) { folderName(context, KEY_FOLDER) }
@@ -119,6 +122,7 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolde
                 chatlab = chatlab,
                 sources = sources,
                 reading = reading,
+                totals = totals,
                 overviews = overviews,
                 lastRun = lastRun,
                 message = progress.message,
@@ -178,6 +182,7 @@ private fun Idle(
     chatlab: String,
     sources: List<SourceFolder>,
     reading: Map<String, Int>,
+    totals: Map<String, Int>,
     overviews: List<FolderOverview>?,
     lastRun: RunReport?,
     message: String,
@@ -201,7 +206,7 @@ private fun Idle(
             val failures = lastRun?.folders?.firstOrNull { it.uri == folder.uri }?.failures.orEmpty()
             FolderCard(overview, failures, onRemove = { onRemove(folder.uri) })
         } else {
-            ReadingCard(folder, reading[folder.uri] ?: 0)
+            ReadingCard(folder, reading[folder.uri] ?: 0, totals[folder.uri] ?: 0)
         }
         // The same grey line between each folder, as in the mockup.
         Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
@@ -224,9 +229,64 @@ private fun Idle(
     }
 }
 
+/** Une coche dans un rond clair : le dossier est fini ou n'a rien de nouveau. */
+@Composable
+internal fun CheckMark(size: androidx.compose.ui.unit.Dp = 20.dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        drawCircle(Palette.Soft, radius = size.minDimension / 2)
+        val w = size.width
+        val h = size.height
+        val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val tick = Path().apply {
+            moveTo(w * 0.28f, h * 0.52f)
+            lineTo(w * 0.44f, h * 0.68f)
+            lineTo(w * 0.72f, h * 0.36f)
+        }
+        drawPath(tick, Palette.Accent, style = stroke)
+    }
+}
+
+/** Un sablier gris : le dossier attend son tour. */
+@Composable
+internal fun Hourglass(size: androidx.compose.ui.unit.Dp = 20.dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val w = size.width
+        val h = size.height
+        val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val glass = Path().apply {
+            moveTo(w * 0.22f, h * 0.10f); lineTo(w * 0.78f, h * 0.10f)
+            moveTo(w * 0.22f, h * 0.90f); lineTo(w * 0.78f, h * 0.90f)
+            moveTo(w * 0.30f, h * 0.10f); lineTo(w * 0.30f, h * 0.28f); lineTo(w * 0.50f, h * 0.50f)
+            lineTo(w * 0.30f, h * 0.72f); lineTo(w * 0.30f, h * 0.90f)
+            moveTo(w * 0.70f, h * 0.10f); lineTo(w * 0.70f, h * 0.28f); lineTo(w * 0.50f, h * 0.50f)
+            lineTo(w * 0.70f, h * 0.72f); lineTo(w * 0.70f, h * 0.90f)
+        }
+        drawPath(glass, Palette.Muted, style = stroke)
+    }
+}
+
+/**
+ * Une jauge circulaire : une part de cercle qui suit l'avancement, ou un tour continu si
+ * l'avancement n'est pas connu (null).
+ */
+@Composable
+internal fun GaugeRing(fraction: Float?, size: androidx.compose.ui.unit.Dp = 20.dp) {
+    if (fraction == null) {
+        CircularProgressIndicator(modifier = Modifier.size(size), color = Palette.Accent, strokeWidth = 2.dp)
+    } else {
+        Canvas(modifier = Modifier.size(size)) {
+            val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+            val inset = 1.dp.toPx()
+            val arc = Size(this.size.width - 2 * inset, this.size.height - 2 * inset)
+            drawArc(Palette.Field, 0f, 360f, false, Offset(inset, inset), arc, style = stroke)
+            drawArc(Palette.Accent, -90f, 360f * fraction, false, Offset(inset, inset), arc, style = stroke)
+        }
+    }
+}
+
 /** A folder being read: its name, and the number of files examined so far. */
 @Composable
-private fun ReadingCard(folder: SourceFolder, examined: Int) {
+private fun ReadingCard(folder: SourceFolder, examined: Int, total: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,19 +294,20 @@ private fun ReadingCard(folder: SourceFolder, examined: Int) {
             .semantics { contentDescription = "Dossier ${folder.name}, lecture en cours" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // A spinning gauge: it says a reading is in progress, without claiming a percentage.
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            color = Palette.Accent,
-            strokeWidth = 2.dp,
-        )
+        // La jauge suit le vrai avancement : les fichiers examinés sur le total du dossier.
+        // Tant que le total n'est pas connu, un tour continu indique seulement que ça tourne.
+        GaugeRing(if (total > 0) Progress01.of(examined, total) else null)
         Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(16.dp))
                 Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
             }
             Text(
-                if (examined == 0) "Lecture en cours…" else "Lecture en cours · $examined fichiers examinés",
+                when {
+                    total > 0 -> "Lecture en cours · $examined sur $total fichiers"
+                    examined == 0 -> "Lecture en cours…"
+                    else -> "Lecture en cours · $examined fichiers examinés"
+                },
                 fontSize = 12.sp,
                 color = Palette.Muted,
             )
@@ -488,8 +549,15 @@ private fun FolderProgressRow(folder: FolderProgress) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val done = folder.nothingNew || folder.finished
-        Text(if (done) "✓" else "○", fontSize = 14.sp, color = Palette.Accent, modifier = Modifier.width(16.dp))
+        // La marque de gauche dit l'état du dossier : une coche, une jauge qui suit ses photos, ou un sablier.
+        val done = folder.mark() == FolderMark.FINISHED
+        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+            when (folder.mark()) {
+                FolderMark.FINISHED -> CheckMark()
+                FolderMark.RUNNING -> GaugeRing(Progress01.of(folder.done, folder.total))
+                FolderMark.WAITING -> Hourglass()
+            }
+        }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
             Text(if (folder.nothingNew) "Déjà dans le carnet" else "Nouvelles photos", fontSize = 12.sp, color = Palette.Muted)

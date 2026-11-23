@@ -20,16 +20,21 @@ object ReadProgress {
     private val state = MutableStateFlow<Map<String, Int>>(emptyMap())
     val counts: StateFlow<Map<String, Int>> = state.asStateFlow()
 
+    /** Le nombre total de fichiers de chaque dossier en cours de lecture : le total de la jauge. */
+    private val totals = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val totalCounts: StateFlow<Map<String, Int>> = totals.asStateFlow()
+
     /** The reading in progress for each folder. */
     private val current = HashMap<String, Int>()
     private var lastNumber = 0
 
     /** Starts a reading of the folder, and returns its number. */
     @Synchronized
-    fun start(folder: String): Int {
+    fun start(folder: String, total: Int = 0): Int {
         val number = ++lastNumber
         current[folder] = number
         state.update { it + (folder to 0) }
+        totals.update { it + (folder to total) }
         return number
     }
 
@@ -44,5 +49,6 @@ object ReadProgress {
         if (current[folder] != number) return
         current.remove(folder)
         state.update { it - folder }
+        totals.update { it - folder }
     }
 }

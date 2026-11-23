@@ -110,3 +110,13 @@ fun durationText(totalMinutes: Int): String {
         else -> "$hoursText et $minutes minutes"
     }
 }
+
+/** La marque d'un dossier dans la liste de l'analyse : fini, en cours, ou en attente. */
+enum class FolderMark { FINISHED, RUNNING, WAITING }
+
+/** Le dossier est fini (ou n'a rien de nouveau), il est en cours s'il a commencé, sinon il attend. */
+fun FolderProgress.mark(): FolderMark = when {
+    nothingNew || finished -> FolderMark.FINISHED
+    done > 0 || current.isNotBlank() -> FolderMark.RUNNING
+    else -> FolderMark.WAITING
+}

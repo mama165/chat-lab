@@ -430,10 +430,11 @@ fun overview(context: Context): List<FolderOverview> {
     val sources = Sources.read(context)
     val known = readKnown(LibraryStore.read(context))
     return sources.map { folder ->
-        val number = ReadProgress.start(folder.uri)
+        val root = Sources.rootOf(context, folder)
+        val number = ReadProgress.start(folder.uri, FileTally.count(root))
         val scan = try {
             FolderScanner.scan(
-                Sources.rootOf(context, folder),
+                root,
                 reusable = { file -> reusableMime(known, file) },
                 examined = { count -> ReadProgress.report(folder.uri, number, count) },
             )

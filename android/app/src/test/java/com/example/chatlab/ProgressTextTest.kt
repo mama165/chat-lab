@@ -130,3 +130,28 @@ class ProgressTextTest {
         assertEquals(folders, next.folders)
     }
 }
+
+class FolderMarkTest {
+    private fun folder(done: Int, total: Int, current: String = "") = FolderProgress("Screenshots", done, total, current)
+
+    @org.junit.Test
+    fun aFinishedFolderGetsTheCheck() {
+        org.junit.Assert.assertEquals(FolderMark.FINISHED, folder(14, 14).mark())
+    }
+
+    @org.junit.Test
+    fun aFolderWithNothingNewGetsTheCheck() {
+        org.junit.Assert.assertEquals(FolderMark.FINISHED, folder(0, 0).mark())
+    }
+
+    @org.junit.Test
+    fun aFolderBeingAnalysedGetsTheGauge() {
+        org.junit.Assert.assertEquals(FolderMark.RUNNING, folder(6, 14).mark())
+        org.junit.Assert.assertEquals(FolderMark.RUNNING, folder(0, 14, current = "qr.png").mark())
+    }
+
+    @org.junit.Test
+    fun aFolderNotStartedYetGetsTheHourglass() {
+        org.junit.Assert.assertEquals(FolderMark.WAITING, folder(0, 14).mark())
+    }
+}
