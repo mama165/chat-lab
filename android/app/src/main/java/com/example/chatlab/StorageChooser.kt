@@ -321,7 +321,7 @@ private fun FolderRows(
                     Text(Formats.photos(photos), fontSize = 13.sp, color = Palette.Muted)
                 }
                 fraction != null && fraction > 0f -> GaugeRing(fraction, size = 18.dp)
-                else -> Hourglass(size = 18.dp)
+                else -> Hourglass(dimension = 18.dp)
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
