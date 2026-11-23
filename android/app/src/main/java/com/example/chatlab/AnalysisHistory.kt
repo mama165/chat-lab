@@ -61,7 +61,7 @@ fun analysisDateLabel(startMs: Long): String =
     SimpleDateFormat("d MMM yyyy · HH:mm", Locale.FRANCE).format(Date(startMs))
 
 /** A duration in seconds as "2,1 s" (or "850 ms" under a second). */
-private fun secondsLabel(millis: Long): String =
+internal fun secondsLabel(millis: Long): String =
     if (millis < 1000) "$millis ms" else "%.1f s".format(Locale.FRANCE, millis / 1000.0)
 
 /** The analysis files, read in the background, with their name. Unreadable files are left out. */

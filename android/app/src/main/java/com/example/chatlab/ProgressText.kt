@@ -33,9 +33,15 @@ data class Progress(
     val folders: List<FolderProgress> = emptyList(),
     /** Workers reloading their models after a pause; 0 when none is loading. */
     val loadingModels: Int = 0,
+    /** Each model loaded since the last reload, with its loading time in milliseconds. */
+    val modelSteps: Map<String, Long> = emptyMap(),
 ) {
-    /** A worker starts reloading its models. */
-    fun loadingStarted(): Progress = copy(loadingModels = loadingModels + 1)
+    /** A worker starts reloading its models. The models loaded before are forgotten. */
+    fun loadingStarted(): Progress = copy(loadingModels = loadingModels + 1, modelSteps = emptyMap())
+
+    /** A model is loaded: the first time it is seen is the one kept. */
+    fun modelDone(name: String, millis: Long): Progress =
+        if (modelSteps.containsKey(name)) this else copy(modelSteps = modelSteps + (name to millis))
 
     /** A worker has its models again. Never below zero. */
     fun loadingDone(): Progress = copy(loadingModels = (loadingModels - 1).coerceAtLeast(0))
@@ -134,6 +140,35 @@ fun durationText(totalMinutes: Int): String {
 
 /** La marque d'un dossier dans la liste de l'analyse : fini, en cours, ou en attente. */
 enum class FolderMark { FINISHED, RUNNING, WAITING }
+
+/** The names of the models, as the analysis file and the screens show them, in loading order. */
+object ModelNames {
+    const val IMAGES = "Modèle des images"
+    const val TEXTS = "Modèle des textes"
+    const val FACES = "Détection des visages"
+    val ORDER = listOf(IMAGES, TEXTS, FACES)
+}
+
+/** One row of the reloading view: loaded (with its time), being loaded, or still to come. */
+enum class ModelRowState { DONE, LOADING, WAITING }
+
+/** The rows of the reloading view: the models in loading order, each with its state. */
+fun reloadRows(steps: Map<String, Long>, loading: Boolean): List<Pair<String, ModelRowState>> {
+    var current = true
+    return ModelNames.ORDER.map { name ->
+        when {
+            steps.containsKey(name) -> name to ModelRowState.DONE
+            loading && current -> {
+                current = false
+                name to ModelRowState.LOADING
+            }
+            else -> {
+                current = false
+                name to ModelRowState.WAITING
+            }
+        }
+    }
+}
 
 /** The screens of an analysis in progress: running, paused (view 2.2), models reloading (view 2.3). */
 enum class RunningScreen { RUNNING, PAUSED, RELOADING }

@@ -73,7 +73,12 @@ data class ImageResult(
  */
 const val ANALYSIS_VERSION = 2
 
-class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
+class Analyzer(
+    context: Context,
+    private val tree: Uri,
+    /** Called as each model is loaded, with its name and its loading time in milliseconds. */
+    private val onModelDone: (String, Long) -> Unit = { _, _ -> },
+) : AutoCloseable {
     private val appContext = context.applicationContext
 
     private val env = OrtEnvironment.getEnvironment()
@@ -96,15 +101,15 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
         ModelFiles.removeOldCopies(context)
         val models = ModelFiles.folder(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
-        vision = timed("Modèle des images") {
+        vision = timed(ModelNames.IMAGES) {
             ModelFiles.session(env, context, models, "vision_model.onnx")
         }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
-        reader = timed("Modèle des textes") { TextReader(env, context, models) }
-        detector = timed("Détection des visages") {
+        reader = timed(ModelNames.TEXTS) { TextReader(env, context, models) }
+        detector = timed(ModelNames.FACES) {
             FaceDetectorYN.create(
                 "onnx",
                 MatOfByte(*ModelFiles.bytes(context, models, "face_detection_yunet_2023mar.onnx")),
@@ -121,7 +126,9 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     private fun <T> timed(name: String, step: () -> T): T {
         val started = System.nanoTime()
         val loaded = step()
-        timings[name] = (System.nanoTime() - started) / 1_000_000
+        val millis = (System.nanoTime() - started) / 1_000_000
+        timings[name] = millis
+        onModelDone(name, millis)
         return loaded
     }
 

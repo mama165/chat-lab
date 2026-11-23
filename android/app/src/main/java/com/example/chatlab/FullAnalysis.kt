@@ -170,7 +170,11 @@ class AnalysisService : Service() {
         val loads = Collections.synchronizedList(mutableListOf<ModelLoad>())
         val slots = List(workers) {
             AnalyzerSlot<Analyzer>(
-                load = { Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) },
+                load = {
+                    Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) { name, millis ->
+                        AnalysisProgress.update { it.modelDone(name, millis) }
+                    }
+                },
                 onLoad = { loads.add(it) },
                 parts = { it.modelTimings },
             )

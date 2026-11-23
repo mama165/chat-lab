@@ -496,12 +496,24 @@ private fun AddFolderRow(onClick: () -> Unit) {
 /** During the analysis: the running list, the pause (view 2.2) or the reloading of the models (view 2.3). */
 @Composable
 private fun Running(progress: Progress, now: Long) {
-    when (progress.runningScreen()) {
-        RunningScreen.RELOADING -> ReloadingScreen()
-        RunningScreen.PAUSED -> PausedScreen(progress)
-        RunningScreen.RUNNING -> RunningDetail(progress, now)
+    val reloading = progress.loadingModels > 0
+    var holding by remember { mutableStateOf(false) }
+    // Once the models are ready, the reloading view stays a moment, so that its three rows can be read.
+    LaunchedEffect(reloading) {
+        if (!reloading && progress.modelSteps.isNotEmpty()) {
+            holding = true
+            delay(RELOAD_HOLD_MS)
+            holding = false
+        }
+    }
+    when {
+        reloading || holding -> ReloadingScreen(progress, loading = reloading)
+        progress.runningScreen() == RunningScreen.PAUSED -> PausedScreen(progress)
+        else -> RunningDetail(progress, now)
     }
 }
+
+private const val RELOAD_HOLD_MS = 2500L
 
 /** Pause (view 2.2): the ring frozen in grey, what is done, Reprendre and Arrêter. */
 @Composable
@@ -536,22 +548,59 @@ private fun PausedScreen(progress: Progress) {
     }
 }
 
-/** Reprise (view 2.3): the models load again; the photos go on once they are ready. */
+/**
+ * Reprise (view 2.3): the three models, each waiting, loading (turning) or done with its real
+ * loading time; then the photos go on.
+ */
 @Composable
-private fun ReloadingScreen() {
+private fun ReloadingScreen(progress: Progress, loading: Boolean) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 28.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(130.dp), color = Palette.Accent, strokeWidth = 10.dp)
-        Text("Chargement des modèles", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(130.dp), color = Palette.Accent, strokeWidth = 10.dp)
+        } else {
+            Canvas(modifier = Modifier.size(130.dp)) {
+                val stroke = Stroke(width = 10.dp.toPx())
+                drawArc(Palette.Accent, 0f, 360f, false, Offset(5.dp.toPx(), 5.dp.toPx()), Size(size.width - 10.dp.toPx(), size.height - 10.dp.toPx()), style = stroke)
+            }
+        }
         Text(
-            "Les photos reprendront une fois les modèles prêts.",
+            if (loading) "Chargement des modèles" else "Modèles prêts",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Palette.Ink,
+        )
+        Text(
+            if (loading) "Les photos reprendront une fois les modèles prêts." else "Les photos reprennent.",
             fontSize = 13.sp,
             color = Palette.Muted,
             textAlign = TextAlign.Center,
         )
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        reloadRows(progress.modelSteps, loading).forEachIndexed { index, (name, state) ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+                    when (state) {
+                        ModelRowState.DONE -> CheckMark(22.dp)
+                        ModelRowState.LOADING -> GaugeRing(null, 22.dp)
+                        ModelRowState.WAITING -> Hourglass(22.dp)
+                    }
+                }
+                Text(name, fontSize = 15.sp, color = Palette.Ink, modifier = Modifier.weight(1f))
+                if (state == ModelRowState.DONE) {
+                    Text(secondsLabel(progress.modelSteps.getValue(name)), fontSize = 13.sp, color = Palette.Muted)
+                }
+            }
+            if (index < 2) Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
+        }
     }
 }
 
