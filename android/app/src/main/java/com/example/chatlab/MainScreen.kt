@@ -2,6 +2,7 @@ package com.example.chatlab
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -42,7 +43,9 @@ fun MainScreen() {
     val entries = remember(dataVersion, tab) { Library.load(context) }
 
     BackHandler(enabled = page != Page.TABS) { page = page.parent() }
+    BackHandler(enabled = search.sheetOpen) { search.sheetOpen = false }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,7 +55,7 @@ fun MainScreen() {
     ) {
         when (page) {
             Page.FILTERS -> FiltersPage(search, entries, removalsVersion, onBack = { page = Page.TABS }, onDates = { page = Page.DATES })
-            Page.DATES -> DatesPage(search, entries, onBack = { page = Page.FILTERS })
+            Page.DATES -> DatesPage(search, entries, onBack = { search.sheetOpen = true; page = Page.TABS })
             Page.SETTINGS -> SettingsPage(
                 entries = entries,
                 dataVersion = dataVersion,
@@ -101,7 +104,7 @@ fun MainScreen() {
                         removalsVersion = removalsVersion,
                         onRemovalsChanged = { removalsVersion++ },
                         onSettings = { page = Page.SETTINGS },
-                        onFilters = { page = Page.FILTERS },
+                        onFilters = { search.sheetOpen = true },
                         modifier = content,
                     )
                 } else {
@@ -116,8 +119,16 @@ fun MainScreen() {
                         modifier = content,
                     )
                 }
+                if (tab == 0) AnalysisBanner(onOpen = { tab = 1 })
                 BottomTabs(selected = tab, onSelect = { tab = it })
             }
         }
+    }
+    FilterSheet(
+        state = search,
+        visible = search.sheetOpen,
+        onChooseDates = { search.sheetOpen = false; page = Page.DATES },
+        onClose = { search.sheetOpen = false },
+    )
     }
 }

@@ -16,6 +16,9 @@ object FileSniffer {
     const val HEIC = "image/heic"
     const val PDF = "application/pdf"
 
+    /** The picture formats: what "Image" in the Type filter means. */
+    val PICTURES = setOf(JPEG, PNG, WEBP, GIF, HEIC)
+
     /** The types the analysis can read today. */
     val SUPPORTED: Set<String> = setOf(JPEG, PNG, WEBP)
 

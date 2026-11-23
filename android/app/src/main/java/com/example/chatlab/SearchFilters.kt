@@ -20,11 +20,25 @@ enum class TextFilter(val label: String) {
 /** Fenêtres de temps glissantes, comptées en arrière à partir de maintenant. */
 enum class DatePreset(val label: String) {
     ALL("Toutes les dates"),
+    TODAY("Aujourd'hui"),
     LAST_HOUR("Dernière heure"),
     LAST_24H("24 dernières heures"),
     LAST_7D("7 derniers jours"),
     LAST_30D("30 derniers jours"),
     LAST_12M("12 derniers mois"),
+}
+
+/** Kind of file, from the bytes of the file: "Image" groups the picture formats, "PDF" the documents. */
+enum class FileKind(val label: String) {
+    ANY("Tous les types"),
+    IMAGE("Image"),
+    PDF("PDF");
+
+    fun matches(mime: String?): Boolean = when (this) {
+        ANY -> true
+        IMAGE -> mime != null && mime in FileSniffer.PICTURES
+        PDF -> mime == FileSniffer.PDF
+    }
 }
 
 /** Time of the day, for the dates chosen by hand. The night goes past midnight. */
@@ -68,6 +82,13 @@ data class DateFilter(val preset: DatePreset = DatePreset.ALL, val range: DateRa
             val end = time.now + 60_000L
             val start = when (preset) {
                 DatePreset.ALL -> Long.MIN_VALUE
+                DatePreset.TODAY -> Calendar.getInstance(time.zone).apply {
+                    timeInMillis = time.now
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
                 DatePreset.LAST_HOUR -> time.now - 3_600_000L
                 DatePreset.LAST_24H -> time.now - 24 * 3_600_000L
                 DatePreset.LAST_7D -> time.now - 7 * 24 * 3_600_000L
@@ -106,6 +127,8 @@ data class Filters(
     val folders: Set<String> = emptySet(),
     /** Types MIME choisis ; vide veut dire tous. */
     val types: Set<String> = emptySet(),
+    /** Image or PDF, as in the Type filter of the search sheet. */
+    val kind: FileKind = FileKind.ANY,
     val resemblance: Resemblance = Resemblance.NORMAL,
 ) {
     /** Number of active filters: one per category that is no longer on its starting value. */
@@ -120,15 +143,16 @@ data class Filters(
      * [time] is used to write the dates chosen (the year appears only if it is not the current one)).
      */
     fun chips(time: When = WHEN_UNKNOWN): List<FilterChip> = buildList {
-        if (date.isActive) add(FilterChip(dateLabel(time), copy(date = DateFilter())))
-        if (place != Place.ALL) add(FilterChip(placeLabel(place), copy(place = Place.ALL)))
-        if (people != People.ANY) add(FilterChip(peopleChip(people), copy(people = People.ANY)))
+        if (date.isActive) add(FilterChip("Date · ${dateLabel(time)}", copy(date = DateFilter())))
+        if (place != Place.ALL) add(FilterChip("Lieu · ${placeLabel(place)}", copy(place = Place.ALL)))
+        if (people != People.ANY) add(FilterChip("Personnes · ${people.label}", copy(people = People.ANY)))
         if (closeUp) add(FilterChip("Gros plan", copy(closeUp = false)))
         if (text != TextFilter.ANY) add(FilterChip(text.label, copy(text = TextFilter.ANY)))
         if (folders.isNotEmpty()) add(FilterChip(folders.sorted().joinToString(", "), copy(folders = emptySet())))
         if (types.isNotEmpty()) {
             add(FilterChip(types.map { FileSniffer.label(it) }.sorted().joinToString(", "), copy(types = emptySet())))
         }
+        if (kind != FileKind.ANY) add(FilterChip("Type · ${kind.label}", copy(kind = FileKind.ANY)))
         if (resemblance != Resemblance.NORMAL) {
             add(FilterChip("Ressemblance ${resemblance.label.lowercase()}", copy(resemblance = Resemblance.NORMAL)))
         }
@@ -143,15 +167,19 @@ data class Filters(
         return date.preset.label
     }
 
-    /** A photo passes all the content filters (the resemblance does not filter the photos). */
+    /**
+     * A photo passes all the content filters (the resemblance does not filter the photos).
+     * The place is only chosen for now: it does not filter the photos yet, as the place
+     * of a photo is not read on the phone. It is still shown among the active filters.
+     */
     fun matches(entry: LibraryEntry, time: When): Boolean =
         date.matches(entry.takenMs, time) &&
-            Library.inPlace(entry, place) &&
             matchesPeople(entry.faces) &&
             (!closeUp || entry.closeUp) &&
             matchesText(entry.text) &&
             (folders.isEmpty() || entry.folder in folders) &&
-            (types.isEmpty() || entry.mime in types)
+            (types.isEmpty() || entry.mime in types) &&
+            kind.matches(entry.mime)
 
     private fun matchesPeople(faces: Int): Boolean = when (people) {
         People.ANY -> true
@@ -176,11 +204,5 @@ data class Filters(
             Place.OUTDOOR -> "Extérieur"
         }
 
-        private fun peopleChip(people: People): String = when (people) {
-            People.ANY -> "Peu importe"
-            People.NONE -> "Sans personne"
-            People.ONE -> "1 personne"
-            People.MANY -> "2 personnes et plus"
-        }
     }
 }

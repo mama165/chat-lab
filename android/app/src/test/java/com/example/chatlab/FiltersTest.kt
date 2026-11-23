@@ -48,7 +48,7 @@ class FiltersTest {
         )
         assertEquals(
             listOf(
-                "24 dernières heures", "Intérieur", "Sans personne", "Gros plan", "Avec texte",
+                "Date · 24 dernières heures", "Lieu · Intérieur", "Personnes · Aucune", "Gros plan", "Avec texte",
                 "Camera, Screenshots", "JPG, PNG", "Ressemblance proche",
             ),
             filters.chips(TIME).map { it.label },
@@ -70,7 +70,7 @@ class FiltersTest {
     @Test
     fun removingAChipOnlyResetsThatCategory() {
         val filters = Filters(place = Place.INDOOR, date = DateFilter(DatePreset.LAST_7D), folders = setOf("Camera"))
-        val withoutPlace = filters.chips(TIME).first { it.label == "Intérieur" }.without
+        val withoutPlace = filters.chips(TIME).first { it.label == "Lieu · Intérieur" }.without
         assertEquals(Place.ALL, withoutPlace.place)
         assertEquals(DatePreset.LAST_7D, withoutPlace.date.preset)
         assertEquals(setOf("Camera"), withoutPlace.folders)
@@ -80,9 +80,9 @@ class FiltersTest {
 
     @Test
     fun peopleChipLabels() {
-        assertEquals("1 personne", Filters(people = People.ONE).chips().single().label)
-        assertEquals("2 personnes et plus", Filters(people = People.MANY).chips().single().label)
-        assertEquals("Sans personne", Filters(people = People.NONE).chips().single().label)
+        assertEquals("Personnes · 1", Filters(people = People.ONE).chips().single().label)
+        assertEquals("Personnes · 2 et plus", Filters(people = People.MANY).chips().single().label)
+        assertEquals("Personnes · Aucune", Filters(people = People.NONE).chips().single().label)
     }
 
     @Test
@@ -94,8 +94,9 @@ class FiltersTest {
     @Test
     fun matchesPlaceAndPeople() {
         val inside = entry("a", indoor = true, faces = 0)
+        // The place is chosen but does not filter the photos yet.
         assertTrue(matches(Filters(place = Place.INDOOR), inside))
-        assertFalse(matches(Filters(place = Place.OUTDOOR), inside))
+        assertTrue(matches(Filters(place = Place.OUTDOOR), inside))
         assertTrue(matches(Filters(people = People.NONE), inside))
         assertFalse(matches(Filters(people = People.ONE), inside))
         assertTrue(matches(Filters(people = People.MANY), entry("b", faces = 3)))

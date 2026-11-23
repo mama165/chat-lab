@@ -107,10 +107,13 @@ class SearchUiState {
     var newFrom by mutableIntStateOf(-1)
     var selected by mutableStateOf(emptySet<String>())
     var ranked by mutableStateOf(emptyList<Match>())
+    /** The filter sheet, which rises over the search. */
+    var sheetOpen by mutableStateOf(false)
 
     fun reset() {
         query = ""
         filters = Filters()
+        sheetOpen = false
         shownExtra = 0
         newFrom = -1
         selected = emptySet()
@@ -230,41 +233,25 @@ fun SearchScreen(
         }
         Spacer(Modifier.height(10.dp))
 
+        // Recent searches, then the filters applied (on lines, never scrolled), then the results.
         val chips = state.filters.chips(time)
-        if (query.isNotBlank() && (!outcome.isEmpty || chips.isNotEmpty())) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(Formats.results(outcome.total), fontSize = 14.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
-                if (!selecting && chips.size >= 2) {
-                    Text(
-                        "Réinitialiser",
-                        fontSize = 14.sp,
-                        color = Palette.Accent,
-                        modifier = Modifier.clickable { state.filters = Filters() }.padding(4.dp),
-                    )
-                }
-            }
-        } else if (query.isBlank() && chips.isNotEmpty()) {
-            Text("Filtres actifs", fontSize = 13.sp, color = Palette.Muted)
+        if (query.isBlank() && entries.isNotEmpty() && !selecting) {
+            Recents(recents, onPick = { state.query = it })
+            Spacer(Modifier.height(18.dp))
         }
-        if (chips.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                chips.forEach { chip ->
-                    FilterTag(chip.label, onRemove = if (selecting) null else ({ state.filters = chip.without }))
-                }
-            }
+        if (chips.isNotEmpty() && !selecting) {
+            Text("Filtres", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+            Spacer(Modifier.height(8.dp))
+            ActiveFilterPills(chips, onRemove = { state.filters = it.without })
+            Spacer(Modifier.height(18.dp))
         }
-        Spacer(Modifier.height(10.dp))
 
         when {
             entries.isEmpty() -> Message(
                 "Aucune photo analysée pour l'instant.",
                 "Ouvrez l'onglet Photos pour lancer l'analyse.",
             )
-            query.isBlank() -> Recents(recents, onPick = { state.query = it })
+            query.isBlank() -> Spacer(Modifier.weight(1f))
             outcome.isEmpty && chips.isNotEmpty() -> Message(
                 "Aucune photo ne correspond à « $query ».",
                 "Essayez de retirer un filtre.",
