@@ -64,9 +64,12 @@ class AnalysisService : Service() {
 
     /** Loads the models again after a pause, showing it on the screen. */
     private fun reloadModels(slot: AnalyzerSlot<Analyzer>) {
-        AnalysisProgress.update { it.copy(message = "Chargement des modèles…") }
-        slot.get()
-        AnalysisProgress.update { it.copy(message = "") }
+        AnalysisProgress.update { it.loadingStarted() }
+        try {
+            slot.get()
+        } finally {
+            AnalysisProgress.update { it.loadingDone() }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

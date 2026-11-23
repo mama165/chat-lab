@@ -493,9 +493,71 @@ private fun AddFolderRow(onClick: () -> Unit) {
     }
 }
 
-/** During the analysis: progress ring, progress per folder, Pause or Reprendre, and Arrêter. */
+/** During the analysis: the running list, the pause (view 2.2) or the reloading of the models (view 2.3). */
 @Composable
 private fun Running(progress: Progress, now: Long) {
+    when (progress.runningScreen()) {
+        RunningScreen.RELOADING -> ReloadingScreen()
+        RunningScreen.PAUSED -> PausedScreen(progress)
+        RunningScreen.RUNNING -> RunningDetail(progress, now)
+    }
+}
+
+/** Pause (view 2.2): the ring frozen in grey, what is done, Reprendre and Arrêter. */
+@Composable
+private fun PausedScreen(progress: Progress) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.size(150.dp)) {
+                val stroke = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+                val inset = 6.dp.toPx()
+                val arcSize = Size(size.width - 2 * inset, size.height - 2 * inset)
+                val topLeft = Offset(inset, inset)
+                drawArc(Palette.Field, 0f, 360f, false, topLeft, arcSize, style = stroke)
+                drawArc(Color(0xFF9AA3AF), -90f, 360f * progress.fraction, false, topLeft, arcSize, style = stroke)
+            }
+            Text("En pause", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        }
+        Text("${progress.done} sur ${progress.total} photos", fontSize = 16.sp, color = Palette.Ink)
+        Text(
+            "Rien ne tourne · ${Formats.photos(progress.done)} déjà faite${if (progress.done > 1) "s" else ""}, rien n'est perdu",
+            fontSize = 13.sp,
+            color = Palette.Muted,
+            textAlign = TextAlign.Center,
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        PrimaryButton("▶ Reprendre", onClick = { AnalysisService.resume() }, modifier = Modifier.weight(1f))
+        OutlineButton("Arrêter", onClick = { AnalysisService.stop() }, modifier = Modifier.weight(1f), leading = { StopSquare() })
+    }
+}
+
+/** Reprise (view 2.3): the models load again; the photos go on once they are ready. */
+@Composable
+private fun ReloadingScreen() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(130.dp), color = Palette.Accent, strokeWidth = 10.dp)
+        Text("Chargement des modèles", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        Text(
+            "Les photos reprendront une fois les modèles prêts.",
+            fontSize = 13.sp,
+            color = Palette.Muted,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** The running list: progress ring, progress per folder, Pause, and Arrêter. */
+@Composable
+private fun RunningDetail(progress: Progress, now: Long) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -31,7 +31,22 @@ data class Progress(
     val pausedTotal: Long = 0L,
     /** The progress of each folder, in the order of the list. */
     val folders: List<FolderProgress> = emptyList(),
+    /** Workers reloading their models after a pause; 0 when none is loading. */
+    val loadingModels: Int = 0,
 ) {
+    /** A worker starts reloading its models. */
+    fun loadingStarted(): Progress = copy(loadingModels = loadingModels + 1)
+
+    /** A worker has its models again. Never below zero. */
+    fun loadingDone(): Progress = copy(loadingModels = (loadingModels - 1).coerceAtLeast(0))
+
+    /** Which screen the analysis shows: the models reloading, the pause, or the running list. */
+    fun runningScreen(): RunningScreen = when {
+        loadingModels > 0 -> RunningScreen.RELOADING
+        paused -> RunningScreen.PAUSED
+        else -> RunningScreen.RUNNING
+    }
+
     /** Part faite, de 0 à 1. */
     val fraction: Float
         get() = if (total > 0) done.toFloat() / total else 0f
@@ -119,6 +134,9 @@ fun durationText(totalMinutes: Int): String {
 
 /** La marque d'un dossier dans la liste de l'analyse : fini, en cours, ou en attente. */
 enum class FolderMark { FINISHED, RUNNING, WAITING }
+
+/** The screens of an analysis in progress: running, paused (view 2.2), models reloading (view 2.3). */
+enum class RunningScreen { RUNNING, PAUSED, RELOADING }
 
 /**
  * What the gauge of a folder shows: null while it turns (started, no photo finished yet), then
