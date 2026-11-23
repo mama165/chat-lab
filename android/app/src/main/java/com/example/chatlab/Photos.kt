@@ -130,7 +130,7 @@ fun PhotosScreen(
         )
         when {
             chatlab == null || sources.isEmpty() -> FirstSteps(chatlab, sources, pickers)
-            progress.running -> Running(progress, now)
+            progress.running -> Running(progress, now, sources)
             else -> Idle(
                 sources = sources,
                 lastRun = lastRun,
@@ -372,7 +372,13 @@ private fun BannerLine(icon: String, color: Color, number: String, label: String
  * pause (view 2.3). The "Plus de détails" control is at the top, and only when running.
  */
 @Composable
-private fun Running(progress: Progress, now: Long) {
+private fun Running(running: Progress, now: Long, sources: List<SourceFolder>) {
+    // A folder added while the analysis runs is shown as waiting: the analysis does not read it.
+    val progress = running.copy(
+        folders = running.folders + sources
+            .filter { source -> running.folders.none { it.name == source.name } }
+            .map { FolderProgress(it.name, done = 0, total = 0, later = true) },
+    )
     var reprise by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     LaunchedEffect(progress.loadingModels > 0) {

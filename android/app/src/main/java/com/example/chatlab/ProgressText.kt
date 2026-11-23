@@ -7,6 +7,8 @@ data class FolderProgress(
     val total: Int,
     /** The file being processed in this folder, empty if none. */
     val current: String = "",
+    /** Added while the analysis runs: not read by it, it waits for the next analysis. */
+    val later: Boolean = false,
 ) {
     /** Nothing new in this folder: it is not read again. */
     val nothingNew: Boolean get() = total == 0
@@ -138,12 +140,13 @@ fun remainingText(millis: Long?): String = when {
  * being read, and the count. "Terminé, 4 nouvelles photos · 4 / 4", "Déjà dans le carnet · rien à faire".
  */
 fun folderDetail(folder: FolderProgress): String {
+    if (folder.later) return "Ajouté pendant l'analyse, lu à la prochaine"
     val mark = folder.mark()
     val parts = mutableListOf(
         when (mark) {
             FolderMark.FINISHED -> if (folder.nothingNew) "Déjà dans le carnet" else "Terminé, ${folder.total} nouvelles photos"
             FolderMark.RUNNING -> "Nouvelles photos"
-            FolderMark.WAITING -> "En attente, pas encore lu"
+            FolderMark.WAITING -> if (folder.later) "Ajouté pendant l'analyse, lu à la prochaine" else "En attente, pas encore lu"
         },
     )
     if (mark == FolderMark.RUNNING && folder.current.isNotBlank()) parts += "en cours : ${folder.current}"
@@ -219,6 +222,7 @@ fun FolderProgress.gaugeFraction(): Float? =
 
 /** Le dossier est fini (ou n'a rien de nouveau), il est en cours s'il a commencé, sinon il attend. */
 fun FolderProgress.mark(): FolderMark = when {
+    later -> FolderMark.WAITING
     nothingNew || finished -> FolderMark.FINISHED
     done > 0 || current.isNotBlank() -> FolderMark.RUNNING
     else -> FolderMark.WAITING

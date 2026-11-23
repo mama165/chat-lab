@@ -44,3 +44,17 @@ class PerformanceTextTest {
         assertEquals("Normal", Progress(running = true, levelLabel = "Normal").levelLabel)
     }
 }
+
+class LaterFolderTest {
+    @Test
+    fun a_folder_added_during_the_analysis_waits_for_the_next_one() {
+        val folder = FolderProgress("WhatsApp Images", done = 0, total = 0, later = true)
+        assertEquals(FolderMark.WAITING, folder.mark())
+        assertEquals("Ajouté pendant l'analyse, lu à la prochaine", folderDetail(folder))
+    }
+
+    @Test
+    fun a_folder_of_the_analysis_is_not_marked_as_later() {
+        assertEquals(FolderMark.FINISHED, FolderProgress("Camera", done = 4, total = 4).mark())
+    }
+}
