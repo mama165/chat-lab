@@ -210,7 +210,15 @@ private fun FolderNameRow(name: String, onRemove: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // The folder icon in a light square, as in the mockup.
+        Box(
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Palette.Soft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
+        }
         Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink, modifier = Modifier.weight(1f))
         Text("✕", fontSize = 16.sp, color = Palette.Muted, modifier = Modifier.clickable(onClick = onRemove).padding(4.dp))
     }
