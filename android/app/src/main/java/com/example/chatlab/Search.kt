@@ -219,6 +219,8 @@ fun SearchScreen(
             TabTitle(
                 "Rechercher",
                 onSettings = onSettings,
+                onFilters = onFilters,
+                filtersCount = state.filters.activeCount,
                 subtitle = if (query.isBlank()) "${Formats.photos(entries.size).replaceFirstChar { it.uppercase() }}, dans le carnet" else null,
             )
             Spacer(Modifier.height(12.dp))
@@ -229,8 +231,6 @@ fun SearchScreen(
                     focus.clearFocus()
                     if (!outcome.isEmpty) recents = RecentStore.add(context, query)
                 },
-                activeFilters = state.filters.activeCount,
-                onFilters = onFilters,
             )
         }
         Spacer(Modifier.height(10.dp))
@@ -336,8 +336,6 @@ private fun SearchField(
     value: String,
     onChange: (String) -> Unit,
     onSearch: () -> Unit,
-    activeFilters: Int,
-    onFilters: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextField(
@@ -371,31 +369,6 @@ private fun SearchField(
                 cursorColor = Palette.Accent,
             ),
         )
-        Box {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(Palette.Soft)
-                    .clickable(onClick = onFilters)
-                    .semantics { contentDescription = "Filtres" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(painterResource(R.drawable.ic_filtres), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
-            }
-            if (activeFilters > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(Palette.Accent),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("$activeFilters", fontSize = 10.sp, color = Color.White)
-                }
-            }
-        }
     }
 }
 

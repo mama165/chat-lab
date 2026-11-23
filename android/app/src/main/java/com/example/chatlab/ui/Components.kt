@@ -39,7 +39,14 @@ import com.example.chatlab.R
 
 /** Title of a tab, with the settings gear on the right. */
 @Composable
-fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null, onAdd: (() -> Unit)? = null) {
+fun TabTitle(
+    title: String,
+    onSettings: () -> Unit,
+    subtitle: String? = null,
+    onAdd: (() -> Unit)? = null,
+    onFilters: (() -> Unit)? = null,
+    filtersCount: Int = 0,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink, modifier = Modifier.weight(1f))
@@ -58,6 +65,35 @@ fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null, on
                         val line = 2.dp.toPx()
                         drawLine(Palette.Accent, Offset(size.width / 2, 0f), Offset(size.width / 2, size.height), strokeWidth = line, cap = StrokeCap.Round)
                         drawLine(Palette.Accent, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), strokeWidth = line, cap = StrokeCap.Round)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+            if (onFilters != null) {
+                // The filters sit next to the settings wheel, with a badge for the filters active.
+                Box(modifier = Modifier.size(40.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Palette.Field)
+                            .clickable(onClick = onFilters)
+                            .semantics { contentDescription = "Filtres" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(R.drawable.ic_filtres), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
+                    }
+                    if (filtersCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(Palette.Accent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("$filtersCount", fontSize = 10.sp, color = Color.White)
+                        }
                     }
                 }
                 Spacer(Modifier.width(8.dp))
