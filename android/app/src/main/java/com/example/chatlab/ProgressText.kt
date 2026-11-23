@@ -37,6 +37,8 @@ data class Progress(
     val modelSteps: Map<String, Long> = emptyMap(),
     /** True once every worker has its models again, after a reload; the photos can go on. */
     val reloadDone: Boolean = false,
+    /** The performance the analysis runs with, as the screen names it ("Normal"). */
+    val levelLabel: String = "",
 ) {
     /** A worker starts reloading its models. The models loaded before are forgotten. */
     fun loadingStarted(): Progress = copy(loadingModels = loadingModels + 1, modelSteps = emptyMap(), reloadDone = false)
@@ -120,14 +122,33 @@ fun clock(millis: Long): String {
     return "%d:%02d".format(seconds / 60, seconds % 60)
 }
 
-/** "Environ 2 minutes restantes", "Environ 1 heure et 52 minutes restantes", for the analysis screen. */
+/** The time left, short, as the analysis screen shows it: "1 heure", "38 min", "1 min", "20s", "5s". */
 fun remainingText(millis: Long?): String = when {
-    millis == null -> "Estimation du temps restant…"
-    millis < 60_000L -> "Moins d'une minute restante"
-    else -> {
-        val minutes = ((millis + 30_000L) / 60_000L).toInt()
-        if (minutes == 1) "Environ 1 minute restante" else "Environ ${durationText(minutes)} restantes"
+    millis == null -> "…"
+    millis >= 3_570_000L -> {
+        val hours = ((millis + 1_800_000L) / 3_600_000L).toInt().coerceAtLeast(1)
+        if (hours == 1) "1 heure" else "$hours heures"
     }
+    millis >= 59_500L -> "${((millis + 30_000L) / 60_000L).toInt()} min"
+    else -> "${((millis + 500L) / 1000L).toInt().coerceAtLeast(1)}s"
+}
+
+/**
+ * The detail of a folder, shown under its name when the details are open: its state, the photo
+ * being read, and the count. "Terminé, 4 nouvelles photos · 4 / 4", "Déjà dans le carnet · rien à faire".
+ */
+fun folderDetail(folder: FolderProgress): String {
+    val mark = folder.mark()
+    val parts = mutableListOf(
+        when (mark) {
+            FolderMark.FINISHED -> if (folder.nothingNew) "Déjà dans le carnet" else "Terminé, ${folder.total} nouvelles photos"
+            FolderMark.RUNNING -> "Nouvelles photos"
+            FolderMark.WAITING -> "En attente, pas encore lu"
+        },
+    )
+    if (mark == FolderMark.RUNNING && folder.current.isNotBlank()) parts += "en cours : ${folder.current}"
+    parts += if (folder.nothingNew) "rien à faire" else "${folder.done} / ${folder.total}"
+    return parts.joinToString(" · ")
 }
 
 /** A duration in French, in minutes under an hour, then in hours and minutes: "50 minutes", "2 heures et 13 minutes". */

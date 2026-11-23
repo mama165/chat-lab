@@ -269,7 +269,7 @@ private fun RunBlock(record: AnalysisRecord) {
         KeyValue("Début", analysisDateLabel(record.startMs))
         KeyValue("Durée", durationText((record.durationMs / 60_000).toInt()))
         KeyValue("Fin", if (record.stopped) "arrêtée par l'utilisateur" else "terminée")
-        KeyValue("Niveau", "${AnalysisLevel.fromKey(record.level).label} · ${record.workers} à la fois")
+        KeyValue("Performance", "${AnalysisLevel.fromKey(record.level).label} · ${record.workers} à la fois")
         KeyValue("Photos analysées", record.analyzed.toString())
         KeyValue("Photos ignorées", record.ignored.toString())
     }
@@ -388,7 +388,7 @@ fun LevelPage(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Spacer(Modifier.height(4.dp))
-        PageHeader("Niveau d'analyse", onBack = onBack)
+        PageHeader("Performance", onBack = onBack)
         Text(
             "Un niveau plus haut analyse plusieurs photos à la fois : c'est plus rapide, mais le téléphone chauffe et consomme davantage. Le choix prend effet à la prochaine analyse.",
             fontSize = 13.sp,

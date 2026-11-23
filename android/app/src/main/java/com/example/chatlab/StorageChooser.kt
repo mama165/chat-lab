@@ -131,10 +131,8 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
                 GaugeRing(fraction = null, size = 14.dp)
                 Text("Comptage des photos en cours", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
             } else {
-                val folders = all.size
-                val photos = roots.orEmpty().sumOf { counts?.get(it.path) ?: 0 }
                 Text(
-                    "Comptage terminé · ${Formats.photos(photos)} dans $folders dossiers",
+                    "Comptage terminé",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Palette.Accent,
@@ -217,7 +215,7 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
                     Text("Cochez au moins un dossier", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
                 }
             } else {
-                PrimaryButton(if (count == 1) "Ajouter 1 dossier" else "Ajouter $count dossiers", onClick = addSelection)
+                PrimaryButton("Ajouter les dossiers cochés", onClick = addSelection)
             }
         }
     }

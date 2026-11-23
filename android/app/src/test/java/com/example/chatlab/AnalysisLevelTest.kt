@@ -20,7 +20,7 @@ class AnalysisLevelTest {
     }
 
     @Test
-    fun labels_are_the_french_names() {
-        assertEquals(listOf("Économique", "Équilibré", "Puissant", "Maximal"), AnalysisLevel.entries.map { it.label })
+    fun labels_are_the_performance_names() {
+        assertEquals(listOf("Léger", "Normal", "Rapide", "Maximum"), AnalysisLevel.entries.map { it.label })
     }
 }

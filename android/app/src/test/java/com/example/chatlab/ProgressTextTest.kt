@@ -79,18 +79,14 @@ class ProgressTextTest {
 
     @Test
     fun remainingText() {
-        assertEquals("Estimation du temps restant…", remainingText(null))
-        assertEquals("Moins d'une minute restante", remainingText(20_000L))
-        assertEquals("Environ 1 minute restante", remainingText(70_000L))
-        assertEquals("Environ 2 minutes restantes", remainingText(110_000L))
-        assertEquals("Environ 50 minutes restantes", remainingText(50 * 60_000L))
-        assertEquals("Environ 10 minutes restantes", remainingText(10 * 60_000L))
-        assertEquals("Environ 1 heure et 52 minutes restantes", remainingText(112 * 60_000L))
-        assertEquals("Environ 2 heures et 13 minutes restantes", remainingText(133 * 60_000L))
-        assertEquals("Environ 2 heures et 40 minutes restantes", remainingText(160 * 60_000L))
-        assertEquals("Environ 2 heures et 50 minutes restantes", remainingText(170 * 60_000L))
-        assertEquals("Environ 2 heures restantes", remainingText(120 * 60_000L))
-        assertEquals("Environ 1 heure et 1 minute restantes", remainingText(61 * 60_000L))
+        assertEquals("…", remainingText(null))
+        assertEquals("5s", remainingText(5_000L))
+        assertEquals("20s", remainingText(20_000L))
+        assertEquals("1 min", remainingText(70_000L))
+        assertEquals("2 min", remainingText(110_000L))
+        assertEquals("50 min", remainingText(50 * 60_000L))
+        assertEquals("1 heure", remainingText(60 * 60_000L))
+        assertEquals("2 heures", remainingText(133 * 60_000L))
     }
 
     private val folders = listOf(FolderProgress("Camera", 0, 0), FolderProgress("Screenshots", 0, 14))

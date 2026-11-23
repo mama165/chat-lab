@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.expandVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,16 +87,10 @@ fun PhotosScreen(
 ) {
     val context = LocalContext.current
     val progress by AnalysisProgress.state.collectAsState()
-    val reading by ReadProgress.counts.collectAsState()
-    val totals by ReadProgress.totalCounts.collectAsState()
     var version by remember { mutableIntStateOf(0) }
     val pickers = rememberFolderPickers(onAddSource = onAddFolders) { version++ }
     val chatlab = remember(version) { folderName(context, KEY_FOLDER) }
     val sources = remember(version) { Sources.read(context) }
-    // What the folders contain, read in the background: no analysis, only a listing.
-    val overviews by produceState<List<FolderOverview>?>(initialValue = null, version, entries, progress.running) {
-        value = if (progress.running) null else withContext(Dispatchers.IO) { overview(context) }
-    }
     val lastRun = remember(progress.running, version, entries) { ReportStore.readRun(context) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(progress.running) {
@@ -126,20 +122,19 @@ fun PhotosScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Spacer(Modifier.height(0.dp))
-        TabTitle("Photos", onSettings = onSettings)
+        TabTitle(
+            "Photos",
+            onSettings = onSettings,
+            // The plus adds a folder, as in the mockup; not before the chatlab folder and a first folder.
+            onAdd = if (chatlab != null && sources.isNotEmpty()) onAddFolders else null,
+        )
         when {
             chatlab == null || sources.isEmpty() -> FirstSteps(chatlab, sources, pickers)
             progress.running -> Running(progress, now)
             else -> Idle(
-                entries = entries,
-                chatlab = chatlab,
                 sources = sources,
-                reading = reading,
-                totals = totals,
-                overviews = overviews,
                 lastRun = lastRun,
                 message = progress.message,
-                pickers = pickers,
                 onRemove = { uri ->
                     Sources.remove(context, uri)
                     version++
@@ -189,58 +184,78 @@ private fun Step(number: Int, title: String, detail: String, chosen: String?, ac
     }
 }
 
-/** At rest: report of the last analysis, folders and their state, analysis button. */
+/** At rest (view 1.5): the names of the folders, the performance, and the button to start. */
 @Composable
 private fun Idle(
-    entries: List<LibraryEntry>,
-    chatlab: String,
     sources: List<SourceFolder>,
-    reading: Map<String, Int>,
-    totals: Map<String, Int>,
-    overviews: List<FolderOverview>?,
     lastRun: RunReport?,
     message: String,
-    pickers: FolderPickers,
     onRemove: (String) -> Unit,
     onStart: () -> Unit,
     onHistory: () -> Unit,
 ) {
-    val subtitle = buildString {
-        append("${Formats.photos(entries.size).replaceFirstChar { it.uppercase() }} dans le carnet")
-        lastRun?.let { append(" · dernière analyse le ${Dates.short(SimpleDate.of(it.finishedAt))}") }
-    }
-    Text(subtitle, fontSize = 13.sp, color = Palette.Muted, modifier = Modifier.padding(top = 0.dp))
     if (lastRun != null) RunBanner(lastRun, onHistory)
-
-    SectionLabel("Dossiers à analyser", right = "sous-dossiers inclus")
-    // Each folder shows at once: its card if its reading is done, otherwise its reading in progress.
-    // So a folder just added does not wait for all the others to be read.
-    sources.forEach { folder ->
-        val overview = overviews?.firstOrNull { it.status.folder.uri == folder.uri }
-        if (overview != null) {
-            val failures = lastRun?.folders?.firstOrNull { it.uri == folder.uri }?.failures.orEmpty()
-            FolderCard(overview, failures, onRemove = { onRemove(folder.uri) })
-        } else {
-            ReadingCard(folder, reading[folder.uri] ?: 0, totals[folder.uri] ?: 0)
-        }
-        // The same grey line between each folder, as in the mockup.
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
-    }
-    AddFolderRow(pickers.addSource)
-    Text("Les photos restent dans leur dossier. Seules les nouvelles sont analysées.", fontSize = 12.sp, color = Palette.Muted)
-
-    val fresh = overviews?.sumOf { it.fresh }
-    val retry = lastRun?.unread ?: 0
-    val newOnes = fresh?.let { (it - retry).coerceAtLeast(0) }
-    when {
-        newOnes != null && newOnes > 0 ->
-            PrimaryButton(if (newOnes == 1) "Analyser la nouvelle photo" else "Analyser les $newOnes nouvelles photos", onClick = onStart)
-        retry > 0 || lastRun != null -> OutlineButton("Relancer l'analyse", onClick = onStart, modifier = Modifier.fillMaxWidth())
-        fresh == null -> PrimaryButton("Analyser les nouvelles photos", onClick = onStart, enabled = false)
-        else -> PrimaryButton("Tout est à jour", onClick = onStart, enabled = false)
-    }
+    SectionLabel("Dossiers")
+    sources.forEach { folder -> FolderNameRow(folder.name, onRemove = { onRemove(folder.uri) }) }
+    PerformanceChoice()
+    PrimaryButton("Lancer l'analyse", onClick = onStart, enabled = sources.isNotEmpty())
     if (message.isNotBlank()) {
         Text(message, fontSize = 13.sp, color = Palette.Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** A folder of the list, by its name only, with the cross that removes it (view 1.5). */
+@Composable
+private fun FolderNameRow(name: String, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink, modifier = Modifier.weight(1f))
+        Text("✕", fontSize = 16.sp, color = Palette.Muted, modifier = Modifier.clickable(onClick = onRemove).padding(4.dp))
+    }
+}
+
+/**
+ * The performance, chosen before the analysis (view 1.5): four choices, the chosen one in blue with
+ * its check, and under them how many photos are read at once.
+ */
+@Composable
+private fun PerformanceChoice() {
+    val context = LocalContext.current
+    var chosen by remember { mutableStateOf(LevelStore.read(context)) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel("Performance")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            AnalysisLevel.entries.forEach { level ->
+                val selected = level == chosen
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            chosen = level
+                            LevelStore.write(context, level)
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(modifier = Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                        if (selected) {
+                            CheckMark(16.dp)
+                        } else {
+                            Box(modifier = Modifier.size(16.dp).border(1.dp, Color(0xFFD0D5DD), CircleShape))
+                        }
+                    }
+                    Text(
+                        level.label,
+                        fontSize = 13.sp,
+                        color = if (selected) Palette.Accent else Palette.Ink,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+        Text(chosen.photosAtOnce(), fontSize = 12.sp, color = Palette.Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -299,37 +314,6 @@ internal fun GaugeRing(fraction: Float?, size: androidx.compose.ui.unit.Dp = 20.
     }
 }
 
-/** A folder being read: its name, and the number of files examined so far. */
-@Composable
-private fun ReadingCard(folder: SourceFolder, examined: Int, total: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .semantics { contentDescription = "Dossier ${folder.name}, lecture en cours" },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // La jauge suit le vrai avancement : les fichiers examinés sur le total du dossier.
-        // Tant que le total n'est pas connu, un tour continu indique seulement que ça tourne.
-        GaugeRing(if (total > 0) Progress01.of(examined, total) else null)
-        Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(16.dp))
-                Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-            }
-            Text(
-                when {
-                    total > 0 -> "Lecture en cours · $examined sur $total fichiers"
-                    examined == 0 -> "Lecture en cours…"
-                    else -> "Lecture en cours · $examined fichiers examinés"
-                },
-                fontSize = 12.sp,
-                color = Palette.Muted,
-            )
-        }
-    }
-}
-
 /** L'encart de bilan : analyse terminée, photos analysées, fichiers non lus. */
 @Composable
 private fun RunBanner(run: RunReport, onHistory: () -> Unit) {
@@ -375,146 +359,118 @@ private fun BannerLine(icon: String, color: Color, number: String, label: String
     }
 }
 
-/** A folder: its state (readable, refused, empty), its problems, and what is needed to remove it from the list. */
-@Composable
-private fun FolderCard(overview: FolderOverview, failures: List<FileFailure>, onRemove: () -> Unit) {
-    val status = overview.status
-    val problem = status.state == FolderStatus.State.REFUSED || status.refused.isNotEmpty() || failures.isNotEmpty()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .semantics { contentDescription = "Dossier ${status.folder.name}" },
-        verticalAlignment = Alignment.Top,
-    ) {
-        Box(
-            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(if (problem) Palette.Field else Palette.Soft),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (problem) Text("!", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.Danger)
-            else Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(status.folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-            when (status.state) {
-                FolderStatus.State.REFUSED -> {
-                    Text("Accès refusé par Android", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Danger)
-                    Text("Aucune photo ne sera analysée depuis ce dossier.", fontSize = 12.sp, color = Palette.Muted)
-                }
-                FolderStatus.State.EMPTY -> {
-                    Text("Aucune image à analyser", fontSize = 12.sp, color = Palette.Muted)
-                    if (status.ignored > 0) Text("${status.ignored} fichiers ignorés (pas des images lisibles)", fontSize = 12.sp, color = Palette.Muted)
-                }
-                FolderStatus.State.READABLE -> {
-                    Text("${Formats.photos(status.photos)} · ${overview.known} dans le carnet", fontSize = 12.sp, color = Palette.Muted)
-                    Text(
-                        if (overview.fresh == 0) "Rien de nouveau" else if (overview.fresh == 1) "1 nouvelle" else "${overview.fresh} nouvelles",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Palette.Accent,
-                    )
-                    if (status.ignored > 0) Text("${status.ignored} fichiers ignorés (pas des images lisibles)", fontSize = 11.sp, color = Palette.Muted)
-                }
-            }
-            if (status.refused.isNotEmpty()) {
-                ProblemBox(
-                    if (status.refused.size == 1) "1 sous-dossier refusé" else "${status.refused.size} sous-dossiers refusés",
-                    status.refused.map { it to "accès refusé par Android" },
-                )
-            }
-            if (failures.isNotEmpty()) {
-                ProblemBox(
-                    if (failures.size == 1) "1 fichier non lu" else "${failures.size} fichiers non lus",
-                    failures.map { it.name to it.reason.label },
-                )
-            }
-            if (problem) {
-                Text(
-                    "Retirer ce dossier de l'analyse",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Palette.Accent,
-                    modifier = Modifier.clickable(onClick = onRemove).padding(vertical = 2.dp),
-                )
-            }
-        }
-        Text(
-            "✕",
-            fontSize = 16.sp,
-            color = Palette.Muted,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onRemove)
-                .semantics { contentDescription = "Retirer ${status.folder.name}" }
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        )
-    }
-}
-
-/** A red box: a title, then each file with its reason in brackets. */
-@Composable
-private fun ProblemBox(title: String, items: List<Pair<String, String>>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFFBEAEA))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Danger)
-        items.forEach { (name, reason) ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(name, fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Palette.Ink, modifier = Modifier.weight(1f, fill = false))
-                Text("($reason)", fontSize = 11.sp, color = Palette.Muted)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddFolderRow(onClick: () -> Unit) {
-    // As in mockup 1.3: a light blue square with a plus, then "Nouveau dossier".
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Palette.Soft),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.size(20.dp)) {
-                val w = size.width
-                val h = size.height
-                drawLine(Palette.Accent, Offset(w / 2, 0f), Offset(w / 2, h), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
-                drawLine(Palette.Accent, Offset(0f, h / 2), Offset(w, h / 2), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        Text("Nouveau dossier", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
-    }
-}
-
 /**
- * During the analysis. Once the models have been reloaded after a pause, the photos go on
- * through the reprise sequence (view 2.3), which ends on the list.
+ * During the analysis: the running list (view 2.1), the pause (view 2.2), or the reprise after a
+ * pause (view 2.3). The "Plus de détails" control is at the top, and only when running.
  */
 @Composable
 private fun Running(progress: Progress, now: Long) {
     var reprise by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
     LaunchedEffect(progress.loadingModels > 0) {
         if (progress.loadingModels > 0) reprise = true
     }
+    if (!progress.paused) DetailsToggle(open = showDetails, onToggle = { showDetails = !showDetails })
     when {
         progress.paused -> PausedScreen(progress)
-        reprise -> RepriseScreen(progress, now)
-        else -> RunningDetail(progress, now)
+        reprise -> RepriseScreen(progress, now, showDetails)
+        else -> RunningDetail(progress, now, showDetails)
     }
+}
+
+/** "Plus de détails ›", or "Moins de détails" once they are open. Blue text, no background. */
+@Composable
+private fun DetailsToggle(open: Boolean, onToggle: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Text(
+            if (open) "Moins de détails" else "Plus de détails ›",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Palette.Accent,
+            modifier = Modifier.clickable(onClick = onToggle).padding(vertical = 4.dp),
+        )
+    }
+}
+
+/** A small clock in the accent colour, for the time left. */
+@Composable
+private fun ClockMark(dimension: androidx.compose.ui.unit.Dp) {
+    Canvas(modifier = Modifier.size(dimension)) {
+        val line = 1.8.dp.toPx()
+        val centre = Offset(size.width / 2, size.height / 2)
+        drawCircle(Palette.Accent, radius = size.minDimension / 2 - line / 2, center = centre, style = Stroke(width = line))
+        drawLine(Palette.Accent, centre, Offset(centre.x, size.height * 0.27f), strokeWidth = line, cap = StrokeCap.Round)
+        drawLine(Palette.Accent, centre, Offset(size.width * 0.72f, size.height * 0.6f), strokeWidth = line, cap = StrokeCap.Round)
+    }
+}
+
+/** The ring of the progress: the blue part only, the percentage in its middle, the time left under it. */
+@Composable
+private fun ProgressRing(progress: Progress, now: Long) {
+    Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(150.dp)) {
+            val stroke = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+            val inset = 6.dp.toPx()
+            val arcSize = Size(size.width - 2 * inset, size.height - 2 * inset)
+            drawArc(Palette.Accent, -90f, 360f * progress.fraction, false, Offset(inset, inset), arcSize, style = stroke)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${(progress.fraction * 100).toInt()} %", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                ClockMark(13.dp)
+                Text(remainingText(progress.remaining(now)), fontSize = 12.sp, color = Palette.Muted)
+            }
+        }
+    }
+}
+
+/** The running list (view 2.1): the ring, the performance, the folders with their marks. */
+@Composable
+private fun RunningDetail(progress: Progress, now: Long, showDetails: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ProgressRing(progress, now)
+        AnimatedVisibility(
+            visible = showDetails,
+            enter = fadeIn(tween(250)) + expandVertically(tween(250)),
+            exit = fadeOut(tween(250)) + shrinkVertically(tween(250)),
+        ) {
+            Text(countLine(progress), fontSize = 16.sp, color = Palette.Ink)
+        }
+        if (progress.levelLabel.isNotBlank()) {
+            Text("Performance : ${progress.levelLabel}", fontSize = 12.sp, color = Palette.Accent)
+        }
+        if (progress.message == "Arrêt en cours…") {
+            Text("Arrêt en cours, ce qui est fait est enregistré…", fontSize = 12.sp, color = Palette.Muted, textAlign = TextAlign.Center)
+        }
+    }
+    if (progress.folders.isNotEmpty()) {
+        SectionLabel("Par dossier")
+        progress.folders.forEach { FolderProgressRow(it, showDetails) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (progress.paused) {
+            PrimaryButton("▶ Reprendre", onClick = { AnalysisService.resume() }, modifier = Modifier.weight(1f))
+        } else {
+            PrimaryButton("❚❚ Pause", onClick = { AnalysisService.pause() }, modifier = Modifier.weight(1f))
+        }
+        OutlineButton("Arrêter", onClick = { AnalysisService.stop() }, modifier = Modifier.weight(1f), leading = { StopSquare() })
+    }
+    Text(
+        "Une jauge qui tourne : le dossier est en cours. Un sablier : il attend son tour. Une coche : il est fini ou il n'est pas relu.",
+        fontSize = 12.sp,
+        color = Palette.Muted,
+    )
+}
+
+/** What the count line says: photos done out of the total, or why there is nothing to read. */
+private fun countLine(progress: Progress): String = when {
+    progress.total > 0 -> "${progress.done} sur ${progress.total} nouvelles photos"
+    progress.message == "Rien de nouveau" -> "Rien de nouveau à analyser"
+    else -> progress.message.ifBlank { "Préparation…" }
 }
 
 /** Pause (view 2.2): the ring frozen in grey, what is done, Reprendre and Arrêter. */
@@ -569,7 +525,7 @@ private enum class Subline { LOADING, SUMMARY, CALC, REMAINING }
  * the photos are real.
  */
 @Composable
-private fun RepriseScreen(progress: Progress, now: Long) {
+private fun RepriseScreen(progress: Progress, now: Long, showDetails: Boolean) {
     var step by remember { mutableIntStateOf(STEP_LOADING) }
     var foldersShown by remember { mutableIntStateOf(0) }
     LaunchedEffect(progress.reloadDone) {
@@ -613,17 +569,22 @@ private fun RepriseScreen(progress: Progress, now: Long) {
                     val stroke = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
                     val inset = 5.dp.toPx()
                     val arcSize = Size(size.width - 2 * inset, size.height - 2 * inset)
-                    drawArc(Palette.Field, 0f, 360f, false, Offset(inset, inset), arcSize, style = stroke)
                     drawArc(Palette.Accent, -90f, 360f * progress.fraction, false, Offset(inset, inset), arcSize, style = stroke)
                 }
                 Text("${(progress.fraction * 100).toInt()} %", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
             }
         }
-        Text(
-            if (loading) "Chargement des modèles" else "${progress.done} sur ${progress.total} nouvelles photos",
-            fontSize = 16.sp,
-            color = Palette.Ink,
-        )
+        if (loading) {
+            Text("Chargement des modèles", fontSize = 16.sp, color = Palette.Ink)
+        } else {
+            AnimatedVisibility(
+                visible = showDetails,
+                enter = fadeIn(tween(250)) + expandVertically(tween(250)),
+                exit = fadeOut(tween(250)) + shrinkVertically(tween(250)),
+            ) {
+                Text("${progress.done} sur ${progress.total} nouvelles photos", fontSize = 16.sp, color = Palette.Ink)
+            }
+        }
         Crossfade(targetState = subline, label = "subline") { line ->
             when (line) {
                 Subline.LOADING -> Text(
@@ -656,7 +617,7 @@ private fun RepriseScreen(progress: Progress, now: Long) {
             visible = foldersShown > index,
             enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 },
         ) {
-            FolderProgressRow(folder)
+            FolderProgressRow(folder, showDetails)
         }
     }
     AnimatedVisibility(visible = step >= STEP_BUTTONS, enter = fadeIn(tween(400))) {
@@ -695,93 +656,31 @@ private fun ModelRows(progress: Progress) {
     }
 }
 
-/** The running list: progress ring, progress per folder, Pause, and Arrêter. */
 @Composable
-private fun RunningDetail(progress: Progress, now: Long) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
-            val color = if (progress.paused) Palette.Disabled else Palette.Accent
-            Canvas(modifier = Modifier.size(150.dp)) {
-                val stroke = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
-                val inset = 6.dp.toPx()
-                val arcSize = Size(size.width - 2 * inset, size.height - 2 * inset)
-                val topLeft = Offset(inset, inset)
-                drawArc(Palette.Field, 0f, 360f, false, topLeft, arcSize, style = stroke)
-                drawArc(color, -90f, 360f * progress.fraction, false, topLeft, arcSize, style = stroke)
-            }
-            Text(
-                if (progress.paused) "En pause" else "${(progress.fraction * 100).toInt()} %",
-                fontSize = if (progress.paused) 20.sp else 26.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Palette.Ink,
-            )
-        }
-        Text(
-            when {
-                progress.total > 0 -> "${progress.done} sur ${progress.total} nouvelles photos"
-                progress.message == "Rien de nouveau" -> "Rien de nouveau à analyser"
-                else -> progress.message.ifBlank { "Préparation…" }
-            },
-            fontSize = 16.sp,
-            color = Palette.Ink,
-        )
-        Text(
-            when {
-                progress.paused -> "Rien ne tourne · ${Formats.photos(progress.done)} déjà faite${if (progress.done > 1) "s" else ""}, rien n'est perdu"
-                progress.message == "Arrêt en cours…" -> "Arrêt en cours, ce qui est fait est enregistré…"
-                else -> remainingText(progress.remaining(now))
-            },
-            fontSize = 13.sp,
-            color = Palette.Muted,
-            textAlign = TextAlign.Center,
-        )
-    }
-    if (progress.folders.isNotEmpty()) {
-        SectionLabel("Par dossier")
-        progress.folders.forEach { FolderProgressRow(it) }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (progress.paused) {
-            PrimaryButton("▶ Reprendre", onClick = { AnalysisService.resume() }, modifier = Modifier.weight(1f))
-        } else {
-            PrimaryButton("❚❚ Pause", onClick = { AnalysisService.pause() }, modifier = Modifier.weight(1f))
-        }
-        OutlineButton("Arrêter", onClick = { AnalysisService.stop() }, modifier = Modifier.weight(1f), leading = { StopSquare() })
-    }
-    Text(
-        "Un dossier sans rien de nouveau est marqué d'une coche : il n'est pas relu. Vous pouvez quitter l'application : la notification suit l'analyse et propose les mêmes boutons.",
-        fontSize = 12.sp,
-        color = Palette.Muted,
-    )
-}
-
-@Composable
-private fun FolderProgressRow(folder: FolderProgress) {
+private fun FolderProgressRow(folder: FolderProgress, showDetails: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        // The mark sits on the middle of the text: of the name alone, or between the name and its detail.
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // La marque de gauche dit l'état du dossier : une coche, une jauge qui suit ses photos, ou un sablier.
-        val done = folder.mark() == FolderMark.FINISHED
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+        // The mark says the state of the folder, and sits on the middle of its text.
+        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             when (folder.mark()) {
-                FolderMark.FINISHED -> CheckMark()
+                FolderMark.FINISHED -> CheckMark(24.dp)
                 // Started but no photo finished yet: the ring turns; then it follows the real count.
-                FolderMark.RUNNING -> GaugeRing(folder.gaugeFraction())
-                FolderMark.WAITING -> Hourglass()
+                FolderMark.RUNNING -> GaugeRing(folder.gaugeFraction(), 24.dp)
+                FolderMark.WAITING -> Hourglass(24.dp)
             }
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-            Text(if (folder.nothingNew) "Déjà dans le carnet" else "Nouvelles photos", fontSize = 12.sp, color = Palette.Muted)
-            if (!done && folder.current.isNotBlank()) Text("En cours : ${folder.current}", fontSize = 11.sp, color = Palette.Muted)
+            AnimatedVisibility(
+                visible = showDetails,
+                enter = fadeIn(tween(250)) + expandVertically(tween(250)),
+                exit = fadeOut(tween(250)) + shrinkVertically(tween(250)),
+            ) {
+                Text(folderDetail(folder), fontSize = 12.sp, color = Palette.Muted)
+            }
         }
-        Text(if (folder.nothingNew) "rien à faire" else "${folder.done} / ${folder.total}", fontSize = 13.sp, color = Palette.Accent)
     }
 }

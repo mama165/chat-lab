@@ -1,6 +1,7 @@
 package com.example.chatlab.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,7 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,10 +39,29 @@ import com.example.chatlab.R
 
 /** Title of a tab, with the settings gear on the right. */
 @Composable
-fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null) {
+fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null, onAdd: (() -> Unit)? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink, modifier = Modifier.weight(1f))
+            if (onAdd != null) {
+                // A plus in a light circle, next to the settings: it adds a folder to analyse.
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Palette.Field)
+                        .clickable(onClick = onAdd)
+                        .semantics { contentDescription = "Ajouter un dossier" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(modifier = Modifier.size(18.dp)) {
+                        val line = 2.dp.toPx()
+                        drawLine(Palette.Accent, Offset(size.width / 2, 0f), Offset(size.width / 2, size.height), strokeWidth = line, cap = StrokeCap.Round)
+                        drawLine(Palette.Accent, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), strokeWidth = line, cap = StrokeCap.Round)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
             Box(
                 modifier = Modifier
                     .size(40.dp)

@@ -106,6 +106,7 @@ class AnalysisService : Service() {
                 startedAt = started,
                 message = "Préparation…",
                 folders = sources.map { FolderProgress(it.name, 0, 0) },
+                levelLabel = LevelStore.read(this).label,
             ),
         )
         startForeground(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, true))

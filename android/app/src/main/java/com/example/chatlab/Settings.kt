@@ -108,7 +108,7 @@ fun SettingsPage(
         }
         Column {
             SectionLabel("Analyse")
-            SettingRow("Niveau d'analyse", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
+            SettingRow("Performance", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
         }
         Column {
             SectionLabel("Espace")
