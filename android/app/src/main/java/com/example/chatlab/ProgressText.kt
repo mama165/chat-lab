@@ -149,6 +149,17 @@ object ModelNames {
     val ORDER = listOf(IMAGES, TEXTS, FACES)
 }
 
+/**
+ * The line under "Modèles prêts": how many models were reloaded, and how long it took in all,
+ * for example "Modèles rechargés : 3 sur 3, en 2,1 s".
+ */
+fun reloadSummary(steps: Map<String, Long>): String {
+    val loaded = ModelNames.ORDER.filter { steps.containsKey(it) }
+    val total = loaded.sumOf { steps.getValue(it) }
+    return "Modèles rechargés : ${loaded.size} sur ${ModelNames.ORDER.size}, en " +
+        "%.1f s".format(java.util.Locale.FRANCE, total / 1000.0)
+}
+
 /** One row of the reloading view: loaded (with its time), being loaded, or still to come. */
 enum class ModelRowState { DONE, LOADING, WAITING }
 

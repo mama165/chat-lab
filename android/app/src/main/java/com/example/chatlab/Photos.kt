@@ -574,7 +574,7 @@ private fun ReloadingScreen(progress: Progress, loading: Boolean) {
             color = Palette.Ink,
         )
         Text(
-            if (loading) "Les photos reprendront une fois les modèles prêts." else "Les photos reprennent.",
+            if (loading) "Les photos reprendront une fois les modèles prêts." else reloadSummary(progress.modelSteps),
             fontSize = 13.sp,
             color = Palette.Muted,
             textAlign = TextAlign.Center,

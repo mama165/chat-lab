@@ -46,3 +46,16 @@ class ReloadRowsTest {
         assertEquals(1, done.loadingModels)
     }
 }
+
+class ReloadSummaryTest {
+    @Test
+    fun all_three_models_reloaded_in_the_total_time() {
+        val steps = mapOf(ModelNames.IMAGES to 800L, ModelNames.TEXTS to 900L, ModelNames.FACES to 400L)
+        assertEquals("Modèles rechargés : 3 sur 3, en 2,1 s", reloadSummary(steps))
+    }
+
+    @Test
+    fun a_partial_reload_counts_only_the_models_loaded() {
+        assertEquals("Modèles rechargés : 1 sur 3, en 0,8 s", reloadSummary(mapOf(ModelNames.IMAGES to 800L)))
+    }
+}
