@@ -39,6 +39,10 @@ data class AnalysisRecord(
     val cores: Int,
     val folders: List<FolderStat>,
     val samples: List<Sample>,
+    /** Photos analysed by type (JPEG, PNG, WebP, Autre). */
+    val types: Map<String, Int> = emptyMap(),
+    /** Each loading of the models: the first one, and each reload after a pause. */
+    val modelLoads: List<ModelLoad> = emptyList(),
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val analyzed: Int get() = folders.sumOf { it.analyzed }
@@ -67,6 +71,15 @@ data class AnalysisRecord(
             .put("level", level)
             .put("workers", workers)
             .put("stopped", stopped))
+        .put("types", JSONObject().apply { types.forEach { (k, v) -> put(k, v) } })
+        .put("models", JSONArray().apply {
+            modelLoads.forEach {
+                put(JSONObject()
+                    .put("reload", it.reload)
+                    .put("t", ((it.atMs - startMs) / 1000).toInt())
+                    .put("millis", it.millis))
+            }
+        })
         .put("device", JSONObject()
             .put("model", device)
             .put("android", androidVersion)
@@ -119,6 +132,14 @@ data class AnalysisRecord(
                     val p = samples.getJSONObject(i)
                     Sample(p.getInt("t"), p.getDouble("cpu").toFloat(), p.getInt("memMb"), p.getInt("battery"), p.getDouble("batteryTempC").toFloat(), p.getInt("thermal"))
                 },
+                types = json.optJSONObject("types")?.let { t -> t.keys().asSequence().associateWith { t.getInt(it) } }.orEmpty(),
+                modelLoads = json.optJSONArray("models")?.let { m ->
+                    val start = parseIso(run.getString("start"))
+                    (0 until m.length()).map { i ->
+                        val p = m.getJSONObject(i)
+                        ModelLoad(p.getBoolean("reload"), start + p.getInt("t") * 1000L, p.getLong("millis"))
+                    }
+                }.orEmpty(),
             )
         }
 

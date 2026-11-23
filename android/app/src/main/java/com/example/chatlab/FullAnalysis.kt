@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.Collections
 import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -48,7 +49,7 @@ object AnalysisProgress {
  * the work goes on when the application is left.
  *
  * Each file is recognised by its first bytes (like the Go scanner), never by its name.
- * The images are processed by WORKERS workers in parallel. An unchanged photo (same
+ * The images are processed by workers in parallel (see AnalysisLevel). An unchanged photo (same
  * address, size and date) is taken from the library without computing. The library is saved in the
  * chatlab folder, and the photos stay where they are: nothing is copied permanently.
  * At the end, a report per folder says what was analysed and what could not be.
@@ -57,6 +58,16 @@ class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var recorder: AnalysisRecorder? = null
     private var lastNotified = 0L
+
+    /** The level of the analysis running, read when it starts. */
+    private var level = AnalysisLevel.DEFAULT
+
+    /** Loads the models again after a pause, showing it on the screen. */
+    private fun reloadModels(slot: AnalyzerSlot<Analyzer>) {
+        AnalysisProgress.update { it.copy(message = "Chargement des modèles…") }
+        slot.get()
+        AnalysisProgress.update { it.copy(message = "") }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -96,6 +107,7 @@ class AnalysisService : Service() {
         )
         startForeground(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, true))
 
+        level = LevelStore.read(this)
         recorder = AnalysisRecorder(this).also { it.start(scope) }
         scope.launch {
             try {
@@ -151,16 +163,26 @@ class AnalysisService : Service() {
 
         // One analyser per worker: each loads its models and works alone. With nothing to
         // analyse, no model is loaded.
-        val workers = if (total == 0) 0 else WORKERS
-        val analyzers = List(workers) { Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) }
+        val workers = if (total == 0) 0 else level.workers
+        val loads = Collections.synchronizedList(mutableListOf<ModelLoad>())
+        val slots = List(workers) {
+            AnalyzerSlot<Analyzer>(
+                load = { Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) },
+                onLoad = { loads.add(it) },
+            )
+        }
         try {
             coroutineScope {
-                analyzers.map { analyzer ->
+                slots.map { slot ->
                     async(Dispatchers.Default) {
                         while (true) {
-                            // Stop point before each photo: when paused we wait here, when stopped we leave.
+                            // Stop point before each photo. A pause releases the models here, and
+                            // a resume loads them again before the next photo.
                             try {
-                                control.checkpoint()
+                                control.boundary(
+                                    onPaused = { slot.release() },
+                                    onResumed = { reloadModels(slot) },
+                                )
                             } catch (stopped: AnalysisStopped) {
                                 break
                             }
@@ -168,7 +190,7 @@ class AnalysisService : Service() {
                             if (index >= total) break
                             val item = plan.toProcess[index]
                             val outcome = try {
-                                analyzeOne(this@AnalysisService, analyzer, item, sources[item.folderIndex].name, zone, control::checkpoint)
+                                analyzeOne(this@AnalysisService, slot, item, sources[item.folderIndex].name, zone, control::checkpointStep)
                             } catch (stopped: AnalysisStopped) {
                                 // The current photo is dropped; it will be taken again in the next analysis.
                                 break
@@ -204,7 +226,7 @@ class AnalysisService : Service() {
             ReportStore.saveRun(this@AnalysisService, runReport)
             val samples = recorder?.stop().orEmpty()
             recorder = null
-            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped))
+            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults))
             val text = when {
                 stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
@@ -216,7 +238,7 @@ class AnalysisService : Service() {
                 runReport,
             )
         } finally {
-            analyzers.forEach { it.close() }
+            slots.forEach { it.release() }
         }
     }
 
@@ -250,7 +272,15 @@ class AnalysisService : Service() {
     }
 
     /** Le fichier d'une analyse : ce qui s'est passé dans chaque dossier, et les relevés du téléphone. */
-    private fun recordOf(started: Long, report: RunReport, samples: List<Sample>, stopped: Boolean): AnalysisRecord {
+    private fun recordOf(
+        started: Long,
+        report: RunReport,
+        samples: List<Sample>,
+        stopped: Boolean,
+        level: AnalysisLevel,
+        loads: List<ModelLoad>,
+        results: List<ImageResult>,
+    ): AnalysisRecord {
         val info = try {
             packageManager.getPackageInfo(packageName, 0)
         } catch (e: Exception) {
@@ -259,8 +289,8 @@ class AnalysisService : Service() {
         return AnalysisRecord(
             startMs = started,
             endMs = System.currentTimeMillis(),
-            level = "equilibre",
-            workers = WORKERS,
+            level = level.key,
+            workers = level.workers,
             stopped = stopped,
             appVersion = "${info?.versionName ?: "?"} (${info?.longVersionCode ?: 0})",
             device = "${Build.MANUFACTURER} ${Build.MODEL}",
@@ -270,6 +300,8 @@ class AnalysisService : Service() {
                 FolderStat(it.name, it.analyzed, it.ignored, it.unread, it.refused.size + if (it.rootRefused) 1 else 0)
             },
             samples = samples,
+            types = TypeCounts.of(results.map { it.mime }),
+            modelLoads = loads,
         )
     }
 
@@ -306,9 +338,6 @@ class AnalysisService : Service() {
         /** Ends the analysis, keeping everything done. */
         fun stop() = current?.stop() ?: false
 
-        /** Number of images analysed at the same time. Each worker loads its models. */
-        const val WORKERS = 2
-
         /** The library is saved at most every two minutes during the analysis. */
         const val SAVE_INTERVAL_MS = 120_000L
 
@@ -331,7 +360,7 @@ private sealed interface Outcome {
  */
 private fun analyzeOne(
     context: Context,
-    analyzer: Analyzer,
+    slot: AnalyzerSlot<Analyzer>,
     item: PlanItem,
     folderName: String,
     zone: TimeZone,
@@ -347,7 +376,7 @@ private fun analyzeOne(
             val input = file.open() ?: throw ImageFailure(FailureReason.INACCESSIBLE, "ouverture impossible")
             input.use { source -> temp.outputStream().use { source.copyTo(it) } }
             val started = System.nanoTime()
-            val analyzed = analyzer.analyzeFile(temp, checkpoint)
+            val analyzed = slot.get().analyzeFile(temp, checkpoint)
             val millis = (System.nanoTime() - started) / 1_000_000
             val taken = Dates.exifToTaken(exifDate(temp)) ?: Dates.formatTaken(file.lastModified, zone)
             Outcome.Done(

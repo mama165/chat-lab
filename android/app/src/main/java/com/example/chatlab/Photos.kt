@@ -69,7 +69,13 @@ import kotlinx.coroutines.withContext
 
 /** Photos tab: the folders to analyse, the report of the last analysis, then the progress. */
 @Composable
-fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolders: () -> Unit, modifier: Modifier = Modifier) {
+fun PhotosScreen(
+    entries: List<LibraryEntry>,
+    onSettings: () -> Unit,
+    onAddFolders: () -> Unit,
+    onHistory: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val progress by AnalysisProgress.state.collectAsState()
     val reading by ReadProgress.counts.collectAsState()
@@ -132,6 +138,7 @@ fun PhotosScreen(entries: List<LibraryEntry>, onSettings: () -> Unit, onAddFolde
                     version++
                 },
                 onStart = start,
+                onHistory = onHistory,
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -189,13 +196,14 @@ private fun Idle(
     pickers: FolderPickers,
     onRemove: (String) -> Unit,
     onStart: () -> Unit,
+    onHistory: () -> Unit,
 ) {
     val subtitle = buildString {
         append("${Formats.photos(entries.size).replaceFirstChar { it.uppercase() }} dans le carnet")
         lastRun?.let { append(" · dernière analyse le ${Dates.short(SimpleDate.of(it.finishedAt))}") }
     }
     Text(subtitle, fontSize = 13.sp, color = Palette.Muted, modifier = Modifier.padding(top = 0.dp))
-    if (lastRun != null) RunBanner(lastRun)
+    if (lastRun != null) RunBanner(lastRun, onHistory)
 
     SectionLabel("Dossiers à analyser", right = "sous-dossiers inclus")
     // Each folder shows at once: its card if its reading is done, otherwise its reading in progress.
@@ -317,7 +325,7 @@ private fun ReadingCard(folder: SourceFolder, examined: Int, total: Int) {
 
 /** L'encart de bilan : analyse terminée, photos analysées, fichiers non lus. */
 @Composable
-private fun RunBanner(run: RunReport) {
+private fun RunBanner(run: RunReport, onHistory: () -> Unit) {
     val clock = Dates.formatTaken(run.finishedAt, java.util.TimeZone.getDefault()).substringAfter(' ')
     val day = Dates.short(SimpleDate.of(run.finishedAt))
     Column(
@@ -340,6 +348,13 @@ private fun RunBanner(run: RunReport) {
         if (run.refusedFolders > 0) {
             BannerLine("!", Palette.Danger, "${run.refusedFolders}", if (run.refusedFolders > 1) "dossiers refusés par Android" else "dossier refusé par Android")
         }
+        Text(
+            "Voir l'historique des analyses ›",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Palette.Accent,
+            modifier = Modifier.clickable(onClick = onHistory).padding(top = 4.dp),
+        )
     }
 }
 

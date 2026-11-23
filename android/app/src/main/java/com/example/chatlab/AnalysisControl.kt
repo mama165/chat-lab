@@ -12,9 +12,10 @@ class AnalysisStopped : RuntimeException("analyse arrêtée")
 /**
  * Control of an analysis: pause, resume and stop.
  *
- * Workers call [checkpoint] between two steps of a photo. When paused, they stay there
- * blocked without computing anything, until [resume] (only on request) or [stop]. Nothing is
- * lost: the current photo resumes at the step where it was frozen.
+ * A pause takes effect at the next photo boundary: the photo in progress is finished, then the
+ * worker releases its models ([boundary] calls [onPaused]) and waits without computing anything.
+ * On [resume], the worker reloads its models ([onResumed]) before taking the next photo. A stop
+ * is raised at the next stop point, in the photo or at the boundary.
  */
 class AnalysisControl(private val onChange: (RunState) -> Unit = {}) {
     private val lock = ReentrantLock()
@@ -42,12 +43,36 @@ class AnalysisControl(private val onChange: (RunState) -> Unit = {}) {
         return moved
     }
 
+    /**
+     * Stop point inside a photo: only a stop is raised. A pause does not freeze the photo in
+     * progress, it takes effect at the next boundary.
+     */
+    fun checkpointStep() {
+        if (state == RunState.STOPPING) throw AnalysisStopped()
+    }
+
     /** Waits while the analysis is paused; throws [AnalysisStopped] if a stop is requested. */
     fun checkpoint() {
         lock.withLock {
             while (current == RunState.PAUSED) changed.await()
             if (current == RunState.STOPPING) throw AnalysisStopped()
         }
+    }
+
+    /**
+     * Stop point between two photos. When paused, [onPaused] runs once before the wait (models
+     * released), and [onResumed] runs after it (models reloaded), unless a stop comes first.
+     */
+    fun boundary(onPaused: () -> Unit = {}, onResumed: () -> Unit = {}) {
+        val paused = lock.withLock { current == RunState.PAUSED }
+        if (paused) {
+            onPaused()
+            lock.withLock {
+                while (current == RunState.PAUSED) changed.await()
+            }
+        }
+        if (state == RunState.STOPPING) throw AnalysisStopped()
+        if (paused) onResumed()
     }
 
     private fun move(from: RunState, to: RunState): Boolean {

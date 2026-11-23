@@ -28,6 +28,8 @@ fun MainScreen() {
     var page by remember { mutableStateOf(Page.TABS) }
     // Where we came from to choose folders: the Photos tab, or the settings.
     var storageBack by remember { mutableStateOf(Page.TABS) }
+    // The analysis file opened from the history (its name in ChatLab/analyses).
+    var openedRun by remember { mutableStateOf("") }
     val search = remember { SearchUiState() }
     // Increase when the library or the removals change, to read again what is saved.
     var dataVersion by remember { mutableIntStateOf(0) }
@@ -81,6 +83,15 @@ fun MainScreen() {
                 },
             )
             Page.TESTS -> TestsPage(onBack = { page = Page.SETTINGS })
+            Page.LEVEL -> LevelPage(onBack = { page = Page.SETTINGS })
+            Page.HISTORY -> AnalysisHistoryPage(
+                onBack = { page = Page.SETTINGS },
+                onOpen = {
+                    openedRun = it
+                    page = Page.RUN
+                },
+            )
+            Page.RUN -> AnalysisDetailPage(name = openedRun, onBack = { page = Page.HISTORY })
             Page.TABS -> {
                 val content = Modifier.weight(1f)
                 if (tab == 0) {
@@ -97,6 +108,7 @@ fun MainScreen() {
                     PhotosScreen(
                         entries = entries,
                         onSettings = { page = Page.SETTINGS },
+                        onHistory = { page = Page.HISTORY },
                         onAddFolders = {
                             storageBack = Page.TABS
                             page = Page.STORAGE

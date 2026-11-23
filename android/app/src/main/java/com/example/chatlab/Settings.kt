@@ -72,6 +72,7 @@ fun SettingsPage(
     val sources = remember(foldersVersion) { Sources.read(context) }
     val chatlab = remember(foldersVersion) { folderName(context, KEY_FOLDER) }
     val removals = remember(removalsVersion) { RemovalsJson.count(LibraryStore.readRemovals(context)) }
+    val history = remember(dataVersion) { RunArchive.list(context).size }
     val appSize by produceState<Long?>(initialValue = null, dataVersion) {
         value = withContext(Dispatchers.IO) { measureAppSize(context) }
     }
@@ -106,6 +107,10 @@ fun SettingsPage(
             SettingRow("Non classifiées", "$removals", onClick = { onOpen(Page.REMOVED) })
         }
         Column {
+            SectionLabel("Analyse")
+            SettingRow("Niveau d'analyse", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
+        }
+        Column {
             SectionLabel("Espace")
             SettingRow("Application", appSize?.let { Formats.size(it) } ?: "…")
             SettingRow(
@@ -115,6 +120,7 @@ fun SettingsPage(
         }
         Column {
             SectionLabel("Avancé")
+            SettingRow("Historique des analyses", "$history", onClick = { onOpen(Page.HISTORY) })
             SettingRow("Outils de test", onClick = { onOpen(Page.TESTS) })
             SettingRow("Tout effacer", color = Palette.Danger, onClick = { onOpen(Page.WIPE) })
         }
