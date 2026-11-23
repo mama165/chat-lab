@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -37,6 +38,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -57,11 +59,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -72,6 +77,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -221,7 +227,7 @@ fun SearchScreen(
                 onSettings = onSettings,
                 onFilters = onFilters,
                 filtersCount = state.filters.activeCount,
-                subtitle = if (query.isBlank()) "${Formats.photos(entries.size).replaceFirstChar { it.uppercase() }}, dans le carnet" else null,
+                subtitle = null,
             )
             Spacer(Modifier.height(12.dp))
             SearchField(
@@ -337,37 +343,58 @@ private fun SearchField(
     onChange: (String) -> Unit,
     onSearch: () -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextField(
-            value = value,
-            onValueChange = onChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            shape = RoundedCornerShape(24.dp),
-            placeholder = { Text("Un mot, ou ce que montre la photo", color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_loupe), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(18.dp)) },
-            trailingIcon = {
-                if (value.isNotEmpty()) {
+    // As in the design: a bare field with a navy underline, and a helper line under it.
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    val line = 1.5.dp.toPx()
+                    drawLine(Palette.Accent, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = line)
+                }
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(painterResource(R.drawable.ic_loupe), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(20.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                if (value.isEmpty()) {
                     Text(
-                        "✕",
+                        "Un mot, ou ce que montre la photo",
+                        fontSize = 17.sp,
                         color = Palette.Muted,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable { onChange("") }
-                            .semantics { contentDescription = "Effacer la recherche" }
-                            .padding(8.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Palette.Field,
-                unfocusedContainerColor = Palette.Field,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Palette.Accent,
-            ),
+                BasicTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 17.sp, color = Palette.Ink),
+                    cursorBrush = SolidColor(Palette.Accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (value.isNotEmpty()) {
+                Text(
+                    "✕",
+                    fontSize = 14.sp,
+                    color = Palette.Muted,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onChange("") }
+                        .semantics { contentDescription = "Effacer la recherche" }
+                        .padding(4.dp),
+                )
+            }
+        }
+        Text(
+            "Par exemple « facture », « wifi » ou « une plage ».",
+            fontSize = 13.sp,
+            color = Palette.Muted,
         )
     }
 }
@@ -425,10 +452,7 @@ private fun SelectionBar(count: Int, query: String, onCancel: () -> Unit, onRemo
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
-    if (recents.isEmpty()) {
-        Text("Tapez un mot lu sur la photo, ou décrivez-la : « une plage », « deux personnes ».", fontSize = 14.sp, color = Palette.Muted)
-        return
-    }
+    if (recents.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("Récentes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -439,9 +463,9 @@ private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
                     color = Palette.Ink,
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Palette.Field)
+                        .border(1.dp, Palette.Line, RoundedCornerShape(18.dp))
                         .clickable { onPick(recent) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
                 )
             }
         }

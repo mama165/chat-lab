@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -85,16 +86,16 @@ fun TabTitle(
                         Icon(painterResource(R.drawable.ic_filtres), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
                     }
                     if (filtersCount > 0) {
-                        Box(
+                        // The number of filters, written over the bottom-right edge of the circle, without background.
+                        Text(
+                            "$filtersCount",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Palette.Accent,
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .background(Palette.Accent),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("$filtersCount", fontSize = 10.sp, color = Color.White)
-                        }
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 2.dp, y = 2.dp),
+                        )
                     }
                 }
                 Spacer(Modifier.width(8.dp))
