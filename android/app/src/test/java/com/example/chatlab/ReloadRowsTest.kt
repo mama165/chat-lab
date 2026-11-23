@@ -59,3 +59,22 @@ class ReloadSummaryTest {
         assertEquals("Modèles rechargés : 1 sur 3, en 0,8 s", reloadSummary(mapOf(ModelNames.IMAGES to 800L)))
     }
 }
+
+class ReloadDoneTest {
+    private val paused = Progress(running = true, total = 10, paused = true)
+
+    @Test
+    fun the_photos_go_on_only_once_every_worker_has_its_models() {
+        val reloading = paused.resuming(now = 0L).loadingStarted().loadingStarted()
+        assertEquals(false, reloading.reloadDone)
+        assertEquals(false, reloading.loadingDone().reloadDone)
+        assertEquals(true, reloading.loadingDone().loadingDone().reloadDone)
+    }
+
+    @Test
+    fun resuming_clears_the_previous_reload() {
+        val finished = paused.loadingStarted().loadingDone()
+        assertEquals(true, finished.reloadDone)
+        assertEquals(false, finished.copy(paused = true).resuming(now = 0L).reloadDone)
+    }
+}

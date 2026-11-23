@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.ui.PageHeader
@@ -97,6 +99,11 @@ fun AnalysisHistoryPage(onBack: () -> Unit, onOpen: (String) -> Unit) {
     ) {
         Spacer(Modifier.height(4.dp))
         PageHeader("Historique des analyses", onBack = onBack)
+        Text(
+            "Chaque analyse terminée est gardée dans ChatLab/analyses sur le téléphone.",
+            fontSize = 13.sp,
+            color = Palette.Muted,
+        )
         val list = records
         when {
             list == null -> Text("Lecture des analyses…", fontSize = 14.sp, color = Palette.Muted)
@@ -107,6 +114,13 @@ fun AnalysisHistoryPage(onBack: () -> Unit, onOpen: (String) -> Unit) {
             )
             else -> list.forEach { (name, record) -> RunCard(record) { onOpen(name) } }
         }
+        Text(
+            "Pour le détail d'une analyse, voir la fiche technique.",
+            fontSize = 12.sp,
+            color = Palette.Muted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -114,34 +128,65 @@ fun AnalysisHistoryPage(onBack: () -> Unit, onOpen: (String) -> Unit) {
 @Composable
 private fun RunCard(record: AnalysisRecord, onClick: () -> Unit) {
     val summary = record.summary()
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .border(1.dp, Palette.Line, shape)
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            analysisDateLabel(record.startMs) + if (record.stopped) " · arrêtée" else "",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Palette.Ink,
+    val minutes = (record.durationMs / 60_000).toInt()
+    val seconds = record.durationMs / 1000.0
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                analysisDateLabel(record.startMs) + if (record.stopped) " · arrêtée" else "",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Palette.Ink,
+            )
+            Text(
+                "${AnalysisLevel.fromKey(record.level).label} · ${HistoryText.shortDuration(minutes)}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Palette.Accent,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        StatLine("CPU", "${summary.avgCpu.roundToInt()} % en moyenne")
+        StatLine("Mémoire", "${summary.peakMemMb} Mo au pic")
+        StatLine(
+            "Batterie",
+            if (summary.batteryStart != null && summary.batteryEnd != null) "${summary.batteryStart} % → ${summary.batteryEnd} %" else "–",
         )
-        Text(
-            "${Formats.photos(record.analyzed)} · ${durationText((record.durationMs / 60_000).toInt())}",
-            fontSize = 13.sp,
-            color = Palette.Muted,
-        )
-        Text(
-            "CPU moyen ${summary.avgCpu.roundToInt()} % · mémoire max ${summary.peakMemMb} Mo",
-            fontSize = 13.sp,
-            color = Palette.Muted,
-        )
-        Text("Détail et courbes ›", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
+        StatLine("Chauffe", HistoryText.heating(summary.thermalMax))
+        StatLine("Photos", HistoryText.photosInFolders(record.analyzed, record.folders.size))
+        StatLine("Vitesse", HistoryText.photosPerSecond(HistoryText.speed(record.analyzed, seconds)))
+        Spacer(Modifier.height(10.dp))
+        val pill = RoundedCornerShape(20.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(pill)
+                .border(1.dp, Palette.Accent, pill)
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Détail et courbes ›", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
+        }
     }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
+}
+
+/** One line of an analysis card: a label on the left, its value on the right. */
+@Composable
+private fun StatLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 13.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink, textAlign = TextAlign.End)
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Field))
 }
 
 private sealed interface Loaded {

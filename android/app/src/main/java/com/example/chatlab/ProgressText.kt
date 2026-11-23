@@ -35,16 +35,21 @@ data class Progress(
     val loadingModels: Int = 0,
     /** Each model loaded since the last reload, with its loading time in milliseconds. */
     val modelSteps: Map<String, Long> = emptyMap(),
+    /** True once every worker has its models again, after a reload; the photos can go on. */
+    val reloadDone: Boolean = false,
 ) {
     /** A worker starts reloading its models. The models loaded before are forgotten. */
-    fun loadingStarted(): Progress = copy(loadingModels = loadingModels + 1, modelSteps = emptyMap())
+    fun loadingStarted(): Progress = copy(loadingModels = loadingModels + 1, modelSteps = emptyMap(), reloadDone = false)
 
     /** A model is loaded: the first time it is seen is the one kept. */
     fun modelDone(name: String, millis: Long): Progress =
         if (modelSteps.containsKey(name)) this else copy(modelSteps = modelSteps + (name to millis))
 
     /** A worker has its models again. Never below zero. */
-    fun loadingDone(): Progress = copy(loadingModels = (loadingModels - 1).coerceAtLeast(0))
+    fun loadingDone(): Progress {
+        val left = (loadingModels - 1).coerceAtLeast(0)
+        return copy(loadingModels = left, reloadDone = left == 0)
+    }
 
     /** Which screen the analysis shows: the models reloading, the pause, or the running list. */
     fun runningScreen(): RunningScreen = when {
@@ -87,7 +92,7 @@ data class Progress(
 
     /** Resumes: the duration of the pause is removed from the elapsed time. */
     fun resuming(now: Long): Progress =
-        if (!paused) this else copy(paused = false, pausedAt = 0L, pausedTotal = pausedTotal + (now - pausedAt).coerceAtLeast(0L))
+        if (!paused) this else copy(paused = false, pausedAt = 0L, pausedTotal = pausedTotal + (now - pausedAt).coerceAtLeast(0L), reloadDone = false)
 }
 
 /** Line of text shown on the screen and in the notification. */

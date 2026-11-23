@@ -7,6 +7,13 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -493,27 +500,22 @@ private fun AddFolderRow(onClick: () -> Unit) {
     }
 }
 
-/** During the analysis: the running list, the pause (view 2.2) or the reloading of the models (view 2.3). */
+/**
+ * During the analysis. Once the models have been reloaded after a pause, the photos go on
+ * through the reprise sequence (view 2.3), which ends on the list.
+ */
 @Composable
 private fun Running(progress: Progress, now: Long) {
-    val reloading = progress.loadingModels > 0
-    var holding by remember { mutableStateOf(false) }
-    // Once the models are ready, the reloading view stays a moment, so that its three rows can be read.
-    LaunchedEffect(reloading) {
-        if (!reloading && progress.modelSteps.isNotEmpty()) {
-            holding = true
-            delay(RELOAD_HOLD_MS)
-            holding = false
-        }
+    var reprise by remember { mutableStateOf(false) }
+    LaunchedEffect(progress.loadingModels > 0) {
+        if (progress.loadingModels > 0) reprise = true
     }
     when {
-        reloading || holding -> ReloadingScreen(progress, loading = reloading)
-        progress.runningScreen() == RunningScreen.PAUSED -> PausedScreen(progress)
+        progress.paused -> PausedScreen(progress)
+        reprise -> RepriseScreen(progress, now)
         else -> RunningDetail(progress, now)
     }
 }
-
-private const val RELOAD_HOLD_MS = 2500L
 
 /** Pause (view 2.2): the ring frozen in grey, what is done, Reprendre and Arrêter. */
 @Composable
@@ -548,38 +550,127 @@ private fun PausedScreen(progress: Progress) {
     }
 }
 
+/** The steps of the reprise sequence (view 2.3), in order. */
+private const val STEP_LOADING = 0
+private const val STEP_READY = 1
+private const val STEP_FOLDING = 2
+private const val STEP_CALC = 3
+private const val STEP_REMAINING = 4
+private const val STEP_FOLDERS = 5
+private const val STEP_BUTTONS = 6
+
+/** What the line under the figure says during the sequence. */
+private enum class Subline { LOADING, SUMMARY, CALC, REMAINING }
+
 /**
- * Reprise (view 2.3): the three models, each waiting, loading (turning) or done with its real
- * loading time; then the photos go on.
+ * Reprise (view 2.3). While the models reload: a turning ring and the three model rows. Once they
+ * are ready: the summary of the reload, the rows fold away, the remaining time is calculated, then
+ * the folders come back one by one and the buttons appear. The timing is cosmetic; the models and
+ * the photos are real.
  */
 @Composable
-private fun ReloadingScreen(progress: Progress, loading: Boolean) {
+private fun RepriseScreen(progress: Progress, now: Long) {
+    var step by remember { mutableIntStateOf(STEP_LOADING) }
+    var foldersShown by remember { mutableIntStateOf(0) }
+    LaunchedEffect(progress.reloadDone) {
+        if (!progress.reloadDone) {
+            step = STEP_LOADING
+            foldersShown = 0
+            return@LaunchedEffect
+        }
+        step = STEP_READY
+        delay(1200)
+        step = STEP_FOLDING
+        delay(1000)
+        step = STEP_CALC
+        delay(1300)
+        step = STEP_REMAINING
+        delay(800)
+        step = STEP_FOLDERS
+        for (i in 1..progress.folders.size) {
+            foldersShown = i
+            delay(180)
+        }
+        step = STEP_BUTTONS
+    }
+    val loading = step == STEP_LOADING
+    val subline = when (step) {
+        STEP_LOADING -> Subline.LOADING
+        STEP_READY, STEP_FOLDING -> Subline.SUMMARY
+        STEP_CALC -> Subline.CALC
+        else -> Subline.REMAINING
+    }
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (loading) {
-            CircularProgressIndicator(modifier = Modifier.size(130.dp), color = Palette.Accent, strokeWidth = 10.dp)
-        } else {
-            Canvas(modifier = Modifier.size(130.dp)) {
-                val stroke = Stroke(width = 10.dp.toPx())
-                drawArc(Palette.Accent, 0f, 360f, false, Offset(5.dp.toPx(), 5.dp.toPx()), Size(size.width - 10.dp.toPx(), size.height - 10.dp.toPx()), style = stroke)
+        Box(modifier = Modifier.size(130.dp), contentAlignment = Alignment.Center) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(130.dp), color = Palette.Accent, strokeWidth = 10.dp)
+            } else {
+                Canvas(modifier = Modifier.size(130.dp)) {
+                    val stroke = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
+                    val inset = 5.dp.toPx()
+                    val arcSize = Size(size.width - 2 * inset, size.height - 2 * inset)
+                    drawArc(Palette.Field, 0f, 360f, false, Offset(inset, inset), arcSize, style = stroke)
+                    drawArc(Palette.Accent, -90f, 360f * progress.fraction, false, Offset(inset, inset), arcSize, style = stroke)
+                }
+                Text("${(progress.fraction * 100).toInt()} %", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
             }
         }
         Text(
-            if (loading) "Chargement des modèles" else "Modèles prêts",
+            if (loading) "Chargement des modèles" else "${progress.done} sur ${progress.total} nouvelles photos",
             fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
             color = Palette.Ink,
         )
-        Text(
-            if (loading) "Les photos reprendront une fois les modèles prêts." else reloadSummary(progress.modelSteps),
-            fontSize = 13.sp,
-            color = Palette.Muted,
-            textAlign = TextAlign.Center,
-        )
+        Crossfade(targetState = subline, label = "subline") { line ->
+            when (line) {
+                Subline.LOADING -> Text(
+                    "Les photos reprendront une fois les modèles prêts.",
+                    fontSize = 13.sp,
+                    color = Palette.Muted,
+                    textAlign = TextAlign.Center,
+                )
+                Subline.SUMMARY -> Text(reloadSummary(progress.modelSteps), fontSize = 13.sp, color = Palette.Muted)
+                Subline.CALC -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Hourglass(14.dp)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Calcul du temps restant", fontSize = 13.sp, color = Palette.Accent)
+                }
+                Subline.REMAINING -> Text(remainingText(progress.remaining(now)), fontSize = 13.sp, color = Palette.Muted)
+            }
+        }
     }
+    AnimatedVisibility(
+        visible = step < STEP_FOLDING,
+        exit = shrinkVertically(tween(900)) + fadeOut(tween(900)),
+    ) {
+        ModelRows(progress)
+    }
+    AnimatedVisibility(visible = step >= STEP_FOLDERS, enter = fadeIn(tween(300))) {
+        SectionLabel("Par dossier")
+    }
+    progress.folders.forEachIndexed { index, folder ->
+        AnimatedVisibility(
+            visible = foldersShown > index,
+            enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 },
+        ) {
+            FolderProgressRow(folder)
+        }
+    }
+    AnimatedVisibility(visible = step >= STEP_BUTTONS, enter = fadeIn(tween(400))) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrimaryButton("❚❚ Pause", onClick = { AnalysisService.pause() }, modifier = Modifier.weight(1f))
+            OutlineButton("Arrêter", onClick = { AnalysisService.stop() }, modifier = Modifier.weight(1f), leading = { StopSquare() })
+        }
+    }
+}
+
+/** The three models, each waiting, loading (turning) or done with its real loading time. */
+@Composable
+private fun ModelRows(progress: Progress) {
+    val loading = progress.loadingModels > 0
     Column(modifier = Modifier.fillMaxWidth()) {
         reloadRows(progress.modelSteps, loading).forEachIndexed { index, (name, state) ->
             Row(
