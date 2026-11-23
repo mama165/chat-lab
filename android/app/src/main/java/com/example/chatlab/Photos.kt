@@ -231,8 +231,8 @@ private fun Idle(
 
 /** Une coche dans un rond clair : le dossier est fini ou n'a rien de nouveau. */
 @Composable
-internal fun CheckMark(size: androidx.compose.ui.unit.Dp = 20.dp) {
-    Canvas(modifier = Modifier.size(size)) {
+internal fun CheckMark(dimension: androidx.compose.ui.unit.Dp = 20.dp) {
+    Canvas(modifier = Modifier.size(dimension)) {
         drawCircle(Palette.Soft, radius = size.minDimension / 2)
         val w = size.width
         val h = size.height
@@ -248,8 +248,8 @@ internal fun CheckMark(size: androidx.compose.ui.unit.Dp = 20.dp) {
 
 /** Un sablier gris : le dossier attend son tour. */
 @Composable
-internal fun Hourglass(size: androidx.compose.ui.unit.Dp = 20.dp) {
-    Canvas(modifier = Modifier.size(size)) {
+internal fun Hourglass(dimension: androidx.compose.ui.unit.Dp = 20.dp) {
+    Canvas(modifier = Modifier.size(dimension)) {
         val w = size.width
         val h = size.height
         val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
