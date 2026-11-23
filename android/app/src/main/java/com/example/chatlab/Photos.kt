@@ -570,7 +570,7 @@ private fun FolderProgressRow(folder: FolderProgress) {
             when (folder.mark()) {
                 FolderMark.FINISHED -> CheckMark()
                 // Started but no photo finished yet: the ring turns; then it follows the real count.
-                FolderMark.RUNNING -> GaugeRing(if (folder.done == 0) null else Progress01.of(folder.done, folder.total))
+                FolderMark.RUNNING -> GaugeRing(folder.gaugeFraction())
                 FolderMark.WAITING -> Hourglass()
             }
         }

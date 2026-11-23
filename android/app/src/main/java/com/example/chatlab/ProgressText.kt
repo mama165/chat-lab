@@ -120,6 +120,13 @@ fun durationText(totalMinutes: Int): String {
 /** La marque d'un dossier dans la liste de l'analyse : fini, en cours, ou en attente. */
 enum class FolderMark { FINISHED, RUNNING, WAITING }
 
+/**
+ * What the gauge of a folder shows: null while it turns (started, no photo finished yet), then
+ * the share of its photos done.
+ */
+fun FolderProgress.gaugeFraction(): Float? =
+    if (mark() != FolderMark.RUNNING || done == 0) null else Progress01.of(done, total)
+
 /** Le dossier est fini (ou n'a rien de nouveau), il est en cours s'il a commencé, sinon il attend. */
 fun FolderProgress.mark(): FolderMark = when {
     nothingNew || finished -> FolderMark.FINISHED
