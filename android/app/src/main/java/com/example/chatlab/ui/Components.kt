@@ -86,16 +86,18 @@ fun TabTitle(
                         Icon(painterResource(R.drawable.ic_filtres), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
                     }
                     if (filtersCount > 0) {
-                        // The number of filters, written over the bottom-right edge of the circle, without background.
-                        Text(
-                            "$filtersCount",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Palette.Accent,
+                        // As in the design: a small navy disc with the number, over the top-right edge of the circle.
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .offset(x = 2.dp, y = 2.dp),
-                        )
+                                .align(Alignment.TopEnd)
+                                .offset(x = 2.dp, y = (-2).dp)
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Palette.Accent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("$filtersCount", fontSize = 10.sp, color = Color.White)
+                        }
                     }
                 }
                 Spacer(Modifier.width(8.dp))
