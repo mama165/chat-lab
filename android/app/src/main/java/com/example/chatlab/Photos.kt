@@ -420,7 +420,7 @@ private fun ClockMark(dimension: androidx.compose.ui.unit.Dp) {
 
 /** The ring of the progress: the blue part only, the percentage in its middle, the time left under it. */
 @Composable
-private fun ProgressRing(progress: Progress, now: Long) {
+private fun ProgressRing(progress: Progress, now: Long, showTime: Boolean = true) {
     Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.size(150.dp)) {
             val stroke = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
@@ -430,9 +430,11 @@ private fun ProgressRing(progress: Progress, now: Long) {
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("${(progress.fraction * 100).toInt()} %", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                ClockMark(13.dp)
-                Text(remainingText(progress.remaining(now)), fontSize = 12.sp, color = Palette.Muted)
+            if (showTime) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ClockMark(13.dp)
+                    Text(remainingText(progress.remaining(now)), fontSize = 12.sp, color = Palette.Muted)
+                }
             }
         }
     }
@@ -530,7 +532,7 @@ private const val STEP_FOLDERS = 5
 private const val STEP_BUTTONS = 6
 
 /** What the line under the figure says during the sequence. */
-private enum class Subline { LOADING, SUMMARY, CALC, REMAINING }
+private enum class Subline { LOADING, SUMMARY, CALC, PERFORMANCE }
 
 /**
  * Reprise (view 2.3). While the models reload: a turning ring and the three model rows. Once they
@@ -549,17 +551,17 @@ private fun RepriseScreen(progress: Progress, now: Long, showDetails: Boolean) {
             return@LaunchedEffect
         }
         step = STEP_READY
-        delay(1200)
+        delay(RepriseTimeline.FOLDING)
         step = STEP_FOLDING
-        delay(1000)
+        delay(RepriseTimeline.CALC - RepriseTimeline.FOLDING)
         step = STEP_CALC
-        delay(1300)
+        delay(RepriseTimeline.REMAINING - RepriseTimeline.CALC)
         step = STEP_REMAINING
-        delay(800)
+        delay(RepriseTimeline.FOLDERS - RepriseTimeline.REMAINING)
         step = STEP_FOLDERS
         for (i in 1..progress.folders.size) {
             foldersShown = i
-            delay(180)
+            delay(RepriseTimeline.FOLDER_STEP)
         }
         step = STEP_BUTTONS
     }
@@ -568,25 +570,19 @@ private fun RepriseScreen(progress: Progress, now: Long, showDetails: Boolean) {
         STEP_LOADING -> Subline.LOADING
         STEP_READY, STEP_FOLDING -> Subline.SUMMARY
         STEP_CALC -> Subline.CALC
-        else -> Subline.REMAINING
+        else -> Subline.PERFORMANCE
     }
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(modifier = Modifier.size(130.dp), contentAlignment = Alignment.Center) {
-            if (loading) {
-                CircularProgressIndicator(modifier = Modifier.size(130.dp), color = Palette.Accent, strokeWidth = 10.dp)
-            } else {
-                Canvas(modifier = Modifier.size(130.dp)) {
-                    val stroke = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
-                    val inset = 5.dp.toPx()
-                    val arcSize = Size(size.width - 2 * inset, size.height - 2 * inset)
-                    drawArc(Palette.Accent, -90f, 360f * progress.fraction, false, Offset(inset, inset), arcSize, style = stroke)
-                }
-                Text("${(progress.fraction * 100).toInt()} %", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        if (loading) {
+            Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(150.dp), color = Palette.Accent, strokeWidth = 10.dp)
             }
+        } else {
+            ProgressRing(progress, now, showTime = step >= STEP_REMAINING)
         }
         if (loading) {
             Text("Chargement des modèles", fontSize = 16.sp, color = Palette.Ink)
@@ -613,7 +609,11 @@ private fun RepriseScreen(progress: Progress, now: Long, showDetails: Boolean) {
                     Spacer(Modifier.width(6.dp))
                     Text("Calcul du temps restant", fontSize = 13.sp, color = Palette.Accent)
                 }
-                Subline.REMAINING -> Text(remainingText(progress.remaining(now)), fontSize = 13.sp, color = Palette.Muted)
+                Subline.PERFORMANCE -> Text(
+                    if (progress.levelLabel.isBlank()) "" else "Performance : ${progress.levelLabel}",
+                    fontSize = 12.sp,
+                    color = Palette.Accent,
+                )
             }
         }
     }

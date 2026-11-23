@@ -227,3 +227,25 @@ fun FolderProgress.mark(): FolderMark = when {
     done > 0 || current.isNotBlank() -> FolderMark.RUNNING
     else -> FolderMark.WAITING
 }
+
+/**
+ * The timing of the reprise (view 2.4), in milliseconds from the end of the reload. Cosmetic: the
+ * models and the photos are real; the screen only moves through these steps.
+ */
+object RepriseTimeline {
+    /** The models are ready: the summary of the reload shows. */
+    const val FOLDING = 1200L
+    /** The model rows fold away, then the time left is calculated. */
+    const val CALC = 2200L
+    /** The time left is shown, in the ring and under it. */
+    const val REMAINING = 3500L
+    /** The folders come back one by one, then the buttons. */
+    const val FOLDERS = 4300L
+    /** The pause between two folders coming back. */
+    const val FOLDER_STEP = 180L
+
+    /** How many folders are shown at [elapsedMs], out of [folders]. */
+    fun foldersShownAt(elapsedMs: Long, folders: Int): Int =
+        if (elapsedMs < FOLDERS) 0 else minOf(folders, ((elapsedMs - FOLDERS) / FOLDER_STEP + 1).toInt())
+}
+
