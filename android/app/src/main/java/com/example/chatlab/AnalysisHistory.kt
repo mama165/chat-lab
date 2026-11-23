@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -313,7 +312,7 @@ private fun CopyDataButton(name: String) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (phase == CopyPhase.COPYING) {
-            CircularProgressIndicator(modifier = Modifier.size(12.dp), color = Palette.Accent, strokeWidth = 2.dp)
+            GaugeRing(fraction = null, size = 12.dp)
         }
         Text(
             when (phase) {
