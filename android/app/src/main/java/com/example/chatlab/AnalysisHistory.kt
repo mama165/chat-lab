@@ -203,6 +203,7 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
                             if (load.reload) "Reprise après la pause" else "Premier chargement",
                             "${ChartMath.clockLabel(record.startMs, ((load.atMs - record.startMs) / 1000).toInt())} · ${secondsLabel(load.millis)}",
                         )
+                        load.parts.forEach { (name, millis) -> KeyValue("   $name", secondsLabel(millis)) }
                     }
                 }
                 Block("Téléphone") {

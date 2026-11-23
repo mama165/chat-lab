@@ -1,7 +1,10 @@
 package com.example.chatlab
 
-/** One loading of the models, for the record of an analysis. */
-data class ModelLoad(val reload: Boolean, val atMs: Long, val millis: Long)
+/**
+ * One loading of the models, for the record of an analysis: whether it is a reload, when it
+ * started, how long it took in all, and how long each model took ([parts]).
+ */
+data class ModelLoad(val reload: Boolean, val atMs: Long, val millis: Long, val parts: Map<String, Long> = emptyMap())
 
 /**
  * Holds the models of one worker. They are loaded on first use, released when the analysis
@@ -12,6 +15,7 @@ class AnalyzerSlot<T : AutoCloseable>(
     private val load: () -> T,
     private val clock: () -> Long = System::currentTimeMillis,
     private val onLoad: (ModelLoad) -> Unit = {},
+    private val parts: (T) -> Map<String, Long> = { emptyMap() },
 ) {
     private var analyzer: T? = null
     private var loadedBefore = false
@@ -25,7 +29,7 @@ class AnalyzerSlot<T : AutoCloseable>(
         val reload = loadedBefore
         val started = clock()
         val fresh = load()
-        onLoad(ModelLoad(reload = reload, atMs = started, millis = clock() - started))
+        onLoad(ModelLoad(reload = reload, atMs = started, millis = clock() - started, parts = parts(fresh)))
         analyzer = fresh
         loadedBefore = true
         return fresh

@@ -70,4 +70,18 @@ class AnalyzerSlotTest {
             loads,
         )
     }
+
+    @Test
+    fun each_model_time_is_kept_with_the_load() {
+        var now = 0L
+        val loads = mutableListOf<ModelLoad>()
+        val slot = AnalyzerSlot(
+            load = { now += 1_000L; FakeModels(1) },
+            clock = { now },
+            onLoad = { loads.add(it) },
+            parts = { mapOf("Modèle des images" to 600L, "Détection des visages" to 150L) },
+        )
+        slot.get()
+        assertEquals(mapOf("Modèle des images" to 600L, "Détection des visages" to 150L), loads.single().parts)
+    }
 }

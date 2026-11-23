@@ -77,7 +77,8 @@ data class AnalysisRecord(
                 put(JSONObject()
                     .put("reload", it.reload)
                     .put("t", ((it.atMs - startMs) / 1000).toInt())
-                    .put("millis", it.millis))
+                    .put("millis", it.millis)
+                    .put("parts", JSONObject().apply { it.parts.forEach { (name, ms) -> put(name, ms) } }))
             }
         })
         .put("device", JSONObject()
@@ -137,7 +138,8 @@ data class AnalysisRecord(
                     val start = parseIso(run.getString("start"))
                     (0 until m.length()).map { i ->
                         val p = m.getJSONObject(i)
-                        ModelLoad(p.getBoolean("reload"), start + p.getInt("t") * 1000L, p.getLong("millis"))
+                        val parts = p.optJSONObject("parts")?.let { o -> o.keys().asSequence().associateWith { o.getLong(it) } }.orEmpty()
+                        ModelLoad(p.getBoolean("reload"), start + p.getInt("t") * 1000L, p.getLong("millis"), parts)
                     }
                 }.orEmpty(),
             )

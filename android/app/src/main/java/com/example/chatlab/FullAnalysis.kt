@@ -172,6 +172,7 @@ class AnalysisService : Service() {
             AnalyzerSlot<Analyzer>(
                 load = { Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) },
                 onLoad = { loads.add(it) },
+                parts = { it.modelTimings },
             )
         }
         try {

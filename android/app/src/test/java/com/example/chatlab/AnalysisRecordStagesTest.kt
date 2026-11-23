@@ -57,4 +57,12 @@ class AnalysisRecordStagesTest {
         assertTrue(back.modelLoads.isEmpty())
         assertEquals(10, back.analyzed)
     }
+
+    @Test
+    fun the_time_of_each_model_survives_the_file() {
+        val parts = mapOf("Modèle des images" to 640L, "Modèle des textes" to 980L, "Détection des visages" to 120L)
+        val original = record(listOf(ModelLoad(reload = true, atMs = start + 5_000L, millis = 1_740L, parts = parts)), emptyMap())
+        val back = AnalysisRecord.fromJson(JSONObject(original.toJson().toString()))
+        assertEquals(parts, back.modelLoads.single().parts)
+    }
 }

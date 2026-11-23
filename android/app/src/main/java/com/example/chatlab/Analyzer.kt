@@ -85,26 +85,44 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     private val detector: FaceDetectorYN
     private val reader: TextReader
 
+    /** Milliseconds each model took to load, by name, in the order they were loaded. */
+    private val timings = LinkedHashMap<String, Long>()
+
+    /** The loading times of the models of this analyzer, for the analysis file. */
+    val modelTimings: Map<String, Long> get() = timings.toMap()
+
     init {
         // The models are read from chatlab/models: the old private copies are no longer used.
         ModelFiles.removeOldCopies(context)
         val models = ModelFiles.folder(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
-        vision = ModelFiles.session(env, context, models, "vision_model.onnx")
+        vision = timed("Modèle des images") {
+            ModelFiles.session(env, context, models, "vision_model.onnx")
+        }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
-        reader = TextReader(env, context, models)
-        detector = FaceDetectorYN.create(
-            "onnx",
-            MatOfByte(*ModelFiles.bytes(context, models, "face_detection_yunet_2023mar.onnx")),
-            MatOfByte(),
-            Size(320.0, 320.0),
-            0.75f,
-            0.3f,
-            5000,
-        )
+        reader = timed("Modèle des textes") { TextReader(env, context, models) }
+        detector = timed("Détection des visages") {
+            FaceDetectorYN.create(
+                "onnx",
+                MatOfByte(*ModelFiles.bytes(context, models, "face_detection_yunet_2023mar.onnx")),
+                MatOfByte(),
+                Size(320.0, 320.0),
+                0.75f,
+                0.3f,
+                5000,
+            )
+        }
+    }
+
+    /** Runs a loading step and keeps how long it took under [name]. */
+    private fun <T> timed(name: String, step: () -> T): T {
+        val started = System.nanoTime()
+        val loaded = step()
+        timings[name] = (System.nanoTime() - started) / 1_000_000
+        return loaded
     }
 
     /**
