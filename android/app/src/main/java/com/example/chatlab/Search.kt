@@ -109,6 +109,8 @@ class SearchUiState {
     var ranked by mutableStateOf(emptyList<Match>())
     /** The filter sheet, which rises over the search. */
     var sheetOpen by mutableStateOf(false)
+    /** Set when an analysis has just finished, until the user opens it. */
+    var analysisDone by mutableStateOf(false)
 
     fun reset() {
         query = ""

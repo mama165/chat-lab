@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,10 +36,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.PrimaryButton
+import androidx.compose.foundation.shape.CircleShape
 
 /** The four categories of the filter sheet, in the order of the chips. */
 enum class SheetCategory(val label: String) {
@@ -71,11 +74,12 @@ fun sheetValue(category: SheetCategory, filters: Filters): String {
 @Composable
 fun BoxScope.FilterSheet(
     state: SearchUiState,
+    entries: List<LibraryEntry>,
     visible: Boolean,
-    onChooseDates: () -> Unit,
     onClose: () -> Unit,
 ) {
     var category by remember { mutableStateOf(SheetCategory.DATE) }
+    var calendarOpen by remember { mutableStateOf(false) }
     val filters = state.filters
 
     AnimatedVisibility(
@@ -135,7 +139,9 @@ fun BoxScope.FilterSheet(
             Crossfade(targetState = category, label = "filtre") { shown ->
                 Column(modifier = Modifier.fillMaxWidth()) {
                     when (shown) {
-                        SheetCategory.DATE -> {
+                        SheetCategory.DATE -> if (calendarOpen) {
+                            SheetCalendar(state, entries, onBack = { calendarOpen = false })
+                        } else {
                             SheetDatePresets.forEach { preset ->
                                 SheetRow(
                                     label = preset.label,
@@ -143,7 +149,12 @@ fun BoxScope.FilterSheet(
                                     onClick = { state.filters = filters.copy(date = DateFilter(preset)) },
                                 )
                             }
-                            SheetRow(label = "Choisir des dates", selected = false, chevron = true, onClick = onChooseDates)
+                            SheetRow(
+                                label = "Choisir des dates",
+                                selected = filters.date.range != null,
+                                chevron = true,
+                                onClick = { calendarOpen = true },
+                            )
                         }
                         SheetCategory.PLACE -> {
                             SheetRow(
@@ -177,6 +188,125 @@ fun BoxScope.FilterSheet(
 
             Spacer(Modifier.height(4.dp))
             PrimaryButton("Appliquer", onClick = onClose)
+        }
+    }
+}
+
+/**
+ * Choosing dates by hand: the first day, then the last one. The range applies as soon as it has
+ * a first day; a second tap on the same day keeps one day. "Raccourcis" goes back to the presets.
+ */
+@Composable
+private fun SheetCalendar(state: SearchUiState, entries: List<LibraryEntry>, onBack: () -> Unit) {
+    val time = remember { When(System.currentTimeMillis()) }
+    val initial = state.filters.date.range
+    var selection by remember { mutableStateOf(DateSelection.of(initial)) }
+    var month by remember { mutableStateOf((initial?.from ?: time.today).let { it.year to it.month }) }
+    val photoDays = remember(entries) { FilterOptions.photoDays(entries, time.zone) }
+    val weeks = remember(month, photoDays) { CalendarGrid.month(month.first, month.second, photoDays, time.zone) }
+    val range = selection.toRange(DayPart.ALL)
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "‹",
+                fontSize = 22.sp,
+                color = Palette.Muted,
+                modifier = Modifier
+                    .clickable { month = CalendarGrid.previous(month.first, month.second) }
+                    .padding(horizontal = 10.dp)
+                    .semantics { contentDescription = "Mois précédent" },
+            )
+            Text(
+                CalendarGrid.title(month.first, month.second),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Palette.Ink,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "›",
+                fontSize = 22.sp,
+                color = Palette.Muted,
+                modifier = Modifier
+                    .clickable { month = CalendarGrid.next(month.first, month.second) }
+                    .padding(horizontal = 10.dp)
+                    .semantics { contentDescription = "Mois suivant" },
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            CalendarGrid.WEEKDAYS.forEach {
+                Text(it, fontSize = 11.sp, color = Palette.Muted, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            }
+        }
+        weeks.forEach { week ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                week.forEach { cell ->
+                    SheetDay(cell, selection, modifier = Modifier.weight(1f)) { day ->
+                        selection = selection.tap(day)
+                        selection.toRange(DayPart.ALL)?.let { state.filters = state.filters.copy(date = DateFilter(range = it)) }
+                    }
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                if (range == null) "Touchez un premier jour" else Dates.rangeLabel(range.from, range.to, time.today),
+                fontSize = 13.sp,
+                color = Palette.Muted,
+            )
+            Text(
+                "Raccourcis",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Palette.Accent,
+                modifier = Modifier.clickable(onClick = onBack).padding(4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SheetDay(cell: CalendarCell, selection: DateSelection, modifier: Modifier, onTap: (SimpleDate) -> Unit) {
+    val day = cell.day
+    if (day == null) {
+        Box(modifier.aspectRatio(1f))
+        return
+    }
+    val inside = selection.contains(day)
+    val edge = day == selection.from || day == (selection.to ?: selection.from)
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .padding(vertical = 1.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                when {
+                    edge -> Palette.Accent
+                    inside -> Palette.Soft
+                    else -> Color.Transparent
+                },
+            )
+            .clickable { onTap(day) }
+            .semantics { contentDescription = "jour ${day.day}" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "${day.day}",
+                fontSize = 14.sp,
+                color = if (edge) Color.White else if (inside) Palette.Accent else Palette.Ink,
+                fontWeight = if (edge) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            Box(
+                Modifier
+                    .padding(top = 1.dp)
+                    .height(4.dp)
+                    .aspectRatio(1f)
+                    .clip(CircleShape)
+                    .background(if (cell.hasPhotos) (if (edge) Color.White else Palette.Accent) else Color.Transparent),
+            )
         }
     }
 }

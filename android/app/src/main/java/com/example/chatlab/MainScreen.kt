@@ -37,8 +37,13 @@ fun MainScreen() {
     var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()
 
+    // The notice "Analyse terminée" appears only when a run ends while the app is open.
+    var wasRunning by remember { mutableStateOf(progress.running) }
     LaunchedEffect(progress.running) {
         if (!progress.running) dataVersion++
+        if (progress.running) search.analysisDone = false
+        else if (wasRunning) search.analysisDone = true
+        wasRunning = progress.running
     }
     val entries = remember(dataVersion, tab) { Library.load(context) }
 
@@ -54,8 +59,6 @@ fun MainScreen() {
             .navigationBarsPadding(),
     ) {
         when (page) {
-            Page.FILTERS -> FiltersPage(search, entries, removalsVersion, onBack = { page = Page.TABS }, onDates = { page = Page.DATES })
-            Page.DATES -> DatesPage(search, entries, onBack = { search.sheetOpen = true; page = Page.TABS })
             Page.SETTINGS -> SettingsPage(
                 entries = entries,
                 dataVersion = dataVersion,
@@ -119,15 +122,21 @@ fun MainScreen() {
                         modifier = content,
                     )
                 }
-                if (tab == 0) AnalysisBanner(onOpen = { tab = 1 })
+                if (tab == 0) AnalysisBanner(
+                    notice = search.analysisDone,
+                    onOpen = {
+                        search.analysisDone = false
+                        tab = 1
+                    },
+                )
                 BottomTabs(selected = tab, onSelect = { tab = it })
             }
         }
     }
     FilterSheet(
         state = search,
+        entries = entries,
         visible = search.sheetOpen,
-        onChooseDates = { search.sheetOpen = false; page = Page.DATES },
         onClose = { search.sheetOpen = false },
     )
     }

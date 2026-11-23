@@ -27,16 +27,29 @@ import androidx.compose.ui.unit.sp
 import com.example.chatlab.ui.Palette
 import kotlinx.coroutines.delay
 
+/** What the bottom line shows: nothing, the analysis in progress, or the notice that it has finished. */
+enum class BannerKind { HIDDEN, RUNNING, FINISHED }
+
+/**
+ * [notice] is set when an analysis has just finished, and cleared once the user has opened it:
+ * an old analysis does not keep the notice on screen.
+ */
+fun analysisBannerKind(running: Boolean, done: Int, total: Int, notice: Boolean): BannerKind = when {
+    running -> BannerKind.RUNNING
+    notice && total > 0 && done >= total -> BannerKind.FINISHED
+    else -> BannerKind.HIDDEN
+}
+
 /**
  * Bottom line of the search, above the tabs: the analysis in progress with its time left,
- * then, once it is finished, "Analyse terminée" and a link back to the analysis.
- * Nothing is shown when no analysis has run.
+ * then "Analyse terminée" and a link back to the analysis, right after it has finished.
  */
 @Composable
-fun AnalysisBanner(onOpen: () -> Unit) {
+fun AnalysisBanner(notice: Boolean, onOpen: () -> Unit) {
     val progress by AnalysisProgress.state.collectAsState()
-    val finished = !progress.running && progress.total > 0 && progress.done >= progress.total
-    if (!progress.running && !finished) return
+    val kind = analysisBannerKind(progress.running, progress.done, progress.total, notice)
+    if (kind == BannerKind.HIDDEN) return
+    val finished = kind == BannerKind.FINISHED
 
     val now by produceState(initialValue = System.currentTimeMillis(), progress.running) {
         while (true) {
