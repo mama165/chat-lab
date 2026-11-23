@@ -569,7 +569,8 @@ private fun FolderProgressRow(folder: FolderProgress) {
         Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
             when (folder.mark()) {
                 FolderMark.FINISHED -> CheckMark()
-                FolderMark.RUNNING -> GaugeRing(Progress01.of(folder.done, folder.total))
+                // Started but no photo finished yet: the ring turns; then it follows the real count.
+                FolderMark.RUNNING -> GaugeRing(if (folder.done == 0) null else Progress01.of(folder.done, folder.total))
                 FolderMark.WAITING -> Hourglass()
             }
         }

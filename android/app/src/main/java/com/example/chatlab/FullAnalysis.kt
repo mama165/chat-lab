@@ -189,6 +189,7 @@ class AnalysisService : Service() {
                             val index = next.getAndIncrement()
                             if (index >= total) break
                             val item = plan.toProcess[index]
+                            AnalysisProgress.update { it.taking(item.folderIndex, item.candidate.file.name) }
                             val outcome = try {
                                 analyzeOne(this@AnalysisService, slot, item, sources[item.folderIndex].name, zone, control::checkpointStep)
                             } catch (stopped: AnalysisStopped) {

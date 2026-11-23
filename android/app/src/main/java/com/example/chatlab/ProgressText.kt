@@ -49,6 +49,12 @@ data class Progress(
     }
 
     /** One more file is done in the folder [index]; [name] is the file that has just'être traité. */
+    /** A worker takes a photo of this folder: the folder starts being read, before its photo is done. */
+    fun taking(index: Int, name: String): Progress {
+        if (index !in folders.indices) return this
+        return copy(folders = folders.mapIndexed { i, f -> if (i == index) f.copy(current = name) else f })
+    }
+
     fun advancing(index: Int, name: String): Progress {
         if (index !in folders.indices) return copy(done = done + 1, current = name)
         val updated = folders.mapIndexed { i, f -> if (i == index) f.copy(done = f.done + 1, current = name) else f }
