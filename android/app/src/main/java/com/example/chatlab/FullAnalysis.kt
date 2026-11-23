@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,7 @@ object AnalysisProgress {
  */
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var recorder: AnalysisRecorder? = null
     private var lastNotified = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -94,10 +96,13 @@ class AnalysisService : Service() {
         )
         startForeground(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, true))
 
+        recorder = AnalysisRecorder(this).also { it.start(scope) }
         scope.launch {
             try {
                 run(chatlab, sources, started, control)
             } catch (e: Throwable) {
+                recorder?.cancel()
+                recorder = null
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 val message = "Analyse interrompue : ${e.message ?: e.javaClass.simpleName}"
                 val state = AnalysisProgress.state.value
@@ -197,6 +202,9 @@ class AnalysisService : Service() {
             LibraryWriter.write(this@AnalysisService, finalResults, keep)
             val runReport = report.build(System.currentTimeMillis(), elapsed, stopped)
             ReportStore.saveRun(this@AnalysisService, runReport)
+            val samples = recorder?.stop().orEmpty()
+            recorder = null
+            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped))
             val text = when {
                 stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
@@ -239,6 +247,30 @@ class AnalysisService : Service() {
             }
         }
         notifyProgress()
+    }
+
+    /** Le fichier d'une analyse : ce qui s'est passé dans chaque dossier, et les relevés du téléphone. */
+    private fun recordOf(started: Long, report: RunReport, samples: List<Sample>, stopped: Boolean): AnalysisRecord {
+        val info = try {
+            packageManager.getPackageInfo(packageName, 0)
+        } catch (e: Exception) {
+            null
+        }
+        return AnalysisRecord(
+            startMs = started,
+            endMs = System.currentTimeMillis(),
+            level = "equilibre",
+            workers = WORKERS,
+            stopped = stopped,
+            appVersion = "${info?.versionName ?: "?"} (${info?.longVersionCode ?: 0})",
+            device = "${Build.MANUFACTURER} ${Build.MODEL}",
+            androidVersion = Build.VERSION.SDK_INT,
+            cores = Runtime.getRuntime().availableProcessors(),
+            folders = report.folders.map {
+                FolderStat(it.name, it.analyzed, it.ignored, it.unread, it.refused.size + if (it.rootRefused) 1 else 0)
+            },
+            samples = samples,
+        )
     }
 
     private fun finish(progress: Progress, text: String, report: RunReport?) {
