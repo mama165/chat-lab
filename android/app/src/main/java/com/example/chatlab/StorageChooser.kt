@@ -236,6 +236,8 @@ private fun countAll(roots: List<FolderNode>): Map<String, Int> {
         }).candidates.map { it.file.id }
         counts.putAll(FolderCounts.countByFolder(photos, node.path))
         counts[node.path] = photos.size
+        // Every empty subfolder is set to zero, so that the chooser can hide it.
+        counts.putAll(FolderCounts.zeroFill(node, counts))
         CountProgress.set(node.path, 1f)
     }
     return counts

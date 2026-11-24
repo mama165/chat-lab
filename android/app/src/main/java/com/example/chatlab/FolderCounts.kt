@@ -21,4 +21,11 @@ object FolderCounts {
         }
         return counts
     }
+
+    /**
+     * The counts of [node] and of all its subfolders, each one at zero when it has no photo: a
+     * folder with photos only appears in [countByFolder], so an empty one would be missing.
+     */
+    fun zeroFill(node: FolderNode, counts: Map<String, Int>): Map<String, Int> =
+        FolderSelection.withDescendants(node).associate { it.path to (counts[it.path] ?: 0) }
 }
