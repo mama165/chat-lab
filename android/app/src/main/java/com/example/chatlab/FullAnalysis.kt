@@ -442,9 +442,10 @@ class AnalysisService : Service() {
                 .put("message", text),
         )
         AnalysisProgress.set(progress.copy(message = text, paused = false, running = false))
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        // The notification stays, no longer ongoing, and it is updated in place: there is only one.
+        stopForeground(STOP_FOREGROUND_DETACH)
         getSystemService(NotificationManager::class.java)
-            .notify(Notifications.DONE_ID, Notifications.done(this, text, report))
+            .notify(Notifications.PROGRESS_ID, Notifications.done(this, text, report))
         stopSelf()
     }
 

@@ -14,11 +14,15 @@ import android.graphics.Typeface
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
-/** The analysis notifications: running (with Pause or Reprendre, and Arrêter), then finishedminée. */
+/**
+ * The analysis notification: one only. It shows the run (with Pause or Reprendre, and Arrêter),
+ * then it is updated in place to the end of the run, under the same id.
+ */
 object Notifications {
     const val PROGRESS_ID = 1
-    const val DONE_ID = 2
-    private const val CHANNEL = "analysis"
+    // A new channel, silent and without vibration: a channel's sound settings cannot change once it exists.
+    private const val CHANNEL = "analysis_quiet"
+    private const val OLD_CHANNEL = "analysis"
 
     private const val BLUE = 0xFF1F3A68.toInt()
     private const val TRACK = 0xFFE6ECF6.toInt()
@@ -27,8 +31,14 @@ object Notifications {
 
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL, "Analyse des photos", NotificationManager.IMPORTANCE_DEFAULT),
+            val manager = context.getSystemService(NotificationManager::class.java)
+            // The channel of the earlier versions alerted with a vibration: it is removed.
+            manager.deleteNotificationChannel(OLD_CHANNEL)
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL, "Analyse des photos", NotificationManager.IMPORTANCE_LOW).apply {
+                    enableVibration(false)
+                    setSound(null, null)
+                },
             )
         }
     }
@@ -82,6 +92,7 @@ object Notifications {
             .setContentText(lines.substringBefore('\n'))
             .setStyle(NotificationCompat.BigTextStyle().bigText(lines))
             .setContentIntent(openApp(context))
+            .setOnlyAlertOnce(true)
             .setAutoCancel(true)
             .build()
     }
