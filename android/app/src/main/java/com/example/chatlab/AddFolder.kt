@@ -27,7 +27,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,10 +54,8 @@ import com.example.chatlab.ui.Palette
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import org.json.JSONObject
 import kotlinx.coroutines.withContext
-
-/** The folders with photos to analyse, found once when the page opens. */
-private class Pending(val roots: List<FolderNode>, val photos: Map<String, List<String>>)
 
 /**
  * The "+" page, to add a folder to the analysis once the first folders are chosen. It only
@@ -84,8 +81,35 @@ fun AddFolderPage(onBack: () -> Unit) {
     }
 
     val storage = remember { Environment.getExternalStorageDirectory().absolutePath }
-    val pending by produceState<Pending?>(initialValue = null) {
-        value = withContext(Dispatchers.IO) { findPending(context, storage) }
+    // The last result is shown at once; the folders are then read one by one, so the first ones appear
+    // without waiting for the whole storage.
+    var roots by remember { mutableStateOf(AddFolderCache.roots) }
+    var pendingByRoot by remember { mutableStateOf(AddFolderCache.pendingByRoot) }
+    var scanning by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        val started = System.currentTimeMillis()
+        val tree = withContext(Dispatchers.IO) { StorageTree.build(File(storage)) }
+        Diagnostics.event(context, "addFolderTree", JSONObject().put("ms", System.currentTimeMillis() - started).put("folders", tree.size))
+        roots = tree
+        AddFolderCache.roots = tree
+        val known = withContext(Dispatchers.IO) {
+            val libraryStarted = System.currentTimeMillis()
+            readKnown(LibraryStore.read(context)).also {
+                Diagnostics.event(context, "addFolderLibrary", JSONObject().put("ms", System.currentTimeMillis() - libraryStarted))
+            }
+        }
+        for (node in tree) {
+            val folderStarted = System.currentTimeMillis()
+            val photos = withContext(Dispatchers.IO) { pendingPhotosOf(node, known) }
+            Diagnostics.event(
+                context,
+                "addFolderScan",
+                JSONObject().put("folder", node.name).put("ms", System.currentTimeMillis() - folderStarted).put("pending", photos.size),
+            )
+            pendingByRoot = pendingByRoot + (node.path to photos)
+            AddFolderCache.pendingByRoot = pendingByRoot
+        }
+        scanning = false
     }
     // The folders already added, by path. Taps are added to [justAdded] first, so the row stays
     // on screen for a moment with its "Ajouté" label.
@@ -101,14 +125,12 @@ fun AddFolderPage(onBack: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(emptySet<String>()) }
 
-    val loaded = pending
-    val visible = remember(loaded, added) {
-        loaded?.let { p ->
-            p.roots.map { root ->
-                val counts = AddFolderTree.pendingCounts(root.path, p.photos[root.path].orEmpty(), added)
-                AddFolderTree.visible(listOf(root), counts, added).singleOrNull()
-            }.filterNotNull()
-        }.orEmpty()
+    val visible = remember(roots, pendingByRoot, added) {
+        roots.mapNotNull { root ->
+            val photos = pendingByRoot[root.path] ?: return@mapNotNull null
+            val counts = AddFolderTree.pendingCounts(root.path, photos, added)
+            AddFolderTree.visible(listOf(root), counts, added).singleOrNull()
+        }
     }
     val hits = remember(visible, query) { AddFolderTree.hits(visible, storage, query) }
     val add: (String) -> Unit = { path ->
@@ -125,18 +147,18 @@ fun AddFolderPage(onBack: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         PageHeader("Ajouter un dossier", onBack = onBack)
 
-        if (loaded == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Palette.Accent, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
-            }
-            return@Column
-        }
-
         SearchField(
             query = query,
             onQuery = { query = it },
             suggestion = AddFolderTree.suggestion(hits, query),
         )
+        if (scanning) {
+            CircularProgressIndicator(
+                color = Palette.Accent,
+                strokeWidth = 1.5.dp,
+                modifier = Modifier.padding(top = 10.dp).size(16.dp),
+            )
+        }
 
         Column(modifier = Modifier.fillMaxSize().padding(top = 12.dp).verticalScroll(rememberScrollState())) {
             if (query.isNotBlank()) {
@@ -189,17 +211,21 @@ fun AddFolderPage(onBack: () -> Unit) {
 private fun addedPaths(context: Context): Set<String> =
     Sources.read(context).map { it.uri }.filter { it.startsWith("file:") }.map { it.removePrefix("file:") }.toSet()
 
-/** The folders of the storage with a photo to analyse under them, found by reading the photos. */
-private fun findPending(context: Context, storage: String): Pending {
-    val known = readKnown(LibraryStore.read(context))
-    val roots = StorageTree.build(File(storage))
-    val photos = roots.associate { root ->
-        val scan = FolderScanner.scan(JavaDirNode(File(root.path)), reusable = { file -> reusableMime(known, file) })
-        root.path to scan.candidates
-            .filter { carry(known, it.file) == Carry.PROCESS }
-            .map { it.file.id }
-    }
-    return Pending(roots, photos)
+/** The photos under one folder that are not analysed yet, by address. */
+private fun pendingPhotosOf(node: FolderNode, known: KnownLibrary): List<String> {
+    val scan = FolderScanner.scan(JavaDirNode(File(node.path)), reusable = { file -> reusableMime(known, file) })
+    return scan.candidates
+        .filter { carry(known, it.file) == Carry.PROCESS }
+        .map { it.file.id }
+}
+
+/**
+ * The last result of the page, kept while the app runs: the next opening shows it at once, and the
+ * folders are read again behind it.
+ */
+internal object AddFolderCache {
+    @Volatile var roots: List<FolderNode> = emptyList()
+    @Volatile var pendingByRoot: Map<String, List<String>> = emptyMap()
 }
 
 /** The search line: a loupe, the default text, the typed text, the grey suggestion, and a cross. */
