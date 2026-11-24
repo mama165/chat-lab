@@ -2,18 +2,22 @@ package com.example.chatlab
 
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Build
 import android.os.IBinder
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +61,7 @@ object AnalysisProgress {
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var recorder: AnalysisRecorder? = null
+    private var diagnosticsSampler: Job? = null
     private var lastNotified = 0L
 
     /** The level of the analysis running, read when it starts. */
@@ -70,6 +75,27 @@ class AnalysisService : Service() {
         } finally {
             AnalysisProgress.update { it.loadingDone() }
         }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        Diagnostics.onAppStart(this)
+        // Android asks the app to free memory: each request is written to the diagnostics.
+        registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: Configuration) {}
+
+            override fun onLowMemory() {
+                Diagnostics.event(this@AnalysisService, "lowMemory", Diagnostics.snapshot(this@AnalysisService))
+            }
+
+            override fun onTrimMemory(level: Int) {
+                Diagnostics.event(
+                    this@AnalysisService,
+                    "trimMemory",
+                    Diagnostics.snapshot(this@AnalysisService).put("level", level),
+                )
+            }
+        })
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -112,7 +138,24 @@ class AnalysisService : Service() {
         startForeground(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, true))
 
         level = LevelStore.read(this)
+        Diagnostics.openRun(this, level, sources.size)
         recorder = AnalysisRecorder(this).also { it.start(scope) }
+        // Every 2 seconds: memory, CPU, thermal state and progress, written at once to the diagnostics.
+        diagnosticsSampler = scope.launch(Dispatchers.Default) {
+            while (isActive) {
+                val state = AnalysisProgress.state.value
+                Diagnostics.event(
+                    this@AnalysisService,
+                    "sample",
+                    Diagnostics.snapshot(this@AnalysisService)
+                        .put("done", state.done)
+                        .put("total", state.total)
+                        .put("paused", state.paused)
+                        .put("loadingModels", state.loadingModels),
+                )
+                delay(2_000)
+            }
+        }
         scope.launch {
             try {
                 run(chatlab, sources, started, control)
@@ -317,6 +360,17 @@ class AnalysisService : Service() {
 
     private fun finish(progress: Progress, text: String, report: RunReport?) {
         current = null
+        diagnosticsSampler?.cancel()
+        diagnosticsSampler = null
+        Diagnostics.event(
+            this,
+            "runEnd",
+            JSONObject()
+                .put("done", progress.done)
+                .put("total", progress.total)
+                .put("errors", progress.errors)
+                .put("message", text),
+        )
         AnalysisProgress.set(progress.copy(message = text, paused = false, running = false))
         stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java)
