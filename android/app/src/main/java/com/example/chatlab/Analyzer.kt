@@ -80,6 +80,8 @@ class Analyzer(
     private val onModelDone: (String, Long) -> Unit = { _, _ -> },
     /** Called for each photo stage (decoding, image, faces, text), with its time in milliseconds. */
     private val onStage: (String, Long) -> Unit = { _, _ -> },
+    /** Called as each model is loaded, with the native memory before and after it, in bytes. */
+    private val onNativeMemory: (String, Long, Long) -> Unit = { _, _, _ -> },
 ) : AutoCloseable {
     private val appContext = context.applicationContext
 
@@ -126,9 +128,11 @@ class Analyzer(
 
     /** Runs a loading step and keeps how long it took under [name]. */
     private fun <T> timed(name: String, step: () -> T): T {
+        val memoryBefore = android.os.Debug.getNativeHeapAllocatedSize()
         val started = System.nanoTime()
         val loaded = step()
         val millis = (System.nanoTime() - started) / 1_000_000
+        onNativeMemory(name, memoryBefore, android.os.Debug.getNativeHeapAllocatedSize())
         timings[name] = millis
         onModelDone(name, millis)
         return loaded

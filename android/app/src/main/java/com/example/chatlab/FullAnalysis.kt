@@ -254,6 +254,7 @@ class AnalysisService : Service() {
         val results = arrayOfNulls<ImageResult>(total)
         val next = AtomicInteger(0)
         val errors = AtomicInteger(0)
+        val photosDone = AtomicInteger(0)
         val saveLock = Any()
         var lastSave = System.currentTimeMillis()
         val keep = LibraryMerge.keepFromRemovedFolders(parseArray(oldLibrary), sources.map { it.name }.toSet())
@@ -271,6 +272,17 @@ class AnalysisService : Service() {
                         android.net.Uri.parse(chatlab),
                         onModelDone = { name, millis -> AnalysisProgress.update { it.modelDone(name, millis) } },
                         onStage = { stage, millis -> stageTimes.add(stage, millis) },
+                        onNativeMemory = { name, before, after ->
+                            Diagnostics.event(
+                                this@AnalysisService,
+                                "modelMemory",
+                                JSONObject()
+                                    .put("model", name)
+                                    .put("beforeMb", NativeMemory.mb(before))
+                                    .put("afterMb", NativeMemory.mb(after))
+                                    .put("deltaMb", NativeMemory.deltaMb(before, after)),
+                            )
+                        },
                     )
                 },
                 onLoad = { loads.add(it) },
@@ -311,6 +323,17 @@ class AnalysisService : Service() {
                                 is Outcome.Done -> {
                                     results[index] = outcome.result
                                     report.analyzed(item.folderIndex)
+                                    val count = photosDone.incrementAndGet()
+                                    if (NativeMemory.isPhotoPoint(count)) {
+                                        Diagnostics.event(
+                                            this@AnalysisService,
+                                            "photoMemory",
+                                            JSONObject()
+                                                .put("photos", count)
+                                                .put("worker", workerIndex)
+                                                .put("nativeMb", NativeMemory.mb(android.os.Debug.getNativeHeapAllocatedSize())),
+                                        )
+                                    }
                                 }
                                 is Outcome.Failed -> {
                                     errors.incrementAndGet()
