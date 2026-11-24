@@ -39,12 +39,14 @@ class TextReader(
     private val env: OrtEnvironment,
     context: Context,
     models: DocumentFile,
-    arenaOn: Boolean = true,
+    settings: OnnxExperiment.Settings = OnnxExperiment.Settings(),
+    /** Called with the time of each step of the reading, in milliseconds (and the count of zones). */
+    private val onStep: (String, Long) -> Unit = { _, _ -> },
 ) : AutoCloseable {
-    private val detector = OnnxExperiment.options(arenaOn).use {
+    private val detector = OnnxExperiment.options(settings).use {
         ModelFiles.session(env, context, models, "ch_PP-OCRv3_det_infer.onnx", it)
     }
-    private val recognizer = OnnxExperiment.options(arenaOn).use {
+    private val recognizer = OnnxExperiment.options(settings).use {
         ModelFiles.session(env, context, models, "ch_PP-OCRv3_rec_infer.onnx", it)
     }
     // Index 0 is the CTC blank, the last index is the space.
@@ -79,11 +81,15 @@ class TextReader(
             } else {
                 bgr.copyTo(reduced)
             }
-            for ((index, variant) in variants(reduced).withIndex()) {
+            val prepared = timed("ocr_prepare") { variants(reduced) }
+            for ((index, variant) in prepared.withIndex()) {
                 try {
                     // The contrast readings must be surer of a line than the normal one to add words.
                     val minimum = if (index == 0) MIN_CONFIDENCE else CONTRAST_CONFIDENCE
-                    for (line in readLines(variant, record = index == 0, minimum = minimum)) {
+                    val lines = timed("ocr_variant_$index") {
+                        readLines(variant, record = index == 0, minimum = minimum)
+                    }
+                    for (line in lines) {
                         // A capital I before an apostrophe is a misread l: "I'herbe".
                         val fixed = line.replace("I'", "l'").replace("I’", "l’")
                         for (word in fixed.split(Regex("\\s+"))) {
@@ -135,11 +141,22 @@ class TextReader(
         }
     }
 
+    /** Runs one step and reports its time to [onStep]. */
+    private fun <T> timed(stage: String, step: () -> T): T {
+        val started = System.nanoTime()
+        try {
+            return step()
+        } finally {
+            onStep(stage, (System.nanoTime() - started) / 1_000_000)
+        }
+    }
+
     private fun readLines(image: Mat, record: Boolean, minimum: Float): List<String> {
-        val boxes = detect(image)
+        val boxes = timed("ocr_detection") { detect(image) }
         zones += boxes.size
+        onStep("ocr_zones", boxes.size.toLong())
         return boxes.mapNotNull { box ->
-            val (text, confidence) = recognize(crop(image, box))
+            val (text, confidence) = timed("ocr_recognition") { recognize(crop(image, box)) }
             best = max(best, confidence)
             if (record) {
                 val corners = box.joinToString(" ") { "[${it.x.roundToInt()},${it.y.roundToInt()}]" }

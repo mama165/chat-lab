@@ -288,7 +288,7 @@ fun TestsPage(onBack: () -> Unit) {
             selected = arenaOn,
             onClick = {
                 arenaOn = true
-                OnnxExperiment.write(context, true)
+                OnnxExperiment.writeArena(context, true)
             },
         )
         RadioRow(
@@ -297,9 +297,23 @@ fun TestsPage(onBack: () -> Unit) {
             selected = !arenaOn,
             onClick = {
                 arenaOn = false
-                OnnxExperiment.write(context, false)
+                OnnxExperiment.writeArena(context, false)
             },
         )
+        // Experiment on the threads of the ONNX sessions: 0 leaves the choice to ONNX Runtime.
+        var threads by remember { mutableStateOf(OnnxExperiment.read(context).threads) }
+        Text("Threads par session (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        OnnxExperiment.THREAD_CHOICES.forEach { n ->
+            RadioRow(
+                label = if (n == 0) "Automatique (réglage actuel)" else "$n threads",
+                count = if (n == 0) "ONNX Runtime" else "essai",
+                selected = threads == n,
+                onClick = {
+                    threads = n
+                    OnnxExperiment.writeThreads(context, n)
+                },
+            )
+        }
         // Optional, test only: forces the number of workers, bypassing the start memory budget.
         var forcedWorkers by remember { mutableStateOf(WorkerOverride.read(context)) }
         Text("Nombre de workers (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
