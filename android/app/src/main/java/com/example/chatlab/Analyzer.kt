@@ -105,14 +105,16 @@ class Analyzer(
         ModelFiles.removeOldCopies(context)
         val models = ModelFiles.folder(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
+        // The arena switch comes from the test page: on by default, as before the experiment.
+        val arena = OnnxExperiment.arenaOn(appContext)
         vision = timed(ModelNames.IMAGES) {
-            ModelFiles.session(env, context, models, "vision_model.onnx")
+            OnnxExperiment.options(arena).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
         }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
-        reader = timed(ModelNames.TEXTS) { TextReader(env, context, models) }
+        reader = timed(ModelNames.TEXTS) { TextReader(env, context, models, arena) }
         detector = timed(ModelNames.FACES) {
             FaceDetectorYN.create(
                 "onnx",

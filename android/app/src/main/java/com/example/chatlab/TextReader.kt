@@ -35,9 +35,18 @@ import kotlin.math.sqrt
  * Files expected in the models folder:
  *   ch_PP-OCRv3_det_infer.onnx, ch_PP-OCRv3_rec_infer.onnx, ppocr_keys.txt
  */
-class TextReader(private val env: OrtEnvironment, context: Context, models: DocumentFile) : AutoCloseable {
-    private val detector = ModelFiles.session(env, context, models, "ch_PP-OCRv3_det_infer.onnx")
-    private val recognizer = ModelFiles.session(env, context, models, "ch_PP-OCRv3_rec_infer.onnx")
+class TextReader(
+    private val env: OrtEnvironment,
+    context: Context,
+    models: DocumentFile,
+    arenaOn: Boolean = true,
+) : AutoCloseable {
+    private val detector = OnnxExperiment.options(arenaOn).use {
+        ModelFiles.session(env, context, models, "ch_PP-OCRv3_det_infer.onnx", it)
+    }
+    private val recognizer = OnnxExperiment.options(arenaOn).use {
+        ModelFiles.session(env, context, models, "ch_PP-OCRv3_rec_infer.onnx", it)
+    }
     // Index 0 is the CTC blank, the last index is the space.
     private val vocabulary: List<String> =
         listOf("blank") + ModelFiles.text(context, models, "ppocr_keys.txt").split("\n") + " "

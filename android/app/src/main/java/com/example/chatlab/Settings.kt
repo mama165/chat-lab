@@ -38,10 +38,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import com.example.chatlab.ui.OutlineButton
 import com.example.chatlab.ui.PageHeader
 import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.PrimaryButton
+import com.example.chatlab.ui.RadioRow
 import com.example.chatlab.ui.SectionLabel
 import com.example.chatlab.ui.SettingRow
 import kotlinx.coroutines.CoroutineScope
@@ -276,6 +278,27 @@ fun TestsPage(onBack: () -> Unit) {
             "Analyse les images du sous-dossier test du dossier chatlab. Le carnet est remplacé par ces images.",
             fontSize = 13.sp,
             color = Palette.Muted,
+        )
+        // Experiment on the memory of the models: it applies to the analyses started after the change.
+        var arenaOn by remember { mutableStateOf(OnnxExperiment.arenaOn(context)) }
+        Text("Mémoire des modèles", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        RadioRow(
+            label = "Mémoire ONNX gardée (réglage actuel)",
+            count = "arène activée",
+            selected = arenaOn,
+            onClick = {
+                arenaOn = true
+                OnnxExperiment.write(context, true)
+            },
+        )
+        RadioRow(
+            label = "Mémoire ONNX rendue (essai)",
+            count = "arène désactivée",
+            selected = !arenaOn,
+            onClick = {
+                arenaOn = false
+                OnnxExperiment.write(context, false)
+            },
         )
         PrimaryButton(
             if (running) "Analyse en cours…" else "Analyser les images de test",
