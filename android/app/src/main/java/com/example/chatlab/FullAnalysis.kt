@@ -1,5 +1,6 @@
 package com.example.chatlab
 
+import android.app.ActivityManager
 import android.app.NotificationManager
 import android.app.Service
 import android.content.ComponentCallbacks2
@@ -63,6 +64,10 @@ class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var recorder: AnalysisRecorder? = null
     private var diagnosticsSampler: Job? = null
+    /** The memory guard: lowers the workers when the phone runs short of memory. */
+    private var workerGuard: WorkerGuard? = null
+    /** Set when Android asked for memory, until the next look of the guard. */
+    @Volatile private var trimRequested = false
     private var lastNotified = 0L
 
     /** The level of the analysis running, read when it starts. */
@@ -90,6 +95,7 @@ class AnalysisService : Service() {
             }
 
             override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) trimRequested = true
                 Diagnostics.event(
                     this@AnalysisService,
                     "trimMemory",
@@ -140,11 +146,29 @@ class AnalysisService : Service() {
 
         level = LevelStore.read(this)
         Diagnostics.openRun(this, level, sources.size)
+        workerGuard = WorkerGuard(level.workers)
         recorder = AnalysisRecorder(this).also { it.start(scope) }
         // Every 2 seconds: memory, CPU, thermal state and progress, written at once to the diagnostics.
         diagnosticsSampler = scope.launch(Dispatchers.Default) {
             while (isActive) {
                 val state = AnalysisProgress.state.value
+                // The memory guard looks at the same moment: it lowers the workers if the memory runs short.
+                val memory = ActivityManager.MemoryInfo()
+                getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
+                val pressure = trimRequested
+                trimRequested = false
+                val availMb = memory.availMem / (1024L * 1024L)
+                workerGuard?.observe(System.currentTimeMillis(), availMb, memory.lowMemory, pressure)?.let { limit ->
+                    Diagnostics.event(
+                        this@AnalysisService,
+                        "guard",
+                        JSONObject()
+                            .put("workersAllowed", limit)
+                            .put("availMb", availMb)
+                            .put("lowMemory", memory.lowMemory)
+                            .put("trimRequested", pressure),
+                    )
+                }
                 Diagnostics.event(
                     this@AnalysisService,
                     "sample",
@@ -226,7 +250,7 @@ class AnalysisService : Service() {
         }
         try {
             coroutineScope {
-                slots.map { slot ->
+                slots.mapIndexed { workerIndex, slot ->
                     async(Dispatchers.Default) {
                         while (true) {
                             // Stop point before each photo. A pause releases the models here, and
@@ -237,6 +261,11 @@ class AnalysisService : Service() {
                                     onResumed = { reloadModels(slot) },
                                 )
                             } catch (stopped: AnalysisStopped) {
+                                break
+                            }
+                            // The guard lowered the workers: the highest ones stop here, and free their models.
+                            if (workerIndex >= (workerGuard?.limit ?: Int.MAX_VALUE)) {
+                                slot.release()
                                 break
                             }
                             val index = next.getAndIncrement()
@@ -272,6 +301,14 @@ class AnalysisService : Service() {
                     }
                 }.awaitAll()
             }
+            Diagnostics.event(
+                this@AnalysisService,
+                "workersEnd",
+                JSONObject()
+                    .put("levelWorkers", level.workers)
+                    .put("workersAllowedAtEnd", workerGuard?.limit ?: 0)
+                    .put("reductions", workerGuard?.reductions ?: 0),
+            )
             val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
             val stopped = control.state == RunState.STOPPING
             val finalResults = carried + results.filterNotNull()
@@ -286,9 +323,12 @@ class AnalysisService : Service() {
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
                 else -> "Analyse terminée · ${runReport.analyzed} photos analysées"
             }
+            // The memory guard's work is named at the end of the message, so that it is visible.
+            val guard = workerGuard?.takeIf { it.reductions > 0 }
+            val guardNote = guard?.let { " · mémoire limitée : ${level.workers} → ${it.limit} workers" }.orEmpty()
             finish(
                 Progress(false, total, total, "", started, errors.get(), report = runReport.toText(), folders = AnalysisProgress.state.value.folders),
-                text,
+                text + guardNote,
                 runReport,
             )
         } finally {
