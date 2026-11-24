@@ -53,6 +53,8 @@ data class ImageResult(
     val mime: String = "",
     /** Instant de prise de vue en millisecondes, 0 si inconnu. */
     val takenMs: Long = 0L,
+    /** The words added by each contrast pass (1 and 2) that the normal reading did not find. */
+    val textExtra: Map<Int, List<String>> = emptyMap(),
 )
 
 /**
@@ -198,7 +200,7 @@ class Analyzer(
         // A failure while reading the text is reported, not allowed to stop the whole analysis.
         return try {
             val text = timedStage(StageTimes.TEXT) { reader.read(bitmap) }
-            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace())
+            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace(), textExtra = reader.extras())
         } catch (e: Throwable) {
             ImageResult(file, answer, faces, portrait, vector, 0, textNote = "lecture du texte impossible : ${e.javaClass.simpleName} ${e.message ?: ""}")
         }

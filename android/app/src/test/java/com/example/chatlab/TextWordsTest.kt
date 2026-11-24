@@ -33,4 +33,12 @@ class TextWordsTest {
         assertEquals(1, TextWords.add(words, "% 0 a   "))
         assertEquals(setOf("a"), words.keys)
     }
+
+    @Test
+    fun the_new_words_are_listed_as_they_were_read() {
+        val words = LinkedHashMap<String, String>()
+        TextWords.add(words, "Bonjour le monde")
+        assertEquals(listOf("Paris", "Lyon"), TextWords.addNew(words, "Paris monde Lyon"))
+        assertEquals(emptyList<String>(), TextWords.addNew(words, "Paris"))
+    }
 }

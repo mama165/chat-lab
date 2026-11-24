@@ -325,6 +325,17 @@ class AnalysisService : Service() {
                                 is Outcome.Done -> {
                                     results[index] = outcome.result
                                     report.analyzed(item.folderIndex)
+                                    if (outcome.result.textExtra.isNotEmpty()) {
+                                        Diagnostics.event(
+                                            this@AnalysisService,
+                                            "textExtra",
+                                            JSONObject()
+                                                .put("file", outcome.result.file.name)
+                                                .put("passes", JSONObject().apply {
+                                                    outcome.result.textExtra.forEach { (pass, list) -> put(pass.toString(), JSONArray(list)) }
+                                                }),
+                                        )
+                                    }
                                     val count = photosDone.incrementAndGet()
                                     if (NativeMemory.isPhotoPoint(count)) {
                                         Diagnostics.event(

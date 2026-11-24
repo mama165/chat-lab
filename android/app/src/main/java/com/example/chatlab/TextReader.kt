@@ -58,6 +58,12 @@ class TextReader(
     private var best = 0f
     private val trace = ArrayList<String>()
 
+    /** The words each contrast pass added to those before it, by pass number (1 and 2). */
+    private val passExtras = LinkedHashMap<Int, List<String>>()
+
+    /** The words added by the contrast passes of the last reading, for checking them by hand. */
+    fun extras(): Map<Int, List<String>> = passExtras.toMap()
+
     /** Areas, text and confidence of the first reading, to compare with the computer. */
     fun trace(): String = trace.joinToString("\n")
 
@@ -71,6 +77,7 @@ class TextReader(
         kept = 0
         best = 0f
         trace.clear()
+        passExtras.clear()
         try {
             Utils.bitmapToMat(bitmap, source)
             Imgproc.cvtColor(source, bgr, Imgproc.COLOR_RGBA2BGR)
@@ -90,11 +97,10 @@ class TextReader(
                         readLines(variant, record = index == 0, minimum = minimum)
                     }
                     // The words this pass adds to those of the passes before: what it is worth.
-                    var added = 0
-                    for (line in lines) {
-                        added += TextWords.add(words, line)
-                    }
-                    onStep("ocr_words_$index", added.toLong())
+                    val fresh = ArrayList<String>()
+                    for (line in lines) fresh.addAll(TextWords.addNew(words, line))
+                    if (index > 0) passExtras[index] = fresh
+                    onStep("ocr_words_$index", fresh.size.toLong())
                 } finally {
                     variant.release()
                 }
