@@ -9,6 +9,7 @@ import android.os.PowerManager
 import android.os.Process
 import android.os.Environment
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -65,7 +66,7 @@ object Diagnostics {
     }
 
     /** Starts a new run file; its name is kept, so that a later exit is written in it. */
-    fun openRun(context: Context, level: AnalysisLevel, folders: Int) {
+    fun openRun(context: Context, level: AnalysisLevel, folders: Int): String {
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val file = File(dir(context), "run-$stamp.jsonl")
         synchronized(lock) { current = file }
@@ -78,6 +79,7 @@ object Diagnostics {
                 .put("workers", level.workers)
                 .put("folders", folders),
         )
+        return file.name
     }
 
     /** Writes one event, with the time since the app started. Never throws. */
@@ -166,6 +168,33 @@ object Diagnostics {
     }
 
     /** The name of an exit reason, from its code. */
+    /**
+     * What "Copier les données" copies for a diagnosis: the analysis file, the journal of its run
+     * and the recent lines of the application's journal.
+     */
+    fun copyBundle(context: Context, analysis: JSONObject, runName: String): JSONObject {
+        val run = if (runName.isBlank()) emptyList() else linesOf(dir(context), runName)
+        return bundle(analysis, run, linesOf(dir(context), "session.jsonl"))
+    }
+
+    /** The bundle, from the lines already read. The application's journal keeps its last [SESSION_LINES] lines. */
+    fun bundle(analysis: JSONObject, runLines: List<String>, sessionLines: List<String>): JSONObject = JSONObject()
+        .put("analysis", analysis)
+        .put(
+            "diagnostics",
+            JSONObject()
+                .put("run", JSONArray(runLines.mapNotNull { parse(it) }))
+                .put("session", JSONArray(sessionLines.takeLast(SESSION_LINES).mapNotNull { parse(it) })),
+        )
+
+    /** How many lines of the application's journal are copied: the recent ones. */
+    const val SESSION_LINES = 300
+
+    private fun linesOf(folder: File, name: String): List<String> =
+        runCatching { File(folder, name).readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())
+
+    private fun parse(line: String): JSONObject? = runCatching { JSONObject(line) }.getOrNull()
+
     fun reasonName(code: Int): String = when (code) {
         ApplicationExitInfo.REASON_UNKNOWN -> "UNKNOWN"
         ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"

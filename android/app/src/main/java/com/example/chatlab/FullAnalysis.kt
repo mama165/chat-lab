@@ -65,6 +65,8 @@ class AnalysisService : Service() {
     private var recorder: AnalysisRecorder? = null
     /** The time of each photo stage in the run in progress. */
     @Volatile private var stageTimes = StageTimes()
+    /** The journal file of the run in progress, named in its analysis file. */
+    private var runDiagnostics = ""
     private var diagnosticsSampler: Job? = null
     /** The memory guard: lowers the workers when the phone runs short of memory. */
     private var workerGuard: WorkerGuard? = null
@@ -147,7 +149,7 @@ class AnalysisService : Service() {
         startForeground(Notifications.PROGRESS_ID, Notifications.progress(this, AnalysisProgress.state.value, true))
 
         level = LevelStore.read(this)
-        Diagnostics.openRun(this, level, sources.size)
+        runDiagnostics = Diagnostics.openRun(this, level, sources.size)
         // The memory at the start decides how many workers may run: a worker needs its own models.
         val memory = ActivityManager.MemoryInfo()
         getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
@@ -339,7 +341,7 @@ class AnalysisService : Service() {
             ReportStore.saveRun(this@AnalysisService, runReport)
             val samples = recorder?.stop().orEmpty()
             recorder = null
-            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals()))
+            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals(), runDiagnostics))
             val text = when {
                 stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
@@ -402,6 +404,7 @@ class AnalysisService : Service() {
         loads: List<ModelLoad>,
         results: List<ImageResult>,
         stages: Map<String, Long>,
+        diagnosticsRun: String,
     ): AnalysisRecord {
         val info = try {
             packageManager.getPackageInfo(packageName, 0)
@@ -425,6 +428,7 @@ class AnalysisService : Service() {
             types = TypeCounts.of(results.map { it.mime }),
             modelLoads = loads,
             stages = stages,
+            diagnosticsRun = diagnosticsRun,
         )
     }
 

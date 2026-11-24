@@ -97,6 +97,18 @@ private fun readText(context: Context, name: String): String? = try {
     null
 }
 
+/**
+ * What "Copier les données" puts on the clipboard: the analysis file, the journal of its run and
+ * the recent journal of the application. If the journals cannot be read, the analysis file alone.
+ */
+private fun copyText(context: Context, name: String): String? {
+    val analysis = readText(context, name) ?: return null
+    return runCatching {
+        val run = AnalysisRecord.fromJson(JSONObject(analysis)).diagnosticsRun
+        Diagnostics.copyBundle(context, JSONObject(analysis), run).toString()
+    }.getOrElse { analysis }
+}
+
 private fun readRecord(context: Context, name: String): AnalysisRecord? = try {
     AnalysisRecord.fromJson(JSONObject(File(RunArchive.directory(context), name).readText()))
 } catch (e: Exception) {
@@ -283,7 +295,7 @@ private fun CopyDataButton(name: String) {
             .clickable(enabled = phase == CopyPhase.IDLE) {
                 phase = CopyPhase.COPYING
                 scope.launch {
-                    val text = withContext(Dispatchers.IO) { readText(context, name) }
+                    val text = withContext(Dispatchers.IO) { copyText(context, name) }
                     phase = if (text == null) {
                         CopyPhase.FAILED
                     } else {

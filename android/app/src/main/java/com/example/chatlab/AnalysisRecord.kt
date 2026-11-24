@@ -47,6 +47,8 @@ data class AnalysisRecord(
     val modelLoads: List<ModelLoad> = emptyList(),
     /** The time of each photo stage over the run, in milliseconds (see [StageTimes]). */
     val stages: Map<String, Long> = emptyMap(),
+    /** The name of the journal of this run (ChatLab/diagnostics), or empty when there is none. */
+    val diagnosticsRun: String = "",
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val analyzed: Int get() = folders.sumOf { it.analyzed }
@@ -86,6 +88,7 @@ data class AnalysisRecord(
             }
         })
         .put("stages", JSONObject().apply { stages.forEach { (k, v) -> put(k, v) } })
+        .put("diagnosticsRun", diagnosticsRun)
         .put("device", JSONObject()
             .put("model", device)
             .put("android", androidVersion)
@@ -140,6 +143,7 @@ data class AnalysisRecord(
                     Sample(p.getInt("t"), p.getDouble("cpu").toFloat(), p.getInt("memMb"), p.getInt("battery"), p.getDouble("batteryTempC").toFloat(), p.getInt("thermal"), p.optInt("workers", 0))
                 },
                 stages = json.optJSONObject("stages")?.let { o -> o.keys().asSequence().associateWith { o.getLong(it) } }.orEmpty(),
+                diagnosticsRun = json.optString("diagnosticsRun", ""),
                 types = json.optJSONObject("types")?.let { t -> t.keys().asSequence().associateWith { t.getInt(it) } }.orEmpty(),
                 modelLoads = json.optJSONArray("models")?.let { m ->
                     val start = parseIso(run.getString("start"))
