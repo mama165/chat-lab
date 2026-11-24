@@ -255,7 +255,8 @@ private fun FolderRows(
     onToggleSelect: (FolderNode) -> Unit,
     onToggleExpand: (String) -> Unit,
 ) {
-    nodes.forEach { node ->
+    // A folder without photos is not offered: its count is known and it is zero.
+    nodes.filter { ChooserFilter.visible(it.path, counts, locked) }.forEach { node ->
         val isLocked = node.path in locked
         val on = node.path in selected
         val partial = FolderSelection.isPartial(node, selected)
