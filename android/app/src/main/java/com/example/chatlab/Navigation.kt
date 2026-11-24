@@ -7,7 +7,9 @@ enum class Page { TABS, SETTINGS, REMOVED, WIPE, TESTS, STORAGE, LEVEL, HISTORY,
 fun Page.parent(): Page = when (this) {
     Page.REMOVED, Page.WIPE, Page.TESTS -> Page.SETTINGS
     Page.STORAGE -> Page.TABS
-    Page.LEVEL, Page.HISTORY -> Page.SETTINGS
+    Page.LEVEL -> Page.SETTINGS
+    // The history is opened from the Photos tab.
+    Page.HISTORY -> Page.TABS
     Page.RUN -> Page.HISTORY
     else -> Page.TABS
 }

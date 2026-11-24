@@ -17,3 +17,15 @@ class NavigationTest {
         assertEquals(Page.TABS, Page.TABS.parent())
     }
 }
+
+class HistoryNavigationTest {
+    @Test
+    fun theHistoryGoesBackToThePhotosTabs() {
+        assertEquals(Page.TABS, Page.HISTORY.parent())
+    }
+
+    @Test
+    fun theAnalysisDetailGoesBackToTheHistory() {
+        assertEquals(Page.HISTORY, Page.RUN.parent())
+    }
+}

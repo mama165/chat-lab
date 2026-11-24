@@ -91,7 +91,8 @@ fun MainScreen() {
             Page.TESTS -> TestsPage(onBack = { page = Page.SETTINGS })
             Page.LEVEL -> LevelPage(onBack = { page = Page.SETTINGS })
             Page.HISTORY -> AnalysisHistoryPage(
-                onBack = { page = Page.SETTINGS },
+                // The history is opened from the Photos tab: its arrow goes back there.
+                onBack = { page = Page.TABS },
                 onOpen = {
                     openedRun = it
                     page = Page.RUN
