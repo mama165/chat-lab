@@ -249,18 +249,13 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
                     Text("Courbes pendant l'analyse", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
                     CopyDataButton(name)
                 }
-                CurvesLegend()
+                CurvesLegend(workersUsed = AnalysisTechnical.workersUsed(record))
                 CurvesChart(record)
                 Block("Contexte") {
-                    KeyValue("Début · fin", "${ChartMath.clockLabel(record.startMs, 0)} · ${ChartMath.clockLabel(record.startMs, (record.durationMs / 1000).toInt())}")
-                    KeyValue("Niveau · workers", "${AnalysisLevel.fromKey(record.level).label} · ${record.workers}")
-                    KeyValue("Version de l'appli", record.appVersion)
-                    KeyValue("Téléphone · Android", "${record.device} · ${record.androidVersion}")
-                    KeyValue("État thermique (max)", "niveau ${record.summary().thermalMax}")
+                    AnalysisTechnical.contextRows(record).forEach { (label, value) -> KeyValue(label, value) }
                 }
                 Block("Technique") {
-                    SummaryRows(record)
-                    KeyValue("Cœurs", record.cores.toString())
+                    AnalysisTechnical.technicalRows(record).forEach { (label, value) -> KeyValue(label, value) }
                 }
                 Block("Métier") {
                     record.folders.forEach { folder ->
@@ -324,20 +319,6 @@ private fun CopyDataButton(name: String) {
             color = Palette.Accent,
         )
     }
-}
-
-@Composable
-private fun SummaryRows(record: AnalysisRecord) {
-    val s = record.summary()
-    KeyValue("CPU moyen", "${s.avgCpu.roundToInt()} %")
-    KeyValue("CPU au pic", "${s.peakCpu.roundToInt()} %")
-    KeyValue("Mémoire au pic", "${s.peakMemMb} Mo")
-    KeyValue("Photos par seconde", "%.2f".format(Locale.FRANCE, s.photosPerSecond))
-    KeyValue(
-        "Batterie",
-        if (s.batteryStart != null && s.batteryEnd != null) "${s.batteryStart} % → ${s.batteryEnd} %" else "–",
-    )
-    KeyValue("Pic thermique", "niveau ${s.thermalMax}")
 }
 
 @Composable
@@ -462,20 +443,21 @@ private fun CurvesChart(record: AnalysisRecord) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CurvesLegend() {
+private fun CurvesLegend(workersUsed: Int) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         LegendItem(CurveCpu, "CPU (%)")
         LegendItem(CurveMemory, "Mémoire (Mo, à droite)")
         LegendItem(CurveBattery, "Batterie (%)")
-        WorkerLegend()
+        WorkerLegend(workersUsed)
     }
 }
 
+/** Only the numbers of workers the analysis used, from the most to 1: 2 gives "2 1", 4 gives "4 3 2 1". */
 @Composable
-private fun WorkerLegend() {
+private fun WorkerLegend(workersUsed: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("Workers :", fontSize = 11.sp, color = Palette.Muted)
-        listOf(4, 3, 2, 1).forEach { workers ->
+        (workersUsed.coerceAtLeast(1) downTo 1).forEach { workers ->
             Canvas(Modifier.size(8.dp)) { drawCircle(workerColor(workers)) }
             Text("$workers", fontSize = 11.sp, color = Palette.Muted)
         }
