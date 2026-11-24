@@ -2,6 +2,8 @@ package com.example.chatlab
 
 import android.Manifest
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +77,7 @@ import com.example.chatlab.ui.StopSquare
 import com.example.chatlab.ui.TabTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Photos tab: the folders to analyse, the report of the last analysis, then the progress. */
@@ -391,7 +395,70 @@ private fun Running(running: Progress, now: Long, sources: List<SourceFolder>) {
         reprise -> RepriseScreen(progress, now, showDetails)
         else -> RunningDetail(progress, now, showDetails)
     }
+    CopyInProgress(progress)
 }
+
+/** Copies what the run has done so far (the progress and the journal), without stopping it. */
+@Composable
+private fun CopyInProgress(progress: Progress) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var phase by remember { mutableStateOf(InProgressCopy.IDLE) }
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(shape)
+                .border(1.dp, Palette.Accent, shape)
+                .clickable(enabled = phase == InProgressCopy.IDLE) {
+                    phase = InProgressCopy.COPYING
+                    val now = System.currentTimeMillis()
+                    val snapshot = progress.snapshotJson(now)
+                    scope.launch {
+                        val text = withContext(Dispatchers.IO) {
+                            runCatching { Diagnostics.inProgressText(context, snapshot) }.getOrNull()
+                        }
+                        phase = if (text == null) {
+                            InProgressCopy.FAILED
+                        } else {
+                            context.getSystemService(ClipboardManager::class.java)
+                                .setPrimaryClip(ClipData.newPlainText("Analyse ChatLab en cours", text))
+                            InProgressCopy.COPIED
+                        }
+                        delay(2_000)
+                        phase = InProgressCopy.IDLE
+                    }
+                }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (phase == InProgressCopy.COPYING) GaugeRing(fraction = null, size = 12.dp)
+            Text(
+                when (phase) {
+                    InProgressCopy.IDLE -> "Copier le résultat en cours"
+                    InProgressCopy.COPYING -> "Copie en cours…"
+                    InProgressCopy.COPIED -> "Copié dans le presse-papier"
+                    InProgressCopy.FAILED -> "Copie impossible"
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Palette.Accent,
+            )
+        }
+        Text(
+            "Le journal jusqu'à maintenant. L'analyse continue.",
+            fontSize = 11.sp,
+            color = Palette.Muted,
+        )
+    }
+}
+
+private enum class InProgressCopy { IDLE, COPYING, COPIED, FAILED }
 
 /** "Plus de détails ›", or "Moins de détails" once they are open. Blue text, no background. */
 @Composable

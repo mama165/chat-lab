@@ -190,6 +190,30 @@ object Diagnostics {
                 .put("session", JSONArray(sessionLines.takeLast(SESSION_LINES).mapNotNull { parse(it) })),
         )
 
+    /**
+     * What "Copier le résultat en cours" copies during a run: the progress as it is, the journal of the run
+     * as far as it is written, and the recent lines of the application's journal. The analysis goes on.
+     */
+    fun inProgressText(context: Context, progress: JSONObject): String = synchronized(lock) {
+        val path = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CURRENT_RUN, null)
+        val run = path?.let { readLinesSafely(File(it)) }.orEmpty()
+        inProgressBundle(progress, run, readLinesSafely(File(dir(context), "session.jsonl"))).toString()
+    }
+
+    /** The bundle of a copy made during the run, from the lines already read. */
+    fun inProgressBundle(progress: JSONObject, runLines: List<String>, sessionLines: List<String>): JSONObject = JSONObject()
+        .put("inProgress", true)
+        .put("progress", progress)
+        .put(
+            "diagnostics",
+            JSONObject()
+                .put("run", JSONArray(runLines.mapNotNull { parse(it) }))
+                .put("session", JSONArray(sessionLines.takeLast(SESSION_LINES).mapNotNull { parse(it) })),
+        )
+
+    private fun readLinesSafely(file: File): List<String> =
+        runCatching { file.readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())
+
     /** The journal of the run that started nearest to [startMs], within ten minutes; empty when there is none. */
     fun runFor(context: Context, startMs: Long): String =
         nearestRun(dir(context).list()?.toList().orEmpty(), startMs, TimeZone.getDefault())
