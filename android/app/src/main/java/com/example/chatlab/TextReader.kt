@@ -89,16 +89,12 @@ class TextReader(
                     val lines = timed("ocr_variant_$index") {
                         readLines(variant, record = index == 0, minimum = minimum)
                     }
+                    // The words this pass adds to those of the passes before: what it is worth.
+                    var added = 0
                     for (line in lines) {
-                        // A capital I before an apostrophe is a misread l: "I'herbe".
-                        val fixed = line.replace("I'", "l'").replace("I’", "l’")
-                        for (word in fixed.split(Regex("\\s+"))) {
-                            // A lone symbol or digit is noise on a photograph ("%", "0"), not a word.
-                            if (word.isNotBlank() && (word.length > 1 || word[0].isLetter())) {
-                                words.putIfAbsent(word.lowercase(), word)
-                            }
-                        }
+                        added += TextWords.add(words, line)
                     }
+                    onStep("ocr_words_$index", added.toLong())
                 } finally {
                     variant.release()
                 }
