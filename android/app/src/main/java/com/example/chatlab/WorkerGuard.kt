@@ -1,6 +1,21 @@
 package com.example.chatlab
 
 /**
+ * How many workers the memory of the phone allows at the start of a run. Each worker loads its
+ * own models, about [PER_WORKER_MB] of native memory; [RESERVE_MB] stays free for the system.
+ */
+object MemoryBudget {
+    const val PER_WORKER_MB = 1300L
+    const val RESERVE_MB = 600L
+
+    /** At least one worker; never more than the level chosen; fewer when the memory is short. */
+    fun workersAllowedAtStart(levelWorkers: Int, availMb: Long): Int {
+        val byMemory = ((availMb - RESERVE_MB) / PER_WORKER_MB).toInt()
+        return minOf(levelWorkers, byMemory).coerceAtLeast(1)
+    }
+}
+
+/**
  * Keeps the analysis under the memory limit of the phone. It only ever lowers the number of
  * workers, one at a time: each worker loads its own models (about 1.5 GB of native memory on
  * the test phone), and Android stops the app when the available memory stays too low.
@@ -11,11 +26,14 @@ package com.example.chatlab
  */
 class WorkerGuard(
     initial: Int,
-    private val lowAvailMb: Long = 600L,
-    private val cooldownMs: Long = 20_000L,
+    private val lowAvailMb: Long = 900L,
+    private val cooldownMs: Long = 8_000L,
 ) {
+    /** Number of workers allowed at the start of the run. */
+    val startLimit: Int = initial.coerceAtLeast(1)
+
     /** Number of workers allowed to take a new photo. */
-    var limit: Int = initial.coerceAtLeast(1)
+    var limit: Int = startLimit
         private set
 
     /** How many times the limit was lowered during the run. */

@@ -149,6 +149,8 @@ fun SearchScreen(
     var modelError by remember { mutableStateOf<String?>(null) }
     var recents by remember { mutableStateOf(RecentStore.read(context)) }
     val time = remember(query, state.filters, entries) { When(System.currentTimeMillis()) }
+    // The place is chosen, but does not filter the results yet: see Filters.withoutPlace.
+    val resultFilters = state.filters.withoutPlace()
     val gridState = rememberLazyGridState()
 
     // A new search or other filters start again from the beginning: neither photos less close, nor selection.
@@ -180,8 +182,8 @@ fun SearchScreen(
     }
 
     val removed = remember(queryKey, removalsVersion) { Removals.sourcesFor(context, queryKey) }
-    val outcome = remember(entries, query, state.ranked, state.filters, removed, state.shownExtra, time) {
-        SearchResults.compute(entries, query, state.ranked, state.filters, removed, state.shownExtra, time)
+    val outcome = remember(entries, query, state.ranked, resultFilters, removed, state.shownExtra, time) {
+        SearchResults.compute(entries, query, state.ranked, resultFilters, removed, state.shownExtra, time)
     }
     val rows = remember(outcome, state.newFrom, query) { resultItems(outcome, query, state.newFrom) }
     val latestOutcome by rememberUpdatedState(outcome)

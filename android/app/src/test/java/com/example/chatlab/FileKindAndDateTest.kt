@@ -13,7 +13,7 @@ class FileKindAndDateTest {
     @Test
     fun imageGroupsEveryPictureFormatButNotDocuments() {
         for (mime in listOf(FileSniffer.JPEG, FileSniffer.PNG, FileSniffer.WEBP, FileSniffer.GIF, FileSniffer.HEIC)) {
-            assertTrue(FileKind.IMAGE.matches(mime), mime)
+            assertTrue(mime, FileKind.IMAGE.matches(mime))
         }
         assertFalse(FileKind.IMAGE.matches(FileSniffer.PDF))
         assertFalse(FileKind.IMAGE.matches(null))

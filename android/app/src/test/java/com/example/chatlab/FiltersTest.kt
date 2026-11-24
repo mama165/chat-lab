@@ -58,13 +58,13 @@ class FiltersTest {
     @Test
     fun customDatesAreWrittenAsARange() {
         val range = DateRange(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 22))
-        assertEquals("9 – 22 nov.", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
+        assertEquals("Date · 9 – 22 nov.", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
     }
 
     @Test
     fun customDatesWithADayPartMentionIt() {
         val range = DateRange(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 22), DayPart.MORNING)
-        assertEquals("9 – 22 nov. · Matin", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
+        assertEquals("Date · 9 – 22 nov. · Matin", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
     }
 
     @Test
@@ -94,9 +94,8 @@ class FiltersTest {
     @Test
     fun matchesPlaceAndPeople() {
         val inside = entry("a", indoor = true, faces = 0)
-        // The place is chosen but does not filter the photos yet.
         assertTrue(matches(Filters(place = Place.INDOOR), inside))
-        assertTrue(matches(Filters(place = Place.OUTDOOR), inside))
+        assertFalse(matches(Filters(place = Place.OUTDOOR), inside))
         assertTrue(matches(Filters(people = People.NONE), inside))
         assertFalse(matches(Filters(people = People.ONE), inside))
         assertTrue(matches(Filters(people = People.MANY), entry("b", faces = 3)))

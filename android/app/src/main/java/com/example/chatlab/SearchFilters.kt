@@ -158,6 +158,9 @@ data class Filters(
         }
     }
 
+    /** The filters that the search screen applies: the place is not applied yet. */
+    fun withoutPlace(): Filters = copy(place = Place.ALL)
+
     private fun dateLabel(time: When): String {
         val range = date.range
         if (range != null) {
@@ -169,11 +172,11 @@ data class Filters(
 
     /**
      * A photo passes all the content filters (the resemblance does not filter the photos).
-     * The place is only chosen for now: it does not filter the photos yet, as the place
-     * of a photo is not read on the phone. It is still shown among the active filters.
+     * The search screen leaves the place out for now (see [withoutPlace]): the counts keep it.
      */
     fun matches(entry: LibraryEntry, time: When): Boolean =
         date.matches(entry.takenMs, time) &&
+            Library.inPlace(entry, place) &&
             matchesPeople(entry.faces) &&
             (!closeUp || entry.closeUp) &&
             matchesText(entry.text) &&

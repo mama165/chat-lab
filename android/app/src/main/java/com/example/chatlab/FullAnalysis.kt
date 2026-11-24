@@ -146,9 +146,21 @@ class AnalysisService : Service() {
 
         level = LevelStore.read(this)
         Diagnostics.openRun(this, level, sources.size)
-        workerGuard = WorkerGuard(level.workers)
+        // The memory at the start decides how many workers may run: a worker needs its own models.
+        val memory = ActivityManager.MemoryInfo()
+        getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
+        val availAtStart = memory.availMem / (1024L * 1024L)
+        workerGuard = WorkerGuard(MemoryBudget.workersAllowedAtStart(level.workers, availAtStart))
+        Diagnostics.event(
+            this,
+            "workersAtStart",
+            JSONObject()
+                .put("levelWorkers", level.workers)
+                .put("allowed", workerGuard?.startLimit ?: 0)
+                .put("availMb", availAtStart),
+        )
         recorder = AnalysisRecorder(this).also {
-            it.workers = level.workers
+            it.workers = workerGuard?.limit ?: level.workers
             it.start(scope)
         }
         // Every 2 seconds: memory, CPU, thermal state and progress, written at once to the diagnostics.
@@ -239,7 +251,7 @@ class AnalysisService : Service() {
 
         // One analyser per worker: each loads its models and works alone. With nothing to
         // analyse, no model is loaded.
-        val workers = if (total == 0) 0 else level.workers
+        val workers = if (total == 0) 0 else (workerGuard?.limit ?: level.workers)
         val loads = Collections.synchronizedList(mutableListOf<ModelLoad>())
         val slots = List(workers) {
             AnalyzerSlot<Analyzer>(
@@ -328,8 +340,13 @@ class AnalysisService : Service() {
                 else -> "Analyse terminée · ${runReport.analyzed} photos analysées"
             }
             // The memory guard's work is named at the end of the message, so that it is visible.
-            val guard = workerGuard?.takeIf { it.reductions > 0 }
-            val guardNote = guard?.let { " · mémoire limitée : ${level.workers} → ${it.limit} workers" }.orEmpty()
+            val guard = workerGuard
+            val guardNote = when {
+                guard == null -> ""
+                guard.reductions > 0 -> " · mémoire limitée : ${level.workers} → ${guard.limit} workers"
+                guard.startLimit < level.workers -> " · mémoire limitée au départ : ${level.workers} → ${guard.startLimit} workers"
+                else -> ""
+            }
             finish(
                 Progress(false, total, total, "", started, errors.get(), report = runReport.toText(), folders = AnalysisProgress.state.value.folders),
                 text + guardNote,
