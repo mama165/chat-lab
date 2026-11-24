@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -233,48 +235,37 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         val state = loaded
         PageHeader(if (state is Loaded.Ready) analysisDateLabel(state.record.startMs) else "Analyse", onBack = onBack)
-        if (state is Loaded.Ready) CopyDataButton(name)
         when (state) {
             Loaded.Loading -> Text("Lecture du fichier…", fontSize = 14.sp, color = Palette.Muted)
             Loaded.Missing -> Text("Ce fichier d'analyse n'est plus là ou ne peut pas être lu.", fontSize = 14.sp, color = Palette.Muted)
             is Loaded.Ready -> {
                 val record = state.record
-                RunBlock(record)
-                Block("Courbes") {
-                    CurvesChart(record)
-                    CurvesLegend()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    SectionLabel("Courbes pendant l'analyse")
+                    CopyDataButton(name)
                 }
-                Block("Résumé") { SummaryRows(record) }
-                Block("Types de photos") {
-                    val types = record.types
-                    if (types.isEmpty()) Text("Aucune photo analysée.", fontSize = 14.sp, color = Palette.Muted)
-                    types.forEach { (type, count) -> KeyValue(type, count.toString()) }
-                }
-                Block("Dossiers") {
-                    record.folders.forEach { folder ->
-                        Text(folder.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-                        Text(
-                            "${folder.analyzed} analysées · ${folder.ignored} ignorées · ${folder.unread} non lues · ${folder.refused} refusées",
-                            fontSize = 13.sp,
-                            color = Palette.Muted,
-                        )
-                    }
-                }
-                Block("Chargements des modèles") {
-                    if (record.modelLoads.isEmpty()) Text("Aucun chargement.", fontSize = 14.sp, color = Palette.Muted)
-                    record.modelLoads.forEach { load ->
-                        KeyValue(
-                            if (load.reload) "Reprise après la pause" else "Premier chargement",
-                            "${ChartMath.clockLabel(record.startMs, ((load.atMs - record.startMs) / 1000).toInt())} · ${secondsLabel(load.millis)}",
-                        )
-                        load.parts.forEach { (name, millis) -> KeyValue("   $name", secondsLabel(millis)) }
-                    }
-                }
-                Block("Téléphone") {
-                    KeyValue("Appareil", record.device)
-                    KeyValue("Android", record.androidVersion.toString())
-                    KeyValue("Cœurs", record.cores.toString())
+                CurvesLegend()
+                CurvesChart(record)
+                Block("Contexte") {
+                    KeyValue("Début · fin", "${ChartMath.clockLabel(record.startMs, 0)} · ${ChartMath.clockLabel(record.startMs, (record.durationMs / 1000).toInt())}")
+                    KeyValue("Niveau · workers", "${AnalysisLevel.fromKey(record.level).label} · ${record.workers}")
                     KeyValue("Version de l'appli", record.appVersion)
+                    KeyValue("Téléphone · Android", "${record.device} · ${record.androidVersion}")
+                    KeyValue("État thermique (max)", "niveau ${record.summary().thermalMax}")
+                }
+                Block("Technique") {
+                    SummaryRows(record)
+                    KeyValue("Cœurs", record.cores.toString())
+                }
+                Block("Métier") {
+                    record.folders.forEach { folder ->
+                        KeyValue(folder.name, "${folder.analyzed} analysées · ${folder.ignored} ignorées · ${folder.unread} non lues · ${folder.refused} refusées")
+                    }
+                    record.types.forEach { (type, count) -> KeyValue(type, count.toString()) }
                 }
             }
         }
@@ -331,18 +322,6 @@ private fun CopyDataButton(name: String) {
             fontWeight = FontWeight.SemiBold,
             color = Palette.Accent,
         )
-    }
-}
-
-@Composable
-private fun RunBlock(record: AnalysisRecord) {
-    Block("Ce qui s'est passé") {
-        KeyValue("Début", analysisDateLabel(record.startMs))
-        KeyValue("Durée", durationText((record.durationMs / 60_000).toInt()))
-        KeyValue("Fin", if (record.stopped) "arrêtée par l'utilisateur" else "terminée")
-        KeyValue("Performance", "${AnalysisLevel.fromKey(record.level).label} · ${record.workers} à la fois")
-        KeyValue("Photos analysées", record.analyzed.toString())
-        KeyValue("Photos ignorées", record.ignored.toString())
     }
 }
 
@@ -480,9 +459,10 @@ private fun CurvesChart(record: AnalysisRecord) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CurvesLegend() {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         LegendItem(CurveCpu, "CPU (%)")
         LegendItem(CurveMemory, "Mémoire (Mo, à droite)")
         LegendItem(CurveBattery, "Batterie (%)")
