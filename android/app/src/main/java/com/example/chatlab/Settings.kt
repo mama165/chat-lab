@@ -300,6 +300,29 @@ fun TestsPage(onBack: () -> Unit) {
                 OnnxExperiment.write(context, false)
             },
         )
+        // Optional, test only: forces the number of workers, bypassing the start memory budget.
+        var forcedWorkers by remember { mutableStateOf(WorkerOverride.read(context)) }
+        Text("Nombre de workers (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        RadioRow(
+            label = "Automatique (réglage actuel)",
+            count = "selon la mémoire",
+            selected = forcedWorkers == null,
+            onClick = {
+                forcedWorkers = null
+                WorkerOverride.write(context, null)
+            },
+        )
+        (1..4).forEach { n ->
+            RadioRow(
+                label = "$n worker${if (n > 1) "s" else ""} forcé${if (n > 1) "s" else ""}",
+                count = "essai",
+                selected = forcedWorkers == n,
+                onClick = {
+                    forcedWorkers = n
+                    WorkerOverride.write(context, n)
+                },
+            )
+        }
         PrimaryButton(
             if (running) "Analyse en cours…" else "Analyser les images de test",
             enabled = !running,

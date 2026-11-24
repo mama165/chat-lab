@@ -157,7 +157,9 @@ class AnalysisService : Service() {
         val memory = ActivityManager.MemoryInfo()
         getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
         val availAtStart = memory.availMem / (1024L * 1024L)
-        workerGuard = WorkerGuard(MemoryBudget.workersAllowedAtStart(level.workers, availAtStart))
+        // A forced number (test page) replaces the start budget; the guard during the run still applies.
+        val forced = WorkerOverride.read(this)
+        workerGuard = WorkerGuard(forced ?: MemoryBudget.workersAllowedAtStart(level.workers, availAtStart))
         runStartWorkers = workerGuard?.startLimit ?: 0
         runMemoryAtStartMb = availAtStart
         Diagnostics.event(
@@ -380,6 +382,7 @@ class AnalysisService : Service() {
             val guardNote = when {
                 guard == null -> ""
                 guard.reductions > 0 -> " · mémoire limitée : ${level.workers} → ${guard.limit} workers"
+                WorkerOverride.read(this) != null -> " · nombre forcé pour l'essai : ${guard.startLimit} workers"
                 guard.startLimit < level.workers -> " · mémoire limitée au départ : ${level.workers} → ${guard.startLimit} workers"
                 else -> ""
             }
