@@ -49,6 +49,10 @@ data class AnalysisRecord(
     val stages: Map<String, Long> = emptyMap(),
     /** The name of the journal of this run (ChatLab/diagnostics), or empty when there is none. */
     val diagnosticsRun: String = "",
+    /** The workers allowed at the start of the run (0 when not kept). */
+    val startWorkers: Int = 0,
+    /** The memory free at the start of the run, in megabytes (0 when not kept). */
+    val memoryAtStartMb: Long = 0L,
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val analyzed: Int get() = folders.sumOf { it.analyzed }
@@ -89,6 +93,8 @@ data class AnalysisRecord(
         })
         .put("stages", JSONObject().apply { stages.forEach { (k, v) -> put(k, v) } })
         .put("diagnosticsRun", diagnosticsRun)
+        .put("startWorkers", startWorkers)
+        .put("memoryAtStartMb", memoryAtStartMb)
         .put("device", JSONObject()
             .put("model", device)
             .put("android", androidVersion)
@@ -144,6 +150,8 @@ data class AnalysisRecord(
                 },
                 stages = json.optJSONObject("stages")?.let { o -> o.keys().asSequence().associateWith { o.getLong(it) } }.orEmpty(),
                 diagnosticsRun = json.optString("diagnosticsRun", ""),
+                startWorkers = json.optInt("startWorkers", 0),
+                memoryAtStartMb = json.optLong("memoryAtStartMb", 0L),
                 types = json.optJSONObject("types")?.let { t -> t.keys().asSequence().associateWith { t.getInt(it) } }.orEmpty(),
                 modelLoads = json.optJSONArray("models")?.let { m ->
                     val start = parseIso(run.getString("start"))

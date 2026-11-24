@@ -47,4 +47,55 @@ class DiagnosticsBundleTest {
         val back = AnalysisRecord.fromJson(JSONObject(record.toJson().toString()))
         assertEquals("run-20261124-101500.jsonl", back.diagnosticsRun)
     }
+
+    @Test
+    fun the_start_workers_and_memory_survive_a_round_trip() {
+        val record = AnalysisRecord(
+            startMs = 1_795_000_000_000L,
+            endMs = 1_795_000_600_000L,
+            level = "maximal",
+            workers = 4,
+            stopped = false,
+            appVersion = "a5391be",
+            device = "Pixel 10a",
+            androidVersion = 16,
+            cores = 8,
+            folders = emptyList(),
+            samples = emptyList(),
+            startWorkers = 1,
+            memoryAtStartMb = 1_900L,
+        )
+        val back = AnalysisRecord.fromJson(JSONObject(record.toJson().toString()))
+        assertEquals(1, back.startWorkers)
+        assertEquals(1_900L, back.memoryAtStartMb)
+    }
+
+    private val paris = java.util.TimeZone.getTimeZone("Europe/Paris")
+
+    private fun startOf(stamp: String): Long =
+        java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).apply { timeZone = paris }.parse(stamp)!!.time
+
+    @Test
+    fun the_journal_started_nearest_to_the_analysis_is_chosen() {
+        val start = startOf("20261124-150707")
+        val names = listOf(
+            "run-20261124-150650.jsonl",
+            "run-20261124-120000.jsonl",
+            "run-20261124-152000.jsonl",
+        )
+        assertEquals("run-20261124-150650.jsonl", Diagnostics.nearestRun(names, start, paris))
+    }
+
+    @Test
+    fun no_journal_within_ten_minutes_means_none() {
+        val start = startOf("20261124-150707")
+        assertEquals("", Diagnostics.nearestRun(listOf("run-20261124-120000.jsonl"), start, paris))
+    }
+
+    @Test
+    fun files_that_are_not_run_journals_are_ignored() {
+        val start = startOf("20261124-150707")
+        val names = listOf("session.jsonl", "exit-1795.trace.txt", "run-20261124-150700.json", "run-bad.jsonl")
+        assertEquals("", Diagnostics.nearestRun(names, start, paris))
+    }
 }

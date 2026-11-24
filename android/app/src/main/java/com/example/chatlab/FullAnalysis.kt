@@ -67,6 +67,9 @@ class AnalysisService : Service() {
     @Volatile private var stageTimes = StageTimes()
     /** The journal file of the run in progress, named in its analysis file. */
     private var runDiagnostics = ""
+    /** The workers allowed at the start of the run, and the memory free then (both kept in the analysis file). */
+    private var runStartWorkers = 0
+    private var runMemoryAtStartMb = 0L
     private var diagnosticsSampler: Job? = null
     /** The memory guard: lowers the workers when the phone runs short of memory. */
     private var workerGuard: WorkerGuard? = null
@@ -155,6 +158,8 @@ class AnalysisService : Service() {
         getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
         val availAtStart = memory.availMem / (1024L * 1024L)
         workerGuard = WorkerGuard(MemoryBudget.workersAllowedAtStart(level.workers, availAtStart))
+        runStartWorkers = workerGuard?.startLimit ?: 0
+        runMemoryAtStartMb = availAtStart
         Diagnostics.event(
             this,
             "workersAtStart",
@@ -341,7 +346,7 @@ class AnalysisService : Service() {
             ReportStore.saveRun(this@AnalysisService, runReport)
             val samples = recorder?.stop().orEmpty()
             recorder = null
-            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals(), runDiagnostics))
+            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals(), runDiagnostics, runStartWorkers, runMemoryAtStartMb))
             val text = when {
                 stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
@@ -405,6 +410,8 @@ class AnalysisService : Service() {
         results: List<ImageResult>,
         stages: Map<String, Long>,
         diagnosticsRun: String,
+        startWorkers: Int,
+        memoryAtStartMb: Long,
     ): AnalysisRecord {
         val info = try {
             packageManager.getPackageInfo(packageName, 0)
@@ -429,6 +436,8 @@ class AnalysisService : Service() {
             modelLoads = loads,
             stages = stages,
             diagnosticsRun = diagnosticsRun,
+            startWorkers = startWorkers,
+            memoryAtStartMb = memoryAtStartMb,
         )
     }
 

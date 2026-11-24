@@ -25,10 +25,10 @@ object AnalysisTechnical {
     }
 
     fun contextRows(record: AnalysisRecord): List<Pair<String, String>> {
-        val lastWorkers = record.samples.lastOrNull { it.workers > 0 }?.workers ?: record.workers
         return listOf(
             "Début · fin" to "${ChartMath.clockLabel(record.startMs, 0)} · ${ChartMath.clockLabel(record.startMs, (record.durationMs / 1000).toInt())}",
-            "Niveau · workers" to "${AnalysisLevel.fromKey(record.level).label} · ${record.workers} → $lastWorkers",
+            "Niveau · workers" to "${AnalysisLevel.fromKey(record.level).label} · ${record.workers}",
+            "Workers au départ" to startWorkersText(record),
             "Version de l'appli" to record.appVersion,
             "Téléphone · Android" to "${record.device} · ${record.androidVersion}",
             "État thermique (max)" to thermalWord(record.summary().thermalMax),
@@ -48,6 +48,13 @@ object AnalysisTechnical {
 
     /** 1450 becomes "1 450". */
     private fun grouped(value: Int): String = value.toString().reversed().chunked(3).joinToString(" ").reversed()
+
+    /** The workers at the start, with the memory free then: what limited the run, not the level's number. */
+    fun startWorkersText(record: AnalysisRecord): String = when {
+        record.startWorkers <= 0 -> MISSING
+        record.memoryAtStartMb > 0 -> "${record.startWorkers} · ${grouped(record.memoryAtStartMb.toInt())} Mo libres"
+        else -> "${record.startWorkers}"
+    }
 
     fun technicalRows(record: AnalysisRecord): List<Pair<String, String>> {
         val s = record.summary()

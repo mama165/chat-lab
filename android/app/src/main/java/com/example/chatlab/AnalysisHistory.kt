@@ -111,8 +111,9 @@ private fun readText(context: Context, name: String): String? = try {
 private fun copyText(context: Context, name: String): String? {
     val analysis = readText(context, name) ?: return null
     return runCatching {
-        val run = AnalysisRecord.fromJson(JSONObject(analysis)).diagnosticsRun
-        Diagnostics.copyBundle(context, JSONObject(analysis), run).toString()
+        val record = AnalysisRecord.fromJson(JSONObject(analysis))
+        val run = record.diagnosticsRun
+        Diagnostics.copyBundle(context, JSONObject(analysis), run, record.startMs).toString()
     }.getOrElse { analysis }
 }
 

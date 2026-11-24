@@ -11,6 +11,8 @@ class AnalysisTechnicalTest {
         samples: List<Sample>,
         loads: List<ModelLoad> = emptyList(),
         stages: Map<String, Long> = emptyMap(),
+        startWorkers: Int = 0,
+        memoryAtStartMb: Long = 0L,
     ) = AnalysisRecord(
         startMs = start,
         endMs = start + 600_000L,
@@ -25,6 +27,8 @@ class AnalysisTechnicalTest {
         samples = samples,
         modelLoads = loads,
         stages = stages,
+        startWorkers = startWorkers,
+        memoryAtStartMb = memoryAtStartMb,
     )
 
     private fun sample(t: Int, workers: Int, thermal: Int = 2) =
@@ -47,8 +51,23 @@ class AnalysisTechnicalTest {
     @Test
     fun the_context_shows_the_workers_from_start_to_end() {
         val rows = AnalysisTechnical.contextRows(record(4, listOf(sample(0, 4), sample(300, 1))))
-        assertEquals("Maximum · 4 → 1", rows.first { it.first == "Niveau · workers" }.second)
+        // The level's number, not a reduction: the run's own start is shown on its own row.
+        assertEquals("Maximum · 4", rows.first { it.first == "Niveau · workers" }.second)
         assertEquals("Modéré", rows.first { it.first == "État thermique (max)" }.second)
+    }
+
+    @Test
+    fun the_start_workers_show_the_memory_that_limited_them() {
+        val limited = record(4, listOf(sample(0, 1), sample(300, 1)), startWorkers = 1, memoryAtStartMb = 1_900)
+        assertEquals("1 · 1 900 Mo libres", AnalysisTechnical.startWorkersText(limited))
+        val rows = AnalysisTechnical.contextRows(limited).map { it.first }
+        assertEquals(listOf("Début · fin", "Niveau · workers", "Workers au départ", "Version de l'appli", "Téléphone · Android", "État thermique (max)"), rows)
+    }
+
+    @Test
+    fun an_analysis_without_the_start_workers_shows_a_dash() {
+        assertEquals("–", AnalysisTechnical.startWorkersText(record(4, emptyList())))
+        assertEquals("3", AnalysisTechnical.startWorkersText(record(4, emptyList(), startWorkers = 3)))
     }
 
     @Test

@@ -16,6 +16,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * A technical log that survives a sudden death of the app. Each line is one JSON object,
@@ -172,8 +173,10 @@ object Diagnostics {
      * What "Copier les données" copies for a diagnosis: the analysis file, the journal of its run
      * and the recent lines of the application's journal.
      */
-    fun copyBundle(context: Context, analysis: JSONObject, runName: String): JSONObject {
-        val run = if (runName.isBlank()) emptyList() else linesOf(dir(context), runName)
+    fun copyBundle(context: Context, analysis: JSONObject, runName: String, startMs: Long): JSONObject {
+        // An analysis saved without its journal's name: the journal started nearest to it.
+        val name = runName.ifBlank { runFor(context, startMs) }
+        val run = if (name.isBlank()) emptyList() else linesOf(dir(context), name)
         return bundle(analysis, run, linesOf(dir(context), "session.jsonl"))
     }
 
@@ -186,6 +189,24 @@ object Diagnostics {
                 .put("run", JSONArray(runLines.mapNotNull { parse(it) }))
                 .put("session", JSONArray(sessionLines.takeLast(SESSION_LINES).mapNotNull { parse(it) })),
         )
+
+    /** The journal of the run that started nearest to [startMs], within ten minutes; empty when there is none. */
+    fun runFor(context: Context, startMs: Long): String =
+        nearestRun(dir(context).list()?.toList().orEmpty(), startMs, TimeZone.getDefault())
+
+    /** Pure choice of the journal name: the run file whose start time is nearest, within [windowMs]. */
+    fun nearestRun(names: List<String>, startMs: Long, zone: TimeZone, windowMs: Long = 10 * 60_000L): String {
+        val format = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).apply { timeZone = zone }
+        return names
+            .mapNotNull { name ->
+                Regex("""run-(\d{8}-\d{6})\.jsonl""").matchEntire(name)?.let { match ->
+                    runCatching { format.parse(match.groupValues[1])!!.time }.getOrNull()?.let { name to it }
+                }
+            }
+            .filter { (_, time) -> kotlin.math.abs(time - startMs) <= windowMs }
+            .minByOrNull { (_, time) -> kotlin.math.abs(time - startMs) }
+            ?.first.orEmpty()
+    }
 
     /** How many lines of the application's journal are copied: the recent ones. */
     const val SESSION_LINES = 300
