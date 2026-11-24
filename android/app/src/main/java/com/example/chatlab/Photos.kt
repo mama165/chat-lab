@@ -82,6 +82,7 @@ fun PhotosScreen(
     entries: List<LibraryEntry>,
     onSettings: () -> Unit,
     onAddFolders: () -> Unit,
+    onAddMore: () -> Unit = onAddFolders,
     onHistory: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -126,7 +127,7 @@ fun PhotosScreen(
             "Photos",
             onSettings = onSettings,
             // The plus adds a folder, as in the mockup; not before the chatlab folder and a first folder.
-            onAdd = if (chatlab != null && sources.isNotEmpty()) onAddFolders else null,
+            onAdd = if (chatlab != null && sources.isNotEmpty()) onAddMore else null,
         )
         when {
             chatlab == null || sources.isEmpty() -> FirstSteps(chatlab, sources, pickers)

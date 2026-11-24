@@ -599,7 +599,7 @@ private fun parseArray(text: String?): JSONArray? = try {
 }
 
 /** The entries of the existing library that have a source, indexed by that source. */
-private fun readKnown(text: String?): KnownLibrary {
+internal fun readKnown(text: String?): KnownLibrary {
     val array = parseArray(text) ?: return KnownLibrary(emptyMap())
     return KnownLibrary(
         (0 until array.length())

@@ -1,7 +1,7 @@
 package com.example.chatlab
 
 /** The separate pages, which cover the whole screen and are left with the arrow or the back button. */
-enum class Page { TABS, SETTINGS, REMOVED, WIPE, TESTS, STORAGE, LEVEL, HISTORY, RUN }
+enum class Page { TABS, SETTINGS, REMOVED, WIPE, TESTS, STORAGE, ADD_FOLDER, LEVEL, HISTORY, RUN }
 
 /** The page the back button returns to from a given page. */
 fun Page.parent(): Page = when (this) {

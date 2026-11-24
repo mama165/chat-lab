@@ -365,7 +365,7 @@ private fun storageSummary(): String {
 }
 
 @Composable
-private fun AccessPanel(onOpenSettings: () -> Unit, onBack: () -> Unit) {
+internal fun AccessPanel(onOpenSettings: () -> Unit, onBack: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().background(Palette.Page).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
