@@ -245,7 +245,8 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    SectionLabel("Courbes pendant l'analyse")
+                    // A plain text here: a section label would take the whole width and push the button away.
+                    Text("Courbes pendant l'analyse", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
                     CopyDataButton(name)
                 }
                 CurvesLegend()
