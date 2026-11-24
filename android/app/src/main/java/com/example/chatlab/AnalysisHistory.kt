@@ -4,10 +4,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Paint
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,9 +39,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -374,18 +379,55 @@ private fun KeyValue(label: String, value: String) {
  * The three curves of an analysis, solid lines. Left axis: percent (CPU and battery). Right axis:
  * memory in megabytes. Bottom: the clock every half hour.
  */
+/** The colour of a number of workers: more workers, a more intense colour. */
+private fun workerColor(workers: Int): Color = when (workers) {
+    4 -> Color(0xFFB3261E)
+    3 -> Color(0xFFE0622B)
+    2 -> Color(0xFFF5A25D)
+    else -> Color(0xFFFBD3B0)
+}
+
 @Composable
 private fun CurvesChart(record: AnalysisRecord) {
     val duration = (record.durationMs / 1000).toInt()
     val memoryMax = ChartMath.memoryAxisMax(record.samples.maxOfOrNull { it.memMb } ?: 0)
     val labelColor = Palette.Muted.toArgb()
-    Canvas(Modifier.fillMaxWidth().height(220.dp)) {
+    val changes = remember(record) { ChartMath.workerChanges(record.samples) }
+    // The changes whose dashed line is up, by their index in the list. A tap on a point toggles it.
+    var opened by remember(record) { mutableStateOf(setOf<Int>()) }
+    val lineLevels = changes.indices.map { index ->
+        animateFloatAsState(if (index in opened) 1f else 0f, animationSpec = tween(400), label = "worker$index").value
+    }
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .pointerInput(changes) {
+                detectTapGestures { tap ->
+                    val left = 36.dp.toPx()
+                    val right = 44.dp.toPx()
+                    val bottom = 22.dp.toPx()
+                    val width = size.width - left - right
+                    val baseline = size.height - bottom
+                    val radius = 12.dp.toPx()
+                    val nearest = changes.indices.minByOrNull { index ->
+                        val x = left + ChartMath.xFraction(changes[index].tSec, duration) * width
+                        (Offset(x, baseline) - tap).getDistance()
+                    } ?: return@detectTapGestures
+                    val x = left + ChartMath.xFraction(changes[nearest].tSec, duration) * width
+                    if ((Offset(x, baseline) - tap).getDistance() <= radius) {
+                        opened = if (nearest in opened) opened - nearest else opened + nearest
+                    }
+                }
+            },
+    ) {
         val left = 36.dp.toPx()
         val right = 44.dp.toPx()
         val top = 8.dp.toPx()
         val bottom = 22.dp.toPx()
         val width = size.width - left - right
         val height = size.height - top - bottom
+        val baseline = top + height
         val text = Paint().apply {
             color = labelColor
             textSize = 10.sp.toPx()
@@ -417,6 +459,23 @@ private fun CurvesChart(record: AnalysisRecord) {
         drawPath(curve({ it.batteryPct.toFloat() }, 100f), CurveBattery, style = stroke)
         drawPath(curve({ it.memMb.toFloat() }, memoryMax.toFloat()), CurveMemory, style = stroke)
         drawPath(curve({ it.cpuPercent }, 100f), CurveCpu, style = stroke)
+
+        // One small point on the time axis per change of workers; a tap lifts a dashed line from it.
+        changes.forEachIndexed { index, change ->
+            val x = left + ChartMath.xFraction(change.tSec, duration) * width
+            val color = workerColor(change.workers)
+            val level = lineLevels[index]
+            if (level > 0f) {
+                drawLine(
+                    color,
+                    Offset(x, baseline),
+                    Offset(x, baseline - height * level),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f),
+                )
+            }
+            drawCircle(color, radius = 3.dp.toPx(), center = Offset(x, baseline))
+        }
     }
 }
 
@@ -426,6 +485,18 @@ private fun CurvesLegend() {
         LegendItem(CurveCpu, "CPU (%)")
         LegendItem(CurveMemory, "Mémoire (Mo, à droite)")
         LegendItem(CurveBattery, "Batterie (%)")
+        WorkerLegend()
+    }
+}
+
+@Composable
+private fun WorkerLegend() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Workers :", fontSize = 11.sp, color = Palette.Muted)
+        listOf(4, 3, 2, 1).forEach { workers ->
+            Canvas(Modifier.size(8.dp)) { drawCircle(workerColor(workers)) }
+            Text("$workers", fontSize = 11.sp, color = Palette.Muted)
+        }
     }
 }
 

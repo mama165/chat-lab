@@ -28,6 +28,9 @@ class AnalysisRecorder(private val context: Context, private val intervalMs: Lon
     private var lastWall = 0L
     private var lastCpu = 0L
 
+    /** Workers allowed right now: the memory guard changes it during the run. */
+    @Volatile var workers: Int = 0
+
     fun start(scope: CoroutineScope) {
         startedAt = System.currentTimeMillis()
         lastWall = startedAt
@@ -79,6 +82,7 @@ class AnalysisRecorder(private val context: Context, private val intervalMs: Lon
                 batteryPct = if (level < 0) -1 else level * 100 / scale,
                 batteryTempC = temperature,
                 thermal = thermal,
+                workers = workers,
             )
         }
     }

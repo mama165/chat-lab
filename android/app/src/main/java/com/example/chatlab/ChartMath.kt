@@ -14,6 +14,24 @@ object ChartMath {
     fun halfHourMarks(durationSec: Int): List<Int> =
         if (durationSec <= 0) emptyList() else (0..durationSec step 1800).toList()
 
+    /** A change of the number of workers: at [tSec], the number became [workers]. */
+    data class WorkerChange(val tSec: Int, val workers: Int)
+
+    /**
+     * The moments where the number of workers changed, from the samples in order. The first sample
+     * with a number of workers starts the list; samples without one (0) are skipped.
+     */
+    fun workerChanges(samples: List<Sample>): List<WorkerChange> {
+        val changes = ArrayList<WorkerChange>()
+        var last = 0
+        for (sample in samples) {
+            if (sample.workers <= 0 || sample.workers == last) continue
+            changes += WorkerChange(sample.tSec, sample.workers)
+            last = sample.workers
+        }
+        return changes
+    }
+
     /** "14:30" style label of a run started at [startMs] and marked at [tSec]. */
     fun clockLabel(startMs: Long, tSec: Int, zoneOffsetMs: Long = java.util.TimeZone.getDefault().getOffset(startMs).toLong()): String {
         val total = ((startMs + zoneOffsetMs) / 1000 + tSec) / 60

@@ -15,6 +15,8 @@ data class Sample(
     val batteryPct: Int,
     val batteryTempC: Float,
     val thermal: Int,
+    /** Workers allowed at that moment; 0 for a record made before this was kept. */
+    val workers: Int = 0,
 )
 
 /** Ce qui s'est passé dans un dossier pendant l'analyse. */
@@ -104,7 +106,8 @@ data class AnalysisRecord(
                     .put("memMb", it.memMb)
                     .put("battery", it.batteryPct)
                     .put("batteryTempC", it.batteryTempC.toDouble())
-                    .put("thermal", it.thermal))
+                    .put("thermal", it.thermal)
+                    .put("workers", it.workers))
             }
         })
 
@@ -131,7 +134,7 @@ data class AnalysisRecord(
                 },
                 samples = (0 until samples.length()).map { i ->
                     val p = samples.getJSONObject(i)
-                    Sample(p.getInt("t"), p.getDouble("cpu").toFloat(), p.getInt("memMb"), p.getInt("battery"), p.getDouble("batteryTempC").toFloat(), p.getInt("thermal"))
+                    Sample(p.getInt("t"), p.getDouble("cpu").toFloat(), p.getInt("memMb"), p.getInt("battery"), p.getDouble("batteryTempC").toFloat(), p.getInt("thermal"), p.optInt("workers", 0))
                 },
                 types = json.optJSONObject("types")?.let { t -> t.keys().asSequence().associateWith { t.getInt(it) } }.orEmpty(),
                 modelLoads = json.optJSONArray("models")?.let { m ->

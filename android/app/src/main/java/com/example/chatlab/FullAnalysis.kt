@@ -147,7 +147,10 @@ class AnalysisService : Service() {
         level = LevelStore.read(this)
         Diagnostics.openRun(this, level, sources.size)
         workerGuard = WorkerGuard(level.workers)
-        recorder = AnalysisRecorder(this).also { it.start(scope) }
+        recorder = AnalysisRecorder(this).also {
+            it.workers = level.workers
+            it.start(scope)
+        }
         // Every 2 seconds: memory, CPU, thermal state and progress, written at once to the diagnostics.
         diagnosticsSampler = scope.launch(Dispatchers.Default) {
             while (isActive) {
@@ -159,6 +162,7 @@ class AnalysisService : Service() {
                 trimRequested = false
                 val availMb = memory.availMem / (1024L * 1024L)
                 workerGuard?.observe(System.currentTimeMillis(), availMb, memory.lowMemory, pressure)?.let { limit ->
+                    recorder?.workers = limit
                     Diagnostics.event(
                         this@AnalysisService,
                         "guard",
