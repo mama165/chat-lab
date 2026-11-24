@@ -35,13 +35,26 @@ object AnalysisTechnical {
         )
     }
 
+    /**
+     * The average time of each stage for one photo: decoding · image · faces · text, in ms.
+     * A dash while no photo or no stage time is kept.
+     */
+    fun stageAverages(record: AnalysisRecord): String {
+        val photos = record.analyzed
+        val stages = listOf(StageTimes.DECODE, StageTimes.IMAGE, StageTimes.FACES, StageTimes.TEXT)
+        if (photos <= 0 || stages.any { record.stages[it] == null }) return MISSING
+        return stages.joinToString(" · ") { grouped((record.stages.getValue(it).toDouble() / photos).roundToInt()) } + " ms"
+    }
+
+    /** 1450 becomes "1 450". */
+    private fun grouped(value: Int): String = value.toString().reversed().chunked(3).joinToString(" ").reversed()
+
     fun technicalRows(record: AnalysisRecord): List<Pair<String, String>> {
         val s = record.summary()
         val firstStart = record.modelLoads.firstOrNull { !it.reload }
         val lastSample = record.samples.lastOrNull()
         return listOf(
-            // The time of each stage of an image is not kept yet.
-            "Décodage · image · visages · texte" to MISSING,
+            "Décodage · image · visages · texte" to stageAverages(record),
             "Démarrage des modèles" to (firstStart?.let { String.format(Locale.FRANCE, "%.1f s", it.millis / 1000.0) } ?: MISSING),
             "CPU de l'appli (moyenne · pic)" to "${s.avgCpu.roundToInt()} % · ${s.peakCpu.roundToInt()} %",
             "Mémoire (pic)" to "${s.peakMemMb} Mo",

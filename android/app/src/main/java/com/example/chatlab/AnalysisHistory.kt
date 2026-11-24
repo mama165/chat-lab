@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -257,12 +258,6 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
                 Block("Technique") {
                     AnalysisTechnical.technicalRows(record).forEach { (label, value) -> KeyValue(label, value) }
                 }
-                Block("Métier") {
-                    record.folders.forEach { folder ->
-                        KeyValue(folder.name, "${folder.analyzed} analysées · ${folder.ignored} ignorées · ${folder.unread} non lues · ${folder.refused} refusées")
-                    }
-                    record.types.forEach { (type, count) -> KeyValue(type, count.toString()) }
-                }
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -331,9 +326,13 @@ private fun Block(title: String, content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun KeyValue(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
-        Text(label, fontSize = 14.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
-        Text(value, fontSize = 14.sp, color = Palette.Ink)
+    // Like the design: each row has a thin line under it.
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.Top) {
+            Text(label, fontSize = 13.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
+            Text(value, fontSize = 13.sp, color = Palette.Ink)
+        }
+        HorizontalDivider(thickness = 1.dp, color = Palette.Line)
     }
 }
 

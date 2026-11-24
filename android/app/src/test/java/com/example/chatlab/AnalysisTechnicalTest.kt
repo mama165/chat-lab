@@ -6,7 +6,12 @@ import org.junit.Test
 class AnalysisTechnicalTest {
     private val start = 1_795_000_000_000L
 
-    private fun record(workers: Int, samples: List<Sample>, loads: List<ModelLoad> = emptyList()) = AnalysisRecord(
+    private fun record(
+        workers: Int,
+        samples: List<Sample>,
+        loads: List<ModelLoad> = emptyList(),
+        stages: Map<String, Long> = emptyMap(),
+    ) = AnalysisRecord(
         startMs = start,
         endMs = start + 600_000L,
         level = "maximal",
@@ -19,6 +24,7 @@ class AnalysisTechnicalTest {
         folders = listOf(FolderStat("Camera", 10, 1, 0, 0)),
         samples = samples,
         modelLoads = loads,
+        stages = stages,
     )
 
     private fun sample(t: Int, workers: Int, thermal: Int = 2) =
@@ -51,7 +57,9 @@ class AnalysisTechnicalTest {
             ModelLoad(reload = false, atMs = start + 2_000L, millis = 2100L),
             ModelLoad(reload = true, atMs = start + 300_000L, millis = 1800L),
         )
-        val rows = AnalysisTechnical.technicalRows(record(4, listOf(sample(0, 4), sample(10, 4)), loads)).toMap()
+        // Ten photos in the folder: the totals are divided by ten.
+        val stages = mapOf(StageTimes.DECODE to 2_100L, StageTimes.IMAGE to 8_400L, StageTimes.FACES to 3_100L, StageTimes.TEXT to 14_500L)
+        val rows = AnalysisTechnical.technicalRows(record(4, listOf(sample(0, 4), sample(10, 4)), loads, stages)).toMap()
         assertEquals(
             listOf(
                 "Décodage · image · visages · texte",
@@ -63,12 +71,26 @@ class AnalysisTechnicalTest {
             ),
             rows.keys.toList(),
         )
-        assertEquals("–", rows["Décodage · image · visages · texte"])
+        assertEquals("210 · 840 · 310 · 1 450 ms", rows["Décodage · image · visages · texte"])
         assertEquals("2,1 s", rows["Démarrage des modèles"])
         assertEquals("60 % · 60 %", rows["CPU de l'appli (moyenne · pic)"])
         assertEquals("710 Mo", rows["Mémoire (pic)"])
         assertEquals("80 % · 36 °C", rows["Batterie · température"])
         assertEquals("8 · –", rows["Cœurs · threads"])
+    }
+
+    @Test
+    fun the_stage_times_are_dashes_until_they_are_kept() {
+        assertEquals("–", AnalysisTechnical.stageAverages(record(4, emptyList())))
+        val partial = record(4, emptyList(), stages = mapOf(StageTimes.IMAGE to 900L))
+        assertEquals("–", AnalysisTechnical.stageAverages(partial))
+    }
+
+    @Test
+    fun stage_times_survive_a_round_trip() {
+        val original = record(4, emptyList(), stages = mapOf(StageTimes.TEXT to 1_450L))
+        val back = AnalysisRecord.fromJson(org.json.JSONObject(original.toJson().toString()))
+        assertEquals(mapOf(StageTimes.TEXT to 1_450L), back.stages)
     }
 
     @Test

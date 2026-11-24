@@ -63,6 +63,8 @@ object AnalysisProgress {
 class AnalysisService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var recorder: AnalysisRecorder? = null
+    /** The time of each photo stage in the run in progress. */
+    @Volatile private var stageTimes = StageTimes()
     private var diagnosticsSampler: Job? = null
     /** The memory guard: lowers the workers when the phone runs short of memory. */
     private var workerGuard: WorkerGuard? = null
@@ -253,12 +255,16 @@ class AnalysisService : Service() {
         // analyse, no model is loaded.
         val workers = if (total == 0) 0 else (workerGuard?.limit ?: level.workers)
         val loads = Collections.synchronizedList(mutableListOf<ModelLoad>())
+        stageTimes = StageTimes()
         val slots = List(workers) {
             AnalyzerSlot<Analyzer>(
                 load = {
-                    Analyzer(this@AnalysisService, android.net.Uri.parse(chatlab)) { name, millis ->
-                        AnalysisProgress.update { it.modelDone(name, millis) }
-                    }
+                    Analyzer(
+                        this@AnalysisService,
+                        android.net.Uri.parse(chatlab),
+                        onModelDone = { name, millis -> AnalysisProgress.update { it.modelDone(name, millis) } },
+                        onStage = { stage, millis -> stageTimes.add(stage, millis) },
+                    )
                 },
                 onLoad = { loads.add(it) },
                 parts = { it.modelTimings },
@@ -333,7 +339,7 @@ class AnalysisService : Service() {
             ReportStore.saveRun(this@AnalysisService, runReport)
             val samples = recorder?.stop().orEmpty()
             recorder = null
-            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults))
+            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals()))
             val text = when {
                 stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
@@ -395,6 +401,7 @@ class AnalysisService : Service() {
         level: AnalysisLevel,
         loads: List<ModelLoad>,
         results: List<ImageResult>,
+        stages: Map<String, Long>,
     ): AnalysisRecord {
         val info = try {
             packageManager.getPackageInfo(packageName, 0)
@@ -417,6 +424,7 @@ class AnalysisService : Service() {
             samples = samples,
             types = TypeCounts.of(results.map { it.mime }),
             modelLoads = loads,
+            stages = stages,
         )
     }
 

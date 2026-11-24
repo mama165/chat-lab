@@ -78,6 +78,8 @@ class Analyzer(
     private val tree: Uri,
     /** Called as each model is loaded, with its name and its loading time in milliseconds. */
     private val onModelDone: (String, Long) -> Unit = { _, _ -> },
+    /** Called for each photo stage (decoding, image, faces, text), with its time in milliseconds. */
+    private val onStage: (String, Long) -> Unit = { _, _ -> },
 ) : AutoCloseable {
     private val appContext = context.applicationContext
 
@@ -174,9 +176,9 @@ class Analyzer(
         LibraryWriter.write(appContext, results, keep)
 
     private fun analyze(file: File, checkpoint: () -> Unit = {}): ImageResult {
-        val bitmap = loadUpright(file)
+        val bitmap = timedStage(StageTimes.DECODE) { loadUpright(file) }
         checkpoint()
-        val vector = embed(bitmap)
+        val vector = timedStage(StageTimes.IMAGE) { embed(bitmap) }
         checkpoint()
         val inScore = dot(vector, indoor)
         val outScore = dot(vector, outdoor)
@@ -185,14 +187,24 @@ class Analyzer(
         val answer: Boolean? =
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
-        val (faces, portrait) = countFaces(bitmap)
+        val (faces, portrait) = timedStage(StageTimes.FACES) { countFaces(bitmap) }
         checkpoint()
         // A failure while reading the text is reported, not allowed to stop the whole analysis.
         return try {
-            val text = reader.read(bitmap)
+            val text = timedStage(StageTimes.TEXT) { reader.read(bitmap) }
             ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace())
         } catch (e: Throwable) {
             ImageResult(file, answer, faces, portrait, vector, 0, textNote = "lecture du texte impossible : ${e.javaClass.simpleName} ${e.message ?: ""}")
+        }
+    }
+
+    /** Runs one stage of a photo's analysis and reports its time. */
+    private fun <T> timedStage(stage: String, step: () -> T): T {
+        val started = System.nanoTime()
+        try {
+            return step()
+        } finally {
+            onStage(stage, (System.nanoTime() - started) / 1_000_000)
         }
     }
 

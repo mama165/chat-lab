@@ -45,6 +45,8 @@ data class AnalysisRecord(
     val types: Map<String, Int> = emptyMap(),
     /** Each loading of the models: the first one, and each reload after a pause. */
     val modelLoads: List<ModelLoad> = emptyList(),
+    /** The time of each photo stage over the run, in milliseconds (see [StageTimes]). */
+    val stages: Map<String, Long> = emptyMap(),
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val analyzed: Int get() = folders.sumOf { it.analyzed }
@@ -83,6 +85,7 @@ data class AnalysisRecord(
                     .put("parts", JSONObject().apply { it.parts.forEach { (name, ms) -> put(name, ms) } }))
             }
         })
+        .put("stages", JSONObject().apply { stages.forEach { (k, v) -> put(k, v) } })
         .put("device", JSONObject()
             .put("model", device)
             .put("android", androidVersion)
@@ -136,6 +139,7 @@ data class AnalysisRecord(
                     val p = samples.getJSONObject(i)
                     Sample(p.getInt("t"), p.getDouble("cpu").toFloat(), p.getInt("memMb"), p.getInt("battery"), p.getDouble("batteryTempC").toFloat(), p.getInt("thermal"), p.optInt("workers", 0))
                 },
+                stages = json.optJSONObject("stages")?.let { o -> o.keys().asSequence().associateWith { o.getLong(it) } }.orEmpty(),
                 types = json.optJSONObject("types")?.let { t -> t.keys().asSequence().associateWith { t.getInt(it) } }.orEmpty(),
                 modelLoads = json.optJSONArray("models")?.let { m ->
                     val start = parseIso(run.getString("start"))
