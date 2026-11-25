@@ -63,6 +63,7 @@ import com.example.chatlab.ui.PageHeader
 import com.example.chatlab.ui.Palette
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import kotlinx.coroutines.withContext
@@ -97,29 +98,39 @@ fun AddFolderPage(onBack: () -> Unit) {
     var pendingByRoot by remember { mutableStateOf(AddFolderCache.pendingByRoot) }
     var scanning by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
-        val started = System.currentTimeMillis()
-        val tree = withContext(Dispatchers.IO) { StorageTree.build(File(storage)) }
-        Diagnostics.event(context, "addFolderTree", JSONObject().put("ms", System.currentTimeMillis() - started).put("folders", tree.size))
-        roots = tree
-        AddFolderCache.roots = tree
-        val known = withContext(Dispatchers.IO) {
-            val libraryStarted = System.currentTimeMillis()
-            readKnown(LibraryStore.read(context)).also {
-                Diagnostics.event(context, "addFolderLibrary", JSONObject().put("ms", System.currentTimeMillis() - libraryStarted))
+        try {
+            val started = System.currentTimeMillis()
+            val tree = withContext(Dispatchers.IO) { StorageTree.build(File(storage)) }
+            Diagnostics.event(context, "addFolderTree", JSONObject().put("ms", System.currentTimeMillis() - started).put("folders", tree.size))
+            roots = tree
+            AddFolderCache.roots = tree
+            // The library is read entry by entry: only what the search needs is kept in memory.
+            val known = withContext(Dispatchers.IO) {
+                val libraryStarted = System.currentTimeMillis()
+                (LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { KnownSummary.parse(it, ANALYSIS_VERSION) }
+                    ?: KnownSummary.EMPTY).also {
+                    Diagnostics.event(context, "addFolderLibrary", JSONObject().put("ms", System.currentTimeMillis() - libraryStarted))
+                }
             }
+            for (node in tree) {
+                val folderStarted = System.currentTimeMillis()
+                val photos = withContext(Dispatchers.IO) { pendingPhotosOf(node, known) }
+                Diagnostics.event(
+                    context,
+                    "addFolderScan",
+                    JSONObject().put("folder", node.name).put("ms", System.currentTimeMillis() - folderStarted).put("pending", photos.size),
+                )
+                pendingByRoot = pendingByRoot + (node.path to photos)
+                AddFolderCache.pendingByRoot = pendingByRoot
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A folder that cannot be read must not stop the page: the spinner stops, the folders read so far stay.
+            Diagnostics.event(context, "addFolderError", JSONObject().put("error", e.toString()))
+        } finally {
+            scanning = false
         }
-        for (node in tree) {
-            val folderStarted = System.currentTimeMillis()
-            val photos = withContext(Dispatchers.IO) { pendingPhotosOf(node, known) }
-            Diagnostics.event(
-                context,
-                "addFolderScan",
-                JSONObject().put("folder", node.name).put("ms", System.currentTimeMillis() - folderStarted).put("pending", photos.size),
-            )
-            pendingByRoot = pendingByRoot + (node.path to photos)
-            AddFolderCache.pendingByRoot = pendingByRoot
-        }
-        scanning = false
     }
     // The folders already added, by path. Taps are added to [justAdded] first, so the row stays
     // on screen for a moment with its "Ajouté" label.
@@ -223,10 +234,10 @@ private fun addedPaths(context: Context): Set<String> =
     Sources.read(context).map { it.uri }.filter { it.startsWith("file:") }.map { it.removePrefix("file:") }.toSet()
 
 /** The photos under one folder that are not analysed yet, by address. */
-private fun pendingPhotosOf(node: FolderNode, known: KnownLibrary): List<String> {
-    val scan = FolderScanner.scan(JavaDirNode(File(node.path)), reusable = { file -> reusableMime(known, file) })
+private fun pendingPhotosOf(node: FolderNode, known: KnownSummary): List<String> {
+    val scan = FolderScanner.scan(JavaDirNode(File(node.path)), reusable = { file -> known.reusableMime(file) })
     return scan.candidates
-        .filter { carry(known, it.file) == Carry.PROCESS }
+        .filter { known.toAnalyse(it.file) }
         .map { it.file.id }
 }
 

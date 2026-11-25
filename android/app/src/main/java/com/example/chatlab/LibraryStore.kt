@@ -22,6 +22,20 @@ object LibraryStore {
         return DocumentFile.fromTreeUri(context, Uri.parse(uri))?.takeIf { it.canWrite() }
     }
 
+    /** The library file as a stream, read entry by entry by the folder page; null if it does not exist yet. */
+    fun open(context: Context): java.io.InputStream? {
+        val inFolder = folder(context)?.findFile(NAME)
+        if (inFolder != null && inFolder.exists()) {
+            return try {
+                context.contentResolver.openInputStream(inFolder.uri)
+            } catch (e: Exception) {
+                null
+            }
+        }
+        val local = File(context.filesDir, NAME)
+        return if (local.exists()) local.inputStream() else null
+    }
+
     /** The content of the library, or null if it does not exist yet. */
     fun read(context: Context): String? {
         val inFolder = folder(context)?.findFile(NAME)
