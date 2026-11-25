@@ -193,7 +193,13 @@ fun SearchScreen(
             Diagnostics.event(
                 context,
                 "searchRank",
-                JSONObject().put("ms", System.currentTimeMillis() - started).put("photos", entries.size).put("found", found.size),
+                JSONObject()
+                    .put("ms", System.currentTimeMillis() - started)
+                    .put("photos", entries.size)
+                    .put("found", found.size)
+                    // Memory at each search: the native part (models) and the Java part (the library).
+                    .put("nativeMb", android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024))
+                    .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)),
             )
             found
         }
