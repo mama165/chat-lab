@@ -291,7 +291,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, suggestion: St
                             append(text.text)
                             if (suggestion.isNotEmpty()) withStyle(SpanStyle(color = Palette.Muted)) { append(suggestion) }
                         }
-                        TransformedText(shown, OffsetMapping.Identity)
+                        TransformedText(shown, SuggestionOffsets(typed = text.length))
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -315,6 +315,15 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, suggestion: St
             color = Palette.Muted,
         )
     }
+}
+
+/**
+ * The positions of the typed text in the text shown, which is longer by the grey suggestion. A position
+ * past the typed text stays at its end: Compose refuses a mapping outside the text it was given.
+ */
+internal class SuggestionOffsets(private val typed: Int) : OffsetMapping {
+    override fun originalToTransformed(offset: Int): Int = offset.coerceIn(0, typed)
+    override fun transformedToOriginal(offset: Int): Int = offset.coerceIn(0, typed)
 }
 
 /** One folder found by the search: its name with the matched letters in dark blue, then its place. */
