@@ -65,17 +65,17 @@ private object CountProgress {
 }
 
 /**
- * Le choix des dossiers à analyser au premier lancement, comme sur la maquette : pendant le comptage,
- * « Veuillez patienter » avec le pourcentage ; ensuite, les dossiers de premier niveau, repliés, avec le nombre
- * total de photos de chacun. Une flèche ouvre les sous-dossiers. Cocher un dossier l'ajoute à l'analyse, avec ses
- * sous-dossiers ; les dossiers déjà ajoutés restent verrouillés.
+ * The choice of the folders to analyse at the first launch, as in the mock: while counting,
+ * "Veuillez patienter" with the percentage; then the first-level folders, collapsed, with the number
+ * total of photos of each one. An arrow opens the subfolders. Ticking a folder adds it to the analysis, with its
+ * subfolders; the folders already added stay locked.
  */
 @Composable
 fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(StorageAccess.granted()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    // Au retour des réglages Android, on vérifie de nouveau l'autorisation.
+    // Back from the Android settings, the permission is checked again.
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) granted = StorageAccess.granted()
@@ -88,7 +88,7 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
         return
     }
 
-    // L'arbre d'abord ; puis le nombre total de photos de chaque dossier, sous-dossiers compris.
+    // The tree first; then the total number of photos of each folder, subfolders included.
     val tree by produceState<List<FolderNode>?>(initialValue = null) {
         value = withContext(Dispatchers.IO) { StorageTree.build(Environment.getExternalStorageDirectory()) }
     }
@@ -110,7 +110,7 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
         tops.forEach { Sources.addPath(context, it) }
         onDone()
     }
-    // La part comptée, en moyenne sur les dossiers de premier niveau : elle affiche le pourcentage.
+    // The counted share, averaged over the first-level folders: it shows the percentage.
     val percent = if (roots.isNullOrEmpty()) 0 else {
         (roots.sumOf { (fractions[it.path] ?: 0f).toDouble() } / roots.size * 100).toInt()
     }
@@ -181,7 +181,7 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
                 }
             }
         } else {
-            // Pendant le comptage : rien d'autre que le message et le pourcentage.
+            // While counting: nothing but the message and the percentage.
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Veuillez patienter", fontSize = 15.sp, color = Palette.Muted)
@@ -193,8 +193,8 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
 }
 
 /**
- * Compte, pour chaque dossier, les photos qu'il contient, sous-dossiers compris. Les photos sont lues dossier par
- * dossier ; la jauge suit les fichiers lus sur le total de chaque dossier de premier niveau.
+ * Counts, for each folder, the photos it contains, subfolders included. The photos are read folder by
+ * folder; the gauge follows the files read against the total of each first-level folder.
  */
 private fun countAll(roots: List<FolderNode>): Map<String, Int> {
     val counts = HashMap<String, Int>()
@@ -214,7 +214,7 @@ private fun countAll(roots: List<FolderNode>): Map<String, Int> {
     return counts
 }
 
-/** Les dossiers d'un niveau, puis leurs sous-dossiers si le parent est ouvert. Une flèche ouvre, la ligne coche. */
+/** The folders of one level, then their subfolders if the parent is open. The arrow opens; the row ticks. */
 @Composable
 private fun FolderRows(
     nodes: List<FolderNode>,
@@ -238,7 +238,7 @@ private fun FolderRows(
                 .padding(start = (depth * 22).dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // La flèche n'existe que pour un dossier qui a des sous-dossiers à afficher.
+            // The arrow exists only for a folder with subfolders to show.
             Box(
                 modifier = Modifier
                     .width(36.dp)
@@ -289,7 +289,7 @@ private fun FolderRows(
     }
 }
 
-/** La barre de défilement fine à droite de la liste : sa position suit le défilement. */
+/** The thin scroll bar on the right of the list: its position follows the scrolling. */
 @Composable
 private fun ScrollThumb(scroll: ScrollState, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier = modifier.fillMaxHeight().width(4.dp)) {
@@ -338,5 +338,5 @@ internal fun AccessPanel(onOpenSettings: () -> Unit, onBack: () -> Unit) {
 
 /** All the folders of the tree, flat. */
 
-/** Tous les dossiers de l'arbre, à plat. */
+/** All the folders of the tree, flat. */
 private fun flatten(node: FolderNode): List<FolderNode> = listOf(node) + node.children.flatMap(::flatten)

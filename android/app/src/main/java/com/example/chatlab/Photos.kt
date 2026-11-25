@@ -275,7 +275,7 @@ private fun PerformanceChoice() {
     }
 }
 
-/** Une coche dans un rond clair : le dossier est fini ou n'a rien de nouveau. */
+/** A tick in a light circle: the folder is done or has nothing new. */
 @Composable
 internal fun CheckMark(dimension: androidx.compose.ui.unit.Dp = 20.dp) {
     Canvas(modifier = Modifier.size(dimension)) {
@@ -292,7 +292,7 @@ internal fun CheckMark(dimension: androidx.compose.ui.unit.Dp = 20.dp) {
     }
 }
 
-/** Un sablier gris : le dossier attend son tour. */
+/** A grey hourglass: the folder is waiting its turn. */
 @Composable
 internal fun Hourglass(dimension: androidx.compose.ui.unit.Dp = 20.dp) {
     Canvas(modifier = Modifier.size(dimension)) {
@@ -312,8 +312,8 @@ internal fun Hourglass(dimension: androidx.compose.ui.unit.Dp = 20.dp) {
 }
 
 /**
- * Une jauge circulaire : une part de cercle qui suit l'avancement, ou un tour continu si
- * l'avancement n'est pas connu (null).
+ * A circular gauge: a share of the circle that follows the progress, or a continuous turn if
+ * the progress is not known (null).
  */
 @Composable
 internal fun GaugeRing(fraction: Float?, size: androidx.compose.ui.unit.Dp = 20.dp) {
@@ -330,7 +330,7 @@ internal fun GaugeRing(fraction: Float?, size: androidx.compose.ui.unit.Dp = 20.
     }
 }
 
-/** L'encart de bilan : analyse terminée, photos analysées, fichiers non lus. */
+/** The summary box: analysis finished, photos analysed, files not read. */
 @Composable
 private fun RunBanner(run: RunReport, onHistory: () -> Unit) {
     val clock = Dates.formatTaken(run.finishedAt, java.util.TimeZone.getDefault()).substringAfter(' ')

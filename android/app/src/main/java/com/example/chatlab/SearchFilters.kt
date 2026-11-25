@@ -17,7 +17,7 @@ enum class TextFilter(val label: String) {
     WITHOUT("Sans texte"),
 }
 
-/** Fenêtres de temps glissantes, comptées en arrière à partir de maintenant. */
+/** Sliding time windows, counted backwards from now. */
 enum class DatePreset(val label: String) {
     ALL("Toutes les dates"),
     TODAY("Aujourd'hui"),

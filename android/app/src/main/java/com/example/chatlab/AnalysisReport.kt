@@ -16,7 +16,7 @@ data class FolderReport(
     val failures: List<FileFailure>,
     /** Files dropped because they are not images we can read. */
     val ignored: Int,
-    /** Sous-dossiers refusés par Android. */
+    /** Subfolders refused by Android. */
     val refused: List<String>,
     /** The folder itself is refused. */
     val rootRefused: Boolean,
@@ -66,7 +66,7 @@ data class RunReport(
             .toString()
     }
 
-    /** Le compte rendu en texte, à copier ou partager. */
+    /** The report as text, to copy or share. */
     fun toText(): String = buildString {
         val state = if (stopped) "arrêtée avant la fin" else "terminée"
         appendLine("Analyse $state en ${clock(durationMs)} : $analyzed photo(s) analysée(s), $unread fichier(s) non lu(s).")
@@ -170,7 +170,7 @@ enum class Carry {
     /** Unchanged but written before the folder and the type existed: kept, with these fields completed. */
     BACKFILL,
 
-    /** Nouveau ou modifié : à analyser. */
+    /** New or changed: to analyse. */
     PROCESS,
 }
 

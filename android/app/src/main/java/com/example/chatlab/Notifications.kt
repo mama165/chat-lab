@@ -43,7 +43,7 @@ object Notifications {
         }
     }
 
-    /** La notification pendant l'analyse. [controllable] vaut faux quand il n'y a plus rien à piloter. */
+    /** The notification during the analysis. [controllable] is false when there is nothing left to control. */
     fun progress(context: Context, progress: Progress, controllable: Boolean): Notification {
         val percent = (progress.fraction * 100).toInt()
         val now = System.currentTimeMillis()

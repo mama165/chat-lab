@@ -30,7 +30,7 @@ data class SearchOutcome(
 
 /** Settings of the one-by-one drip of "Voir des photos moins proches". */
 object MoreResults {
-    /** Photos ajoutées à chaque appui. */
+    /** Photos added at each tap. */
     const val BATCH = 6
 
     /** At most this number of less close photos for a search. */
@@ -47,7 +47,7 @@ object SearchResults {
     /**
      * Computes the results. [ranked] is the full ranking by description (empty if the
      * description is not read yet); [shownExtra] the number of less close photos already
-     * dévoilées.
+     * revealed.
      */
     fun compute(
         entries: List<LibraryEntry>,

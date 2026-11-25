@@ -18,13 +18,13 @@ object Formats {
         return text.removeSuffix(",0")
     }
 
-    /** « 1 photo », « 3 photos », « aucune photo ». */
+    /** Labels of the number of photos, shown on the screen in French: "1 photo", "3 photos", "aucune photo". */
     fun photos(count: Int): String = when (count) {
         0 -> "aucune photo"
         1 -> "1 photo"
         else -> "$count photos"
     }
 
-    /** « 1 résultat », « 4 résultats ». */
+    /** Labels of the number of results, shown on the screen in French: "1 résultat", "4 résultats". */
     fun results(count: Int): String = if (count <= 1) "$count résultat" else "$count résultats"
 }

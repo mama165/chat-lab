@@ -65,7 +65,7 @@ object ImageScale {
     const val MAX_SIDE = 4096
 
     /**
-     * The reduction factor (power of 2, like `inSampleSize`) so that the largest sideé
+     * The reduction factor (power of 2, like `inSampleSize`) so that the largest side
      * does not exceed [maxSide]. An image already small enough is not reduced.
      */
     fun sampleSize(width: Int, height: Int, maxSide: Int = MAX_SIDE): Int {
