@@ -20,12 +20,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -94,8 +94,8 @@ fun AddFolderPage(onBack: () -> Unit) {
     val storage = remember { Environment.getExternalStorageDirectory().absolutePath }
     // The last result is shown at once; the folders are then read one by one, so the first ones appear
     // without waiting for the whole storage.
-    var roots by remember { mutableStateOf(AddFolderCache.roots) }
-    var pendingByRoot by remember { mutableStateOf(AddFolderCache.pendingByRoot) }
+    var roots by remember { mutableStateOf(emptyList<FolderNode>()) }
+    var pendingByRoot by remember { mutableStateOf(emptyMap<String, List<String>>()) }
     var scanning by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         try {
@@ -103,7 +103,6 @@ fun AddFolderPage(onBack: () -> Unit) {
             val tree = withContext(Dispatchers.IO) { StorageTree.build(File(storage)) }
             Diagnostics.event(context, "addFolderTree", JSONObject().put("ms", System.currentTimeMillis() - started).put("folders", tree.size))
             roots = tree
-            AddFolderCache.roots = tree
             // The library is read entry by entry: only what the search needs is kept in memory.
             val known = withContext(Dispatchers.IO) {
                 val libraryStarted = System.currentTimeMillis()
@@ -121,7 +120,6 @@ fun AddFolderPage(onBack: () -> Unit) {
                     JSONObject().put("folder", node.name).put("ms", System.currentTimeMillis() - folderStarted).put("pending", photos.size),
                 )
                 pendingByRoot = pendingByRoot + (node.path to photos)
-                AddFolderCache.pendingByRoot = pendingByRoot
             }
         } catch (e: CancellationException) {
             throw e
@@ -174,16 +172,11 @@ fun AddFolderPage(onBack: () -> Unit) {
             onQuery = { query = it },
             suggestion = AddFolderTree.suggestion(hits, query),
         )
-        if (scanning) {
-            CircularProgressIndicator(
-                color = Palette.Accent,
-                strokeWidth = 1.5.dp,
-                modifier = Modifier.padding(top = 10.dp).size(16.dp),
-            )
-        }
 
         Column(modifier = Modifier.fillMaxSize().padding(top = 12.dp).verticalScroll(rememberScrollState())) {
-            if (query.isNotBlank()) {
+            if (scanning) {
+                WaitingLine()
+            } else if (query.isNotBlank()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -229,6 +222,21 @@ fun AddFolderPage(onBack: () -> Unit) {
     }
 }
 
+/** "Veuillez patienter", with dots that come one after the other, while the folders are read again. */
+@Composable
+private fun WaitingLine() {
+    var dots by remember { mutableIntStateOf(1) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(400)
+            dots = dots % 3 + 1
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
+        Text("Veuillez patienter" + ".".repeat(dots), fontSize = 15.sp, color = Palette.Muted, textAlign = TextAlign.Center)
+    }
+}
+
 /** The chosen folders, as paths. A folder chosen by the picker has no path and is left out. */
 private fun addedPaths(context: Context): Set<String> =
     Sources.read(context).map { it.uri }.filter { it.startsWith("file:") }.map { it.removePrefix("file:") }.toSet()
@@ -241,14 +249,6 @@ private fun pendingPhotosOf(node: FolderNode, known: KnownSummary): List<String>
         .map { it.file.id }
 }
 
-/**
- * The last result of the page, kept while the app runs: the next opening shows it at once, and the
- * folders are read again behind it.
- */
-internal object AddFolderCache {
-    @Volatile var roots: List<FolderNode> = emptyList()
-    @Volatile var pendingByRoot: Map<String, List<String>> = emptyMap()
-}
 
 /**
  * The search line, as in the main search: the loupe, the default text, a navy line under the field, a
