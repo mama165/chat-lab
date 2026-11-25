@@ -50,7 +50,7 @@ class KnownSummary private constructor(
          * Calls [action] for each object of the top-level array, one at a time: only the text of the current
          * entry is held in memory. Strings are read with their escapes, so a brace inside a name does not count.
          */
-        private fun forEachEntry(reader: Reader, action: (JSONObject) -> Unit) {
+        internal fun forEachEntry(reader: Reader, action: (JSONObject) -> Unit) {
             val buffer = CharArray(64 * 1024)
             val text = StringBuilder()
             var braces = 0

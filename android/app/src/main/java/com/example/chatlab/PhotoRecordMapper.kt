@@ -42,3 +42,47 @@ object PhotoRecordMapper {
         return Mapped(records, withoutAddress)
     }
 }
+
+/** The same mapping, for a record of the JSON library being migrated. */
+object PhotoRecordFromJson {
+    private const val VECTOR_SIZE = 768
+    private const val ADDED_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+
+    /** Null when the entry cannot be stored: no address, no name, or a vector that is not 768 numbers. */
+    fun from(item: org.json.JSONObject, now: Long): PhotoRecord? {
+        val address = item.optString("source").ifBlank { return null }
+        val name = item.optString("name").ifBlank { return null }
+        val values = item.optJSONArray("vectors")?.optJSONArray(0) ?: return null
+        if (values.length() != VECTOR_SIZE) return null
+        val vector = FloatArray(VECTOR_SIZE) { values.getDouble(it).toFloat() }
+        return PhotoRecord(
+            address = address,
+            name = name,
+            path = address,
+            folder = item.optString("folder").ifBlank { null },
+            mime = item.optString("mime").ifBlank { null },
+            size = item.optLong("size", 0L),
+            modified = item.optLong("modified", 0L).takeIf { it > 0 },
+            taken = item.optString("taken").ifBlank { null },
+            takenMs = item.optLong("taken_ms", 0L).takeIf { it > 0 },
+            addedAt = addedAt(item.optString("added_at")) ?: now,
+            analysisVersion = item.optInt("analysis_version", 0),
+            faces = item.optInt("faces", 0),
+            portrait = item.optBoolean("portrait", false),
+            indoor = if (item.has("indoor")) item.optBoolean("indoor") else null,
+            text = item.optString("text").ifBlank { null },
+            vector = vector,
+        )
+    }
+
+    private fun addedAt(text: String): Long? {
+        if (text.isBlank()) return null
+        return try {
+            java.text.SimpleDateFormat(ADDED_FORMAT, java.util.Locale.US)
+                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                .parse(text)?.time
+        } catch (e: java.text.ParseException) {
+            null
+        }
+    }
+}
