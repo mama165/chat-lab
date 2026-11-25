@@ -40,6 +40,34 @@ object LibraryCheck {
         return matches.sortedByDescending { it.second }.map { it.first }
     }
 
+    /** The photos of the JSON library that the filters keep, in order, read as a stream. */
+    fun filterMatches(reader: Reader, filters: Filters, time: When): List<String> {
+        val out = ArrayList<String>()
+        val seen = HashSet<String>()
+        KnownSummary.forEachEntry(reader) { item ->
+            val record = PhotoRecordFromJson.from(item, now = 0L) ?: return@forEachEntry
+            if (!seen.add(record.address)) return@forEachEntry
+            if (filters.matches(entryOf(record), time)) out += record.address
+        }
+        return out
+    }
+
+    /** The record as the search screen reads a library entry. */
+    fun entryOf(r: PhotoRecord): LibraryEntry = LibraryEntry(
+        id = r.address,
+        name = r.name,
+        path = r.path,
+        indoor = r.indoor,
+        faces = r.faces,
+        text = r.text ?: "",
+        taken = r.taken ?: "",
+        source = r.address,
+        folder = r.folder ?: "",
+        mime = r.mime ?: "",
+        takenMs = r.takenMs ?: 0L,
+        closeUp = r.portrait,
+    )
+
     /** A word of the first text found in the library, to compare the two searches on real data. */
     fun firstWord(reader: Reader): String? {
         var found: String? = null
