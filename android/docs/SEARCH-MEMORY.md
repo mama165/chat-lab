@@ -1,5 +1,8 @@
 # What uses memory during a search
 
+![Animated view of the memory used during a search](search-memory.svg)
+
+
 This document explains, from the Android app's code, what occupies memory when the user searches for a
 photo, and why a search can crash the app. It describes the code as it is today. Figures are either
 observed or calculated; anything still to be measured is marked as such.
