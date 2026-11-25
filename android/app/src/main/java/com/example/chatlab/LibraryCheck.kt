@@ -85,6 +85,9 @@ object LibraryCheck {
         Place.OUTDOOR -> indoor == false
     }
 
+    /** The same photos on both sides, whatever their order: the ties of the screen are not fixed yet. */
+    fun sameSet(a: List<String>, b: List<String>): Boolean = a.size == b.size && a.toSet() == b.toSet()
+
     /** How many of the addresses are in both lists. */
     fun common(a: List<String>, b: List<String>): Int = a.toSet().intersect(b.toSet()).size
 

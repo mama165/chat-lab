@@ -87,7 +87,8 @@ object LibraryMigration {
             JSONObject()
                 .put("json", jsonPhotos.size)
                 .put("store", storePhotos.size)
-                .put("same", jsonPhotos == storePhotos),
+                .put("sameSet", LibraryCheck.sameSet(jsonPhotos, storePhotos))
+                .put("sameOrder", jsonPhotos == storePhotos),
         )
         // The same query on both sides: the best photos must be the same ones.
         val k = 20
