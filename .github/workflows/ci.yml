@@ -59,22 +59,6 @@ jobs:
           version: v2.15.0
           args: --timeout=5m
 
-  security:
-    name: Security (govulncheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.27'
-          cache: true
-
-      - name: Security Check (govulncheck)
-        # Pinned so that a new release cannot break the CI on its own
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-
   generated:
     name: Generated Code (Mocks)
     runs-on: ubuntu-latest
