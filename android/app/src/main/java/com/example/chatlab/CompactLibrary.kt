@@ -46,6 +46,12 @@ class CompactLibrary(context: Context) : RecordSink {
     fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> =
         VectorRanking.topRows(query, database.nextFreeRow(), vectors, k)
 
+    /** The addresses of the photos matching the words, best first. */
+    fun searchAddresses(search: WordSearch.Query): List<String> = database.searchAddresses(search)
+
+    /** The photos with these addresses, read from the table. */
+    fun entries(addresses: List<String>): List<LibraryEntry> = database.entries(addresses)
+
     /** The vector stored at a row. */
     fun vector(row: Long): FloatArray = vectors.read(row)
 

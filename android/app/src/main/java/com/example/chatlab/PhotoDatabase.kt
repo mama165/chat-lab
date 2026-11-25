@@ -29,7 +29,7 @@ class PhotoRecord(
  * The photo table, in SQLite (part of Android, no library to add). The address is the primary key:
  * writing the same photo again replaces its row, it never adds a second one.
  */
-class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", null, 1) {
+class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -50,6 +50,8 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
               portrait         INTEGER NOT NULL DEFAULT 0,
               indoor           INTEGER,
               text             TEXT,
+              text_fold        TEXT    NOT NULL DEFAULT '',
+              name_fold        TEXT    NOT NULL DEFAULT '',
               vector_row       INTEGER NOT NULL UNIQUE
             )
             """.trimIndent()
@@ -59,7 +61,28 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
         db.execSQL("CREATE INDEX photo_folder ON photo (folder)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    /** Version 2: the normalised text and name, for the word search. Existing rows are filled in once. */
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.beginTransaction()
+            try {
+                db.execSQL("ALTER TABLE photo ADD COLUMN text_fold TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE photo ADD COLUMN name_fold TEXT NOT NULL DEFAULT ''")
+                db.rawQuery("SELECT address, name, text FROM photo", null).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val values = ContentValues().apply {
+                            put("text_fold", Library.fold(cursor.getString(2) ?: ""))
+                            put("name_fold", Library.fold(cursor.getString(1) ?: ""))
+                        }
+                        db.update("photo", values, "address = ?", arrayOf(cursor.getString(0)))
+                    }
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
+    }
 
     /** The row of every known photo, by address. */
     fun rowsByAddress(): Map<String, Long> {
@@ -100,6 +123,8 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
                     put("portrait", if (record.portrait) 1 else 0)
                     put("indoor", record.indoor?.let { if (it) 1 else 0 })
                     put("text", record.text)
+                    put("text_fold", Library.fold(record.text ?: ""))
+                    put("name_fold", Library.fold(record.name))
                     put("vector_row", row)
                 }
                 db.insertWithOnConflict("photo", null, values, SQLiteDatabase.CONFLICT_REPLACE)
@@ -108,5 +133,47 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
         } finally {
             db.endTransaction()
         }
+    }
+
+    /** The addresses of the photos matching all the words, in the order of the word search. */
+    fun searchAddresses(search: WordSearch.Query): List<String> {
+        val out = ArrayList<String>()
+        readableDatabase.rawQuery(search.sql, search.args.toTypedArray()).use { cursor ->
+            while (cursor.moveToNext()) out += cursor.getString(0)
+        }
+        return out
+    }
+
+    /** The photos with these addresses, as the search screen reads them. Vectors are not loaded. */
+    fun entries(addresses: List<String>): List<LibraryEntry> {
+        val byAddress = HashMap<String, LibraryEntry>()
+        addresses.chunked(400).forEach { chunk ->
+            val marks = chunk.joinToString(",") { "?" }
+            readableDatabase.rawQuery(
+                "SELECT address, name, path, indoor, faces, text, taken, folder, mime, taken_ms, portrait " +
+                    "FROM photo WHERE address IN ($marks)",
+                chunk.toTypedArray(),
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val address = cursor.getString(0)
+                    byAddress[address] = LibraryEntry(
+                        id = address,
+                        name = cursor.getString(1),
+                        path = cursor.getString(2),
+                        indoor = if (cursor.isNull(3)) null else cursor.getInt(3) == 1,
+                        faces = cursor.getInt(4),
+                        text = cursor.getString(5) ?: "",
+                        taken = cursor.getString(6) ?: "",
+                        source = address,
+                        folder = cursor.getString(7) ?: "",
+                        mime = cursor.getString(8) ?: "",
+                        takenMs = if (cursor.isNull(9)) 0L else cursor.getLong(9),
+                        closeUp = cursor.getInt(10) == 1,
+                    )
+                }
+            }
+        }
+        // Same order as the addresses asked for.
+        return addresses.mapNotNull { byAddress[it] }
     }
 }
