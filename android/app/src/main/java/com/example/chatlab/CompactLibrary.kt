@@ -42,6 +42,10 @@ class CompactLibrary(context: Context) : RecordSink {
     /** The row of every stored photo, by address. */
     fun rows(): Map<String, Long> = database.rowsByAddress()
 
+    /** The best [k] rows for a query, read from the vector file. */
+    fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> =
+        VectorRanking.topRows(query, database.nextFreeRow(), vectors, k)
+
     /** The vector stored at a row. */
     fun vector(row: Long): FloatArray = vectors.read(row)
 

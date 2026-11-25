@@ -46,3 +46,24 @@ class LibraryCheckTest {
         assertEquals(1, report.duplicates)
     }
 }
+
+class LibraryRankTest {
+    private fun entry(id: String, value: Double) = JSONObject()
+        .put("source", "content://media/$id")
+        .put("name", "photo_$id.jpg")
+        .put("vectors", JSONArray().put(JSONArray(List(768) { value })))
+
+    @Test
+    fun theJsonRankingKeepsTheBestPhotos() {
+        val json = JSONArray(listOf(entry("1", 0.1), entry("2", 0.9), entry("3", 0.5))).toString()
+        val query = FloatArray(768) { 1f }
+        val top = LibraryCheck.rank(StringReader(json), query, k = 2)
+        assertEquals(listOf("content://media/2", "content://media/3"), top.map { it.first })
+    }
+
+    @Test
+    fun theCommonCountIsTheNumberOfAddressesInBothLists() {
+        assertEquals(2, LibraryCheck.common(listOf("a", "b", "c"), listOf("c", "a", "z")))
+        assertEquals(0, LibraryCheck.common(emptyList(), listOf("a")))
+    }
+}
