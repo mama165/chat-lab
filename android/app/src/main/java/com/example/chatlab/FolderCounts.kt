@@ -28,4 +28,12 @@ object FolderCounts {
      */
     fun zeroFill(node: FolderNode, counts: Map<String, Int>): Map<String, Int> =
         FolderSelection.withDescendants(node).associate { it.path to (counts[it.path] ?: 0) }
+
+    /** The photos each folder holds itself, without its subfolders: the folder of each photo. */
+    fun directCounts(photoPaths: Collection<String>): Map<String, Int> =
+        photoPaths.groupingBy { File(it).parent ?: "" }.eachCount()
+
+    /** The folders that hold photos of their own, in the order of the tree: the list of the chooser. */
+    fun withPhotosOfTheirOwn(roots: List<FolderNode>, direct: Map<String, Int>): List<FolderNode> =
+        FolderSelection.all(roots).filter { (direct[it.path] ?: 0) > 0 }
 }

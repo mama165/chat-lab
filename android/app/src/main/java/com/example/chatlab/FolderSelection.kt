@@ -44,6 +44,13 @@ object FolderSelection {
     fun selectAll(roots: List<FolderNode>, locked: Set<String>, counts: Map<String, Int>): Set<String> =
         all(roots).map { it.path }.filter { it !in locked && hasPhotos(it, counts) }.toSet()
 
+    /** Ticks or unticks one folder, without its subfolders: the list shows the folders with photos of their own. */
+    fun tickOne(path: String, selected: Set<String>, locked: Set<String>): Set<String> = when {
+        path in locked -> selected
+        path in selected -> selected - path
+        else -> selected + path
+    }
+
     /** "Tout décocher": nothing, except the folders already added, which stay as they are. */
     fun clear(): Set<String> = emptySet()
 

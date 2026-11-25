@@ -65,10 +65,10 @@ private object CountProgress {
 }
 
 /**
- * Le choix des dossiers à analyser dans le stockage interne, comme sur la maquette 1.5 à 1.10 :
- * l'arbre des dossiers avec des cases. Chaque dossier affiche la jauge de son comptage, puis une
- * coche quand il est fini. Cocher un dossier inclut ses sous-dossiers ; les dossiers déjà ajoutés
- * restent verrouillés.
+ * Le choix des dossiers à analyser dans le stockage interne, au premier lancement, comme sur la maquette :
+ * pendant le comptage, « Veuillez patienter » avec le pourcentage ; ensuite, une liste à plat des dossiers qui
+ * contiennent directement des photos, avec leur nombre. Cocher un dossier l'ajoute à l'analyse ; les dossiers
+ * déjà ajoutés restent verrouillés.
  */
 @Composable
 fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
@@ -88,11 +88,11 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
         return
     }
 
-    // L'arbre d'abord, pour l'afficher tout de suite ; puis le comptage, dossier par dossier.
+    // L'arbre d'abord ; puis le nombre de photos que chaque dossier contient directement.
     val tree by produceState<List<FolderNode>?>(initialValue = null) {
         value = withContext(Dispatchers.IO) { StorageTree.build(Environment.getExternalStorageDirectory()) }
     }
-    val counts by produceState<Map<String, Int>?>(initialValue = null, tree) {
+    val direct by produceState<Map<String, Int>?>(initialValue = null, tree) {
         val roots = tree ?: return@produceState
         CountProgress.reset()
         value = withContext(Dispatchers.IO) { countAll(roots) }
@@ -101,17 +101,21 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
     val added = remember { Sources.read(context).map { it.uri } }
     val locked = remember(added) { added.filter { it.startsWith("file:") }.map { it.removePrefix("file:") }.toSet() }
     var selected by remember { mutableStateOf(emptySet<String>()) }
-    var expanded by remember { mutableStateOf(emptySet<String>()) }
-    val storage = remember { storageSummary() }
     val roots = tree
-    val all = remember(roots) { roots?.let { FolderSelection.all(it) }.orEmpty() }
+    val counts = direct
+    val flat = remember(roots, counts) {
+        if (roots != null && counts != null) FolderCounts.withPhotosOfTheirOwn(roots, counts) else emptyList()
+    }
     val tops = FolderSelection.tops(selected)
     val count = tops.size
     val addSelection: () -> Unit = {
         tops.forEach { Sources.addPath(context, it) }
         onDone()
     }
-    val finished = counts != null
+    // La part comptée, en moyenne sur les dossiers de premier niveau : elle affiche le pourcentage.
+    val percent = if (roots.isNullOrEmpty()) 0 else {
+        (roots.sumOf { (fractions[it.path] ?: 0f).toDouble() } / roots.size * 100).toInt()
+    }
 
     Column(
         modifier = Modifier
@@ -120,114 +124,81 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(16.dp))
-        PageHeader("Dossiers", onBack = onBack, action = "Fait", actionEnabled = count > 0, onAction = addSelection)
+        PageHeader("Dossiers", onBack = onBack)
 
-        Row(
-            modifier = Modifier.padding(top = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (!finished) {
-                GaugeRing(fraction = null, size = 14.dp)
-                Text("Comptage des photos en cours", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
-            } else {
+        if (roots != null && counts != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
                 Text(
-                    "Comptage terminé",
-                    fontSize = 12.sp,
+                    "Tout cocher",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Palette.Accent,
+                    modifier = Modifier.clickable {
+                        selected = FolderSelection.selectAll(roots, locked, counts)
+                    }.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+                Text(
+                    "Tout décocher",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Palette.Accent,
+                    modifier = Modifier.clickable { selected = FolderSelection.clear() }.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
-        }
-
-        // La ligne du stockage : nom, puis espace utilisé.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Palette.Field)
-                .padding(12.dp),
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Stockage interne", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-                Text(storage, fontSize = 12.sp, color = Palette.Muted)
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Text(
-                "Tout cocher",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Palette.Accent,
-                modifier = Modifier.clickable {
-                    // Only once every folder is counted: a folder not counted yet is not ticked.
-                    if (roots != null && finished) selected = FolderSelection.selectAll(roots, locked, counts.orEmpty())
-                }.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-            Text(
-                "Tout décocher",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Palette.Accent,
-                modifier = Modifier.clickable { selected = FolderSelection.clear() }.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-
-        if (roots != null) {
             val scroll = rememberScrollState()
             BoxWithConstraints(modifier = Modifier.weight(1f).padding(top = 6.dp)) {
                 Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(end = 14.dp)) {
-                    FolderRows(
-                        nodes = roots,
-                        depth = 0,
-                        locked = locked,
-                        selected = selected,
-                        expanded = expanded,
-                        counts = counts.orEmpty(),
-                        fractions = fractions,
-                        topPaths = roots.map { it.path },
-                        onToggleSelect = { node -> selected = FolderSelection.toggle(node, selected, locked, counts.orEmpty()) },
-                        onToggleExpand = { path -> expanded = if (path in expanded) expanded - path else expanded + path },
-                    )
+                    flat.forEach { node ->
+                        FolderRow(
+                            node = node,
+                            counts = counts,
+                            selected = selected,
+                            locked = locked,
+                            onToggle = { selected = FolderSelection.tickOne(node.path, selected, locked) },
+                        )
+                    }
                 }
                 ScrollThumb(scroll, Modifier.align(Alignment.TopEnd))
             }
-        } else {
-            Spacer(Modifier.weight(1f))
-        }
-
-        Text(
-            "Les dossiers cachés (dont le nom commence par un point) ne sont pas proposés.",
-            fontSize = 12.sp,
-            color = Palette.Muted,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Column(modifier = Modifier.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (count == 0) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Palette.Line).padding(vertical = 14.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("Cochez au moins un dossier", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+            Text(
+                "Les dossiers cachés (dont le nom commence par un point) ne sont pas proposés.",
+                fontSize = 12.sp,
+                color = Palette.Muted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Column(modifier = Modifier.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (count == 0) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Palette.Line).padding(vertical = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("Cochez au moins un dossier", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+                    }
+                } else {
+                    PrimaryButton("Ajouter les dossiers cochés", onClick = addSelection)
                 }
-            } else {
-                PrimaryButton("Ajouter les dossiers cochés", onClick = addSelection)
+            }
+        } else {
+            // Pendant le comptage : rien d'autre que le message et le pourcentage.
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Veuillez patienter", fontSize = 15.sp, color = Palette.Muted)
+                    Text("$percent %", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+                }
             }
         }
     }
 }
 
 /**
- * Compte les photos sous chaque dossier de premier niveau. Chaque dossier est d'abord compté
- * (ses fichiers, sans les ouvrir), puis lu ; la jauge suit les fichiers lus sur le total.
+ * Compte, pour chaque dossier, les photos qu'il contient directement (sans ses sous-dossiers), les photos
+ * étant lues dossier par dossier. La jauge suit les fichiers lus sur le total de chaque dossier de premier niveau.
  */
 private fun countAll(roots: List<FolderNode>): Map<String, Int> {
-    val counts = HashMap<String, Int>()
+    val direct = HashMap<String, Int>()
     for (node in roots) {
         val dir = JavaDirNode(File(node.path))
         val total = FileTally.count(dir)
@@ -235,102 +206,60 @@ private fun countAll(roots: List<FolderNode>): Map<String, Int> {
         val photos = FolderScanner.scan(dir, examined = { n ->
             CountProgress.set(node.path, Progress01.of(n, total))
         }).candidates.map { it.file.id }
-        counts.putAll(FolderCounts.countByFolder(photos, node.path))
-        counts[node.path] = photos.size
-        // Every empty subfolder is set to zero, so that the chooser can hide it.
-        counts.putAll(FolderCounts.zeroFill(node, counts))
+        direct.putAll(FolderCounts.directCounts(photos))
         CountProgress.set(node.path, 1f)
     }
-    return counts
+    return direct
 }
 
-/** Les dossiers d'un niveau, puis leurs sous-dossiers si le parent est déplié. */
+/** Une ligne de la liste à plat : une case, le nom du dossier, et le nombre de photos qu'il contient. */
 @Composable
-private fun FolderRows(
-    nodes: List<FolderNode>,
-    depth: Int,
-    locked: Set<String>,
-    selected: Set<String>,
-    expanded: Set<String>,
+private fun FolderRow(
+    node: FolderNode,
     counts: Map<String, Int>,
-    fractions: Map<String, Float>,
-    topPaths: List<String>,
-    onToggleSelect: (FolderNode) -> Unit,
-    onToggleExpand: (String) -> Unit,
+    selected: Set<String>,
+    locked: Set<String>,
+    onToggle: () -> Unit,
 ) {
-    // A folder without photos is not offered: its count is known and it is zero.
-    nodes.filter { ChooserFilter.visible(it.path, counts, locked) }.forEach { node ->
-        val isLocked = node.path in locked
-        val on = node.path in selected
-        val partial = FolderSelection.isPartial(node, selected)
-        val open = node.path in expanded
-        // Un sous-dossier suit le comptage de son dossier de premier niveau.
-        val top = topPaths.firstOrNull { node.path == it || node.path.startsWith("$it/") }
-        val fraction = top?.let { fractions[it] }
-        Row(
+    val isLocked = node.path in locked
+    val on = node.path in selected
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+            .clickable(enabled = !isLocked, onClick = onToggle),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // La même colonne que la flèche des dossiers, pour que les cases restent alignées.
+        Spacer(Modifier.width(36.dp))
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = (depth * 22).dp, top = 10.dp, bottom = 10.dp)
-                .clickable(enabled = node.children.isNotEmpty()) { onToggleExpand(node.path) },
-            verticalAlignment = Alignment.CenterVertically,
+                .size(22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .then(
+                    when {
+                        on -> Modifier.background(Palette.Accent)
+                        isLocked -> Modifier.background(Palette.Soft)
+                        else -> Modifier.border(2.dp, Palette.Line, RoundedCornerShape(6.dp))
+                    },
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            // La flèche n'existe que pour un dossier qui a des sous-dossiers : grande, pour bien l'atteindre.
-            Box(modifier = Modifier.width(36.dp).height(36.dp), contentAlignment = Alignment.Center) {
-                if (node.children.isNotEmpty()) {
-                    Text(
-                        if (open) "▾" else "▸",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Palette.Accent,
-                    )
-                }
-            }
-            // Une case, avec le même dessin que la maquette : pleine, marquée, partielle ou vide.
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .then(
-                        when {
-                            on -> Modifier.background(Palette.Accent)
-                            isLocked -> Modifier.background(Palette.Soft)
-                            partial -> Modifier.background(Palette.Soft).border(2.dp, Palette.Accent, RoundedCornerShape(6.dp))
-                            else -> Modifier.border(2.dp, Palette.Line, RoundedCornerShape(6.dp))
-                        },
-                    )
-                    .clickable(enabled = !isLocked) { onToggleSelect(node) },
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    on || isLocked -> Text("✓", fontSize = 13.sp, color = if (on) Color.White else Palette.Accent)
-                    partial -> Box(Modifier.size(width = 10.dp, height = 2.dp).background(Palette.Accent))
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    node.name,
-                    fontSize = if (depth == 0) 15.sp else 14.sp,
-                    fontWeight = if (depth == 0) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isLocked) Palette.Muted else Palette.Ink,
-                )
-                if (isLocked) Text("Déjà ajouté", fontSize = 12.sp, color = Palette.Muted)
-            }
-            // À droite : la jauge du comptage, puis le nombre de photos quand il est connu.
-            val photos = counts[node.path]
-            when {
-                photos != null -> {
-                    Text(Formats.photos(photos), fontSize = 13.sp, color = Palette.Muted)
-                }
-                fraction != null && fraction > 0f -> GaugeRing(fraction, size = 18.dp)
-                else -> Hourglass(dimension = 18.dp)
-            }
+            if (on || isLocked) Text("✓", fontSize = 13.sp, color = if (on) Color.White else Palette.Accent)
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
-        if (open) {
-            FolderRows(node.children, depth + 1, locked, selected, expanded, counts, fractions, topPaths, onToggleSelect, onToggleExpand)
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                node.name,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isLocked) Palette.Muted else Palette.Ink,
+            )
+            if (isLocked) Text("Déjà ajouté", fontSize = 12.sp, color = Palette.Muted)
         }
+        Text(Formats.photos(counts[node.path] ?: 0), fontSize = 13.sp, color = Palette.Muted)
     }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
 }
 
 /** La barre de défilement fine à droite de la liste : sa position suit le défilement. */
@@ -350,18 +279,6 @@ private fun ScrollThumb(scroll: ScrollState, modifier: Modifier = Modifier) {
                     .background(Palette.Line),
             )
         }
-    }
-}
-
-/** « 84 Go utilisés sur 119 Go », lu sur le stockage interne. */
-private fun storageSummary(): String {
-    return try {
-        val stat = StatFs(Environment.getExternalStorageDirectory().path)
-        val total = stat.totalBytes
-        val used = total - stat.availableBytes
-        "${Formats.size(used)} utilisés sur ${Formats.size(total)}"
-    } catch (e: Exception) {
-        "Espace inconnu"
     }
 }
 
