@@ -63,6 +63,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -404,6 +407,9 @@ private fun CopyInProgress(progress: Progress) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var phase by remember { mutableStateOf(InProgressCopy.IDLE) }
+    // The name of the journal, when the last copy was too big for the clipboard.
+    var tooLargeFile by remember { mutableStateOf<String?>(null) }
+    var tooLarge by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -419,15 +425,36 @@ private fun CopyInProgress(progress: Progress) {
                     val now = System.currentTimeMillis()
                     val snapshot = progress.snapshotJson(now)
                     scope.launch {
-                        val text = withContext(Dispatchers.IO) {
-                            runCatching { Diagnostics.inProgressText(context, snapshot) }.getOrNull()
+                        val plan = withContext(Dispatchers.IO) {
+                            runCatching {
+                                ClipboardLimit.plan(
+                                    Diagnostics.inProgressText(context, snapshot),
+                                    Diagnostics.currentRunName(context),
+                                )
+                            }.getOrNull()
                         }
-                        phase = if (text == null) {
-                            InProgressCopy.FAILED
-                        } else {
-                            context.getSystemService(ClipboardManager::class.java)
-                                .setPrimaryClip(ClipData.newPlainText("Analyse ChatLab en cours", text))
-                            InProgressCopy.COPIED
+                        when (plan) {
+                            null -> {
+                                tooLarge = false
+                                phase = InProgressCopy.FAILED
+                            }
+                            is ClipboardPlan.Copy -> {
+                                // The system can still refuse a text: that is a failed copy, not a closed app.
+                                phase = try {
+                                    context.getSystemService(ClipboardManager::class.java)
+                                        .setPrimaryClip(ClipData.newPlainText("Analyse ChatLab en cours", plan.text))
+                                    tooLarge = false
+                                    InProgressCopy.COPIED
+                                } catch (e: Exception) {
+                                    tooLarge = false
+                                    InProgressCopy.FAILED
+                                }
+                            }
+                            is ClipboardPlan.TooLarge -> {
+                                tooLargeFile = plan.fileName
+                                tooLarge = true
+                                phase = InProgressCopy.IDLE
+                            }
                         }
                         delay(2_000)
                         phase = InProgressCopy.IDLE
@@ -448,6 +475,25 @@ private fun CopyInProgress(progress: Progress) {
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Palette.Accent,
+            )
+        }
+        if (tooLarge) {
+            // Too big for the clipboard: the journal is in its file, named in full so that it can be found.
+            val where = Diagnostics.folderLabel()
+            val name = tooLargeFile
+            Text(
+                buildAnnotatedString {
+                    append("Trop volumineux pour le presse-papier. Le fichier est dans $where")
+                    if (name != null) {
+                        append(" : ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(name) }
+                    }
+                    append(".")
+                },
+                fontSize = 12.sp,
+                color = Palette.Accent,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 12.dp),
             )
         }
         Text(

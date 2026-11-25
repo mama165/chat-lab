@@ -200,6 +200,14 @@ object Diagnostics {
         inProgressBundle(progress, run, readLinesSafely(File(dir(context), "session.jsonl"))).toString()
     }
 
+    /** The file name of the journal of the run in progress, or null when no run is open. */
+    fun currentRunName(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CURRENT_RUN, null)?.let { File(it).name }
+
+    /** Where the journals are kept, as it is named to the user. */
+    fun folderLabel(): String =
+        if (StorageAccess.granted()) "ChatLab/diagnostics" else "stockage privé de l'app, dossier diagnostics"
+
     /** The bundle of a copy made during the run, from the lines already read. */
     fun inProgressBundle(progress: JSONObject, runLines: List<String>, sessionLines: List<String>): JSONObject = JSONObject()
         .put("inProgress", true)
