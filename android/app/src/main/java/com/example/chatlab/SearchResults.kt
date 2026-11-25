@@ -59,11 +59,11 @@ object SearchResults {
         time: When,
     ): SearchOutcome {
         if (query.isBlank()) return SearchOutcome.EMPTY
-        val kept = entries.filter { filters.matches(it, time) }
+        val kept = distinctById(entries, { it.source.ifBlank { it.path } }).filter { filters.matches(it, time) }
         val words = Library.searchWords(kept, query, Place.ALL).filter { keyOf(it) !in removed }
         val wordKeys = words.map { keyOf(it) }.toSet()
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()
-        val candidates = ranked.filter { match ->
+        val candidates = distinctById(ranked, { keyOf(it) }).filter { match ->
             val key = keyOf(match)
             key in allowed && key !in removed && key !in wordKeys
         }

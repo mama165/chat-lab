@@ -16,11 +16,13 @@ object LibraryWriter {
         val added = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
+        val fresh = ArrayList<Pair<String, JSONObject>>()
         for (r in results) {
             if (r.error != null || r.vector == null) continue
+            // Two folders can contain the same file name: the original address is unique.
+            val id = if (r.source.isNotBlank()) r.source else r.file.name
             val entry = JSONObject()
-                // Two folders can contain the same file name: the original address is unique.
-                .put("id", if (r.source.isNotBlank()) r.source else r.file.name)
+                .put("id", id)
                 .put("path", if (r.source.isNotBlank()) r.source else r.file.path)
                 .put("name", r.file.name)
                 .put("kind", "image")
@@ -40,10 +42,13 @@ object LibraryWriter {
             if (r.takenMs > 0) entry.put("taken_ms", r.takenMs)
             if (r.folder.isNotBlank()) entry.put("folder", r.folder)
             if (r.mime.isNotBlank()) entry.put("mime", r.mime)
-            entries.put(entry)
+            fresh += id to entry
         }
         // The photos of the folders removed from the list stay in the library, as they are.
-        keep.forEach { entries.put(it) }
+        // A photo is written once: the newest record of an address wins, so that a photo analysed
+        // twice (two selected folders that overlap, or a second run) never gets two records.
+        val all = distinctById(keep.map { it.optString("id") to it } + fresh, { it.first }, keepLast = true)
+        all.forEach { entries.put(it.second) }
         // The library goes into the chosen chatlab folder (it survives a reinstall).
         LibraryStore.write(context, entries.toString())
         return File(context.filesDir, "library.json")

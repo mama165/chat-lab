@@ -12,17 +12,18 @@ import java.io.InputStream
 class AnalysisReportTest {
     private val folders = listOf(SourceFolder("content://cam", "Camera"), SourceFolder("content://drive", "Google Drive · Photos"))
 
-    private class Node(override val name: String) : FileNode {
+    // Each file has its own address, as a content:// address does: the folder is part of it.
+    private class Node(override val name: String, folder: String = "") : FileNode {
         override val length = 10L
         override val lastModified = 1L
-        override val id = "id://$name"
+        override val id = "id://$folder/$name"
         override fun open(): InputStream? = null
     }
 
     private fun scan(name: String, candidates: Int = 0, ignored: Int = 0, refused: List<String> = emptyList(), root: Boolean = false) =
         ScanResult(
             name,
-            (1..candidates).map { Candidate(Node("f$it.jpg"), FileSniffer.JPEG, name) },
+            (1..candidates).map { Candidate(Node("f$it.jpg", name), FileSniffer.JPEG, name) },
             (1..ignored).map { IgnoredFile("x$it.txt", null, name) },
             emptyList(),
             refused,
@@ -155,6 +156,18 @@ class AnalysisReportTest {
         assertEquals(6, plan.toProcess.size)
         assertEquals(4, plan.processCount(0))
         assertEquals(2, plan.processCount(1))
+    }
+
+    @Test
+    fun aPhotoSharedByTwoSelectedFoldersIsPlannedOnce() {
+        // A folder and its subfolder both contain the same photo: it has the same address in both scans.
+        val shared = Node("same.jpg", "Camera")
+        val scans = listOf(
+            ScanResult("Camera", listOf(Candidate(shared, FileSniffer.JPEG, "Camera")), emptyList(), emptyList(), emptyList(), false),
+            ScanResult("Camera/Vacances", listOf(Candidate(shared, FileSniffer.JPEG, "Camera/Vacances")), emptyList(), emptyList(), emptyList(), false),
+        )
+        val plan = AnalysisPlan.build(folders, scans) { Carry.PROCESS }
+        assertEquals(1, plan.toProcess.size)
     }
 
     @Test
