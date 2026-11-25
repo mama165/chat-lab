@@ -181,11 +181,23 @@ fun SearchScreen(
         else withContext(Dispatchers.Default) { Library.rankDescription(entries, vector, Place.ALL, null) }
     }
 
-    val removed = remember(queryKey, removalsVersion) { Removals.sourcesFor(context, queryKey) }
-    val outcome = remember(entries, query, state.ranked, resultFilters, removed, state.shownExtra, time) {
-        SearchResults.compute(entries, query, state.ranked, resultFilters, removed, state.shownExtra, time)
+    // The results follow the typing once it pauses, and they are computed off the main thread: the letters
+    // appear at once, and typing does not wait for the whole library to be searched.
+    var searchQuery by remember { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        delay(250)
+        searchQuery = query
     }
-    val rows = remember(outcome, state.newFrom, query) { resultItems(outcome, query, state.newFrom) }
+    val searchKey = searchQuery.trim().lowercase()
+    val removed by produceState<Set<String>>(initialValue = emptySet(), searchKey, removalsVersion) {
+        value = withContext(Dispatchers.IO) { Removals.sourcesFor(context, searchKey) }
+    }
+    val outcome by produceState(SearchOutcome.EMPTY, entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time) {
+        value = withContext(Dispatchers.Default) {
+            SearchResults.compute(entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time)
+        }
+    }
+    val rows = remember(outcome, state.newFrom, searchQuery) { resultItems(outcome, searchQuery, state.newFrom) }
     val latestOutcome by rememberUpdatedState(outcome)
 
     // A search that gives results joins the recent searches after a pause ofrappe.
