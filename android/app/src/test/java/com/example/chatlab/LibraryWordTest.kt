@@ -52,3 +52,16 @@ class LibraryWordTest {
         assertEquals("facture", LibraryCheck.firstWord(StringReader(json)))
     }
 }
+
+class SameSetTest {
+    @Test
+    fun theSamePhotosInAnyOrderAreTheSameSet() {
+        assertEquals(true, LibraryCheck.sameSet(listOf("a", "b", "c"), listOf("c", "a", "b")))
+    }
+
+    @Test
+    fun aDifferentPhotoOrACountDifferenceIsNotTheSameSet() {
+        assertEquals(false, LibraryCheck.sameSet(listOf("a", "b"), listOf("a", "c")))
+        assertEquals(false, LibraryCheck.sameSet(listOf("a", "a"), listOf("a")))
+    }
+}
