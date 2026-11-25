@@ -49,6 +49,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.clip
 import com.example.chatlab.ui.PageHeader
 import com.example.chatlab.ui.Palette
 import java.io.File
@@ -147,6 +157,7 @@ fun AddFolderPage(onBack: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         PageHeader("Ajouter un dossier", onBack = onBack)
 
+        Spacer(Modifier.height(12.dp))
         SearchField(
             query = query,
             onQuery = { query = it },
@@ -228,29 +239,41 @@ internal object AddFolderCache {
     @Volatile var pendingByRoot: Map<String, List<String>> = emptyMap()
 }
 
-/** The search line: a loupe, the default text, the typed text, the grey suggestion, and a cross. */
+/**
+ * The search line, as in the main search: the loupe, the default text, a navy line under the field, a
+ * cross to clear it, and a helper line below. The grey suggestion completes the first folder name.
+ */
 @Composable
 private fun SearchField(query: String, onQuery: (String) -> Unit, suggestion: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(36.dp).padding(bottom = 6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    val line = 1.5.dp.toPx()
+                    drawLine(Palette.Accent, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = line)
+                }
+                .padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Canvas(Modifier.size(16.dp)) {
-                val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                drawCircle(Palette.Muted, radius = 6.5.dp.toPx(), center = Offset(7.dp.toPx(), 7.dp.toPx()), style = stroke)
-                drawLine(Palette.Muted, Offset(12.dp.toPx(), 12.dp.toPx()), Offset(15.dp.toPx(), 15.dp.toPx()), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
-            }
+            Icon(painterResource(R.drawable.ic_loupe), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(20.dp))
             Box(modifier = Modifier.weight(1f)) {
                 if (query.isEmpty()) {
-                    Text("Rechercher un dossier", fontSize = 15.sp, color = Palette.Muted)
+                    Text(
+                        "Rechercher un dossier",
+                        fontSize = 17.sp,
+                        color = Palette.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 BasicTextField(
                     value = query,
                     onValueChange = onQuery,
                     singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Palette.Ink),
+                    textStyle = TextStyle(fontSize = 17.sp, color = Palette.Ink),
+                    cursorBrush = SolidColor(Palette.Accent),
                     visualTransformation = VisualTransformation { text ->
                         // The rest of the first folder name is shown after the typed text, in grey.
                         val shown = buildAnnotatedString {
@@ -263,14 +286,23 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, suggestion: St
                 )
             }
             if (query.isNotEmpty()) {
-                Canvas(Modifier.size(12.dp).clickable { onQuery("") }) {
-                    val stroke = 1.5.dp.toPx()
-                    drawLine(Palette.Muted, Offset(0f, 0f), Offset(size.width, size.height), strokeWidth = stroke)
-                    drawLine(Palette.Muted, Offset(size.width, 0f), Offset(0f, size.height), strokeWidth = stroke)
-                }
+                Text(
+                    "✕",
+                    fontSize = 14.sp,
+                    color = Palette.Muted,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onQuery("") }
+                        .semantics { contentDescription = "Effacer la recherche" }
+                        .padding(4.dp),
+                )
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFC4C9D1)))
+        Text(
+            "Par exemple « Screenshots » ou « WhatsApp ».",
+            fontSize = 13.sp,
+            color = Palette.Muted,
+        )
     }
 }
 
