@@ -52,9 +52,12 @@ fun MainScreen() {
     // The library is read in the background, once per change of the data: not on each change of tab, which
     // used to freeze the screen while the whole file was parsed.
     val libraryCache = remember { VersionedCache { Library.load(context) } }
-    val entries by produceState<List<LibraryEntry>>(initialValue = emptyList(), dataVersion) {
+    // null until the library is read: "still loading" is not the same as "no photo yet".
+    val library by produceState<List<LibraryEntry>?>(initialValue = null, dataVersion) {
         value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion) }
     }
+    val entries = library ?: emptyList()
+    val libraryLoading = library == null
 
     BackHandler(enabled = page != Page.TABS) { page = page.parent() }
     BackHandler(enabled = search.sheetOpen) { search.sheetOpen = false }
@@ -120,6 +123,7 @@ fun MainScreen() {
                     SearchScreen(
                         state = search,
                         entries = entries,
+                        loading = libraryLoading,
                         removalsVersion = removalsVersion,
                         onRemovalsChanged = { removalsVersion++ },
                         onSettings = { page = Page.SETTINGS },

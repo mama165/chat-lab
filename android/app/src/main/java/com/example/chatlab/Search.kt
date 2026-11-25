@@ -136,6 +136,7 @@ class SearchUiState {
 fun SearchScreen(
     state: SearchUiState,
     entries: List<LibraryEntry>,
+    loading: Boolean,
     removalsVersion: Int,
     onRemovalsChanged: () -> Unit,
     onSettings: () -> Unit,
@@ -300,6 +301,7 @@ fun SearchScreen(
         }
 
         when {
+            loading -> Loading("Veuillez patienter, la bibliothèque se charge…")
             entries.isEmpty() -> Message(
                 "Aucune photo analysée pour l'instant.",
                 "Ouvrez l'onglet Photos pour lancer l'analyse.",
@@ -515,6 +517,19 @@ private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/** While the library is read: the gauge turns, with a short line of text. */
+@Composable
+private fun Loading(text: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        GaugeRing(fraction = null, size = 40.dp)
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
     }
 }
 
