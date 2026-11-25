@@ -13,11 +13,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
 
@@ -46,7 +49,12 @@ fun MainScreen() {
         else if (wasRunning) search.analysisDone = true
         wasRunning = progress.running
     }
-    val entries = remember(dataVersion, tab) { Library.load(context) }
+    // The library is read in the background, once per change of the data: not on each change of tab, which
+    // used to freeze the screen while the whole file was parsed.
+    val libraryCache = remember { VersionedCache { Library.load(context) } }
+    val entries by produceState<List<LibraryEntry>>(initialValue = emptyList(), dataVersion) {
+        value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion) }
+    }
 
     BackHandler(enabled = page != Page.TABS) { page = page.parent() }
     BackHandler(enabled = search.sheetOpen) { search.sheetOpen = false }
