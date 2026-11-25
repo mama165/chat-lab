@@ -2,6 +2,7 @@ package com.example.chatlab
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -20,25 +21,37 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
 
-/** L'écran principal : deux onglets (Rechercher, Photos) et les pages à part. */
+/** The main screen: two tabs (Rechercher, Photos) and the separate pages. */
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var page by remember { mutableStateOf(Page.TABS) }
+    // Where we came from to choose folders: the Photos tab, or the settings.
+    var storageBack by remember { mutableStateOf(Page.TABS) }
+    var addBack by remember { mutableStateOf(Page.TABS) }
+    // The analysis file opened from the history (its name in ChatLab/analyses).
+    var openedRun by remember { mutableStateOf("") }
     val search = remember { SearchUiState() }
-    // Augmentent quand le carnet ou les retraits changent, pour relire ce qui est enregistré.
+    // Increase when the library or the removals change, to read again what is saved.
     var dataVersion by remember { mutableIntStateOf(0) }
     var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()
 
+    // The notice "Analyse terminée" appears only when a run ends while the app is open.
+    var wasRunning by remember { mutableStateOf(progress.running) }
     LaunchedEffect(progress.running) {
         if (!progress.running) dataVersion++
+        if (progress.running) search.analysisDone = false
+        else if (wasRunning) search.analysisDone = true
+        wasRunning = progress.running
     }
     val entries = remember(dataVersion, tab) { Library.load(context) }
 
     BackHandler(enabled = page != Page.TABS) { page = page.parent() }
+    BackHandler(enabled = search.sheetOpen) { search.sheetOpen = false }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -47,8 +60,6 @@ fun MainScreen() {
             .navigationBarsPadding(),
     ) {
         when (page) {
-            Page.FILTERS -> FiltersPage(search, entries, removalsVersion, onBack = { page = Page.TABS }, onDates = { page = Page.DATES })
-            Page.DATES -> DatesPage(search, entries, onBack = { page = Page.FILTERS })
             Page.SETTINGS -> SettingsPage(
                 entries = entries,
                 dataVersion = dataVersion,
@@ -56,6 +67,23 @@ fun MainScreen() {
                 onBack = { page = Page.TABS },
                 onOpen = { page = it },
                 onFoldersChanged = { dataVersion++ },
+                onAddFolders = {
+                    addBack = Page.SETTINGS
+                    page = Page.ADD_FOLDER
+                },
+            )
+            Page.STORAGE -> StorageChooser(
+                onDone = {
+                    dataVersion++
+                    page = storageBack
+                },
+                onBack = { page = storageBack },
+            )
+            Page.ADD_FOLDER -> AddFolderPage(
+                onBack = {
+                    dataVersion++
+                    page = addBack
+                },
             )
             Page.REMOVED -> RemovedPage(onBack = { page = Page.SETTINGS }, onChanged = { removalsVersion++ })
             Page.WIPE -> WipePage(
@@ -68,6 +96,16 @@ fun MainScreen() {
                 },
             )
             Page.TESTS -> TestsPage(onBack = { page = Page.SETTINGS })
+            Page.LEVEL -> LevelPage(onBack = { page = Page.SETTINGS })
+            Page.HISTORY -> AnalysisHistoryPage(
+                // The history is opened from the Photos tab: its arrow goes back there.
+                onBack = { page = Page.TABS },
+                onOpen = {
+                    openedRun = it
+                    page = Page.RUN
+                },
+            )
+            Page.RUN -> AnalysisDetailPage(name = openedRun, onBack = { page = Page.HISTORY })
             Page.TABS -> {
                 val content = Modifier.weight(1f)
                 if (tab == 0) {
@@ -77,18 +115,41 @@ fun MainScreen() {
                         removalsVersion = removalsVersion,
                         onRemovalsChanged = { removalsVersion++ },
                         onSettings = { page = Page.SETTINGS },
-                        onFilters = { page = Page.FILTERS },
+                        onFilters = { search.sheetOpen = true },
                         modifier = content,
                     )
                 } else {
                     PhotosScreen(
                         entries = entries,
                         onSettings = { page = Page.SETTINGS },
+                        onHistory = { page = Page.HISTORY },
+                        onAddFolders = {
+                            storageBack = Page.TABS
+                            page = Page.STORAGE
+                        },
+                        onAddMore = {
+                            addBack = Page.TABS
+                            page = Page.ADD_FOLDER
+                        },
                         modifier = content,
                     )
                 }
+                if (tab == 0) AnalysisBanner(
+                    notice = search.analysisDone,
+                    onOpen = {
+                        search.analysisDone = false
+                        tab = 1
+                    },
+                )
                 BottomTabs(selected = tab, onSelect = { tab = it })
             }
         }
+    }
+    FilterSheet(
+        state = search,
+        entries = entries,
+        visible = search.sheetOpen,
+        onClose = { search.sheetOpen = false },
+    )
     }
 }

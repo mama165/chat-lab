@@ -1,15 +1,15 @@
 package com.example.chatlab
 
-/** Les nombres affichés à côté de chaque choix de la page Filtres. */
+/** The numbers shown next to each choice of the Filtres page. */
 data class Facets(
     val total: Int,
     val datePresets: Map<DatePreset, Int>,
-    /** Photos des dates choisies à la main, ou null s'il n'y en a pas. */
+    /** Photos of the dates chosen by hand, or null if there are none. */
     val customRange: Int?,
     val places: Map<Place, Int>,
     val people: Map<People, Int>,
     val texts: Map<TextFilter, Int>,
-    /** Photos qui passeraient en activant « Visage en gros plan ». */
+    /** Photos that would pass by turning on "Visage en gros plan". */
     val closeUp: Int,
     val folders: Map<String, Int>,
     val types: Map<String, Int>,
@@ -17,8 +17,8 @@ data class Facets(
 )
 
 /**
- * Pour chaque choix d'un filtre, le nombre de résultats qu'on aurait en le choisissant, les autres
- * filtres restant ce qu'ils sont. On sait ainsi, avant d'appuyer, ce que donnera un choix.
+ * For each choice of a filter, the number of results we would get by choosing it, the other
+ * filters staying as they are. We know this way, before tapping, what a choice will give.
  */
 object FacetCounts {
     fun compute(

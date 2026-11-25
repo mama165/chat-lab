@@ -10,6 +10,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Diagnostics first: it reads why the app ended last time, and wraps the handler below.
+        Diagnostics.onAppStart(this)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             LibraryStore.saveErrorReport(applicationContext, "Plantage : $error\n\n${error.stackTraceToString()}")
@@ -25,8 +27,8 @@ class MainActivity : ComponentActivity() {
 
 const val PREFERENCES = "chatlab"
 
-/** Le dossier chatlab (modèles, carnet, retraits), choisi par l'utilisateur. */
+/** The chatlab folder (models, library, removals), chosen by the user. */
 const val KEY_FOLDER = "folder"
 
-/** Le dossier des photos à analyser. */
+/** The folder of the photos to analyse. */
 const val KEY_SOURCE = "source"

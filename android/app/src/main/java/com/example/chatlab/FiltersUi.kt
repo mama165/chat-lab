@@ -48,8 +48,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Page Filtres : date, lieu, personnes, gros plan, texte, dossiers, types et ressemblance. À côté
- * de chaque choix, le nombre de résultats qu'on aurait en le choisissant, avec les autres filtres.
+ * Filtres page: date, place, people, close-up, text, folders, types and resemblance. Next to
+ * each choice, the number of results we would get by choosing it, with the other filters.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -234,7 +234,7 @@ private fun FilterGroup(title: String, hint: String? = null, right: String? = nu
     }
 }
 
-/** Page Dates : début et fin, raccourcis, calendrier avec les jours qui ont des photos, moment de la journée. */
+/** Dates page: start and end, shortcuts, calendar with the days that have photos, time of the day. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DatesPage(state: SearchUiState, entries: List<LibraryEntry>, onBack: () -> Unit) {

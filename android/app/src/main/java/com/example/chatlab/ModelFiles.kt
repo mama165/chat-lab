@@ -11,14 +11,14 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 /**
- * Les modèles sont lus directement dans le sous-dossier models du dossier chatlab,
- * sans copie dans l'espace privé de l'application.
+ * The models are read directly from the models subfolder of the chatlab folder,
+ * without a copy in the private space of the application.
  *
- * Un modèle trop gros, découpé en morceaux « nom.partN », est recollé une seule fois
- * en « nom » dans ce même dossier ; les morceaux peuvent ensuite être supprimés.
+ * A model too big, cut into pieces "nom.partN", is joined back once
+ * as "nom" in the same folder; the pieces can then be deleted.
  */
 object ModelFiles {
-    /** Le sous-dossier models du dossier chatlab (celui passé, sinon celui enregistré). */
+    /** The models subfolder of the chatlab folder (the one passed, otherwise the saved one). */
     fun folder(context: Context, tree: Uri? = null): DocumentFile {
         val uri = tree
             ?: context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -32,7 +32,7 @@ object ModelFiles {
     fun exists(models: DocumentFile, name: String): Boolean =
         models.findFile(name)?.isFile == true || parts(models, name).isNotEmpty()
 
-    /** Le contenu d'un petit fichier (vecteurs, vocabulaire, tokenizer). */
+    /** The content of a small file (vectors, vocabulary, tokenizer). */
     fun bytes(context: Context, models: DocumentFile, name: String): ByteArray {
         val file = models.findFile(name)?.takeIf { it.isFile } ?: error("$name absent de chatlab/models")
         val input = context.contentResolver.openInputStream(file.uri) ?: error("lecture impossible : $name")
@@ -43,9 +43,9 @@ object ModelFiles {
         String(bytes(context, models, name), Charsets.UTF_8)
 
     /**
-     * Ouvre une session ONNX sur le fichier du dossier, sans le copier : le contenu est projeté en
-     * mémoire depuis le descripteur ouvert par Android. Android refuse qu'on rouvre ce fichier par
-     * un chemin (/proc/self/fd/…, erreur 13), d'où le passage par la mémoire plutôt que par un nom.
+     * Opens an ONNX session on the file of the folder, without copying it: the content is mapped into
+     * memory from the descriptor opened by Android. Android refuses to reopen this file by
+     * a path (/proc/self/fd/…, error 13), hence going through memory rather than through a name.
      */
     fun session(
         env: OrtEnvironment,
@@ -62,8 +62,8 @@ object ModelFiles {
     }
 
     /**
-     * Le contenu du fichier dans une mémoire hors du tas Java : projection directe du fichier si
-     * le système l'accepte, sinon lecture dans un tampon direct.
+     * The content of the file in memory outside the Java heap: direct mapping of the file if
+     * the system accepts it, otherwise reading into a direct buffer.
      */
     private fun mapped(channel: FileChannel, name: String): ByteBuffer {
         val size = channel.size()
@@ -83,9 +83,9 @@ object ModelFiles {
     }
 
     /**
-     * Le fichier entier. S'il n'existe qu'en morceaux, ils sont recollés dans un fichier
-     * temporaire, qui ne prend son nom définitif qu'une fois complet : une coupure au milieu
-     * ne laisse jamais un modèle tronqué sous le bon nom.
+     * The whole file. If it exists only in pieces, they are joined into a file
+     * temporary, which takes its final name only once complete: a cut in the middle
+     * never leaves a truncated model under the right name.
      */
     @Synchronized
     fun whole(context: Context, models: DocumentFile, name: String): DocumentFile {
@@ -124,7 +124,7 @@ object ModelFiles {
         return ModelParts.ordered(files.keys, name).map { files.getValue(it) }
     }
 
-    /** Supprime les anciennes copies des modèles et des images de test dans l'espace privé. */
+    /** Deletes the old copies of the models and of the test images in the private space. */
     fun removeOldCopies(context: Context) {
         File(context.filesDir, "models").deleteRecursively()
         File(context.filesDir, "test").deleteRecursively()

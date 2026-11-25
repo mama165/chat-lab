@@ -38,10 +38,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import com.example.chatlab.ui.OutlineButton
 import com.example.chatlab.ui.PageHeader
 import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.PrimaryButton
+import com.example.chatlab.ui.RadioRow
 import com.example.chatlab.ui.SectionLabel
 import com.example.chatlab.ui.SettingRow
 import kotlinx.coroutines.CoroutineScope
@@ -52,7 +54,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Page Réglages, ouverte par la molette : dossiers, non classifiées, espace, outils, tout effacer. */
+/** Settings page, opened by the gear: folders, unclassified, space, tools, erase everything. */
 @Composable
 fun SettingsPage(
     entries: List<LibraryEntry>,
@@ -61,16 +63,18 @@ fun SettingsPage(
     onBack: () -> Unit,
     onOpen: (Page) -> Unit,
     onFoldersChanged: () -> Unit,
+    onAddFolders: () -> Unit,
 ) {
     val context = LocalContext.current
     var foldersVersion by remember { mutableIntStateOf(0) }
-    val pickers = rememberFolderPickers {
+    val pickers = rememberFolderPickers(onAddSource = onAddFolders) {
         foldersVersion++
         onFoldersChanged()
     }
     val sources = remember(foldersVersion) { Sources.read(context) }
     val chatlab = remember(foldersVersion) { folderName(context, KEY_FOLDER) }
     val removals = remember(removalsVersion) { RemovalsJson.count(LibraryStore.readRemovals(context)) }
+    val history = remember(dataVersion) { RunArchive.list(context).size }
     val appSize by produceState<Long?>(initialValue = null, dataVersion) {
         value = withContext(Dispatchers.IO) { measureAppSize(context) }
     }
@@ -105,6 +109,10 @@ fun SettingsPage(
             SettingRow("Non classifiées", "$removals", onClick = { onOpen(Page.REMOVED) })
         }
         Column {
+            SectionLabel("Analyse")
+            SettingRow("Performance", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
+        }
+        Column {
             SectionLabel("Espace")
             SettingRow("Application", appSize?.let { Formats.size(it) } ?: "…")
             SettingRow(
@@ -114,6 +122,7 @@ fun SettingsPage(
         }
         Column {
             SectionLabel("Avancé")
+            SettingRow("Historique des analyses", "$history", onClick = { onOpen(Page.HISTORY) })
             SettingRow("Outils de test", onClick = { onOpen(Page.TESTS) })
             SettingRow("Tout effacer", color = Palette.Danger, onClick = { onOpen(Page.WIPE) })
         }
@@ -126,7 +135,7 @@ fun SettingsPage(
     }
 }
 
-/** Taille de l'application selon Android (programme, données et cache), ou celle de l'APK à défaut. */
+/** Size of the application according to Android (program, data and cache), or that of the APK otherwise. */
 private fun measureAppSize(context: Context): Long {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         try {
@@ -140,7 +149,7 @@ private fun measureAppSize(context: Context): Long {
     return File(context.applicationInfo.sourceDir).length()
 }
 
-/** Page « Tout effacer » : ce qui disparaît, ce qui reste, et le bouton rouge. */
+/** "Tout effacer" page: what disappears, what stays, and the red button. */
 @Composable
 fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Unit) {
     val context = LocalContext.current
@@ -175,7 +184,7 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
         ) {
             Text(
                 if (current != null && !current.canWipe) "Rien à effacer : l'application est déjà dans son état de départ."
-                else "L'application revient à son état de départ. La prochaine analyse reprendra toutes les photos depuis le début.",
+                else "Les dossiers à analyser sont vidés. Le dossier chatlab reste choisi. La prochaine analyse reprendra toutes les photos depuis le début.",
                 fontSize = 14.sp,
                 color = Palette.Muted,
             )
@@ -184,12 +193,17 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
                 current?.lines()?.forEach { line ->
                     WipeRow(if (line.empty) "–" else "✕", line.title, line.detail, if (line.empty) Palette.Disabled else Palette.Danger, line.empty)
                 }
+                if (sourceNames.isEmpty()) {
+                    WipeRow("–", "Les dossiers à analyser", "Aucun dossier choisi", Palette.Disabled, true)
+                } else {
+                    WipeRow("✕", "Les dossiers à analyser", sourceNames.joinToString(", "), Palette.Danger, false)
+                }
             }
             Column {
                 SectionLabel("Reste")
                 WipeRow("✓", "Vos photos", "Rien n'est supprimé dans la galerie", Palette.Muted, false)
                 WipeRow("✓", "Les modèles", "Dans $chatlab/models", Palette.Muted, false)
-                WipeRow("✓", "Les dossiers choisis", (sourceNames + chatlab).joinToString(", "), Palette.Muted, false)
+                WipeRow("✓", "Le dossier chatlab", chatlab, Palette.Muted, false)
             }
         }
         Column(modifier = Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -203,6 +217,7 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
                     RecentStore.clear(context)
                     ReportStore.clear(context)
                     AnalysisProgress.clearReport()
+                    Sources.clear(context)
                     Toast.makeText(context, "Tout est effacé.", Toast.LENGTH_SHORT).show()
                     onWiped()
                     version++
@@ -234,14 +249,14 @@ private fun WipeRow(icon: String, title: String, detail: String, iconColor: andr
     }
 }
 
-/** L'analyse des images de test tourne à part : quitter la page ne l'interrompt pas. */
+/** The analysis of the test images runs apart: leaving the page does not interrupt it. */
 private object TestRun {
     val running = MutableStateFlow(false)
     val report = MutableStateFlow<String?>(null)
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 }
 
-/** Page « Outils de test » : analyse des images de test et dernier compte rendu. */
+/** "Outils de test" page: analysis of the test images and last report. */
 @Composable
 fun TestsPage(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -264,6 +279,64 @@ fun TestsPage(onBack: () -> Unit) {
             fontSize = 13.sp,
             color = Palette.Muted,
         )
+        // Experiment on the memory of the models: it applies to the analyses started after the change.
+        var arenaOn by remember { mutableStateOf(OnnxExperiment.arenaOn(context)) }
+        Text("Mémoire des modèles", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        RadioRow(
+            label = "Mémoire ONNX gardée (réglage actuel)",
+            count = "arène activée",
+            selected = arenaOn,
+            onClick = {
+                arenaOn = true
+                OnnxExperiment.writeArena(context, true)
+            },
+        )
+        RadioRow(
+            label = "Mémoire ONNX rendue (essai)",
+            count = "arène désactivée",
+            selected = !arenaOn,
+            onClick = {
+                arenaOn = false
+                OnnxExperiment.writeArena(context, false)
+            },
+        )
+        // Experiment on the threads of the ONNX sessions: 0 leaves the choice to ONNX Runtime.
+        var threads by remember { mutableStateOf(OnnxExperiment.read(context).threads) }
+        Text("Threads par session (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        OnnxExperiment.THREAD_CHOICES.forEach { n ->
+            RadioRow(
+                label = if (n == 0) "Automatique (réglage actuel)" else "$n threads",
+                count = if (n == 0) "ONNX Runtime" else "essai",
+                selected = threads == n,
+                onClick = {
+                    threads = n
+                    OnnxExperiment.writeThreads(context, n)
+                },
+            )
+        }
+        // Optional, test only: forces the number of workers, bypassing the start memory budget.
+        var forcedWorkers by remember { mutableStateOf(WorkerOverride.read(context)) }
+        Text("Nombre de workers (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        RadioRow(
+            label = "Automatique (réglage actuel)",
+            count = "selon la mémoire",
+            selected = forcedWorkers == null,
+            onClick = {
+                forcedWorkers = null
+                WorkerOverride.write(context, null)
+            },
+        )
+        (1..4).forEach { n ->
+            RadioRow(
+                label = "$n worker${if (n > 1) "s" else ""} forcé${if (n > 1) "s" else ""}",
+                count = "essai",
+                selected = forcedWorkers == n,
+                onClick = {
+                    forcedWorkers = n
+                    WorkerOverride.write(context, n)
+                },
+            )
+        }
         PrimaryButton(
             if (running) "Analyse en cours…" else "Analyser les images de test",
             enabled = !running,
@@ -304,7 +377,7 @@ fun TestsPage(onBack: () -> Unit) {
     }
 }
 
-/** Analyse les images de test et met le compte rendu en forme, image par image. */
+/** Analyses the test images and formats the report, image by image. */
 fun runAnalysis(context: Context, folder: Uri): String = try {
     Analyzer(context, folder).use { analyzer ->
         val started = System.nanoTime()

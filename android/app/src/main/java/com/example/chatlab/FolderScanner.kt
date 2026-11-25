@@ -3,59 +3,65 @@ package com.example.chatlab
 import java.io.File
 import java.io.InputStream
 
-/** Un fichier vu pendant le listage d'un dossier, indépendamment du système de fichiers. */
+/** A file seen while listing a folder, independently of the file system. */
 interface FileNode {
     val name: String
     val length: Long
     val lastModified: Long
 
-    /** Identifiant stable (adresse content:// ou chemin), clé du carnet. */
+    /** Stable identifier (content:// address or path), key of the library. */
     val id: String
 
-    /** Ouvre le fichier en lecture, ou renvoie null / lève une erreur s'il est inaccessible. */
+    /** Opens the file for reading, or returns null / throws an error if it is inaccessible. */
     fun open(): InputStream?
 }
 
-/** Un dossier : sa liste est null quand le système refuse de le lire. */
+/** A folder: its list is null when the system refuses to read it. */
 interface DirNode {
     val name: String
     fun children(): List<Any>?
 }
 
-/** Un fichier gardé pour l'analyse, avec son type détecté. */
+/** A file kept for the analysis, with its detected type. */
 data class Candidate(val file: FileNode, val mime: String, val folder: String)
 
-/** Un fichier écarté, avec le type reconnu (null : inconnu). */
+/** A file dropped, with the recognised type (null: unknown). */
 data class IgnoredFile(val name: String, val mime: String?, val folder: String)
 
-/** Un fichier qu'on n'a pas pu lire dès le listage. */
+/** A file we could not read from the listing. */
 data class UnreadableFile(val name: String, val reason: FailureReason, val folder: String)
 
-/** Le résultat du listage d'un dossier source. */
+/** The result of listing a source folder. */
 data class ScanResult(
     val folder: String,
     val candidates: List<Candidate>,
     val ignored: List<IgnoredFile>,
     val unreadable: List<UnreadableFile>,
-    /** Chemins relatifs des sous-dossiers dont l'accès est refusé. */
+    /** Relative paths of the subfolders whose access is refused. */
     val refused: List<String>,
-    /** Le dossier lui-même est refusé : rien n'a pu être listé. */
+    /** The folder itself is refused: nothing could be listed. */
     val rootRefused: Boolean,
 ) {
     val isEmpty: Boolean get() = candidates.isEmpty() && ignored.isEmpty() && unreadable.isEmpty() && refused.isEmpty()
 }
 
 /**
- * Parcourt un dossier et ses sous-dossiers, et décide de chaque fichier d'après ses premiers
- * octets. Fonctionne sur n'importe quel système de fichiers : Android (DocumentFile) en
- * production, java.io.File dans les tests.
+ * Walks a folder and its subfolders, and decides for each file from its first
+ * bytes. Works on any file system: Android (DocumentFile) in production,
+ * java.io.File in the tests.
  */
 object FolderScanner {
     /**
-     * [reusable] donne le type déjà connu d'un fichier inchangé : il n'est alors pas relu (le
-     * listage reste rapide quand le carnet est déjà plein).
+     * [reusable] gives the type already known for an unchanged file: it is then not read again (the
+     * listing stays fast when the library is already full). [examined] receives the number of
+     * files seen so far, to show the progress.
      */
-    fun scan(root: DirNode, reusable: (FileNode) -> String? = { null }): ScanResult {
+    fun scan(
+        root: DirNode,
+        reusable: (FileNode) -> String? = { null },
+        examined: (Int) -> Unit = {},
+    ): ScanResult {
+        var count = 0
         val candidates = ArrayList<Candidate>()
         val ignored = ArrayList<IgnoredFile>()
         val unreadable = ArrayList<UnreadableFile>()
@@ -76,6 +82,8 @@ object FolderScanner {
                         if (inner == null) refused += label else walk(inner, label)
                     }
                     is FileNode -> {
+                        count++
+                        examined(count)
                         val known = reusable(child)
                         if (known != null) {
                             candidates += Candidate(child, known, root.name)
@@ -94,7 +102,7 @@ object FolderScanner {
         return ScanResult(root.name, candidates, ignored, unreadable, refused, rootRefused = false)
     }
 
-    /** Lit les premiers octets du fichier et applique les règles. */
+    /** Reads the first bytes of the file and applies the rules. */
     fun decide(file: FileNode): ScanDecision {
         val head = try {
             file.open()?.use { input ->
@@ -114,7 +122,7 @@ object FolderScanner {
     }
 }
 
-/** Un fichier réel (java.io.File) vu comme un [FileNode]. Sert aux tests et aux outils. */
+/** A real file (java.io.File) seen as a [FileNode]. Used by the tests and the tools. */
 class JavaFileNode(private val file: File) : FileNode {
     override val name: String get() = file.name
     override val length: Long get() = file.length()
@@ -123,7 +131,7 @@ class JavaFileNode(private val file: File) : FileNode {
     override fun open(): InputStream? = file.inputStream()
 }
 
-/** Un dossier réel (java.io.File) vu comme un [DirNode] ; liste null si le dossier n'est pas lisible. */
+/** A real folder (java.io.File) seen as a [DirNode]; list null if the folder is not readable. */
 class JavaDirNode(private val dir: File) : DirNode {
     override val name: String get() = dir.name
     override fun children(): List<Any>? {

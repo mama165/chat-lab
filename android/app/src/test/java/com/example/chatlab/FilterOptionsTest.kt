@@ -165,7 +165,7 @@ class FilterOptionsTest {
 
     @Test
     fun shortcutsOnASunday() {
-        // TIME est le dimanche 22 novembre 2026.
+        // TIME is Sunday 22 November 2026.
         assertEquals(DateRange(SimpleDate(2026, 11, 22), SimpleDate(2026, 11, 22)), DateShortcut.TODAY.range(TIME))
         assertEquals(DateRange(SimpleDate(2026, 11, 21), SimpleDate(2026, 11, 21)), DateShortcut.YESTERDAY.range(TIME))
         assertEquals(DateRange(SimpleDate(2026, 11, 21), SimpleDate(2026, 11, 22)), DateShortcut.WEEKEND.range(TIME))

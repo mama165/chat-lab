@@ -2,7 +2,7 @@ package com.example.chatlab
 
 import java.util.Calendar
 
-/** Nombre de personnes visibles sur la photo. */
+/** Number of people visible in the photo. */
 enum class People(val label: String) {
     ANY("Peu importe"),
     NONE("Aucune"),
@@ -10,7 +10,7 @@ enum class People(val label: String) {
     MANY("2 et plus"),
 }
 
-/** Avec ou sans texte lu sur la photo. */
+/** With or without text read on the photo. */
 enum class TextFilter(val label: String) {
     ANY("Peu importe"),
     WITH("Avec texte"),
@@ -20,6 +20,7 @@ enum class TextFilter(val label: String) {
 /** Fenêtres de temps glissantes, comptées en arrière à partir de maintenant. */
 enum class DatePreset(val label: String) {
     ALL("Toutes les dates"),
+    TODAY("Aujourd'hui"),
     LAST_HOUR("Dernière heure"),
     LAST_24H("24 dernières heures"),
     LAST_7D("7 derniers jours"),
@@ -27,7 +28,20 @@ enum class DatePreset(val label: String) {
     LAST_12M("12 derniers mois"),
 }
 
-/** Moment de la journée, pour les dates choisies à la main. La nuit passe minuit. */
+/** Kind of file, from the bytes of the file: "Image" groups the picture formats, "PDF" the documents. */
+enum class FileKind(val label: String) {
+    ANY("Tous les types"),
+    IMAGE("Image"),
+    PDF("PDF");
+
+    fun matches(mime: String?): Boolean = when (this) {
+        ANY -> true
+        IMAGE -> mime != null && mime in FileSniffer.PICTURES
+        PDF -> mime == FileSniffer.PDF
+    }
+}
+
+/** Time of the day, for the dates chosen by hand. The night goes past midnight. */
 enum class DayPart(val label: String, val from: Int, val to: Int) {
     ALL("Toute la journée", 0, 1439),
     MORNING("Matin", 6 * 60, 12 * 60 - 1),
@@ -35,22 +49,22 @@ enum class DayPart(val label: String, val from: Int, val to: Int) {
     EVENING("Soir", 18 * 60, 22 * 60 - 1),
     NIGHT("Nuit", 22 * 60, 6 * 60 - 1);
 
-    /** Vrai si la minute de la journée [minute] est dans cette tranche. */
+    /** True if the minute of the day [minute] is in this slot. */
     fun contains(minute: Int): Boolean = if (from <= to) minute in from..to else minute >= from || minute <= to
 }
 
-/** Des dates choisies à la main : de [from] à [to] inclus, éventuellement un moment de la journée. */
+/** Dates chosen by hand: from [from] to [to] included, possibly a time of the day. */
 data class DateRange(val from: SimpleDate, val to: SimpleDate, val dayPart: DayPart = DayPart.ALL) {
     init {
         require(from <= to) { "la date de début doit précéder la date de fin" }
     }
 }
 
-/** Le filtre de date : une fenêtre glissante, ou des dates choisies (qui l'emportent). */
+/** The date filter: a sliding window, or dates chosen (which take precedence). */
 data class DateFilter(val preset: DatePreset = DatePreset.ALL, val range: DateRange? = null) {
     val isActive: Boolean get() = preset != DatePreset.ALL || range != null
 
-    /** Une photo passe si sa date de prise de vue est dans le filtre. Sans date, elle ne passe pas. */
+    /** A photo passes if its shooting date is in the filter. Without a date, it does not pass. */
     fun matches(takenMs: Long, time: When): Boolean {
         if (!isActive) return true
         if (takenMs <= 0) return false
@@ -63,11 +77,18 @@ data class DateFilter(val preset: DatePreset = DatePreset.ALL, val range: DateRa
     }
 
     companion object {
-        /** Le début et la fin de la fenêtre. Une photo « dans le futur » de moins d'une minute reste admise. */
+        /** The start and end of the window. A photo "in the future" by less than a minute stays admise. */
         fun window(preset: DatePreset, time: When): Pair<Long, Long> {
             val end = time.now + 60_000L
             val start = when (preset) {
                 DatePreset.ALL -> Long.MIN_VALUE
+                DatePreset.TODAY -> Calendar.getInstance(time.zone).apply {
+                    timeInMillis = time.now
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
                 DatePreset.LAST_HOUR -> time.now - 3_600_000L
                 DatePreset.LAST_24H -> time.now - 24 * 3_600_000L
                 DatePreset.LAST_7D -> time.now - 7 * 24 * 3_600_000L
@@ -83,8 +104,8 @@ data class DateFilter(val preset: DatePreset = DatePreset.ALL, val range: DateRa
 }
 
 /**
- * Point de départ des photos ressemblantes : le score minimal d'une photo pour être montrée
- * d'emblée. « Voir des photos moins proches » permet ensuite d'aller plus loin sans le changer.
+ * Starting point of the similar photos: the minimum score for a photo to be shown
+ * straight away. "Voir des photos moins proches" then goes further without changing it.
  */
 enum class Resemblance(val label: String, val floor: Float) {
     CLOSE("Proche", 0.11f),
@@ -92,10 +113,10 @@ enum class Resemblance(val label: String, val floor: Float) {
     WIDE("Large", 0.05f),
 }
 
-/** Une étiquette de filtre actif, et les filtres qu'on obtient en la retirant. */
+/** A label of an active filter, and the filters we get by removing it. */
 data class FilterChip(val label: String, val without: Filters)
 
-/** Les filtres de la recherche. Chaque valeur par défaut veut dire « pas de filtre ». */
+/** The filters of the search. Each default value means "no filter". */
 data class Filters(
     val date: DateFilter = DateFilter(),
     val place: Place = Place.ALL,
@@ -106,9 +127,11 @@ data class Filters(
     val folders: Set<String> = emptySet(),
     /** Types MIME choisis ; vide veut dire tous. */
     val types: Set<String> = emptySet(),
+    /** Image or PDF, as in the Type filter of the search sheet. */
+    val kind: FileKind = FileKind.ANY,
     val resemblance: Resemblance = Resemblance.NORMAL,
 ) {
-    /** Nombre de filtres actifs : un par catégorie qui n'est plus sur sa valeur de départ. */
+    /** Number of active filters: one per category that is no longer on its starting value. */
     val activeCount: Int
         get() = chips(WHEN_UNKNOWN).size
 
@@ -116,23 +139,27 @@ data class Filters(
         get() = activeCount == 0
 
     /**
-     * Les filtres actifs, dans l'ordre de la page Filtres, avec de quoi retirer chacun.
-     * [time] sert à écrire les dates choisies (l'année n'apparaît que si elle n'est pas l'actuelle).
+     * The active filters, in the order of the Filtres page, with what is needed to remove each.
+     * [time] is used to write the dates chosen (the year appears only if it is not the current one)).
      */
     fun chips(time: When = WHEN_UNKNOWN): List<FilterChip> = buildList {
-        if (date.isActive) add(FilterChip(dateLabel(time), copy(date = DateFilter())))
-        if (place != Place.ALL) add(FilterChip(placeLabel(place), copy(place = Place.ALL)))
-        if (people != People.ANY) add(FilterChip(peopleChip(people), copy(people = People.ANY)))
+        if (date.isActive) add(FilterChip("Date · ${dateLabel(time)}", copy(date = DateFilter())))
+        if (place != Place.ALL) add(FilterChip("Lieu · ${placeLabel(place)}", copy(place = Place.ALL)))
+        if (people != People.ANY) add(FilterChip("Personnes · ${people.label}", copy(people = People.ANY)))
         if (closeUp) add(FilterChip("Gros plan", copy(closeUp = false)))
         if (text != TextFilter.ANY) add(FilterChip(text.label, copy(text = TextFilter.ANY)))
         if (folders.isNotEmpty()) add(FilterChip(folders.sorted().joinToString(", "), copy(folders = emptySet())))
         if (types.isNotEmpty()) {
             add(FilterChip(types.map { FileSniffer.label(it) }.sorted().joinToString(", "), copy(types = emptySet())))
         }
+        if (kind != FileKind.ANY) add(FilterChip("Type · ${kind.label}", copy(kind = FileKind.ANY)))
         if (resemblance != Resemblance.NORMAL) {
             add(FilterChip("Ressemblance ${resemblance.label.lowercase()}", copy(resemblance = Resemblance.NORMAL)))
         }
     }
+
+    /** The filters that the search screen applies: the place is not applied yet. */
+    fun withoutPlace(): Filters = copy(place = Place.ALL)
 
     private fun dateLabel(time: When): String {
         val range = date.range
@@ -143,7 +170,10 @@ data class Filters(
         return date.preset.label
     }
 
-    /** Une photo passe tous les filtres de contenu (la ressemblance ne filtre pas les photos). */
+    /**
+     * A photo passes all the content filters (the resemblance does not filter the photos).
+     * The search screen leaves the place out for now (see [withoutPlace]): the counts keep it.
+     */
     fun matches(entry: LibraryEntry, time: When): Boolean =
         date.matches(entry.takenMs, time) &&
             Library.inPlace(entry, place) &&
@@ -151,7 +181,8 @@ data class Filters(
             (!closeUp || entry.closeUp) &&
             matchesText(entry.text) &&
             (folders.isEmpty() || entry.folder in folders) &&
-            (types.isEmpty() || entry.mime in types)
+            (types.isEmpty() || entry.mime in types) &&
+            kind.matches(entry.mime)
 
     private fun matchesPeople(faces: Int): Boolean = when (people) {
         People.ANY -> true
@@ -167,7 +198,7 @@ data class Filters(
     }
 
     companion object {
-        /** Un instant sans importance : pour compter les filtres sans écrire de date. */
+        /** An unimportant instant: to count the filters without writing a date. */
         val WHEN_UNKNOWN = When(0L, java.util.TimeZone.getTimeZone("UTC"))
 
         fun placeLabel(place: Place): String = when (place) {
@@ -176,11 +207,5 @@ data class Filters(
             Place.OUTDOOR -> "Extérieur"
         }
 
-        private fun peopleChip(people: People): String = when (people) {
-            People.ANY -> "Peu importe"
-            People.NONE -> "Sans personne"
-            People.ONE -> "1 personne"
-            People.MANY -> "2 personnes et plus"
-        }
     }
 }

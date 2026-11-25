@@ -13,7 +13,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import javax.imageio.ImageIO
 
-/** Parcours de dossiers sur de vrais fichiers : images créées par ImageIO, faux fichiers, dossiers vides. */
+/** Folder walks on real files: images created by ImageIO, fake files, empty folderses. */
 class FolderScannerTest {
     private lateinit var root: File
 
@@ -139,7 +139,7 @@ class FolderScannerTest {
                 override fun open(): InputStream? { opened++; return null }
             })
         }
-        val result = FolderScanner.scan(node) { FileSniffer.JPEG }
+        val result = FolderScanner.scan(node, reusable = { FileSniffer.JPEG })
         assertEquals(0, opened)
         assertEquals(FileSniffer.JPEG, result.candidates.single().mime)
     }
@@ -203,7 +203,7 @@ class FolderScannerTest {
 
     @Test
     fun aShortReadStillClassifiesTheFile() {
-        // Un flux qui ne rend les octets que par petits morceaux reste bien lu en entier.
+        // A stream that returns the bytes only in small pieces is still read in full.
         val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3, 4)
         val slow = object : InputStream() {
             var i = 0
@@ -230,5 +230,15 @@ class FolderScannerTest {
         assertEquals(2, result.ignored.size)
         assertEquals(1, result.unreadable.size)
         assertEquals(0, result.refused.size)
+    }
+
+    @Test
+    fun theExaminedCountGrowsWithEveryFileAndEndsAtTheTotal() {
+        image("a.png", "png")
+        raw("sous/b.txt", "texte".toByteArray())
+        raw("sous/c.jpg", ByteArray(0))
+        val seen = ArrayList<Int>()
+        FolderScanner.scan(JavaDirNode(root), examined = { seen += it })
+        assertEquals(listOf(1, 2, 3), seen)
     }
 }

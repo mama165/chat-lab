@@ -3,7 +3,7 @@ package com.example.chatlab
 import java.util.Calendar
 import java.util.TimeZone
 
-/** Petites fabriques partagées par les tests. Tout se passe en UTC, à une heure fixe. */
+/** Small factories shared by the tests. Everything happens in UTC, at a fixed time. */
 object TestData {
     val UTC: TimeZone = TimeZone.getTimeZone("UTC")
 

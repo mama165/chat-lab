@@ -1,16 +1,16 @@
 package com.example.chatlab
 
-/** Les morceaux « nom.partN » d'un modèle trop gros pour être envoyé d'un seul bloc. */
+/** The pieces "nom.partN" of a model too big to be sent in one block. */
 object ModelParts {
     private val PART = Regex("\\.part(\\d+)$")
 
-    /** Le numéro du morceau, ou null si le nom n'est pas un morceau de [base]. */
+    /** The number of the piece, or null if the name is not a piece of [base]. */
     fun index(name: String, base: String): Int? {
         if (!name.startsWith("$base.part")) return null
         return PART.find(name)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { name == "$base.part$it" }
     }
 
-    /** Les noms des morceaux de [base], dans l'ordre de leur numéro (part2 avant part10). */
+    /** The names of the pieces of [base], in the order of their number (part2 before part10). */
     fun ordered(names: Collection<String>, base: String): List<String> =
         names.mapNotNull { name -> index(name, base)?.let { it to name } }.sortedBy { it.first }.map { it.second }
 }

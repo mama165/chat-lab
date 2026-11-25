@@ -26,7 +26,7 @@ class ProgressTextTest {
     fun pausesAreNotCountedAsWork() {
         val paused = running.pausing(now = 60_000L)
         assertTrue(paused.paused)
-        // Figé à 60 s, quel que soit le moment où l'on regarde.
+        // Frozen at 60 s, whatever the moment we look.
         assertEquals(60_000L, paused.activeElapsed(500_000L))
         val resumed = paused.resuming(now = 160_000L)
         assertFalse(resumed.paused)
@@ -79,10 +79,14 @@ class ProgressTextTest {
 
     @Test
     fun remainingText() {
-        assertEquals("Estimation du temps restant…", remainingText(null))
-        assertEquals("Moins d'une minute restante", remainingText(20_000L))
-        assertEquals("Environ 1 minute restante", remainingText(70_000L))
-        assertEquals("Environ 2 minutes restantes", remainingText(110_000L))
+        assertEquals("…", remainingText(null))
+        assertEquals("5s", remainingText(5_000L))
+        assertEquals("20s", remainingText(20_000L))
+        assertEquals("1 min", remainingText(70_000L))
+        assertEquals("2 min", remainingText(110_000L))
+        assertEquals("50 min", remainingText(50 * 60_000L))
+        assertEquals("1 heure", remainingText(60 * 60_000L))
+        assertEquals("2 heures", remainingText(133 * 60_000L))
     }
 
     private val folders = listOf(FolderProgress("Camera", 0, 0), FolderProgress("Screenshots", 0, 14))
@@ -120,5 +124,30 @@ class ProgressTextTest {
         val next = running.copy(done = 3, folders = folders).advancing(9, "x")
         assertEquals(4, next.done)
         assertEquals(folders, next.folders)
+    }
+}
+
+class FolderMarkTest {
+    private fun folder(done: Int, total: Int, current: String = "") = FolderProgress("Screenshots", done, total, current)
+
+    @org.junit.Test
+    fun aFinishedFolderGetsTheCheck() {
+        org.junit.Assert.assertEquals(FolderMark.FINISHED, folder(14, 14).mark())
+    }
+
+    @org.junit.Test
+    fun aFolderWithNothingNewGetsTheCheck() {
+        org.junit.Assert.assertEquals(FolderMark.FINISHED, folder(0, 0).mark())
+    }
+
+    @org.junit.Test
+    fun aFolderBeingAnalysedGetsTheGauge() {
+        org.junit.Assert.assertEquals(FolderMark.RUNNING, folder(6, 14).mark())
+        org.junit.Assert.assertEquals(FolderMark.RUNNING, folder(0, 14, current = "qr.png").mark())
+    }
+
+    @org.junit.Test
+    fun aFolderNotStartedYetGetsTheHourglass() {
+        org.junit.Assert.assertEquals(FolderMark.WAITING, folder(0, 14).mark())
     }
 }

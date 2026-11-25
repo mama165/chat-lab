@@ -23,12 +23,12 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Parcours complets sur l'émulateur, comme le ferait une personne : taper, filtrer, choisir,
- * retirer, rétablir, ouvrir les réglages, tout effacer. Chaque test part d'un carnet de 5 photos.
+ * Full flows on the emulator, as a person would do them: type, filter, choose,
+ * remove, restore, open the settings, erase everything. Each test starts from a library of 5 photos.
  */
 @RunWith(AndroidJUnit4::class)
 class AppFlowsTest {
-    /** Met le carnet de test en place avant que l'écran ne s'ouvre. */
+    /** Puts the test library in place before the screen opens. */
     private val fixtures = object : ExternalResource() {
         override fun before() {
             val target = InstrumentationRegistry.getInstrumentation().targetContext
@@ -41,8 +41,8 @@ class AppFlowsTest {
     }
 
     /**
-     * Donne à chaque photo du carnet un dossier, un type et une heure de prise de vue relative à
-     * maintenant, pour que les filtres de date se testent quel que soit le jour d'exécution.
+     * Gives each photo of the library a folder, a type and a shooting time relative to
+     * now, so that the date filters are tested whatever the day of the run.
      */
     private fun datedLibrary(json: String): String {
         val now = System.currentTimeMillis()
@@ -76,7 +76,7 @@ class AppFlowsTest {
 
     private fun back() = compose.onNodeWithContentDescription("Retour").performClick()
 
-    /** « Rechercher » est à la fois le titre et l'onglet du bas. */
+    /** "Rechercher" is both the title and the bottom tab. */
     private fun onSearchScreen() = compose.onAllNodesWithText("Rechercher").onFirst().assertExists()
 
     @Test
@@ -136,7 +136,7 @@ class AppFlowsTest {
         compose.onNodeWithText("Lieu").assertExists()
         compose.onNodeWithText("Intérieur").performClick()
         back()
-        // Les photos de test n'ont pas de lieu connu : le filtre Intérieur les écarte toutes.
+        // The test photos have no known place: the Intérieur filter drops them all.
         compose.onNodeWithText("Intérieur ✕").assertExists()
         compose.onNodeWithText("1").assertExists()
         compose.onNodeWithText("Essayez de retirer un filtre.").assertExists()
@@ -153,7 +153,7 @@ class AppFlowsTest {
         back()
         compose.onNodeWithText("Intérieur ✕").assertExists()
         compose.onNodeWithText("7 derniers jours ✕").assertExists()
-        // Deux filtres actifs : le lien Réinitialiser apparaît à côté du nombre de résultats.
+        // Two active filters: the Réinitialiser link appears next to the number of results.
         compose.onNode(hasText("Réinitialiser") and hasClickAction()).performClick()
         compose.onNodeWithText("Intérieur ✕").assertDoesNotExist()
         compose.onNodeWithText("7 derniers jours ✕").assertDoesNotExist()
@@ -211,14 +211,14 @@ class AppFlowsTest {
     fun aDatePresetKeepsOrDropsPhotosByTheirShootingTime() {
         type("facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
-        // La facture date d'il y a trois jours : elle n'est pas dans les dernières 24 heures.
+        // The invoice is three days old: it is not in the last 24 hours.
         compose.onNodeWithText("24 dernières heures").performClick()
         back()
         compose.onNodeWithText("24 dernières heures ✕").assertExists()
         compose.onNodeWithText("Essayez de retirer un filtre.").assertExists()
         compose.onNodeWithText("24 dernières heures ✕").performClick()
         compose.onNodeWithContentDescription("facture_fictive.png").assertExists()
-        // ... mais elle est dans les 7 derniers jours.
+        // ... but it is in the last 7 days.
         compose.onNodeWithContentDescription("Filtres").performClick()
         compose.onNodeWithText("7 derniers jours").performClick()
         back()
@@ -239,7 +239,7 @@ class AppFlowsTest {
     fun aFolderFilterKeepsOnlyItsPhotos() {
         type("facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
-        // Le chip du dossier est en bas de la page : on le fait défiler avant de le toucher.
+        // The folder chip is at the bottom of the page: scroll to it before touching it.
         compose.onNodeWithText("Documents", substring = true).performScrollTo().performClick()
         back()
         compose.onNodeWithText("Documents ✕").assertExists()
@@ -266,7 +266,7 @@ class AppFlowsTest {
         type("facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
         compose.onNodeWithText("Choisir des dates…").performClick()
-        // Aujourd'hui : la facture, d'il y a trois jours, n'y est pas.
+        // Today: the invoice, from three days ago, is not in it.
         compose.onNodeWithText("Aujourd'hui").performClick()
         compose.onNode(hasText("Valider", substring = true) and hasClickAction()).performClick()
         back()

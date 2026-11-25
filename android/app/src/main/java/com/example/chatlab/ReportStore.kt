@@ -3,7 +3,7 @@ package com.example.chatlab
 import android.content.Context
 import java.io.File
 
-/** Le dernier compte rendu d'analyse et sa date, gardés dans l'espace privé de l'application. */
+/** The last analysis report and its date, kept in the private space of the application. */
 object ReportStore {
     private const val FILE = "compte_rendu.txt"
     private const val KEY_DATE = "last_analysis"
@@ -16,7 +16,7 @@ object ReportStore {
     fun read(context: Context): String? =
         File(context.filesDir, FILE).takeIf { it.exists() }?.readText(Charsets.UTF_8)?.takeIf { it.isNotBlank() }
 
-    /** Date de la dernière analyse, ou null s'il n'y en a pas eu. */
+    /** Date of the last analysis, or null if there was none. */
     fun lastDate(context: Context): SimpleDate? {
         val millis = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getLong(KEY_DATE, 0L)
         return if (millis > 0) SimpleDate.of(millis) else null
@@ -24,13 +24,13 @@ object ReportStore {
 
     private const val RUN_FILE = "derniere_analyse.json"
 
-    /** Enregistre le bilan d'une analyse (par dossier) et son compte rendu en texte. */
+    /** Saves the report of an analysis (per folder) and its text report. */
     fun saveRun(context: Context, report: RunReport) {
         File(context.filesDir, RUN_FILE).writeText(report.toJson(), Charsets.UTF_8)
         save(context, report.toText(), report.finishedAt)
     }
 
-    /** Le bilan de la dernière analyse, ou null s'il n'y en a pas. */
+    /** The report of the last analysis, or null if there is none. */
     fun readRun(context: Context): RunReport? =
         RunReport.fromJson(File(context.filesDir, RUN_FILE).takeIf { it.exists() }?.readText(Charsets.UTF_8))
 

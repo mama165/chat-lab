@@ -2,7 +2,7 @@ package com.example.chatlab
 
 import android.content.Context
 
-/** Les recherches récentes, gardées dans les préférences de l'application. */
+/** The recent searches, kept in the preferences of the application. */
 object RecentStore {
     private const val KEY = "recent_searches"
 

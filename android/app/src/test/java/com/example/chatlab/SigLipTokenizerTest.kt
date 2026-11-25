@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SigLipTokenizerTest {
-    /** Un tout petit vocabulaire : a, b, leurs fusions, l'espace « ▁ », et l'octet de « c ». */
+    /** A tiny vocabulary: a, b, their merges, the space "▁", and the byte of "c". */
     private val json = """
         {"model": {
           "vocab": {"<pad>": 0, "<eos>": 1, "▁": 2, "a": 3, "b": 4, "ab": 5, "▁ab": 6, "<0x63>": 7},

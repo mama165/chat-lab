@@ -1,6 +1,7 @@
 package com.example.chatlab.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,8 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -34,12 +39,69 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.R
 
-/** Titre d'un onglet, avec la molette des réglages à droite. */
+/** Title of a tab, with the settings gear on the right. */
 @Composable
-fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null) {
+fun TabTitle(
+    title: String,
+    onSettings: () -> Unit,
+    subtitle: String? = null,
+    onAdd: (() -> Unit)? = null,
+    onFilters: (() -> Unit)? = null,
+    filtersCount: Int = 0,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink, modifier = Modifier.weight(1f))
+            if (onAdd != null) {
+                // A plus in a light circle, next to the settings: it adds a folder to analyse.
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Palette.Field)
+                        .clickable(onClick = onAdd)
+                        .semantics { contentDescription = "Ajouter un dossier" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(modifier = Modifier.size(18.dp)) {
+                        val line = 2.dp.toPx()
+                        drawLine(Palette.Accent, Offset(size.width / 2, 0f), Offset(size.width / 2, size.height), strokeWidth = line, cap = StrokeCap.Round)
+                        drawLine(Palette.Accent, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), strokeWidth = line, cap = StrokeCap.Round)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+            if (onFilters != null) {
+                // The filters sit next to the settings wheel, with a badge for the filters active.
+                Box(modifier = Modifier.size(40.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Palette.Field)
+                            .clickable(onClick = onFilters)
+                            .semantics { contentDescription = "Filtres" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(R.drawable.ic_filtres), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
+                    }
+                    if (filtersCount > 0) {
+                        // As in the design: a small navy disc with the number, over the top-right edge of the circle.
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 2.dp, y = (-2).dp)
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Palette.Accent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("$filtersCount", fontSize = 10.sp, color = Color.White)
+                        }
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -56,7 +118,7 @@ fun TabTitle(title: String, onSettings: () -> Unit, subtitle: String? = null) {
     }
 }
 
-/** En-tête d'une page à part : flèche de retour, titre, et une action facultative à droite. */
+/** Header of a separate page: back arrow, title, and an optional action on the right. */
 @Composable
 fun PageHeader(title: String, onBack: () -> Unit, action: String? = null, actionEnabled: Boolean = true, onAction: () -> Unit = {}) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -97,14 +159,14 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, right: String? = n
     }
 }
 
-/** Choix exclusif en segments, comme sur la page Filtres. */
+/** Exclusive choice in segments, as on the Filtres page. */
 @Composable
 fun <T> Segmented(
     options: List<T>,
     selected: T,
     label: (T) -> String,
     onSelect: (T) -> Unit,
-    /** Une petite ligne sous le libellé, par exemple le nombre de photos de ce choix. */
+    /** A small line under the label, for example the number of photos of this choice. */
     sub: (T) -> String? = { null },
 ) {
     Row(
@@ -141,7 +203,7 @@ fun <T> Segmented(
     }
 }
 
-/** Étiquette de filtre ; avec [onRemove], une croix la retire. */
+/** Filter label; with [onRemove], a cross removes it. */
 @Composable
 fun FilterTag(label: String, onRemove: (() -> Unit)?) {
     Text(
@@ -216,7 +278,7 @@ fun SettingRow(title: String, value: String = "", color: Color = Palette.Ink, on
     }
 }
 
-/** Séparation fine avec un texte au milieu (« Moins proches · 6 »). */
+/** Thin separator with a text in the middle ("Moins proches · 6"). */
 @Composable
 fun TextDivider(text: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -226,7 +288,7 @@ fun TextDivider(text: String) {
     }
 }
 
-/** Barre du bas : les deux onglets. */
+/** Bottom bar: the two tabs. */
 @Composable
 fun BottomTabs(selected: Int, onSelect: (Int) -> Unit) {
     Column {
@@ -253,12 +315,12 @@ fun BottomTabs(selected: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-/** Bord coloré autour d'une vignette (photos nouvellement ajoutées). */
+/** Coloured border around a thumbnail (newly added photos). */
 fun Modifier.glow(alpha: Float): Modifier =
     if (alpha <= 0f) this else this.border(3.dp, Palette.Soft.copy(alpha = alpha), RoundedCornerShape(14.dp))
 
 
-/** Une ligne à choix unique : rond, libellé, nombre de photos à droite, chevron si elle ouvre une page. */
+/** A single-choice line: circle, label, number of photos on the right, chevron if it opens a page. */
 @Composable
 fun RadioRow(label: String, count: String, selected: Boolean, onClick: () -> Unit, chevron: Boolean = false, detail: String? = null) {
     Column {
@@ -288,7 +350,7 @@ fun RadioRow(label: String, count: String, selected: Boolean, onClick: () -> Uni
     }
 }
 
-/** Une pastille à choix multiple, avec le nombre de photos. Grisée et en pointillés si rien n'y correspond. */
+/** A multiple-choice chip, with the number of photos. Greyed and dotted if nothing matches itrespond. */
 @Composable
 fun ChoiceChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     val empty = count == 0 && !selected
@@ -309,7 +371,7 @@ fun ChoiceChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit
     )
 }
 
-/** Un interrupteur avec son explication. */
+/** A switch with its explanation. */
 @Composable
 fun SwitchRow(label: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

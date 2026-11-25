@@ -1,11 +1,15 @@
 package com.example.chatlab
 
-/** Les pages à part, qui couvrent tout l'écran et se quittent par la flèche ou le retour. */
-enum class Page { TABS, FILTERS, DATES, SETTINGS, REMOVED, WIPE, TESTS }
+/** The separate pages, which cover the whole screen and are left with the arrow or the back button. */
+enum class Page { TABS, SETTINGS, REMOVED, WIPE, TESTS, STORAGE, ADD_FOLDER, LEVEL, HISTORY, RUN }
 
-/** Page à laquelle ramène le retour depuis une page donnée. */
+/** The page the back button returns to from a given page. */
 fun Page.parent(): Page = when (this) {
     Page.REMOVED, Page.WIPE, Page.TESTS -> Page.SETTINGS
-    Page.DATES -> Page.FILTERS
+    Page.STORAGE -> Page.TABS
+    Page.LEVEL -> Page.SETTINGS
+    // The history is opened from the Photos tab.
+    Page.HISTORY -> Page.TABS
+    Page.RUN -> Page.HISTORY
     else -> Page.TABS
 }

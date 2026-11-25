@@ -4,32 +4,32 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Un fichier non lu et la raison. */
+/** An unread file and the reason. */
 data class FileFailure(val name: String, val reason: FailureReason)
 
-/** Le bilan d'un dossier à la fin de l'analyse. */
+/** The report of a folder at the end of the analysis. */
 data class FolderReport(
     val name: String,
     val uri: String,
-    /** Photos de ce dossier dans le carnet : analysées maintenant ou déjà connues. */
+    /** Photos of this folder in the library: analysed now or already known. */
     val analyzed: Int,
     val failures: List<FileFailure>,
-    /** Fichiers écartés parce que ce ne sont pas des images qu'on sait lire. */
+    /** Files dropped because they are not images we can read. */
     val ignored: Int,
     /** Sous-dossiers refusés par Android. */
     val refused: List<String>,
-    /** Le dossier lui-même est refusé. */
+    /** The folder itself is refused. */
     val rootRefused: Boolean,
 ) {
     val unread: Int get() = failures.size
     val hasProblem: Boolean get() = failures.isNotEmpty() || refused.isNotEmpty() || rootRefused
 }
 
-/** Le bilan de toute l'analyse, gardé pour l'écran Photos. */
+/** The report of the whole analysis, kept for the Photos screen. */
 data class RunReport(
     val finishedAt: Long,
     val durationMs: Long,
-    /** Vrai si l'analyse a été arrêtée avant la fin. */
+    /** True if the analysis was stopped before the end. */
     val stopped: Boolean,
     val folders: List<FolderReport>,
 ) {
@@ -117,7 +117,7 @@ data class RunReport(
     }
 }
 
-/** Construit le bilan pendant l'analyse. Sûr à appeler depuis plusieurs travailleurs. */
+/** Builds the report during the analysis. Safe to call from several workers. */
 class ReportBuilder(private val sources: List<SourceFolder>) {
     private val analyzed = Array(sources.size) { AtomicInteger() }
     private val failures = Array(sources.size) { java.util.Collections.synchronizedList(ArrayList<FileFailure>()) }
@@ -125,7 +125,7 @@ class ReportBuilder(private val sources: List<SourceFolder>) {
     private val refused = Array(sources.size) { ArrayList<String>() }
     private val rootRefused = BooleanArray(sources.size)
 
-    /** Enregistre ce que le listage d'un dossier a trouvé : écartés, refusés, fichiers illisibles dès le départ. */
+    /** Records what the listing of a folder found: dropped, refused, and files unreadable from the start. */
     @Synchronized
     fun scanned(index: Int, scan: ScanResult) {
         ignored[index] = scan.ignored.size
@@ -162,26 +162,26 @@ class ReportBuilder(private val sources: List<SourceFolder>) {
     )
 }
 
-/** Ce que l'analyse fait d'un fichier déjà dans le carnet. */
+/** What the analysis does with a file already in the library. */
 enum class Carry {
-    /** Inchangé et complet : repris tel quel. */
+    /** Unchanged and complete: kept as it is. */
     REUSE,
 
-    /** Inchangé mais écrit avant que le dossier et le type existent : repris, avec ces champs complétés. */
+    /** Unchanged but written before the folder and the type existed: kept, with these fields completed. */
     BACKFILL,
 
     /** Nouveau ou modifié : à analyser. */
     PROCESS,
 }
 
-/** Les fichiers à analyser, rangés par dossier, et ceux qu'on reprend sans calcul. */
+/** The files to analyse, sorted by folder, and those kept without computing. */
 data class AnalysisPlan(
     val folders: List<SourceFolder>,
     val scans: List<ScanResult>,
     val toProcess: List<PlanItem>,
     val carried: List<PlanItem>,
 ) {
-    /** Nombre de fichiers à analyser dans le dossier [index] : le total de sa progression. */
+    /** Number of files to analyse in the folder [index]: the total of its progress. */
     fun processCount(index: Int): Int = toProcess.count { it.folderIndex == index }
 
     companion object {
@@ -201,11 +201,11 @@ data class AnalysisPlan(
 
 data class PlanItem(val folderIndex: Int, val candidate: Candidate)
 
-/** Garde dans le carnet les photos des dossiers qu'on a retirés de la liste. */
+/** Keeps in the library the photos of the folders removed from the list. */
 object LibraryMerge {
     /**
-     * Les entrées de l'ancien carnet à garder : celles dont le dossier est connu et n'est plus dans
-     * la liste actuelle. Les autres sont refaites par l'analyse (ou disparues avec leur fichier).
+     * The entries of the old library to keep: those whose folder is known and no longer in
+     * the current list. The others are redone by the analysis (or gone with their file).
      */
     fun keepFromRemovedFolders(old: JSONArray?, currentFolders: Set<String>): List<JSONObject> {
         if (old == null) return emptyList()

@@ -3,23 +3,23 @@ package com.example.chatlab
 import java.util.Calendar
 import java.util.TimeZone
 
-/** Un instant « maintenant » et le fuseau dans lequel on lit les dates : passés explicitement pour tester. */
+/** An instant "now" and the time zone in which dates are read: passed explicitly to be testable. */
 data class When(val now: Long, val zone: TimeZone = TimeZone.getDefault()) {
     val today: SimpleDate get() = SimpleDate.of(now, zone)
 }
 
-/** Une date sans heure, dans le fuseau du téléphone. Comparable : 2026-11-09 < 2026-11-22. */
+/** A date without time, in the phone's time zone. Comparable: 2026-11-09 < 2026-11-22. */
 data class SimpleDate(val year: Int, val month: Int, val day: Int) : Comparable<SimpleDate> {
     override fun compareTo(other: SimpleDate): Int =
         compareValuesBy(this, other, { it.year }, { it.month }, { it.day })
 
-    /** Minuit, début du jour, dans le fuseau donné. */
+    /** Midnight, start of the day, in the given time zone. */
     fun startMillis(zone: TimeZone): Long = Calendar.getInstance(zone).apply {
         clear()
         set(year, month - 1, day, 0, 0, 0)
     }.timeInMillis
 
-    /** Dernière milliseconde du jour. */
+    /** Last millisecond of the day. */
     fun endMillis(zone: TimeZone): Long = plusDays(1, zone).startMillis(zone) - 1
 
     fun plusDays(days: Int, zone: TimeZone = TimeZone.getDefault()): SimpleDate {
@@ -31,7 +31,7 @@ data class SimpleDate(val year: Int, val month: Int, val day: Int) : Comparable<
         return of(calendar.timeInMillis, zone)
     }
 
-    /** Le jour de la semaine, de 0 (lundi) à 6 (dimanche). */
+    /** The day of the week, from 0 (Monday) to 6 (Sunday). */
     fun weekday(zone: TimeZone = TimeZone.getDefault()): Int {
         val calendar = Calendar.getInstance(zone).apply {
             clear()
@@ -50,7 +50,7 @@ data class SimpleDate(val year: Int, val month: Int, val day: Int) : Comparable<
             )
         }
 
-        /** Nombre de jours d'un mois (février des années bissextiles compris). */
+        /** Number of days in a month (February of leap years included). */
         fun daysIn(year: Int, month: Int): Int = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
             clear()
             set(year, month - 1, 1)
@@ -72,8 +72,8 @@ object Dates {
     private val TAKEN = Regex("^\\s*(\\d{1,2})/(\\d{1,2})/(\\d{4})(?:\\s+(\\d{1,2}):(\\d{2}))?")
 
     /**
-     * Lit la date d'une photo telle que l'analyse l'écrit, « jj/mm/aaaa » suivi ou non de l'heure.
-     * Renvoie null pour une date absente ou mal formée.
+     * Reads the date of a photo as the analysis writes it, "dd/mm/yyyy" followed or not by the time.
+     * Returns null for a missing or malformed date.
      */
     fun parseTaken(taken: String): SimpleDate? {
         val match = TAKEN.find(taken) ?: return null
@@ -82,7 +82,7 @@ object Dates {
         return date.takeIf { it.month in 1..12 && it.day in 1..SimpleDate.daysIn(it.year, it.month) }
     }
 
-    /** L'instant d'une date « jj/mm/aaaa hh:mm » (minuit si l'heure manque), ou null si illisible. */
+    /** The instant of a date "dd/mm/yyyy hh:mm" (midnight if the time is missing), or null if unreadable. */
     fun parseTakenMillis(taken: String, zone: TimeZone): Long? {
         val date = parseTaken(taken) ?: return null
         val match = TAKEN.find(taken)!!
@@ -92,7 +92,7 @@ object Dates {
         return date.startMillis(zone) + (hour * 60L + minute) * 60_000L
     }
 
-    /** Convertit la date EXIF « aaaa:mm:jj hh:mm:ss » en « jj/mm/aaaa hh:mm », ou null si illisible. */
+    /** Converts the EXIF date "yyyy:mm:dd hh:mm:ss" to "dd/mm/yyyy hh:mm", or null if unreadable. */
     fun exifToTaken(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         val parts = raw.trim().split(' ')
@@ -107,7 +107,7 @@ object Dates {
         return "%02d/%02d/%04d %02d:%02d".format(day, month, year, hour, minute)
     }
 
-    /** « 18/11/2026 13:42 » : le format du carnet. */
+    /** "18/11/2026 13:42": the format of the library. */
     fun formatTaken(millis: Long, zone: TimeZone): String {
         val calendar = Calendar.getInstance(zone).apply { timeInMillis = millis }
         return "%02d/%02d/%04d %02d:%02d".format(
@@ -119,24 +119,24 @@ object Dates {
         )
     }
 
-    /** Minute de la journée, de 0 à 1439. */
+    /** Minute of the day, from 0 to 1439. */
     fun minuteOfDay(millis: Long, zone: TimeZone): Int {
         val calendar = Calendar.getInstance(zone).apply { timeInMillis = millis }
         return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
     }
 
-    /** « 18 nov. 2026 », pour les lignes de résultats. Sans date lisible : « date inconnue ». */
+    /** "18 nov. 2026", for the result lines. Without a readable date: "date inconnue". */
     fun long(taken: String): String {
         val date = parseTaken(taken) ?: return "date inconnue"
         return "${date.day} ${MONTHS[date.month - 1]} ${date.year}"
     }
 
-    /** « 21 nov. », pour une date récente (dernière analyse). */
+    /** "21 nov.", for a recent date (last analysis). */
     fun short(date: SimpleDate): String = "${date.day} ${MONTHS[date.month - 1]}"
 
     /**
-     * La date d'une photo dans une liste : « Aujourd'hui, 13:42 », « Hier, 09:15 », sinon
-     * « 18 nov. 2026 ». [takenMs] vaut 0 quand l'heure exacte est inconnue : on retombe sur [taken].
+     * The date of a photo in a list: "Aujourd'hui, 13:42", "Hier, 09:15", otherwise
+     * "18 nov. 2026". [takenMs] is 0 when the exact time is unknown: it falls back to [taken].
      */
     fun display(takenMs: Long, taken: String, time: When): String {
         if (takenMs <= 0) return long(taken)
@@ -150,7 +150,7 @@ object Dates {
         }
     }
 
-    /** « 9 – 22 nov. », « 28 oct. – 3 nov. », ou avec l'année quand elle diffère d'aujourd'hui. */
+    /** "9 – 22 nov.", "28 oct. – 3 nov.", or with the year when it differs from today. */
     fun rangeLabel(from: SimpleDate, to: SimpleDate, today: SimpleDate): String {
         if (from == to) return dayLabel(from, today)
         val sameYear = from.year == to.year

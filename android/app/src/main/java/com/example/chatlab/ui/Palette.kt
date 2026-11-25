@@ -2,7 +2,7 @@ package com.example.chatlab.ui
 
 import androidx.compose.ui.graphics.Color
 
-/** Les couleurs des maquettes « épuré ». */
+/** The colours of the "épuré" mockups. */
 object Palette {
     val Ink = Color(0xFF1E2120)
     val Muted = Color(0xFF6B7280)

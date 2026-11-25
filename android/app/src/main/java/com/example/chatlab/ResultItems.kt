@@ -1,6 +1,6 @@
 package com.example.chatlab
 
-/** Les éléments de la liste des résultats, dans l'ordre d'affichage. */
+/** The items of the list of results, in display order. */
 sealed interface ResultItem {
     val key: String
 

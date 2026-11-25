@@ -12,15 +12,20 @@ class NavigationTest {
     }
 
     @Test
-    fun settingsAndFiltersGoBackToTheTabs() {
+    fun settingsGoBackToTheTabs() {
         assertEquals(Page.TABS, Page.SETTINGS.parent())
-        assertEquals(Page.TABS, Page.FILTERS.parent())
         assertEquals(Page.TABS, Page.TABS.parent())
+    }
+}
+
+class HistoryNavigationTest {
+    @Test
+    fun theHistoryGoesBackToThePhotosTabs() {
+        assertEquals(Page.TABS, Page.HISTORY.parent())
     }
 
     @Test
-    fun theDatesPageGoesBackToTheFilters() {
-        assertEquals(Page.FILTERS, Page.DATES.parent())
-        assertEquals(Page.TABS, Page.DATES.parent().parent())
+    fun theAnalysisDetailGoesBackToTheHistory() {
+        assertEquals(Page.HISTORY, Page.RUN.parent())
     }
 }

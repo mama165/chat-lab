@@ -3,11 +3,11 @@ package com.example.chatlab
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Une photo retirée d'une recherche, avec la date du retrait. */
+/** A photo removed from a search, with the date of the removal. */
 data class Removal(val query: String, val source: String, val date: String)
 
 /**
- * Le contenu de retraits.json : pour chaque recherche, les photos écartées avec leur date.
+ * The content of retraits.json: for each search, the photos set aside with their date.
  * Format : { "mot": [ {"source": "...", "date": "jj/mm/aaaa"} ] }. Les anciennes entrées,
  * simples chaînes sans date, restent lues.
  */
@@ -27,7 +27,7 @@ object RemovalsJson {
         return (0 until array.length()).map { index -> sourceOf(array.opt(index)) }.toSet()
     }
 
-    /** Ajoute des photos retirées pour une recherche ; une photo déjà retirée n'est pas doublée. */
+    /** Adds removed photos for a search; a photo already removed is not doubledublée. */
     fun add(json: JSONObject, query: String, sources: Collection<String>, date: String): JSONObject {
         val array = json.optJSONArray(query) ?: JSONArray().also { json.put(query, it) }
         val already = (0 until array.length()).map { sourceOf(array.opt(it)) }.toMutableSet()
@@ -38,7 +38,7 @@ object RemovalsJson {
         return json
     }
 
-    /** Rétablit une photo ; une recherche sans plus aucun retrait disparaît du fichier. */
+    /** Restores a photo; a search with no removal left disappears from the file. */
     fun restore(json: JSONObject, query: String, source: String): JSONObject {
         val array = json.optJSONArray(query) ?: return json
         val kept = JSONArray()

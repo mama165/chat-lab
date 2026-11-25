@@ -1,26 +1,26 @@
 package com.example.chatlab
 
 /**
- * Ce que l'écran de recherche affiche pour une requête :
- * - [words] : les photos dont le texte lu (ou le nom) contient tous les mots ;
- * - [close] : les photos ressemblantes, au-dessus du point de départ choisi ;
- * - [extra] : les photos « moins proches » déjà dévoilées, au compte-gouttes.
- * Une photo n'apparaît qu'une fois, et jamais si elle a été retirée de cette recherche.
+ * What the search screen shows for a query:
+ * - [words]: the photos whose text read (or name) contains all the words;
+ * - [close]: the similar photos, above the chosen starting point;
+ * - [extra]: the "less close" photos already revealed, one by one.
+ * A photo appears only once, and never if it was removed from this search.
  */
 data class SearchOutcome(
     val words: List<Match>,
     val close: List<Match>,
     val extra: List<Match>,
-    /** Photos moins proches encore disponibles, dans la limite de [MoreResults.MAX_EXTRA]. */
+    /** Less close photos still available, up to [MoreResults.MAX_EXTRA]. */
     val remaining: Int,
-    /** Vrai si la limite de photos moins proches a été atteinte alors qu'il en restait. */
+    /** True if the limit of less close photos was reached while some were left. */
     val limitReached: Boolean,
 ) {
     val total: Int get() = words.size + close.size + extra.size
     val isEmpty: Boolean get() = total == 0
     val hasMore: Boolean get() = remaining > 0
 
-    /** Nombre de photos qu'ajoutera le prochain appui sur « Voir des photos moins proches ». */
+    /** Number of photos the next tap on "Voir des photos moins proches" will add. */
     val nextBatch: Int get() = minOf(MoreResults.BATCH, remaining)
 
     companion object {
@@ -28,25 +28,25 @@ data class SearchOutcome(
     }
 }
 
-/** Réglages du compte-gouttes « Voir des photos moins proches ». */
+/** Settings of the one-by-one drip of "Voir des photos moins proches". */
 object MoreResults {
     /** Photos ajoutées à chaque appui. */
     const val BATCH = 6
 
-    /** Au plus ce nombre de photos moins proches pour une recherche. */
+    /** At most this number of less close photos for a search. */
     const val MAX_EXTRA = 30
 
-    /** En dessous de ce score, une photo ne ressemble plus assez pour être proposée. */
+    /** Below this score, a photo does not look enough alike to be offered. */
     const val FLOOR = 0.03f
 }
 
 object SearchResults {
-    /** Clé d'une photo : son adresse d'origine, ou son chemin à défaut. */
+    /** Key of a photo: its original address, or its path otherwise. */
     fun keyOf(match: Match): String = match.entry.source.ifBlank { match.entry.path }
 
     /**
-     * Calcule les résultats. [ranked] est le classement complet par description (vide si la
-     * description n'est pas encore lue) ; [shownExtra] le nombre de photos moins proches déjà
+     * Computes the results. [ranked] is the full ranking by description (empty if the
+     * description is not read yet); [shownExtra] the number of less close photos already
      * dévoilées.
      */
     fun compute(
@@ -81,6 +81,6 @@ object SearchResults {
         )
     }
 
-    /** Le nombre de photos moins proches après un nouvel appui. */
+    /** The number of less close photos after a new tap. */
     fun nextShown(outcome: SearchOutcome): Int = outcome.extra.size + outcome.nextBatch
 }

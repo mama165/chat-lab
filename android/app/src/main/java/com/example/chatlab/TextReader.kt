@@ -27,17 +27,28 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Lecture du texte d'une image, comme describe_library.py (RapidOCR, PP-OCRv3) :
- * trois lectures de l'image (normale avec bordure, gris contrasté, inversé), chacune
- * avec détection des zones de texte (DB) puis reconnaissance (CTC). Les mots sont
- * dédoublonnés entre les lectures.
+ * Reading the text of an image, like describe_library.py (RapidOCR, PP-OCRv3):
+ * three readings of the image (normal with border, contrasted grey, inverted), each
+ * with detection of the text areas (DB) then recognition (CTC). The words are
+ * de-duplicated between the readings.
  *
- * Fichiers attendus dans le dossier models :
+ * Files expected in the models folder:
  *   ch_PP-OCRv3_det_infer.onnx, ch_PP-OCRv3_rec_infer.onnx, ppocr_keys.txt
  */
-class TextReader(private val env: OrtEnvironment, context: Context, models: DocumentFile) : AutoCloseable {
-    private val detector = ModelFiles.session(env, context, models, "ch_PP-OCRv3_det_infer.onnx")
-    private val recognizer = ModelFiles.session(env, context, models, "ch_PP-OCRv3_rec_infer.onnx")
+class TextReader(
+    private val env: OrtEnvironment,
+    context: Context,
+    models: DocumentFile,
+    settings: OnnxExperiment.Settings = OnnxExperiment.Settings(),
+    /** Called with the time of each step of the reading, in milliseconds (and the count of zones). */
+    private val onStep: (String, Long) -> Unit = { _, _ -> },
+) : AutoCloseable {
+    private val detector = OnnxExperiment.options(settings).use {
+        ModelFiles.session(env, context, models, "ch_PP-OCRv3_det_infer.onnx", it)
+    }
+    private val recognizer = OnnxExperiment.options(settings).use {
+        ModelFiles.session(env, context, models, "ch_PP-OCRv3_rec_infer.onnx", it)
+    }
     // Index 0 is the CTC blank, the last index is the space.
     private val vocabulary: List<String> =
         listOf("blank") + ModelFiles.text(context, models, "ppocr_keys.txt").split("\n") + " "
@@ -47,10 +58,16 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
     private var best = 0f
     private val trace = ArrayList<String>()
 
-    /** Zones, texte et confiance de la première lecture, pour comparer avec l'ordinateur. */
+    /** The words each contrast pass added to those before it, by pass number (1 and 2). */
+    private val passExtras = LinkedHashMap<Int, List<String>>()
+
+    /** The words added by the contrast passes of the last reading, for checking them by hand. */
+    fun extras(): Map<Int, List<String>> = passExtras.toMap()
+
+    /** Areas, text and confidence of the first reading, to compare with the computer. */
     fun trace(): String = trace.joinToString("\n")
 
-    /** Le texte lu dans l'image, mots séparés par des espaces, sans doublons. */
+    /** The text read in the image, words separated by spaces, without duplicates. */
     fun read(bitmap: Bitmap): String {
         val source = Mat()
         val bgr = Mat()
@@ -60,30 +77,30 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         kept = 0
         best = 0f
         trace.clear()
+        passExtras.clear()
         try {
             Utils.bitmapToMat(bitmap, source)
             Imgproc.cvtColor(source, bgr, Imgproc.COLOR_RGBA2BGR)
-            // Une image très grande ne tient pas en mémoire sur le téléphone : on la réduit d'abord.
+            // A very large image does not fit in memory on the phone: we reduce it first.
             val shrink = min(1.0, MAX_SIDE.toDouble() / max(bgr.cols(), bgr.rows()))
             if (shrink < 1.0) {
                 Imgproc.resize(bgr, reduced, Size(bgr.cols() * shrink, bgr.rows() * shrink))
             } else {
                 bgr.copyTo(reduced)
             }
-            for ((index, variant) in variants(reduced).withIndex()) {
+            val prepared = timed("ocr_prepare") { variants(reduced) }
+            for ((index, variant) in prepared.withIndex()) {
                 try {
                     // The contrast readings must be surer of a line than the normal one to add words.
                     val minimum = if (index == 0) MIN_CONFIDENCE else CONTRAST_CONFIDENCE
-                    for (line in readLines(variant, record = index == 0, minimum = minimum)) {
-                        // A capital I before an apostrophe is a misread l: "I'herbe".
-                        val fixed = line.replace("I'", "l'").replace("I’", "l’")
-                        for (word in fixed.split(Regex("\\s+"))) {
-                            // A lone symbol or digit is noise on a photograph ("%", "0"), not a word.
-                            if (word.isNotBlank() && (word.length > 1 || word[0].isLetter())) {
-                                words.putIfAbsent(word.lowercase(), word)
-                            }
-                        }
+                    val lines = timed("ocr_variant_$index") {
+                        readLines(variant, record = index == 0, minimum = minimum)
                     }
+                    // The words this pass adds to those of the passes before: what it is worth.
+                    val fresh = ArrayList<String>()
+                    for (line in lines) fresh.addAll(TextWords.addNew(words, line))
+                    if (index > 0) passExtras[index] = fresh
+                    onStep("ocr_words_$index", fresh.size.toLong())
                 } finally {
                     variant.release()
                 }
@@ -96,10 +113,10 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         return words.values.joinToString(" ")
     }
 
-    /** Résumé du dernier passage, pour le diagnostic. */
+    /** Summary of the last pass, for the diagnosis. */
     fun summary(): String = "zones trouvées $zones, lues $kept, meilleure confiance ${"%.2f".format(best)}"
 
-    /** Les trois lectures : bordure de la couleur du coin, gris contrasté, gris contrasté inversé. */
+    /** The three readings: border of the corner's colour, contrasted grey, inverted contrasted grey. */
     private fun variants(image: Mat): List<Mat> {
         val border = Mat()
         val gray = Mat()
@@ -126,11 +143,22 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         }
     }
 
+    /** Runs one step and reports its time to [onStep]. */
+    private fun <T> timed(stage: String, step: () -> T): T {
+        val started = System.nanoTime()
+        try {
+            return step()
+        } finally {
+            onStep(stage, (System.nanoTime() - started) / 1_000_000)
+        }
+    }
+
     private fun readLines(image: Mat, record: Boolean, minimum: Float): List<String> {
-        val boxes = detect(image)
+        val boxes = timed("ocr_detection") { detect(image) }
         zones += boxes.size
+        onStep("ocr_zones", boxes.size.toLong())
         return boxes.mapNotNull { box ->
-            val (text, confidence) = recognize(crop(image, box))
+            val (text, confidence) = timed("ocr_recognition") { recognize(crop(image, box)) }
             best = max(best, confidence)
             if (record) {
                 val corners = box.joinToString(" ") { "[${it.x.roundToInt()},${it.y.roundToInt()}]" }
@@ -143,7 +171,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         }
     }
 
-    /** Détection des zones de texte sur une image BVR (couleurs dans l'ordre d'OpenCV). */
+    /** Detection of the text areas on a BVR image (colours in OpenCV order). */
     private fun detect(image: Mat): List<Array<Point>> {
         val resized = Mat()
         val mask = Mat()
@@ -207,7 +235,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         }
     }
 
-    /** Moyenne de la carte de probabilités à l'intérieur du polygone, comme box_score_fast de RapidOCR. */
+    /** Average of the probability map inside the polygon, like box_score_fast of RapidOCR. */
     private fun polygonScore(rect: RotatedRect, probabilities: Array<FloatArray>): Double {
         val corners = Array(4) { Point() }
         rect.points(corners)
@@ -241,7 +269,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         }
     }
 
-    /** Élargit la zone, comme unclip_ratio dans RapidOCR. */
+    /** Enlarges the area, like unclip_ratio in RapidOCR. */
     private fun unclip(rect: RotatedRect): RotatedRect {
         val width = rect.size.width
         val height = rect.size.height
@@ -249,7 +277,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         return RotatedRect(rect.center, Size(width + 2 * distance, height + 2 * distance), rect.angle)
     }
 
-    /** Découpe la zone redressée, puis la tourne si elle est très haute. */
+    /** Cuts the straightened area, then turns it if it is very tall. */
     private fun crop(image: Mat, box: Array<Point>): Mat {
         val (tl, tr, br, bl) = orderCorners(box)
         val width = max(sideLength(tl, tr), sideLength(bl, br)).roundToInt().coerceAtLeast(1)
@@ -277,7 +305,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
         return warped
     }
 
-    /** Reconnaissance CTC d'une zone : texte et confiance moyenne des caractères retenus. */
+    /** CTC recognition of an area: text and average confidence of the kept characters. */
     private fun recognize(piece: Mat): Pair<String, Float> {
         val height = piece.rows()
         val ratio = piece.cols().toDouble() / height
@@ -293,7 +321,7 @@ class TextReader(private val env: OrtEnvironment, context: Context, models: Docu
             for (y in 0 until REC_HEIGHT) for (x in 0 until newWidth) {
                 for (c in 0 until 3) {
                     val value = (pixels[(y * newWidth + x) * 3 + c].toInt() and 0xFF) / 255f
-                    // Remplissage à zéro au-delà de la largeur utile, comme RapidOCR.
+                    // Zero padding beyond the useful width, as in RapidOCR.
                     data[c * plane + y * width + x] = (value - 0.5f) / 0.5f
                 }
             }

@@ -5,7 +5,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Les retraits enregistrés dans retraits.json (dossier chatlab). */
+/** The removals saved in retraits.json (chatlab folder). */
 object Removals {
     fun all(context: Context): List<Removal> = RemovalsJson.all(LibraryStore.readRemovals(context))
 

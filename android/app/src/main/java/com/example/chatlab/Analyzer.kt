@@ -31,7 +31,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
 
-/** Résultat pour une image de test. */
+/** Result for a test image. */
 data class ImageResult(
     val file: File,
     val indoor: Boolean?,
@@ -47,33 +47,44 @@ data class ImageResult(
     val source: String = "",
     val modified: Long = 0L,
     val size: Long = 0L,
-    /** Nom du dossier source (« Camera »), écrit dans le carnet pour le filtre par dossier. */
+    /** Name of the source folder ("Camera"), written to the library for the folder filter. */
     val folder: String = "",
-    /** Type MIME détecté d'après les octets du fichier. */
+    /** MIME type detected from the bytes of the file. */
     val mime: String = "",
     /** Instant de prise de vue en millisecondes, 0 si inconnu. */
     val takenMs: Long = 0L,
+    /** The words added by each contrast pass (1 and 2) that the normal reading did not find. */
+    val textExtra: Map<Int, List<String>> = emptyMap(),
 )
 
 /**
- * Reproduit, sur le téléphone, les étapes de describe_library.py qui ne lisent
- * pas le texte : vecteur SigLIP 2, intérieur/extérieur, nombre de visages (YuNet).
- * Le texte est lu sur l'ordinateur et ajouté au carnet plus tard.
+ * Reproduces, on the phone, the steps of describe_library.py that do not read
+ * the text: SigLIP 2 vector, indoor/outdoor, number of faces (YuNet).
+ * The text is read on the computer and added to the library later.
  *
- * Fichiers attendus, lus directement dans le dossier chatlab choisi (sans copie) :
+ * Expected files, read directly from the chosen chatlab folder (without copy):
  *   models/vision_model.onnx (ou ses morceaux vision_model.onnx.partN)
  *   models/judge_vectors.json
  *   models/face_detection_yunet_2023mar.onnx
- *   test/     (les images de test, facultatif)
- * Le carnet produit est écrit dans le dossier chatlab (library.json).
+ *   test/     (the test images, optional)
+ * The library produced is written to the chatlab folder (library.json).
  */
 /**
- * Version des réglages d'analyse (visages, lecture de texte). Une photo n'est reprise du carnet
- * que si elle a été analysée avec la même version ; sinon elle est analysée de nouveau.
+ * Version of the analysis settings (faces, text reading). A photo is kept from the library
+ * only if it was analysed with the same version; otherwise it is analysed again.
  */
 const val ANALYSIS_VERSION = 2
 
-class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
+class Analyzer(
+    context: Context,
+    private val tree: Uri,
+    /** Called as each model is loaded, with its name and its loading time in milliseconds. */
+    private val onModelDone: (String, Long) -> Unit = { _, _ -> },
+    /** Called for each photo stage (decoding, image, faces, text), with its time in milliseconds. */
+    private val onStage: (String, Long) -> Unit = { _, _ -> },
+    /** Called as each model is loaded, with the native memory before and after it, in bytes. */
+    private val onNativeMemory: (String, Long, Long) -> Unit = { _, _, _ -> },
+) : AutoCloseable {
     private val appContext = context.applicationContext
 
     private val env = OrtEnvironment.getEnvironment()
@@ -85,31 +96,55 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     private val detector: FaceDetectorYN
     private val reader: TextReader
 
+    /** Milliseconds each model took to load, by name, in the order they were loaded. */
+    private val timings = LinkedHashMap<String, Long>()
+
+    /** The loading times of the models of this analyzer, for the analysis file. */
+    val modelTimings: Map<String, Long> get() = timings.toMap()
+
     init {
-        // Les modèles sont lus dans chatlab/models : les anciennes copies privées ne servent plus.
+        // The models are read from chatlab/models: the old private copies are no longer used.
         ModelFiles.removeOldCopies(context)
         val models = ModelFiles.folder(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
-        vision = ModelFiles.session(env, context, models, "vision_model.onnx")
+        // The test page chooses the arena and the threads; by default, as before the experiment.
+        val onnx = OnnxExperiment.read(appContext)
+        vision = timed(ModelNames.IMAGES) {
+            OnnxExperiment.options(onnx).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
+        }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
-        reader = TextReader(env, context, models)
-        detector = FaceDetectorYN.create(
-            "onnx",
-            MatOfByte(*ModelFiles.bytes(context, models, "face_detection_yunet_2023mar.onnx")),
-            MatOfByte(),
-            Size(320.0, 320.0),
-            0.75f,
-            0.3f,
-            5000,
-        )
+        reader = timed(ModelNames.TEXTS) { TextReader(env, context, models, onnx, onStage) }
+        detector = timed(ModelNames.FACES) {
+            FaceDetectorYN.create(
+                "onnx",
+                MatOfByte(*ModelFiles.bytes(context, models, "face_detection_yunet_2023mar.onnx")),
+                MatOfByte(),
+                Size(320.0, 320.0),
+                0.75f,
+                0.3f,
+                5000,
+            )
+        }
+    }
+
+    /** Runs a loading step and keeps how long it took under [name]. */
+    private fun <T> timed(name: String, step: () -> T): T {
+        val memoryBefore = android.os.Debug.getNativeHeapAllocatedSize()
+        val started = System.nanoTime()
+        val loaded = step()
+        val millis = (System.nanoTime() - started) / 1_000_000
+        onNativeMemory(name, memoryBefore, android.os.Debug.getNativeHeapAllocatedSize())
+        timings[name] = millis
+        onModelDone(name, millis)
+        return loaded
     }
 
     /**
-     * Analyse les images du sous-dossier test du dossier chatlab. Chaque image est copiée
-     * le temps de son analyse dans le cache, puis la copie est supprimée.
+     * Analyses the images of the test subfolder of the chatlab folder. Each image is copied
+     * for the time of its analysis into the cache, then the copy is deleted.
      */
     fun analyzeAll(): List<ImageResult> {
         val folder = DocumentFile.fromTreeUri(appContext, tree)?.findFile("test") ?: return emptyList()
@@ -139,39 +174,49 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     }
 
     /**
-     * Analyse une image quelconque, déjà copiée dans l'espace privé de l'application.
-     * [checkpoint] est appelé entre les étapes : une pause y fige le calcul, un arrêt y sort.
+     * Analyses any image, already copied into the private space of the application.
+     * [checkpoint] is called between the steps: a pause freezes the computation there, a stop leaves.
      */
     fun analyzeFile(file: File, checkpoint: () -> Unit = {}): ImageResult = analyze(file, checkpoint)
 
-    /** Écrit le carnet au format attendu par cmd/query (-library). */
+    /** Writes the library in the format expected by cmd/query (-library). */
     fun writeLibrary(results: List<ImageResult>, keep: List<JSONObject> = emptyList()): File =
         LibraryWriter.write(appContext, results, keep)
 
     private fun analyze(file: File, checkpoint: () -> Unit = {}): ImageResult {
-        val bitmap = loadUpright(file)
+        val bitmap = timedStage(StageTimes.DECODE) { loadUpright(file) }
         checkpoint()
-        val vector = embed(bitmap)
+        val vector = timedStage(StageTimes.IMAGE) { embed(bitmap) }
         checkpoint()
         val inScore = dot(vector, indoor)
         val outScore = dot(vector, outdoor)
         val flatScore = dot(vector, flat)
-        // Même règle que ImageJudge.indoor_or_none : sans réponse si incertain.
+        // Same rule as ImageJudge.indoor_or_none: no answer if uncertain.
         val answer: Boolean? =
             if (flatScore >= max(inScore, outScore) || abs(inScore - outScore) < 0.01f) null
             else inScore > outScore
-        val (faces, portrait) = countFaces(bitmap)
+        val (faces, portrait) = timedStage(StageTimes.FACES) { countFaces(bitmap) }
         checkpoint()
         // A failure while reading the text is reported, not allowed to stop the whole analysis.
         return try {
-            val text = reader.read(bitmap)
-            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace())
+            val text = timedStage(StageTimes.TEXT) { reader.read(bitmap) }
+            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace(), textExtra = reader.extras())
         } catch (e: Throwable) {
             ImageResult(file, answer, faces, portrait, vector, 0, textNote = "lecture du texte impossible : ${e.javaClass.simpleName} ${e.message ?: ""}")
         }
     }
 
-    /** Orientation EXIF appliquée, fond blanc pour la transparence, comme flatten() en Python. */
+    /** Runs one stage of a photo's analysis and reports its time. */
+    private fun <T> timedStage(stage: String, step: () -> T): T {
+        val started = System.nanoTime()
+        try {
+            return step()
+        } finally {
+            onStage(stage, (System.nanoTime() - started) / 1_000_000)
+        }
+    }
+
+    /** EXIF orientation applied, white background for transparency, like flatten() in Python. */
     private fun loadUpright(file: File): Bitmap {
         val raw = ImageLoader.decode(file)
         val orientation = ExifInterface(file.path)
@@ -192,7 +237,7 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
         return out
     }
 
-    /** Même préparation que ImageEncoder.encode : 224 × 224, pixels ramenés à [-1, 1]. */
+    /** Same preparation as ImageEncoder.encode: 224 × 224, pixels scaled to [-1, 1]. */
     private fun embed(bitmap: Bitmap): FloatArray {
         val size = 224
         val resized = Bitmap.createScaledBitmap(bitmap, size, size, true)
@@ -215,8 +260,8 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
     }
 
     /**
-     * Même comptage que FaceCounter.faces() : nombre de visages trouvés par YuNet,
-     * et sujet principal si le plus grand visage couvre au moins 4 % de l'image.
+     * Same count as FaceCounter.faces(): number of faces found by YuNet,
+     * and main subject if the largest face covers at least 4 % of the image.
      */
     private fun countFaces(bitmap: Bitmap): Pair<Int, Boolean> {
         val rgba = Mat()
@@ -230,7 +275,7 @@ class Analyzer(context: Context, private val tree: Uri) : AutoCloseable {
             val count = faces.rows()
             var largest = 0.0
             for (row in 0 until count) {
-                // Colonnes 2 et 3 : largeur et hauteur du visage.
+                // Columns 2 and 3: width and height of the face.
                 val w = faces.get(row, 2)[0]
                 val h = faces.get(row, 3)[0]
                 largest = max(largest, w * h)

@@ -18,7 +18,7 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = Pink80
 )
 
-// Bleu foncé de l'application (maquettes), avec un fond bleu très pâle.
+// The application's dark blue (mockups), with a very pale blue background.
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFF1F3A68),
     onPrimary = Color.White,
@@ -43,9 +43,9 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun AndroidTheme(
-    // Les écrans suivent les maquettes, en clair uniquement.
+    // The screens follow the mockups, in light mode only.
     darkTheme: Boolean = false,
-    // Couleurs fixes de l'application : le bleu des maquettes plutôt que la couleur du fond d'écran.
+    // Fixed colours of the application: the blue of the mockups rather than the wallpaper colour.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

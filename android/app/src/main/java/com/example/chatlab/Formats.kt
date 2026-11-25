@@ -3,7 +3,7 @@ package com.example.chatlab
 import java.util.Locale
 
 object Formats {
-    /** « 4 Mo », « 820 Ko », « 1,2 Go » : tailles lisibles, à la française. */
+    /** "4 Mo", "820 Ko", "1,2 Go": readable sizes, in French style. */
     fun size(bytes: Long): String {
         if (bytes < 1024) return "$bytes o"
         val kilo = bytes / 1024.0

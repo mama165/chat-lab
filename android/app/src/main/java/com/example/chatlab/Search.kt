@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -37,6 +38,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -57,11 +59,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -72,6 +77,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -96,21 +102,26 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * L'état de la recherche, partagé entre l'écran de recherche et la page Filtres pour que les
- * filtres choisis là-bas s'appliquent dès le retour.
+ * The state of the search, shared between the search screen and the Filtres page so that the
+ * filters chosen there apply as soon as we come back.
  */
 class SearchUiState {
     var query by mutableStateOf("")
     var filters by mutableStateOf(Filters())
     var shownExtra by mutableIntStateOf(0)
-    /** Position, dans les photos moins proches, du dernier paquet ajouté (pour le surligner). */
+    /** Position, in the photos less close, of the last batch added (to highlight it). */
     var newFrom by mutableIntStateOf(-1)
     var selected by mutableStateOf(emptySet<String>())
     var ranked by mutableStateOf(emptyList<Match>())
+    /** The filter sheet, which rises over the search. */
+    var sheetOpen by mutableStateOf(false)
+    /** Set when an analysis has just finished, until the user opens it. */
+    var analysisDone by mutableStateOf(false)
 
     fun reset() {
         query = ""
         filters = Filters()
+        sheetOpen = false
         shownExtra = 0
         newFrom = -1
         selected = emptySet()
@@ -118,7 +129,7 @@ class SearchUiState {
     }
 }
 
-/** Onglet Rechercher : titre et molette, champ et filtres, puis les résultats. */
+/** Search tab: title and gear, field and filters, then the results. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
@@ -138,16 +149,18 @@ fun SearchScreen(
     var modelError by remember { mutableStateOf<String?>(null) }
     var recents by remember { mutableStateOf(RecentStore.read(context)) }
     val time = remember(query, state.filters, entries) { When(System.currentTimeMillis()) }
+    // The place is chosen, but does not filter the results yet: see Filters.withoutPlace.
+    val resultFilters = state.filters.withoutPlace()
     val gridState = rememberLazyGridState()
 
-    // Une nouvelle recherche ou d'autres filtres repartent du début : ni photos moins proches, ni sélection.
+    // A new search or other filters start again from the beginning: neither photos less close, nor selection.
     LaunchedEffect(query, state.filters) {
         state.shownExtra = 0
         state.newFrom = -1
         state.selected = emptySet()
     }
 
-    // La phrase devient un vecteur une fois la frappe en pause, pour les photos ressemblantes.
+    // The sentence becomes a vector once typing pauses, for the similar photos.
     LaunchedEffect(query) {
         queryVector = null
         modelError = null
@@ -169,20 +182,20 @@ fun SearchScreen(
     }
 
     val removed = remember(queryKey, removalsVersion) { Removals.sourcesFor(context, queryKey) }
-    val outcome = remember(entries, query, state.ranked, state.filters, removed, state.shownExtra, time) {
-        SearchResults.compute(entries, query, state.ranked, state.filters, removed, state.shownExtra, time)
+    val outcome = remember(entries, query, state.ranked, resultFilters, removed, state.shownExtra, time) {
+        SearchResults.compute(entries, query, state.ranked, resultFilters, removed, state.shownExtra, time)
     }
     val rows = remember(outcome, state.newFrom, query) { resultItems(outcome, query, state.newFrom) }
     val latestOutcome by rememberUpdatedState(outcome)
 
-    // Une recherche qui donne des résultats rejoint les recherches récentes après une pause de frappe.
+    // A search that gives results joins the recent searches after a pause ofrappe.
     LaunchedEffect(query) {
         if (query.isBlank()) return@LaunchedEffect
         delay(1500)
         if (!latestOutcome.isEmpty) recents = RecentStore.add(context, query)
     }
 
-    // Après « Voir des photos moins proches », la liste glisse jusqu'aux nouvelles photos.
+    // After "Voir des photos moins proches", the list slides down to the new photos.
     LaunchedEffect(state.shownExtra) {
         if (state.newFrom < 0) return@LaunchedEffect
         val index = rows.indexOfFirst { it is ResultItem.Tile && it.isNew }
@@ -214,7 +227,9 @@ fun SearchScreen(
             TabTitle(
                 "Rechercher",
                 onSettings = onSettings,
-                subtitle = if (query.isBlank()) "${Formats.photos(entries.size).replaceFirstChar { it.uppercase() }}, dans le carnet" else null,
+                onFilters = onFilters,
+                filtersCount = state.filters.activeCount,
+                subtitle = null,
             )
             Spacer(Modifier.height(12.dp))
             SearchField(
@@ -224,47 +239,29 @@ fun SearchScreen(
                     focus.clearFocus()
                     if (!outcome.isEmpty) recents = RecentStore.add(context, query)
                 },
-                activeFilters = state.filters.activeCount,
-                onFilters = onFilters,
             )
         }
         Spacer(Modifier.height(10.dp))
 
+        // Recent searches, then the filters applied (on lines, never scrolled), then the results.
         val chips = state.filters.chips(time)
-        if (query.isNotBlank() && (!outcome.isEmpty || chips.isNotEmpty())) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(Formats.results(outcome.total), fontSize = 14.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
-                if (!selecting && chips.size >= 2) {
-                    Text(
-                        "Réinitialiser",
-                        fontSize = 14.sp,
-                        color = Palette.Accent,
-                        modifier = Modifier.clickable { state.filters = Filters() }.padding(4.dp),
-                    )
-                }
-            }
-        } else if (query.isBlank() && chips.isNotEmpty()) {
-            Text("Filtres actifs", fontSize = 13.sp, color = Palette.Muted)
+        if (query.isBlank() && entries.isNotEmpty() && !selecting) {
+            Recents(recents, onPick = { state.query = it })
+            Spacer(Modifier.height(18.dp))
         }
-        if (chips.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                chips.forEach { chip ->
-                    FilterTag(chip.label, onRemove = if (selecting) null else ({ state.filters = chip.without }))
-                }
-            }
+        if (chips.isNotEmpty() && !selecting) {
+            Text("Filtres", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+            Spacer(Modifier.height(8.dp))
+            ActiveFilterPills(chips, onRemove = { state.filters = it.without })
+            Spacer(Modifier.height(18.dp))
         }
-        Spacer(Modifier.height(10.dp))
 
         when {
             entries.isEmpty() -> Message(
                 "Aucune photo analysée pour l'instant.",
                 "Ouvrez l'onglet Photos pour lancer l'analyse.",
             )
-            query.isBlank() -> Recents(recents, onPick = { state.query = it })
+            query.isBlank() -> Spacer(Modifier.weight(1f))
             outcome.isEmpty && chips.isNotEmpty() -> Message(
                 "Aucune photo ne correspond à « $query ».",
                 "Essayez de retirer un filtre.",
@@ -347,70 +344,64 @@ private fun SearchField(
     value: String,
     onChange: (String) -> Unit,
     onSearch: () -> Unit,
-    activeFilters: Int,
-    onFilters: () -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextField(
-            value = value,
-            onValueChange = onChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            shape = RoundedCornerShape(24.dp),
-            placeholder = { Text("Un mot, ou ce que montre la photo", color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            leadingIcon = { Icon(painterResource(R.drawable.ic_loupe), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(18.dp)) },
-            trailingIcon = {
-                if (value.isNotEmpty()) {
+    // As in the design: a bare field with a navy underline, and a helper line under it.
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    val line = 1.5.dp.toPx()
+                    drawLine(Palette.Accent, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = line)
+                }
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(painterResource(R.drawable.ic_loupe), contentDescription = null, tint = Palette.Muted, modifier = Modifier.size(20.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                if (value.isEmpty()) {
                     Text(
-                        "✕",
+                        "Un mot, ou ce que montre la photo",
+                        fontSize = 17.sp,
                         color = Palette.Muted,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable { onChange("") }
-                            .semantics { contentDescription = "Effacer la recherche" }
-                            .padding(8.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Palette.Field,
-                unfocusedContainerColor = Palette.Field,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Palette.Accent,
-            ),
-        )
-        Box {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(Palette.Soft)
-                    .clickable(onClick = onFilters)
-                    .semantics { contentDescription = "Filtres" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(painterResource(R.drawable.ic_filtres), contentDescription = null, tint = Palette.Accent, modifier = Modifier.size(20.dp))
+                BasicTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 17.sp, color = Palette.Ink),
+                    cursorBrush = SolidColor(Palette.Accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            if (activeFilters > 0) {
-                Box(
+            if (value.isNotEmpty()) {
+                Text(
+                    "✕",
+                    fontSize = 14.sp,
+                    color = Palette.Muted,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(18.dp)
                         .clip(CircleShape)
-                        .background(Palette.Accent),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("$activeFilters", fontSize = 10.sp, color = Color.White)
-                }
+                        .clickable { onChange("") }
+                        .semantics { contentDescription = "Effacer la recherche" }
+                        .padding(4.dp),
+                )
             }
         }
+        Text(
+            "Par exemple « facture », « wifi » ou « une plage ».",
+            fontSize = 13.sp,
+            color = Palette.Muted,
+        )
     }
 }
 
-/** En sélection, la barre du haut remplace le champ : nombre choisi, annuler, retirer. */
+/** When selecting, the top bar replaces the field: number chosen, cancel, remove. */
 @Composable
 private fun SelectionBar(count: Int, query: String, onCancel: () -> Unit, onRemove: () -> Unit) {
     Row(
@@ -463,10 +454,7 @@ private fun SelectionBar(count: Int, query: String, onCancel: () -> Unit, onRemo
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
-    if (recents.isEmpty()) {
-        Text("Tapez un mot lu sur la photo, ou décrivez-la : « une plage », « deux personnes ».", fontSize = 14.sp, color = Palette.Muted)
-        return
-    }
+    if (recents.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("Récentes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -477,9 +465,9 @@ private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
                     color = Palette.Ink,
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Palette.Field)
+                        .border(1.dp, Palette.Line, RoundedCornerShape(18.dp))
                         .clickable { onPick(recent) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
                 )
             }
         }
@@ -494,7 +482,7 @@ private fun Message(title: String, detail: String?) {
     }
 }
 
-/** Page « Non classifiées » : les photos retirées, par recherche, avec la date et Rétablir. */
+/** "Non classifiées" page: the removed photos, per search, with the date and Rétablir. */
 @Composable
 fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
@@ -567,7 +555,7 @@ fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
 private fun toggled(current: Set<String>, key: String): Set<String> =
     if (key in current) current - key else current + key
 
-/** Une correspondance par mot : vignette, extrait du texte lu avec le mot surligné, date. */
+/** A match by word: thumbnail, excerpt of the text read with the word highlighted, date. */
 @Composable
 private fun WordRow(match: Match, query: String, time: When, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
     val entry = match.entry
@@ -628,7 +616,7 @@ private fun Check(modifier: Modifier, size: Int) {
     }
 }
 
-/** Appui court = sélection, appui maintenu = ouverture dans la galerie. */
+/** Short tap = selection, long press = opening in the gallery. */
 private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -> Unit): Modifier =
     this.pointerInput(key) {
         detectTapGestures(onPress = {
@@ -653,7 +641,7 @@ private fun ResultTile(
     LaunchedEffect(pressing) {
         if (pressing) ring.animateTo(1f, tween(LONG_PRESS_MS.toInt())) else ring.snapTo(0f)
     }
-    // Les photos qui viennent d'arriver sont entourées un instant.
+    // The photos that have just arrived are briefly outlined.
     val glow = remember { Animatable(0f) }
     LaunchedEffect(isNew, highlightKey) {
         if (isNew) {
@@ -727,7 +715,7 @@ fun GridThumb(location: String, modifier: Modifier) {
 
 private const val LONG_PRESS_MS = 500L
 
-/** Ouvre la photo d'origine dans l'application de galerie du téléphone. */
+/** Opens the original photo in the gallery application of the phone. */
 private fun openInGallery(context: Context, source: String) {
     if (source.isBlank()) {
         Toast.makeText(context, "Photo d'origine introuvable.", Toast.LENGTH_SHORT).show()
@@ -743,7 +731,7 @@ private fun openInGallery(context: Context, source: String) {
     }
 }
 
-/** Décode l'image à petite taille, pour que la liste reste fluide. */
+/** Decodes the image at a small size, so that the list stays smooth. */
 private fun decodeThumbnail(context: Context, location: String): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     openImage(context, location)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -756,7 +744,7 @@ private fun decodeThumbnail(context: Context, location: String): Bitmap? {
     }
 }
 
-/** Une photo d'origine (adresse content://) ou un fichier de l'application. */
+/** An original photo (content:// address) or a file of the application. */
 private fun openImage(context: Context, location: String): java.io.InputStream? =
     if (location.startsWith("content:")) {
         context.contentResolver.openInputStream(Uri.parse(location))

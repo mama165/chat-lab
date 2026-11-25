@@ -12,13 +12,13 @@ import java.nio.LongBuffer
 import java.text.Normalizer
 import kotlin.math.sqrt
 
-/** Le côté texte de SigLIP 2 : une description devient un vecteur normalisé. */
+/** The text side of SigLIP 2: a description becomes a normalised vector. */
 class TextModel(private val env: OrtEnvironment, context: Context, models: DocumentFile) : AutoCloseable {
     private val session: OrtSession
     private val tokenizer: SigLipTokenizer
 
     init {
-        // Lus directement dans chatlab/models, sans copie.
+        // Read directly from chatlab/models, without copy.
         val name = listOf("text_model_q4f16.onnx", "text_model_quantized.onnx")
             .firstOrNull { ModelFiles.exists(models, it) }
             ?: error("modèle de texte absent : copiez text_model_q4f16.onnx dans chatlab/models")
@@ -51,7 +51,7 @@ class TextModel(private val env: OrtEnvironment, context: Context, models: Docum
     }
 }
 
-/** Un seul modèle de texte chargé, partagé par la recherche et le contrôle. */
+/** A single text model loaded, shared by the search and the check. */
 object TextModels {
     private var loaded: TextModel? = null
 
@@ -64,8 +64,8 @@ object TextModels {
     }
 
     /**
-     * Le vecteur d'une phrase : celui du fichier de test query_vectors.json s'il le fournit
-     * (tests d'interface sur émulateur, sans le modèle de texte), sinon celui du modèle.
+     * The vector of a sentence: the one of the test file query_vectors.json if it provides it
+     * (interface tests on the emulator, without the text model), otherwise that of the model.
      */
     @Synchronized
     fun vectorFor(context: Context, text: String): FloatArray {
@@ -80,7 +80,7 @@ object TextModels {
         return get(context).encode(text)
     }
 
-    /** Ligne de contrôle pour le compte rendu : identifiants et premières valeurs, à comparer à l'ordinateur. */
+    /** Check line for the report: ids and first values, to compare with the computerateur. */
     @Synchronized
     fun control(context: Context): String {
         val model = get(context)
