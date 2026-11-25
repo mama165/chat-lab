@@ -12,6 +12,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Diagnostics first: it reads why the app ended last time, and wraps the handler below.
         Diagnostics.onAppStart(this)
+        // Debug builds only: reports the reads and writes made on the main thread to the diagnostic journal.
+        ThreadWatch.installIfDebuggable(this)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             LibraryStore.saveErrorReport(applicationContext, "Plantage : $error\n\n${error.stackTraceToString()}")
