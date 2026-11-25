@@ -100,6 +100,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 
 /**
  * The state of the search, shared between the search screen and the Filtres page so that the
@@ -175,11 +176,41 @@ fun SearchScreen(
             }
         }
     }
+    // The vector whose ranking is in state.ranked: until it matches the current vector, the search is still running.
+    var rankedFor by remember { mutableStateOf<FloatArray?>(null) }
     LaunchedEffect(queryVector, entries) {
         val vector = queryVector
-        state.ranked = if (vector == null) emptyList()
-        else withContext(Dispatchers.Default) { Library.rankDescription(entries, vector, Place.ALL, null) }
+        rankedFor = null
+        if (vector == null) {
+            state.ranked = emptyList()
+            return@LaunchedEffect
+        }
+        // The timing goes to the journal from the background thread: writing it on the main thread would be a violation.
+        state.ranked = withContext(Dispatchers.Default) {
+            val started = System.currentTimeMillis()
+            val found = Library.rankDescription(entries, vector, Place.ALL, null)
+            Diagnostics.event(
+                context,
+                "searchRank",
+                JSONObject().put("ms", System.currentTimeMillis() - started).put("photos", entries.size).put("found", found.size),
+            )
+            found
+        }
+        rankedFor = vector
     }
+    val pending = rankingPending(query.isBlank(), modelError != null, queryVector, rankedFor)
+    var timedOut by remember { mutableStateOf(false) }
+    LaunchedEffect(pending, queryKey) {
+        timedOut = false
+        if (pending) {
+            delay(SEARCH_LIMIT_MS)
+            timedOut = true
+            withContext(Dispatchers.IO) {
+                Diagnostics.event(context, "searchTimeout", JSONObject().put("limitMs", SEARCH_LIMIT_MS).put("photos", entries.size))
+            }
+        }
+    }
+    val waiting = waitingFor(pending, timedOut)
 
     // The results follow the typing once it pauses, and they are computed off the main thread: the letters
     // appear at once, and typing does not wait for the whole library to be searched.
@@ -274,6 +305,8 @@ fun SearchScreen(
                 "Ouvrez l'onglet Photos pour lancer l'analyse.",
             )
             query.isBlank() -> Spacer(Modifier.weight(1f))
+            waiting == Waiting.RANKING -> Searching()
+            waiting == Waiting.TIMED_OUT -> Message("Recherche trop longue, essaie encore.", "Ajoutez un mot, ou relancez la recherche dans un instant.")
             outcome.isEmpty && chips.isNotEmpty() -> Message(
                 "Aucune photo ne correspond à « $query ».",
                 "Essayez de retirer un filtre.",
@@ -282,7 +315,6 @@ fun SearchScreen(
                 "Aucune photo ne correspond à « $query ».",
                 "Recherche par description indisponible : $modelError",
             )
-            outcome.isEmpty && queryVector == null -> Message("Recherche en cours…", null)
             outcome.isEmpty -> Message("Aucune photo ne correspond à « $query ».", "Essayez d'autres mots.")
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
@@ -483,6 +515,19 @@ private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/** While the photos are ranked: the gauge turns, in place of the results. */
+@Composable
+private fun Searching() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        GaugeRing(fraction = null, size = 40.dp)
+        Text("Recherche en cours…", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
     }
 }
 
