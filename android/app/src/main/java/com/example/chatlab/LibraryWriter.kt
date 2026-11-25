@@ -61,13 +61,20 @@ object LibraryWriter {
      */
     private fun writeCompact(context: Context, results: List<ImageResult>) {
         try {
-            val mapped = PhotoRecordMapper.map(results, System.currentTimeMillis())
+            val started = System.currentTimeMillis()
+            val mapped = PhotoRecordMapper.map(results, started)
             val store = CompactLibrary(context)
             try {
                 store.add(mapped.records)
             } finally {
                 store.close()
             }
+            // The cost of the parallel write, measured in every save of a normal analysis.
+            Diagnostics.event(
+                context,
+                "compactWritten",
+                JSONObject().put("photos", mapped.records.size).put("ms", System.currentTimeMillis() - started),
+            )
             if (mapped.withoutAddress > 0) {
                 Diagnostics.event(context, "compactSkipped", JSONObject().put("withoutAddress", mapped.withoutAddress))
             }
