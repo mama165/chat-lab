@@ -188,11 +188,10 @@ data class AnalysisPlan(
         fun build(folders: List<SourceFolder>, scans: List<ScanResult>, carry: (FileNode) -> Carry): AnalysisPlan {
             val process = ArrayList<PlanItem>()
             val carried = ArrayList<PlanItem>()
-            scans.forEachIndexed { index, scan ->
-                for (candidate in scan.candidates) {
-                    val item = PlanItem(index, candidate)
-                    if (carry(candidate.file) == Carry.PROCESS) process += item else carried += item
-                }
+            // Two selected folders can share a photo (a folder and its subfolder): it is planned once.
+            val all = scans.flatMapIndexed { index, scan -> scan.candidates.map { PlanItem(index, it) } }
+            for (item in distinctById(all, { it.candidate.file.id })) {
+                if (carry(item.candidate.file) == Carry.PROCESS) process += item else carried += item
             }
             return AnalysisPlan(folders, scans, process, carried)
         }
