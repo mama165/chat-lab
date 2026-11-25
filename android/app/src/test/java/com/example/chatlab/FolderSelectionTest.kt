@@ -13,6 +13,8 @@ class FolderSelectionTest {
     private val dcim = node("/s/DCIM", leaf("/s/DCIM/Camera"), leaf("/s/DCIM/Screenshots"))
     private val download = node("/s/Download", leaf("/s/Download/Factures"))
     private val roots = listOf(dcim, download)
+    // Every folder holds one photo: the tests below then see the whole tree.
+    private val photos = FolderSelection.all(roots).associate { it.path to 1 }
 
     @Test
     fun aFolderWithItsSubfoldersIsAllFolders() {
@@ -22,20 +24,20 @@ class FolderSelectionTest {
 
     @Test
     fun togglingAFolderTicksItsSubfolders() {
-        val selected = FolderSelection.toggle(dcim, emptySet(), locked = emptySet())
+        val selected = FolderSelection.toggle(dcim, emptySet(), locked = emptySet(), counts = photos)
         assertEquals(setOf("/s/DCIM", "/s/DCIM/Camera", "/s/DCIM/Screenshots"), selected)
     }
 
     @Test
     fun togglingATickedFolderUntickesItsSubfolders() {
         val selected = setOf("/s/DCIM", "/s/DCIM/Camera", "/s/DCIM/Screenshots")
-        assertEquals(emptySet<String>(), FolderSelection.toggle(dcim, selected, locked = emptySet()))
+        assertEquals(emptySet<String>(), FolderSelection.toggle(dcim, selected, locked = emptySet(), counts = photos))
     }
 
     @Test
     fun aLockedFolderIsNeverTicked() {
         val locked = setOf("/s/DCIM/Screenshots")
-        val selected = FolderSelection.toggle(dcim, emptySet(), locked)
+        val selected = FolderSelection.toggle(dcim, emptySet(), locked, counts = photos)
         assertEquals(setOf("/s/DCIM", "/s/DCIM/Camera"), selected)
         assertFalse("/s/DCIM/Screenshots" in selected)
     }
@@ -61,8 +63,21 @@ class FolderSelectionTest {
 
     @Test
     fun selectAllTicksEverythingButTheLockedFolders() {
-        val selected = FolderSelection.selectAll(roots, locked = setOf("/s/DCIM/Screenshots"))
+        val selected = FolderSelection.selectAll(roots, locked = setOf("/s/DCIM/Screenshots"), counts = photos)
         assertEquals(setOf("/s/DCIM", "/s/DCIM/Camera", "/s/Download", "/s/Download/Factures"), selected)
+    }
+
+    @Test
+    fun selectAllLeavesOutFoldersWithoutPhotosAndNotYetCounted() {
+        // DCIM/Camera has photos; DCIM itself holds them through Camera; Screenshots is empty; Download is not counted.
+        val counts = mapOf("/s/DCIM" to 2, "/s/DCIM/Camera" to 2, "/s/DCIM/Screenshots" to 0)
+        assertEquals(setOf("/s/DCIM", "/s/DCIM/Camera"), FolderSelection.selectAll(roots, locked = emptySet(), counts = counts))
+    }
+
+    @Test
+    fun togglingAFolderSkipsItsEmptySubfolders() {
+        val counts = mapOf("/s/DCIM" to 1, "/s/DCIM/Camera" to 1, "/s/DCIM/Screenshots" to 0)
+        assertEquals(setOf("/s/DCIM", "/s/DCIM/Camera"), FolderSelection.toggle(dcim, emptySet(), locked = emptySet(), counts = counts))
     }
 
     @Test

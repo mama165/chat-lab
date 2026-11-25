@@ -165,7 +165,8 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 color = Palette.Accent,
                 modifier = Modifier.clickable {
-                    if (roots != null) selected = FolderSelection.selectAll(roots, locked)
+                    // Only once every folder is counted: a folder not counted yet is not ticked.
+                    if (roots != null && finished) selected = FolderSelection.selectAll(roots, locked, counts.orEmpty())
                 }.padding(horizontal = 8.dp, vertical = 4.dp),
             )
             Text(
@@ -190,7 +191,7 @@ fun StorageChooser(onDone: () -> Unit, onBack: () -> Unit) {
                         counts = counts.orEmpty(),
                         fractions = fractions,
                         topPaths = roots.map { it.path },
-                        onToggleSelect = { node -> selected = FolderSelection.toggle(node, selected, locked) },
+                        onToggleSelect = { node -> selected = FolderSelection.toggle(node, selected, locked, counts.orEmpty()) },
                         onToggleExpand = { path -> expanded = if (path in expanded) expanded - path else expanded + path },
                     )
                 }
