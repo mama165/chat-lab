@@ -23,7 +23,14 @@ class TextModel(private val env: OrtEnvironment, context: Context, models: Docum
             .firstOrNull { ModelFiles.exists(models, it) }
             ?: error("modèle de texte absent : copiez text_model_q4f16.onnx dans chatlab/models")
         if (!ModelFiles.exists(models, "tokenizer.json")) error("tokenizer.json absent de chatlab/models")
-        session = ModelFiles.session(env, context, models, name)
+        // Sentences are short and of varying length. The CPU arena and the memory-pattern cache keep
+        // the native memory reserved after each call, so it grew from one search to the next (measured:
+        // encodeMemory, the native floor rose from about 750 MB to 2.5 GB). Both are switched off here.
+        val options = OrtSession.SessionOptions().apply {
+            setCPUArenaAllocator(false)
+            setMemoryPatternOptimization(false)
+        }
+        session = options.use { ModelFiles.session(env, context, models, name, it) }
         tokenizer = SigLipTokenizer(ModelFiles.text(context, models, "tokenizer.json"))
     }
 
