@@ -28,6 +28,17 @@ class VectorFile(private val file: File, val dimension: Int = 768) {
         }
     }
 
+    /** Reads [count] consecutive vectors from [firstRow], as one flat array of count * dimension floats. */
+    fun readBlock(firstRow: Long, count: Int): FloatArray {
+        val bytes = ByteArray(count * blockBytes)
+        RandomAccessFile(file, "r").use { raf ->
+            raf.seek(firstRow * blockBytes)
+            raf.readFully(bytes)
+        }
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        return FloatArray(count * dimension) { buffer.getFloat() }
+    }
+
     /** Reads the vector of a row. Only that block is read, not the whole file. */
     fun read(row: Long): FloatArray {
         val bytes = ByteArray(blockBytes)

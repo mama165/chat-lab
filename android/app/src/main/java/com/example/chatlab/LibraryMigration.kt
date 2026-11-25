@@ -40,8 +40,9 @@ object LibraryMigration {
     /** Compares the store with the JSON library, and writes the counts to the journal. */
     private fun check(context: Context, store: CompactLibrary) {
         val input = LibraryStore.open(context) ?: return
+        val rows = store.rows()
         input.bufferedReader(Charsets.UTF_8).use { reader ->
-            val report = LibraryCheck.run(reader, store.rows(), store::vector)
+            val report = LibraryCheck.run(reader, rows, store::vector)
             Diagnostics.event(
                 context,
                 "readCheck",
@@ -52,6 +53,24 @@ object LibraryMigration {
                     .put("duplicates", report.duplicates),
             )
         }
+        if (rows.isEmpty()) return
+        // The same query on both sides: the best photos must be the same ones.
+        val k = 20
+        val query = store.vector(rows.values.first())
+        val addressByRow = rows.entries.associate { it.value to it.key }
+        val fromStore = store.topRows(query, k).mapNotNull { addressByRow[it.first] }
+        val fromJson = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+            LibraryCheck.rank(reader, query, k).map { it.first }
+        }.orEmpty()
+        Diagnostics.event(
+            context,
+            "rankCheck",
+            JSONObject()
+                .put("k", k)
+                .put("common", LibraryCheck.common(fromJson, fromStore))
+                .put("storeCount", fromStore.size)
+                .put("jsonCount", fromJson.size),
+        )
     }
 
     /**
