@@ -326,15 +326,8 @@ class AnalysisService : Service() {
                                     results[index] = outcome.result
                                     report.analyzed(item.folderIndex)
                                     if (outcome.result.textExtra.isNotEmpty()) {
-                                        Diagnostics.event(
-                                            this@AnalysisService,
-                                            "textExtra",
-                                            JSONObject()
-                                                .put("file", outcome.result.file.name)
-                                                .put("passes", JSONObject().apply {
-                                                    outcome.result.textExtra.forEach { (pass, list) -> put(pass.toString(), JSONArray(list)) }
-                                                }),
-                                        )
+                                        // The words of the passes only: the name of the photo is not written to the journal.
+                                        Diagnostics.event(this@AnalysisService, "textExtra", textExtraData(outcome.result.textExtra))
                                     }
                                     val count = photosDone.incrementAndGet()
                                     if (NativeMemory.isPhotoPoint(count)) {
@@ -702,3 +695,9 @@ fun overview(context: Context): List<FolderOverview> {
         )
     }
 }
+
+/** The text read by each pass, for the journal. The name of the photo is not part of it. */
+internal fun textExtraData(passes: Map<*, List<String>>): JSONObject =
+    JSONObject().put("passes", JSONObject().apply {
+        passes.forEach { (pass, list) -> put(pass.toString(), JSONArray(list)) }
+    })
