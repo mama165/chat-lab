@@ -20,7 +20,7 @@ object ReadProgress {
     private val state = MutableStateFlow<Map<String, Int>>(emptyMap())
     val counts: StateFlow<Map<String, Int>> = state.asStateFlow()
 
-    /** Le nombre total de fichiers de chaque dossier en cours de lecture : le total de la jauge. */
+    /** The total number of files of each folder being read: the total of the gauge. */
     private val totals = MutableStateFlow<Map<String, Int>>(emptyMap())
     val totalCounts: StateFlow<Map<String, Int>> = totals.asStateFlow()
 

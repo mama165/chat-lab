@@ -17,7 +17,7 @@ object ImageLoader {
         return if (options.outWidth > 0 && options.outHeight > 0) options.outWidth to options.outHeight else null
     }
 
-    /** Décode l'image, réduite si son plus grand côté dépasse [maxSide]. */
+    /** Decodes the image, reduced if its largest side exceeds [maxSide]. */
     fun decode(file: File, maxSide: Int = ImageScale.MAX_SIDE): Bitmap {
         val (width, height) = bounds(file) ?: throw ImageFailure(FailureReason.UNREADABLE, "dimensions illisibles")
         var sample = ImageScale.sampleSize(width, height, maxSide)

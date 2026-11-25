@@ -62,11 +62,11 @@ data class Progress(
         else -> RunningScreen.RUNNING
     }
 
-    /** Part faite, de 0 à 1. */
+    /** Share done, from 0 to 1. */
     val fraction: Float
         get() = if (total > 0) done.toFloat() / total else 0f
 
-    /** Temps de calcul réel, pauses exclues. */
+    /** Real computing time, pauses excluded. */
     fun activeElapsed(now: Long): Long {
         val pausing = if (paused && pausedAt > 0) now - pausedAt else 0L
         return (now - startedAt - pausedTotal - pausing).coerceAtLeast(0L)
@@ -78,7 +78,7 @@ data class Progress(
         return activeElapsed(now) * (total - done) / done
     }
 
-    /** One more file is done in the folder [index]; [name] is the file that has just'être traité. */
+    /** One more file is done in the folder [index]; [name] is the file that has just been processed. */
     /** A worker takes a photo of this folder: the folder starts being read, before its photo is done. */
     fun taking(index: Int, name: String): Progress {
         if (index !in folders.indices) return this
@@ -91,7 +91,7 @@ data class Progress(
         return copy(done = done + 1, current = name, folders = updated)
     }
 
-    /** Met en pause : l'horloge s'arrête. */
+    /** Pauses: the clock stops. */
     fun pausing(now: Long): Progress = if (paused) this else copy(paused = true, pausedAt = now)
 
     /** Resumes: the duration of the pause is removed from the elapsed time. */
@@ -167,7 +167,7 @@ fun durationText(totalMinutes: Int): String {
     }
 }
 
-/** La marque d'un dossier dans la liste de l'analyse : fini, en cours, ou en attente. */
+/** The mark of a folder in the analysis list: done, running, or waiting. */
 enum class FolderMark { FINISHED, RUNNING, WAITING }
 
 /** The names of the models, as the analysis file and the screens show them, in loading order. */
@@ -220,7 +220,7 @@ enum class RunningScreen { RUNNING, PAUSED, RELOADING }
 fun FolderProgress.gaugeFraction(): Float? =
     if (mark() != FolderMark.RUNNING || done == 0) null else Progress01.of(done, total)
 
-/** Le dossier est fini (ou n'a rien de nouveau), il est en cours s'il a commencé, sinon il attend. */
+/** The folder is done (or has nothing new); it is running if it has started, otherwise it waits. */
 fun FolderProgress.mark(): FolderMark = when {
     later -> FolderMark.WAITING
     nothingNew || finished -> FolderMark.FINISHED

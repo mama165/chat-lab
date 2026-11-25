@@ -625,7 +625,7 @@ private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -
         })
     }
 
-/** Une photo ressemblante : vignette carrée, coche si choisie, anneau pendant l'appui long. */
+/** A similar photo: square thumbnail, tick if chosen, ring during a long press. */
 @Composable
 private fun ResultTile(
     match: Match,

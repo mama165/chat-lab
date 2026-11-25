@@ -17,8 +17,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Relève, pendant une analyse, le CPU de l'appli, sa mémoire, la batterie et la chauffe, à
- * intervalles réguliers. Les relevés sont gardés pour le fichier d'analyse.
+ * Records, during an analysis, the app's CPU, its memory, the battery and the heat, at
+ * regular intervals. The records are kept for the analysis file.
  */
 class AnalysisRecorder(private val context: Context, private val intervalMs: Long = 10_000L) {
     private val samples = ArrayList<Sample>()
@@ -43,7 +43,7 @@ class AnalysisRecorder(private val context: Context, private val intervalMs: Lon
         }
     }
 
-    /** Arrête les relevés, prend un dernier relevé et renvoie tous les relevés. */
+    /** Stops the records, takes a last one and returns all the records. */
     suspend fun stop(): List<Sample> {
         job?.cancelAndJoin()
         job = null
@@ -60,7 +60,7 @@ class AnalysisRecorder(private val context: Context, private val intervalMs: Lon
         val now = System.currentTimeMillis()
         val cpuNow = Process.getElapsedCpuTime()
         val wall = (now - lastWall).coerceAtLeast(1L)
-        // Temps CPU de l'appli rapporté à la durée et à l'ensemble des cœurs : 100 % = tous les cœurs.
+        // The app's CPU time, relative to the duration and to all the cores: 100% = all the cores.
         val cpuPercent = ((cpuNow - lastCpu).toFloat() / wall / cores * 100f).coerceIn(0f, 100f)
         lastWall = now
         lastCpu = cpuNow

@@ -429,7 +429,7 @@ class AnalysisService : Service() {
         notifyProgress()
     }
 
-    /** Le fichier d'une analyse : ce qui s'est passé dans chaque dossier, et les relevés du téléphone. */
+    /** The file of an analysis: what happened in each folder, and the records of the phone. */
     private fun recordOf(
         started: Long,
         report: RunReport,
@@ -507,7 +507,7 @@ class AnalysisService : Service() {
         @Volatile
         internal var current: AnalysisControl? = null
 
-        /** Fige l'analyse en cours : plus aucun calcul jusqu'à [resume]. */
+        /** Freezes the analysis in progress: no more computation until [resume]. */
         fun pause() = current?.pause() ?: false
 
         /** Resumes a paused analysis, exactly where it was frozen. */
@@ -603,7 +603,7 @@ internal fun readKnown(text: String?): KnownLibrary {
 }
 
 /**
- * Les photos déjà analysées : par leur adresse, ou, si elle a changé, par leur nom, leur taille
+ * The photos already analysed: by their address, or, if it has changed, by their name, their size
  * and their date (see [KnownFiles]).
  */
 internal class KnownLibrary(private val byId: Map<String, JSONObject>) {
@@ -660,7 +660,7 @@ data class FolderOverview(
     val status: FolderStatus,
     /** Photos already in the library and unchanged. */
     val known: Int,
-    /** Photos nouvelles ou modifiées, à analyser. */
+    /** New or changed photos, to analyse. */
     val fresh: Int,
 )
 

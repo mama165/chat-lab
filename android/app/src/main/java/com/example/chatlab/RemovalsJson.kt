@@ -8,8 +8,8 @@ data class Removal(val query: String, val source: String, val date: String)
 
 /**
  * The content of retraits.json: for each search, the photos set aside with their date.
- * Format : { "mot": [ {"source": "...", "date": "jj/mm/aaaa"} ] }. Les anciennes entrées,
- * simples chaînes sans date, restent lues.
+ * Format: { "mot": [ {"source": "...", "date": "jj/mm/aaaa"} ] }. The older entries,
+ * plain strings without a date, are still read.
  */
 object RemovalsJson {
     fun all(json: JSONObject): List<Removal> =
@@ -27,7 +27,7 @@ object RemovalsJson {
         return (0 until array.length()).map { index -> sourceOf(array.opt(index)) }.toSet()
     }
 
-    /** Adds removed photos for a search; a photo already removed is not doubledublée. */
+    /** Adds removed photos for a search; a photo already removed is not added twice. */
     fun add(json: JSONObject, query: String, sources: Collection<String>, date: String): JSONObject {
         val array = json.optJSONArray(query) ?: JSONArray().also { json.put(query, it) }
         val already = (0 until array.length()).map { sourceOf(array.opt(it)) }.toMutableSet()

@@ -103,7 +103,7 @@ class AnalysisRecordTest {
 
     @Test
     fun theFileNameIsTheStartDateAndTime() {
-        // 2026-11-23 13:30 UTC = 14:30 à Paris.
+        // 2026-11-23 13:30 UTC = 14:30 in Paris.
         val utc = 1_795_000_000_000L
         val name = AnalysisFiles.nameFor(java.util.GregorianCalendar.getInstance(zone).apply {
             clear(); set(2026, 10, 23, 14, 30)

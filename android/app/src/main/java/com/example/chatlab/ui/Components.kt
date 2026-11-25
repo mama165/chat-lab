@@ -148,7 +148,7 @@ fun PageHeader(title: String, onBack: () -> Unit, action: String? = null, action
     }
 }
 
-/** Intitulé de section, en gris. */
+/** Section title, in grey. */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier, right: String? = null, onRight: () -> Unit = {}) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -254,13 +254,13 @@ fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     }
 }
 
-/** Petit carré plein, symbole d'arrêt. */
+/** Small filled square, the stop symbol. */
 @Composable
 fun StopSquare(color: Color = Palette.Accent) {
     Box(Modifier.size(12.dp).background(color))
 }
 
-/** Une ligne de réglage : titre à gauche, valeur à droite, chevron si elle ouvre quelque chose. */
+/** A settings line: title on the left, value on the right, chevron if it opens something. */
 @Composable
 fun SettingRow(title: String, value: String = "", color: Color = Palette.Ink, onClick: (() -> Unit)? = null) {
     Column {

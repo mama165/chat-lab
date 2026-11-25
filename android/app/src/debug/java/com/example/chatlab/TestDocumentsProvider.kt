@@ -82,7 +82,7 @@ class TestDocumentsProvider : DocumentsProvider() {
         const val AUTHORITY = "com.example.chatlab.testdocuments"
         const val ROOT = "root"
 
-        /** Le dossier servi, choisi par chaque test. */
+        /** The folder served, chosen by each test. */
         @Volatile
         var base: File = File("/nonexistent")
 

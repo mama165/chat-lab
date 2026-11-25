@@ -7,7 +7,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Un relevé pendant l'analyse : une ligne de la courbe. [tSec] est le temps écoulé depuis le début. */
+/** A record during the analysis: one point of the curve. [tSec] is the time elapsed since the start. */
 data class Sample(
     val tSec: Int,
     val cpuPercent: Float,
@@ -19,7 +19,7 @@ data class Sample(
     val workers: Int = 0,
 )
 
-/** Ce qui s'est passé dans un dossier pendant l'analyse. */
+/** What happened in a folder during the analysis. */
 data class FolderStat(
     val name: String,
     val analyzed: Int,
@@ -28,7 +28,7 @@ data class FolderStat(
     val refused: Int,
 )
 
-/** Une analyse terminée, telle qu'elle est écrite dans son fichier JSON sur le téléphone. */
+/** A finished analysis, as it is written in its JSON file on the phone. */
 data class AnalysisRecord(
     val startMs: Long,
     val endMs: Long,
@@ -58,7 +58,7 @@ data class AnalysisRecord(
     val analyzed: Int get() = folders.sumOf { it.analyzed }
     val ignored: Int get() = folders.sumOf { it.ignored }
 
-    /** Le résumé affiché dans la liste de l'historique. */
+    /** The summary shown in the history list. */
     fun summary(): Summary {
         val cpu = samples.map { it.cpuPercent }
         val seconds = durationMs / 1000.0
@@ -124,7 +124,7 @@ data class AnalysisRecord(
         })
 
     companion object {
-        /** Le fichier d'une analyse, relu depuis son JSON. */
+        /** The file of an analysis, read back from its JSON. */
         fun fromJson(json: JSONObject): AnalysisRecord {
             val run = json.getJSONObject("run")
             val device = json.getJSONObject("device")
@@ -184,11 +184,11 @@ data class Summary(
 )
 
 object AnalysisFiles {
-    /** Le nom du fichier d'une analyse : sa date de début, par exemple « 2026-11-23_1430.json ». */
+    /** The file name of an analysis: its start date, for example "2026-11-23_1430.json". */
     fun nameFor(startMs: Long, zone: TimeZone = TimeZone.getDefault()): String =
         SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.ROOT).apply { timeZone = zone }.format(Date(startMs)) + ".json"
 
-    /** Réduit une courbe à [maxPoints] points, en gardant toujours le premier et le dernier. */
+    /** Reduces a curve to [maxPoints] points, always keeping the first and the last. */
     fun downsample(samples: List<Sample>, maxPoints: Int): List<Sample> {
         if (maxPoints <= 0) return emptyList()
         if (samples.size <= maxPoints) return samples

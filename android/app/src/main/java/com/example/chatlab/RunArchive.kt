@@ -5,9 +5,9 @@ import android.os.Environment
 import java.io.File
 
 /**
- * Écrit le fichier de chaque analyse terminée. Sur le téléphone, le dossier ChatLab/analyses du
- * stockage interne, accessible depuis l'appli Fichiers ; sans l'accès à tous les fichiers, le
- * dossier privé de l'appli. Une erreur d'écriture ne doit jamais faire échouer l'analyse.
+ * Writes the file of each finished analysis. On the phone, the ChatLab/analyses folder of the
+ * internal storage, reachable from the Files app; without access to all files, the
+ * private folder of the app. A write error must never make the analysis fail.
  */
 object RunArchive {
     fun directory(context: Context): File =
@@ -21,7 +21,7 @@ object RunArchive {
         null
     }
 
-    /** Les fichiers d'analyse, du plus récent au plus ancien. */
+    /** The analysis files, from the newest to the oldest. */
     fun list(context: Context): List<File> =
         directory(context).listFiles { f -> f.isFile && f.name.endsWith(".json") }
             ?.sortedByDescending { it.name }

@@ -12,8 +12,8 @@ import java.nio.file.Files
 import javax.imageio.ImageIO
 
 /**
- * Le compte des photos d'un dossier repose sur le contenu des fichiers (leurs premiers octets),
- * jamais sur leur nom ni leur extension. Ces tests le vérifient sur de vrais fichiers.
+ * The count of photos in a folder relies on the content of the files (their first bytes),
+ * never on their name or extension. These tests check it on real files.
  */
 class PhotoCountingTest {
     private lateinit var root: File
@@ -42,14 +42,14 @@ class PhotoCountingTest {
         return out.toByteArray()
     }
 
-    /** Un WebP : « RIFF », la taille, puis « WEBP » (le contenu n'a pas besoin d'être décodable). */
+    /** A WebP: "RIFF", the size, then "WEBP" (the content does not need to be decodable). */
     private fun webpBytes(): ByteArray =
         "RIFF".toByteArray() + byteArrayOf(20, 0, 0, 0) + "WEBPVP8 ".toByteArray() + ByteArray(12)
 
-    /** Un HEIC : une boîte « ftyp » avec la marque heic. Non pris en charge par l'analyse. */
+    /** A HEIC: a "ftyp" box with the heic brand. Not supported by the analysis. */
     private fun heicBytes(): ByteArray = byteArrayOf(0, 0, 0, 24) + "ftypheic".toByteArray() + ByteArray(20)
 
-    /** Une vidéo MP4 : « ftyp » avec la marque mp42. Non prise en charge. */
+    /** An MP4 video: "ftyp" with the mp42 brand. Not supported. */
     private fun mp4Bytes(): ByteArray = byteArrayOf(0, 0, 0, 24) + "ftypmp42".toByteArray() + ByteArray(20)
 
     private fun gifBytes(): ByteArray = "GIF89a".toByteArray() + ByteArray(40)
