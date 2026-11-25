@@ -1,0 +1,35 @@
+name: Security (Go)
+
+# The vulnerability check only concerns the Go code: it runs when a Go file or the Go modules change,
+# so that an Android change is never held up by it.
+on:
+  push:
+    branches: main
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+  pull_request:
+    branches: main
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/security.yml'
+
+jobs:
+  security:
+    name: Security (govulncheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache: true
+
+      - name: Security Check (govulncheck)
+        # Pinned so that a new release cannot break the CI on its own
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
