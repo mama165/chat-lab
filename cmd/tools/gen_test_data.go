@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	// Destination folder for the Scanner
+	// Dossier de destination pour le Scanner
 	outputDir := "./test_data"
 	err := os.MkdirAll(outputDir, 0755)
 	if err != nil {
@@ -22,17 +22,17 @@ func main() {
 
 	fmt.Println("🚀 Chat-Lab : Génération des fichiers de test...")
 
-	// 1. Generate a real PDF (for pdf_specialist.py)
+	// 1. Génération d'un vrai PDF (pour pdf_specialist.py)
 	// Nécessite : go get github.com/jung-kurt/gofpdf
 	pdfPath := filepath.Join(outputDir, "rapport_test.pdf")
 	genPDF(pdfPath)
 
-	// 2. Generate a PNG image (for image_specialist.py)
+	// 2. Génération d'une image PNG (pour image_specialist.py)
 	imgPath := filepath.Join(outputDir, "capture_test.png")
 	genImage(imgPath)
 
-	// 3. Integrate your macOS .aiff file (for audio_specialist.py)
-	// REPLACE with the name of your current file at the root
+	// 3. Intégration de ton fichier macOS .aiff (pour audio_specialist.py)
+	// REMPLACE par le nom de ton fichier actuel à la racine
 	aiffSource := "sample_audio_macos.aiff"
 	aiffDest := filepath.Join(outputDir, "audio_macos_test.aiff")
 
@@ -43,7 +43,7 @@ func main() {
 	fmt.Println("\n✅ Prêt ! Tu peux maintenant lancer le Scanner sur ./test_data")
 }
 
-// genPDF creates a multi-page document to test text extraction
+// genPDF crée un document multi-pages pour tester l'extraction de texte
 func genPDF(path string) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	// The built-in fonts only know Windows-1252: without this conversion, the UTF-8
@@ -67,12 +67,12 @@ func genPDF(path string) {
 	}
 }
 
-// genImage creates an 800x600 PNG to test PIL (Pillow)
+// genImage crée un PNG de 800x600 pour tester PIL (Pillow)
 func genImage(path string) {
 	width, height := 800, 600
 	img := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
 
-	// Fill with a blue gradient for the style
+	// Remplissage avec un dégradé bleu pour le style
 	for x := 0; x < width; x++ {
 		for y := 0; y < height; y++ {
 			c := color.RGBA{uint8(x % 255), 100, 200, 0xff}
@@ -89,7 +89,7 @@ func genImage(path string) {
 	}
 }
 
-// prepareAudio copies your real AIFF file to the test folder
+// prepareAudio copie ton fichier AIFF réel vers le dossier de test
 func prepareAudio(src, dst string) error {
 	source, err := os.Open(src)
 	if err != nil {

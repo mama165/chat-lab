@@ -85,29 +85,29 @@ func run() (int, error) {
 		return exitConfig, fmt.Errorf("folder to scan %q is not an accessible directory", config.ScanRootDir)
 	}
 
-	// 2. Prepare the log file
+	// 2. On prépare le fichier de log
 	logFile, err := os.OpenFile("master_execution.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return exitRuntime, fmt.Errorf("failed to open log file: %w", err)
 	}
 	defer logFile.Close()
 
-	// 3. Create a MultiWriter (console + file)
+	// 3. On crée un MultiWriter (Console + Fichier)
 	multiWriter := io.MultiWriter(os.Stdout, logFile)
 
-	// 4. Create a NEW handler that uses the level of your baseLogger
-	// but that writes to our multiWriter
+	// 4. On crée un NOUVEAU handler qui utilise le niveau de ton baseLogger
+	// mais qui écrit vers notre multiWriter
 	level := logs.GetLevelFromString(config.LogLevel)
 
 	handler := slog.NewTextHandler(multiWriter, &slog.HandlerOptions{
 		Level: level,
 	})
 
-	// 5. Instantiate the final logger
+	// 5. On instancie le logger final
 	logger := slog.New(handler)
 
-	// CRITICAL: set this logger as the global default
-	// So your Coordinator and your Orchestrator will use it automatically
+	// CRITIQUE : On définit ce logger comme défaut global
+	// Ainsi, ton Coordinator et ton Orchestrator l'utiliseront automatiquement
 	slog.SetDefault(logger)
 
 	// Context & Signals
@@ -295,7 +295,7 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 	if analysis.Payload != nil {
 		switch payload := analysis.Payload.(type) {
 
-		// Case 1: it is correctly identified as audio
+		// Cas 1 : C'est bien identifié comme de l'audio
 		case storage.AudioDetails, *storage.AudioDetails:
 			row.Type = "AUDIO"
 			var transcription string
@@ -309,7 +309,7 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 
 			row.Detail = transcription
 
-		// Case 2: it is identified as a file (current case in your logs)
+		// Cas 2 : C'est identifié comme un fichier (cas actuel de tes logs)
 		case storage.FileDetails, *storage.FileDetails:
 			row.Type = "FILE"
 			var content string
@@ -320,7 +320,7 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 				content = fPtr.Content
 			}
 
-			// If the content is empty, we keep the summary, otherwise we show the text
+			// Si le contenu est vide, on garde le summary, sinon on affiche le texte
 			if content != "" {
 				row.Detail = content
 			}
@@ -336,7 +336,7 @@ func AnalysisMapper(key string, val []byte) internal.InspectRow {
 		}
 	}
 
-	// Score handling for the display
+	// Gestion des scores pour l'affichage
 	scores := ""
 	for k, v := range analysis.Scores {
 		scores += fmt.Sprintf("%s:%.2f ", k, v)
