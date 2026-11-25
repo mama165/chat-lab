@@ -72,6 +72,23 @@ object LibraryMigration {
                     .put("same", fromJson == fromStore),
             )
         }
+        // The filters: the same photos, in the same order, on both sides.
+        val time = When(System.currentTimeMillis())
+        val filters = Filters(place = Place.INDOOR, text = TextFilter.WITH)
+        val jsonPhotos = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use {
+            LibraryCheck.filterMatches(it, filters, time)
+        }.orEmpty()
+        val storePhotos = store.entries(store.searchAddresses(FilterSql.query(filters, time)))
+            .filter { filters.matches(it, time) }
+            .map { it.source }
+        Diagnostics.event(
+            context,
+            "filterCheck",
+            JSONObject()
+                .put("json", jsonPhotos.size)
+                .put("store", storePhotos.size)
+                .put("same", jsonPhotos == storePhotos),
+        )
         // The same query on both sides: the best photos must be the same ones.
         val k = 20
         val query = store.vector(rows.values.first())
