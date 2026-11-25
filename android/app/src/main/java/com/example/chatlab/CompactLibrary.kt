@@ -39,5 +39,11 @@ class CompactLibrary(context: Context) : RecordSink {
 
     fun count(): Long = database.rowsByAddress().size.toLong()
 
+    /** The row of every stored photo, by address. */
+    fun rows(): Map<String, Long> = database.rowsByAddress()
+
+    /** The vector stored at a row. */
+    fun vector(row: Long): FloatArray = vectors.read(row)
+
     fun close() = database.close()
 }
