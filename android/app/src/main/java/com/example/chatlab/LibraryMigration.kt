@@ -37,21 +37,48 @@ object LibraryMigration {
         return Report(migrated, skipped)
     }
 
+    /** Compares the store with the JSON library, and writes the counts to the journal. */
+    private fun check(context: Context, store: CompactLibrary) {
+        val input = LibraryStore.open(context) ?: return
+        input.bufferedReader(Charsets.UTF_8).use { reader ->
+            val report = LibraryCheck.run(reader, store.rows(), store::vector)
+            Diagnostics.event(
+                context,
+                "readCheck",
+                JSONObject()
+                    .put("checked", report.checked)
+                    .put("missing", report.missing)
+                    .put("different", report.different)
+                    .put("duplicates", report.duplicates),
+            )
+        }
+    }
+
     /**
      * Starts the copy in the background, if it has not been done yet. The marker is written only at the
      * end, so an interrupted copy is started again. Nothing happens when there is no library file.
      */
     fun startIfNeeded(context: Context) {
         val marker = File(context.filesDir, "photos.migrated")
-        if (marker.exists()) return
         Thread {
             try {
+                if (marker.exists()) {
+                    // Already copied: only the check runs, to see that the store still matches the JSON.
+                    val compact = CompactLibrary(context)
+                    try {
+                        check(context, compact)
+                    } finally {
+                        compact.close()
+                    }
+                    return@Thread
+                }
                 val input = LibraryStore.open(context) ?: return@Thread
                 val store = CompactLibrary(context)
                 try {
                     input.bufferedReader(Charsets.UTF_8).use { reader ->
                         val report = run(reader, store, System.currentTimeMillis())
                         marker.writeText("migrated=${report.migrated} skipped=${report.skipped}")
+                        check(context, store)
                         Diagnostics.event(
                             context,
                             "migration",
