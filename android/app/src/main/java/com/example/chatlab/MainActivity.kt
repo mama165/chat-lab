@@ -14,6 +14,8 @@ class MainActivity : ComponentActivity() {
         Diagnostics.onAppStart(this)
         // Debug builds only: reports the reads and writes made on the main thread to the diagnostic journal.
         ThreadWatch.installIfDebuggable(this)
+        // Copies the JSON library into the compact store, once, in the background.
+        LibraryMigration.startIfNeeded(applicationContext)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             LibraryStore.saveErrorReport(applicationContext, "Plantage : $error\n\n${error.stackTraceToString()}")

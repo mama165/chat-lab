@@ -10,14 +10,20 @@ import java.io.File
  * A photo exists when its row exists. Vectors written without a row are harmless: no row points to them,
  * and the next write takes the same place.
  */
-class CompactLibrary(context: Context) {
+/** Where photo records go: the compact store, or a test. */
+fun interface RecordSink {
+    fun add(records: List<PhotoRecord>)
+}
+
+class CompactLibrary(context: Context) : RecordSink {
     private val database = PhotoDatabase(context)
     private val vectors = VectorFile(File(context.filesDir, "vectors.bin"))
 
-    fun add(records: List<PhotoRecord>) {
+    /** The analysis and the migration may write at the same time: rows are planned one writer at a time. */
+    override fun add(records: List<PhotoRecord>) = synchronized(lock) {
         // One record per address: the newest one wins, as in the JSON writer.
         val unique = distinctById(records, { it.address }, keepLast = true)
-        if (unique.isEmpty()) return
+        if (unique.isEmpty()) return@synchronized
         val (assignments, _) = RowPlanner.plan(
             unique.map { it.address },
             database.rowsByAddress(),
@@ -25,6 +31,10 @@ class CompactLibrary(context: Context) {
         )
         vectors.writeAll(assignments.mapIndexed { index, a -> a.row to unique[index].vector })
         database.upsertAll(unique.mapIndexed { index, record -> record to assignments[index].row })
+    }
+
+    companion object {
+        private val lock = Any()
     }
 
     fun count(): Long = database.rowsByAddress().size.toLong()
