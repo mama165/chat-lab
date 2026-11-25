@@ -51,6 +51,28 @@ object LibraryWriter {
         all.forEach { entries.put(it.second) }
         // The library goes into the chosen chatlab folder (it survives a reinstall).
         LibraryStore.write(context, entries.toString())
+        writeCompact(context, results)
         return File(context.filesDir, "library.json")
+    }
+
+    /**
+     * The same results, in the compact store (parallel writing: the JSON is still the one the app reads).
+     * A failure is recorded in the journal and never stops the analysis.
+     */
+    private fun writeCompact(context: Context, results: List<ImageResult>) {
+        try {
+            val mapped = PhotoRecordMapper.map(results, System.currentTimeMillis())
+            val store = CompactLibrary(context)
+            try {
+                store.add(mapped.records)
+            } finally {
+                store.close()
+            }
+            if (mapped.withoutAddress > 0) {
+                Diagnostics.event(context, "compactSkipped", JSONObject().put("withoutAddress", mapped.withoutAddress))
+            }
+        } catch (e: Exception) {
+            Diagnostics.event(context, "compactError", JSONObject().put("error", e.javaClass.simpleName))
+        }
     }
 }

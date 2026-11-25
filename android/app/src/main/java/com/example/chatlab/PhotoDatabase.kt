@@ -17,6 +17,7 @@ class PhotoRecord(
     val taken: String?,
     val takenMs: Long?,
     val analysisVersion: Int,
+    val addedAt: Long,
     val faces: Int,
     val portrait: Boolean,
     val indoor: Boolean?,
@@ -43,6 +44,7 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
               modified         INTEGER,
               taken            TEXT,
               taken_ms         INTEGER,
+              added_at         INTEGER NOT NULL,
               analysis_version INTEGER NOT NULL,
               faces            INTEGER NOT NULL DEFAULT 0,
               portrait         INTEGER NOT NULL DEFAULT 0,
@@ -92,6 +94,7 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
                     put("modified", record.modified)
                     put("taken", record.taken)
                     put("taken_ms", record.takenMs)
+                    put("added_at", record.addedAt)
                     put("analysis_version", record.analysisVersion)
                     put("faces", record.faces)
                     put("portrait", if (record.portrait) 1 else 0)

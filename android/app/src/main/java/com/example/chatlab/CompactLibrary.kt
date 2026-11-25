@@ -28,4 +28,6 @@ class CompactLibrary(context: Context) {
     }
 
     fun count(): Long = database.rowsByAddress().size.toLong()
+
+    fun close() = database.close()
 }
