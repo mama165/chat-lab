@@ -54,6 +54,24 @@ object LibraryMigration {
             )
         }
         if (rows.isEmpty()) return
+        // The word search, on one word of the library: the same photos, in the same order, on both sides.
+        val word = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { LibraryCheck.firstWord(it) }
+        if (word != null) {
+            val words = listOf(word)
+            val fromJson = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use {
+                LibraryCheck.wordMatches(it, words, Place.ALL)
+            }.orEmpty()
+            val fromStore = store.searchAddresses(WordSearch.query(words, Place.ALL))
+            // The word itself is not written: it comes from the text of the photos.
+            Diagnostics.event(
+                context,
+                "wordCheck",
+                JSONObject()
+                    .put("json", fromJson.size)
+                    .put("store", fromStore.size)
+                    .put("same", fromJson == fromStore),
+            )
+        }
         // The same query on both sides: the best photos must be the same ones.
         val k = 20
         val query = store.vector(rows.values.first())

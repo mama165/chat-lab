@@ -20,6 +20,43 @@ object LibraryCheck {
         return top.sorted()
     }
 
+    /**
+     * The word search of the JSON library, read as a stream, with the rules of Library.searchWords: the same
+     * photos, in the same order. Returns the addresses.
+     */
+    fun wordMatches(reader: Reader, words: List<String>, place: Place): List<String> {
+        val matches = ArrayList<Pair<String, Int>>()
+        val seen = HashSet<String>()
+        KnownSummary.forEachEntry(reader) { item ->
+            val record = PhotoRecordFromJson.from(item, now = 0L) ?: return@forEachEntry
+            if (!seen.add(record.address)) return@forEachEntry
+            if (!inPlace(record.indoor, place)) return@forEachEntry
+            val text = Library.fold(record.text ?: "")
+            val name = Library.fold(record.name)
+            if (words.all { text.contains(it) || name.contains(it) }) {
+                matches += record.address to words.count { text.contains(it) }
+            }
+        }
+        return matches.sortedByDescending { it.second }.map { it.first }
+    }
+
+    /** A word of the first text found in the library, to compare the two searches on real data. */
+    fun firstWord(reader: Reader): String? {
+        var found: String? = null
+        KnownSummary.forEachEntry(reader) { item ->
+            if (found != null) return@forEachEntry
+            val text = Library.fold(item.optString("text"))
+            found = text.split(" ").firstOrNull { it.length >= 3 }
+        }
+        return found
+    }
+
+    private fun inPlace(indoor: Boolean?, place: Place): Boolean = when (place) {
+        Place.ALL -> true
+        Place.INDOOR -> indoor == true
+        Place.OUTDOOR -> indoor == false
+    }
+
     /** How many of the addresses are in both lists. */
     fun common(a: List<String>, b: List<String>): Int = a.toSet().intersect(b.toSet()).size
 
