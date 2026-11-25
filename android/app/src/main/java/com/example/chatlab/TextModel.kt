@@ -53,14 +53,37 @@ class TextModel(private val env: OrtEnvironment, context: Context, models: Docum
 
 /** A single text model loaded, shared by the search and the check. */
 object TextModels {
+    private const val RETRY_MS = 30_000L
     private var loaded: TextModel? = null
+    private var failure: Exception? = null
+    private var failedAt = 0L
 
+    /**
+     * The model is loaded once. After a failure, it is not loaded again at each keystroke: each load takes
+     * native memory, and the retries piled up until the process was aborted. The next try waits RETRY_MS.
+     */
     @Synchronized
     fun get(context: Context): TextModel {
         loaded?.let { return it }
-        val model = TextModel(OrtEnvironment.getEnvironment(), context, ModelFiles.folder(context))
-        loaded = model
-        return model
+        failure?.let { error ->
+            if (System.currentTimeMillis() - failedAt < RETRY_MS) throw error
+        }
+        return try {
+            val model = TextModel(OrtEnvironment.getEnvironment(), context, ModelFiles.folder(context))
+            loaded = model
+            failure = null
+            Diagnostics.event(context, "modelLoad", JSONObject().put("ok", true))
+            model
+        } catch (error: Exception) {
+            failure = error
+            failedAt = System.currentTimeMillis()
+            Diagnostics.event(
+                context,
+                "modelLoad",
+                JSONObject().put("ok", false).put("error", error.javaClass.simpleName),
+            )
+            throw error
+        }
     }
 
     /**
