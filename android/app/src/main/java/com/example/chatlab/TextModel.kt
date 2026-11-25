@@ -100,7 +100,19 @@ object TextModels {
                 return FloatArray(array.length()) { array.getDouble(it).toFloat() }
             }
         }
-        return get(context).encode(text)
+        // Measured around the model call only: the native memory before and after, and the time it took.
+        val nativeBefore = android.os.Debug.getNativeHeapAllocatedSize()
+        val started = System.currentTimeMillis()
+        val vector = get(context).encode(text)
+        Diagnostics.event(
+            context,
+            "encodeMemory",
+            JSONObject()
+                .put("beforeMb", nativeBefore / (1024 * 1024))
+                .put("afterMb", android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024))
+                .put("ms", System.currentTimeMillis() - started),
+        )
+        return vector
     }
 
     /** Check line for the report: ids and first values, to compare with the computerateur. */
