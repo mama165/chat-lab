@@ -263,6 +263,13 @@ class AnalysisService : Service() {
         // One analyser per worker: each loads its models and works alone. With nothing to
         // analyse, no model is loaded.
         val workers = if (total == 0) 0 else (workerGuard?.limit ?: level.workers)
+        val cores = Runtime.getRuntime().availableProcessors()
+        val threadsPerSession = ThreadBudget.perSession(cores, workers)
+        Diagnostics.event(
+            this@AnalysisService,
+            "threadPlan",
+            JSONObject().put("cores", cores).put("workers", workers).put("threadsPerSession", threadsPerSession),
+        )
         val loads = Collections.synchronizedList(mutableListOf<ModelLoad>())
         stageTimes = StageTimes()
         val slots = List(workers) {
@@ -271,6 +278,7 @@ class AnalysisService : Service() {
                     Analyzer(
                         this@AnalysisService,
                         android.net.Uri.parse(chatlab),
+                        threads = threadsPerSession,
                         onModelDone = { name, millis -> AnalysisProgress.update { it.modelDone(name, millis) } },
                         onStage = { stage, millis -> stageTimes.add(stage, millis) },
                         onNativeMemory = { name, before, after ->
@@ -374,7 +382,7 @@ class AnalysisService : Service() {
             ReportStore.saveRun(this@AnalysisService, runReport)
             val samples = recorder?.stop().orEmpty()
             recorder = null
-            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals(), runDiagnostics, runStartWorkers, runMemoryAtStartMb))
+            RunArchive.save(this@AnalysisService, recordOf(started, runReport, samples, stopped, level, loads.toList(), finalResults, stageTimes.totals(), runDiagnostics, runStartWorkers, runMemoryAtStartMb, threadsPerSession))
             val text = when {
                 stopped -> "Analyse arrêtée : ${runReport.analyzed} photos dans le carnet, ce qui est fait est gardé."
                 runReport.unread > 0 -> "Analyse terminée · ${runReport.analyzed} photos analysées · ${runReport.unread} fichiers non lus"
@@ -441,6 +449,7 @@ class AnalysisService : Service() {
         diagnosticsRun: String,
         startWorkers: Int,
         memoryAtStartMb: Long,
+        threadsPerSession: Int,
     ): AnalysisRecord {
         val info = try {
             packageManager.getPackageInfo(packageName, 0)
@@ -467,6 +476,7 @@ class AnalysisService : Service() {
             diagnosticsRun = diagnosticsRun,
             startWorkers = startWorkers,
             memoryAtStartMb = memoryAtStartMb,
+            threadsPerSession = threadsPerSession,
         )
     }
 

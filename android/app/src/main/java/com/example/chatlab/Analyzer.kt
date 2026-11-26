@@ -79,6 +79,8 @@ class Analyzer(
     private val onStage: (String, Long) -> Unit = { _, _ -> },
     /** Called as each model is loaded, with the native memory before and after it, in bytes. */
     private val onNativeMemory: (String, Long, Long) -> Unit = { _, _, _ -> },
+    /** Threads of the model session: the share of this worker (0: the runtime's default). */
+    private val threads: Int = 0,
 ) : AutoCloseable {
     private val appContext = context.applicationContext
 
@@ -104,7 +106,7 @@ class Analyzer(
         // The test page chooses the arena and the threads; by default, as before the experiment.
         val onnx = OnnxExperiment.read(appContext)
         vision = timed(ModelNames.IMAGES) {
-            OnnxExperiment.options(onnx).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
+            OnnxExperiment.options(onnx, threads).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
         }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
