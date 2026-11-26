@@ -66,6 +66,13 @@ object TextModels {
     private var failedAt = 0L
 
     /** The vectors of the last sentences searched, least recently used first out. Used under the lock of vectorFor. */
+    private var encodes = 0
+    private var cacheHits = 0
+
+    fun encodeCount(): Int = encodes
+
+    fun cacheHitCount(): Int = cacheHits
+
     private val recent = object : LinkedHashMap<String, FloatArray>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, FloatArray>?): Boolean = size > 32
     }
@@ -114,12 +121,16 @@ object TextModels {
         }
         // The same sentence again (typing back, or the same search repeated) does not call the model:
         // each call leaves native memory behind, so fewer calls means less memory used.
-        recent[text]?.let { return it.copyOf() }
+        recent[text]?.let {
+            cacheHits++
+            return it.copyOf()
+        }
         // Measured around the model call only: the native memory before and after, and the time it took.
         val nativeBefore = android.os.Debug.getNativeHeapAllocatedSize()
         val started = System.currentTimeMillis()
         val vector = get(context).encode(text)
         recent[text] = vector.copyOf()
+        encodes++
         Diagnostics.event(
             context,
             "encodeMemory",

@@ -785,7 +785,8 @@ fun GridThumb(location: String, modifier: Modifier) {
     val image by produceState<ImageBitmap?>(initialValue = null, location) {
         value = withContext(Dispatchers.IO) {
             try {
-                Diagnostics.native(context, "thumb") { decodeThumbnail(context, location) }?.asImageBitmap()
+                Diagnostics.native(context, "thumb") { ThumbStats.decoding { decodeThumbnail(context, location) } }?.asImageBitmap()
+                    ?.also { ThumbStats.decoded(it.asAndroidBitmap().allocationByteCount.toLong()) }
             } catch (e: Exception) {
                 null
             }
@@ -847,6 +848,30 @@ private fun openImage(context: Context, location: String): java.io.InputStream? 
 object ThumbStats {
     private val bytes = AtomicLong()
     private val count = AtomicInteger()
+    private val running = AtomicInteger()
+    private val peak = AtomicInteger()
+    private val decodedBytes = AtomicLong()
+
+    /** Runs one decoding, counting how many run at the same time (peak) and the bytes decoded in all. */
+    fun <T> decoding(block: () -> T): T {
+        val now = running.incrementAndGet()
+        peak.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+        try {
+            return block()
+        } finally {
+            running.decrementAndGet()
+        }
+    }
+
+    fun decoded(size: Long) {
+        decodedBytes.addAndGet(size)
+    }
+
+    fun running(): Int = running.get()
+
+    fun peak(): Int = peak.get()
+
+    fun decodedMb(): Long = decodedBytes.get() / (1024 * 1024)
 
     fun show(size: Long) {
         bytes.addAndGet(size)
