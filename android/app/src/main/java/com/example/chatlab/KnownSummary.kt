@@ -31,10 +31,6 @@ class KnownSummary private constructor(
     companion object {
         val EMPTY = KnownSummary(emptyMap(), emptyMap())
 
-        /** Reads the library text of [reader] (a JSON array of entries), keeping the entries of [version] only. */
-        fun parse(reader: Reader, version: Int): KnownSummary =
-            build(version) { action -> forEachEntry(reader, action) }
-
         /** The same summary, from the photos of the database: the library text is not needed. */
         fun fromStore(store: CompactLibrary, version: Int): KnownSummary =
             build(version) { action -> store.recordItems(action) }

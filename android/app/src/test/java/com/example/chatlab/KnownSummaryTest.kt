@@ -23,7 +23,10 @@ class KnownSummaryTest {
         ]
     """.trimIndent()
 
-    private val known = KnownSummary.parse(StringReader(library), version = 2)
+    private val known = KnownSummary.fromItems(2) { action ->
+        val array = JSONArray(library)
+        for (i in 0 until array.length()) action(array.getJSONObject(i))
+    }
 
     @Test
     fun an_unchanged_photo_is_known_and_its_type_is_reused() {
@@ -59,7 +62,7 @@ class KnownSummaryTest {
     @Test
     fun an_empty_or_missing_library_knows_nothing() {
         assertTrue(KnownSummary.EMPTY.toAnalyse(Photo("/s/DCIM/a.jpg", "a.jpg", 100, 500)))
-        assertTrue(KnownSummary.parse(StringReader(""), version = 2).toAnalyse(Photo("/s/DCIM/a.jpg", "a.jpg", 100, 500)))
+        assertTrue(KnownSummary.fromItems(2) { }.toAnalyse(Photo("/s/DCIM/a.jpg", "a.jpg", 100, 500)))
     }
 
     @Test

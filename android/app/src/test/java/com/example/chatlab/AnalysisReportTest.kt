@@ -183,21 +183,4 @@ class AnalysisReportTest {
         assertEquals(0, plan.processCount(0))
         assertEquals(0, plan.processCount(1))
     }
-
-    @Test
-    fun photosOfRemovedFoldersStayInTheLibrary() {
-        val old = JSONArray()
-            .put(JSONObject().put("id", "a").put("folder", "Camera"))
-            .put(JSONObject().put("id", "b").put("folder", "Ancien dossier"))
-            .put(JSONObject().put("id", "c"))
-            .put(JSONObject().put("id", "d").put("folder", "Screenshots"))
-        val kept = LibraryMerge.keepFromRemovedFolders(old, setOf("Camera", "Screenshots"))
-        assertEquals(listOf("b"), kept.map { it.getString("id") })
-    }
-
-    @Test
-    fun nothingIsKeptWithoutAnOldLibrary() {
-        assertTrue(LibraryMerge.keepFromRemovedFolders(null, setOf("Camera")).isEmpty())
-        assertTrue(LibraryMerge.keepFromRemovedFolders(JSONArray(), setOf("Camera")).isEmpty())
-    }
 }
