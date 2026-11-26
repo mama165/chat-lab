@@ -39,6 +39,9 @@ class VectorFile(private val file: File, val dimension: Int = 768) {
         return FloatArray(count * dimension) { buffer.getFloat() }
     }
 
+    /** The number of rows the file really holds: a row beyond it has no vector yet. */
+    fun rowCount(): Long = if (file.exists()) file.length() / blockBytes else 0L
+
     /**
      * The vector of a row, or null if the file is missing or does not reach that row (after a wipe, the
      * table and the file are not always gone together). Reading it must not stop the whole library.

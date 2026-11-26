@@ -1,6 +1,7 @@
 package com.example.chatlab
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -32,5 +33,13 @@ class VectorFileReadTest {
     fun aMissingFileGivesNothingInsteadOfAnError() {
         // The file is erased by "Tout effacer" while the table still has rows: the search must not crash.
         assertNull(VectorFile(File(folder.root, "vectors.bin"), dimension).readOrNull(0L))
+    }
+
+    @Test
+    fun rowCountIsWhatTheFileReallyHolds() {
+        val file = File(folder.root, "vectors.bin")
+        VectorFile(file, dimension).writeAll(listOf(0L to floatArrayOf(1f, 2f, 3f, 4f), 2L to floatArrayOf(1f, 1f, 1f, 1f)))
+        assertEquals(3L, VectorFile(file, dimension).rowCount())
+        assertEquals(0L, VectorFile(File(folder.root, "none.bin"), dimension).rowCount())
     }
 }

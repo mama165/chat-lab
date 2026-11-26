@@ -44,7 +44,8 @@ class CompactLibrary(context: Context) : RecordSink {
 
     /** Every stored photo, in the shape of library.json, with its vector. Read by the Photos page and the analysis. */
     fun records(each: (JSONObject, FloatArray) -> Unit) {
-        database.records { item, row -> each(item, vector(row)) }
+        // A photo whose vector is missing is not known as analysed: it is left out, so it is analysed again.
+        database.records { item, row -> vectors.readOrNull(row)?.let { each(item, it) } }
     }
 
     /** Every stored photo in the shape of library.json, without the vector: enough to know what is already analysed. */
@@ -68,7 +69,7 @@ class CompactLibrary(context: Context) : RecordSink {
 
     /** The best [k] rows for a query, read from the vector file. */
     fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> =
-        VectorRanking.topRows(query, database.nextFreeRow(), vectors, k)
+        VectorRanking.topRows(query, minOf(database.nextFreeRow(), vectors.rowCount()), vectors, k)
 
     /** The addresses of the photos matching the words, best first. */
     fun searchAddresses(search: WordSearch.Query): List<String> = database.searchAddresses(search)
