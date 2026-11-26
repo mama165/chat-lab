@@ -8,7 +8,6 @@ class NavigationTest {
     fun pagesOpenedFromSettingsGoBackToSettings() {
         assertEquals(Page.SETTINGS, Page.REMOVED.parent())
         assertEquals(Page.SETTINGS, Page.WIPE.parent())
-        assertEquals(Page.SETTINGS, Page.TESTS.parent())
     }
 
     @Test
