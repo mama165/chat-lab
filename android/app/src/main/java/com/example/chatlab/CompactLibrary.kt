@@ -36,7 +36,8 @@ class CompactLibrary(context: Context) : RecordSink {
     }
 
     companion object {
-        private val lock = Any()
+        /** Held by the writers and by "Tout effacer", so that the erase never runs in the middle of a write. */
+        internal val lock = Any()
     }
 
     fun count(): Long = database.rowsByAddress().size.toLong()
@@ -61,7 +62,7 @@ class CompactLibrary(context: Context) : RecordSink {
     fun loadAll(): List<LibraryEntry> {
         val rows = database.rowsByAddress()
         return database.entries(rows.keys.toList()).map { entry ->
-            entry.copy(vector = rows[entry.id]?.let { vector(it) })
+            entry.copy(vector = rows[entry.id]?.let { vectors.readOrNull(it) })
         }
     }
 

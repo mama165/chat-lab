@@ -39,6 +39,15 @@ class VectorFile(private val file: File, val dimension: Int = 768) {
         return FloatArray(count * dimension) { buffer.getFloat() }
     }
 
+    /**
+     * The vector of a row, or null if the file is missing or does not reach that row (after a wipe, the
+     * table and the file are not always gone together). Reading it must not stop the whole library.
+     */
+    fun readOrNull(row: Long): FloatArray? {
+        if (!file.exists() || (row + 1) * blockBytes > file.length()) return null
+        return read(row)
+    }
+
     /** Reads the vector of a row. Only that block is read, not the whole file. */
     fun read(row: Long): FloatArray {
         val bytes = ByteArray(blockBytes)

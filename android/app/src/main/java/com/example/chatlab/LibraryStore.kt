@@ -117,5 +117,5 @@ fun LibraryStore.wipeAnalysis(context: Context) {
         }
         File(context.filesDir, name).delete()
     }
-    AnalysisRecordFiles.wipe(context.filesDir)
+    synchronized(CompactLibrary.lock) { AnalysisRecordFiles.wipe(context.filesDir) }
 }
