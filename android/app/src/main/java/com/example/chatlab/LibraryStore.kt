@@ -15,6 +15,9 @@ import java.io.File
 object LibraryStore {
     private const val NAME = "library.json"
 
+    /** The trace of the last crash, in the diagnostics folder. */
+    const val CRASH_REPORT = "plantage.txt"
+
     private fun folder(context: Context): DocumentFile? {
         val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
             ?: return null
@@ -25,11 +28,14 @@ object LibraryStore {
     fun open(context: Context): java.io.InputStream? =
         LibraryExport.snapshotFile(context).takeIf { it.exists() }?.inputStream()
 
-    /** Writes the trace of a crash to erreur.txt, in the chatlab folder, so it can be read. */
+    /** Writes the trace of a crash to plantage.txt, in the diagnostics folder of the chatlab folder, so it can be read. */
     fun saveErrorReport(context: Context, text: String) {
         try {
-            val dir = folder(context) ?: return
-            val target = dir.findFile("erreur.txt") ?: dir.createFile("text/plain", "erreur.txt") ?: return
+            val chatlab = folder(context) ?: return
+            val diagnostics = chatlab.findFile("diagnostics")?.takeIf { it.isDirectory }
+                ?: chatlab.createDirectory("diagnostics")
+                ?: return
+            val target = diagnostics.findFile(CRASH_REPORT) ?: diagnostics.createFile("text/plain", CRASH_REPORT) ?: return
             context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
         } catch (e: Exception) {
             // Nothing more to do: we do not want to cause a second crash.
