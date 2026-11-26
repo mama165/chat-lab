@@ -174,7 +174,7 @@ enum class Carry {
     PROCESS,
 }
 
-/** The files to analyse, sorted by folder, and those kept without computing. */
+/** The files to analyse, most recent first, and those kept without computing. */
 data class AnalysisPlan(
     val folders: List<SourceFolder>,
     val scans: List<ScanResult>,
@@ -193,7 +193,10 @@ data class AnalysisPlan(
             for (item in distinctById(all, { it.candidate.file.id })) {
                 if (carry(item.candidate.file) == Carry.PROCESS) process += item else carried += item
             }
-            return AnalysisPlan(folders, scans, process, carried)
+            // Most recent first: a photo just taken is analysed before the older ones. The file date is the
+            // one known before reading the photo; for a camera photo it is the time it was taken.
+            val recentFirst = process.sortedByDescending { it.candidate.file.lastModified }
+            return AnalysisPlan(folders, scans, recentFirst, carried)
         }
     }
 }
