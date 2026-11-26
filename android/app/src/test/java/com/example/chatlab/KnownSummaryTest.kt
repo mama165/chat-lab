@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONArray
 import java.io.InputStream
 import java.io.StringReader
 
@@ -59,5 +60,24 @@ class KnownSummaryTest {
     fun an_empty_or_missing_library_knows_nothing() {
         assertTrue(KnownSummary.EMPTY.toAnalyse(Photo("/s/DCIM/a.jpg", "a.jpg", 100, 500)))
         assertTrue(KnownSummary.parse(StringReader(""), version = 2).toAnalyse(Photo("/s/DCIM/a.jpg", "a.jpg", 100, 500)))
+    }
+
+    @Test
+    fun entries_given_one_by_one_answer_as_the_library_text() {
+        val entries = JSONArray(library)
+        val fromEntries = KnownSummary.fromItems(2) { action ->
+            for (i in 0 until entries.length()) action(entries.getJSONObject(i))
+        }
+        val photos = listOf(
+            Photo("/s/DCIM/a.jpg", "a.jpg", 100, 500),
+            Photo("/s/DCIM/a.jpg", "a.jpg", 101, 500),
+            Photo("/s/Pictures/b.png", "b \"quoted {brace}\".png", 200, 600),
+            Photo("/s/old/c.jpg", "c.jpg", 300, 700),
+            Photo("/new/d.jpg", "no-source.jpg", 400, 800),
+        )
+        for (photo in photos) {
+            assertEquals(known.toAnalyse(photo), fromEntries.toAnalyse(photo))
+            assertEquals(known.reusableMime(photo), fromEntries.reusableMime(photo))
+        }
     }
 }

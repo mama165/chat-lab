@@ -46,6 +46,11 @@ class CompactLibrary(context: Context) : RecordSink {
         database.records { item, row -> each(item, vector(row)) }
     }
 
+    /** Every stored photo in the shape of library.json, without the vector: enough to know what is already analysed. */
+    fun recordItems(each: (JSONObject) -> Unit) {
+        database.records { item, _ -> each(item) }
+    }
+
     /** The row of every stored photo, by address. */
     fun rows(): Map<String, Long> = database.rowsByAddress()
 

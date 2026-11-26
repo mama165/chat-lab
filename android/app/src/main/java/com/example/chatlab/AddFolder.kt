@@ -106,8 +106,12 @@ fun AddFolderPage(onBack: () -> Unit) {
             // The library is read entry by entry: only what the search needs is kept in memory.
             val known = withContext(Dispatchers.IO) {
                 val libraryStarted = System.currentTimeMillis()
-                (LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { KnownSummary.parse(it, ANALYSIS_VERSION) }
-                    ?: KnownSummary.EMPTY).also {
+                val store = CompactLibrary(context)
+                try {
+                    KnownSummary.fromStore(store, ANALYSIS_VERSION)
+                } finally {
+                    store.close()
+                }.also {
                     Diagnostics.event(context, "addFolderLibrary", JSONObject().put("ms", System.currentTimeMillis() - libraryStarted))
                 }
             }
