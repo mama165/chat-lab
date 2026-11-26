@@ -65,23 +65,33 @@ class StressTest {
         val minutes = args.getString("minutes")?.toLongOrNull() ?: 3L
         val deadline = System.currentTimeMillis() + minutes * 60_000L
         val field = compose.onNode(hasSetTextAction())
-        val expect = args.getString("expect")?.toIntOrNull() ?: 1
+        // Only the words listed in "expect" (word:minimum, comma-separated) are checked; the others are only counted.
+        val expectations: Map<String, Int> = args.getString("expect")?.split(",")
+            ?.mapNotNull { part ->
+                val pieces = part.split(":")
+                if (pieces.size == 2) pieces[0].trim() to (pieces[1].trim().toIntOrNull() ?: 0) else null
+            }?.toMap() ?: emptyMap()
         val failures = mutableListOf<String>()
         var round = 0
         while (System.currentTimeMillis() < deadline) {
             round++
             for (word in words) {
                 field.performTextReplacement(word)
-                // Checks that photos appear for the word: at least "expect" thumbnails, within 30 s.
+                val expect = expectations[word]
                 val started = System.currentTimeMillis()
-                val shown = runCatching {
-                    compose.waitUntil(30_000L) { photoTiles() >= expect }
-                }.isSuccess
+                if (expect != null) {
+                    // Waits up to 30 s for the photos; the word fails if fewer than "expect" thumbnails appear.
+                    runCatching { compose.waitUntil(30_000L) { photoTiles() >= expect } }
+                }
                 val tiles = photoTiles()
                 val ms = System.currentTimeMillis() - started
-                val ok = shown && tiles >= expect
-                Log.i(TAG, "check round=$round word=\"$word\" tiles=$tiles expected=$expect ms=$ms ok=$ok")
-                if (!ok) failures += "\"$word\" (round $round): $tiles photos, $expect attendues"
+                if (expect == null) {
+                    Log.i(TAG, "count round=$round word=\"$word\" tiles=$tiles ms=$ms")
+                } else {
+                    val ok = tiles >= expect
+                    Log.i(TAG, "check round=$round word=\"$word\" tiles=$tiles expected=$expect ms=$ms ok=$ok")
+                    if (!ok) failures += "\"$word\" (round $round): $tiles photos, $expect attendues"
+                }
                 Thread.sleep(pause)
                 Log.i(TAG, "visible round=$round word=\"$word\" written=full pauseMs=$pause")
                 field.performTextReplacement(word.take(word.length / 2))
