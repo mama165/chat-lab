@@ -620,14 +620,41 @@ internal fun readKnownFrom(reader: java.io.Reader): KnownLibrary {
 }
 
 /** The known library of the store, read entry by entry; empty if there is none yet. */
-internal fun readKnownFromStore(context: Context): KnownLibrary =
-    LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { readKnownFrom(it) } ?: KnownLibrary(emptyMap())
+internal fun readKnownFromStore(context: Context): KnownLibrary {
+    val store = CompactLibrary(context)
+    try {
+        val byId = LinkedHashMap<String, JSONObject>()
+        val vectors = HashMap<String, FloatArray>()
+        store.records { item, vector ->
+            if (item.optInt("analysis_version") == ANALYSIS_VERSION) {
+                val source = item.getString("source")
+                byId[source] = item
+                vectors[source] = vector
+            }
+        }
+        return KnownLibrary(byId, vectors)
+    } finally {
+        store.close()
+    }
+}
 
 /** The photos of the folders that are no longer in the list, kept as they are. Read entry by entry. */
-internal fun keepFromRemovedFolders(context: Context, currentFolders: Set<String>): List<JSONObject> =
-    LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use {
-        LibraryMerge.keepFromRemovedFolders(it, currentFolders)
-    } ?: emptyList()
+internal fun keepFromRemovedFolders(context: Context, currentFolders: Set<String>): List<JSONObject> {
+    val store = CompactLibrary(context)
+    try {
+        val kept = ArrayList<JSONObject>()
+        store.records { item, vector ->
+            val folder = item.optString("folder")
+            if (folder.isNotBlank() && folder !in currentFolders) {
+                item.put("vectors", JSONArray().put(JSONArray(vector.toList())))
+                kept += item
+            }
+        }
+        return kept
+    } finally {
+        store.close()
+    }
+}
 
 /**
  * The photos already analysed: by their address, or, if it has changed, by their name, their size

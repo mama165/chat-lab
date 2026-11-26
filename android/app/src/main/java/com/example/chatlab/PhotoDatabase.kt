@@ -1,5 +1,7 @@
 package com.example.chatlab
 
+import org.json.JSONObject
+
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -145,6 +147,44 @@ class PhotoDatabase(context: Context) : SQLiteOpenHelper(context, "photos.db", n
     }
 
     /** The photos with these addresses, as the search screen reads them. Vectors are not loaded. */
+    /**
+     * Every stored photo, in the shape of library.json but without the vector, with its row: what the
+     * Photos page and the analysis need to know which photos are already analysed.
+     */
+    fun records(each: (JSONObject, Long) -> Unit) {
+        val added = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+        readableDatabase.rawQuery(
+            "SELECT address, name, path, folder, mime, size, modified, taken, taken_ms, added_at, " +
+                "analysis_version, faces, portrait, indoor, text, vector_row FROM photo",
+            null,
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val address = cursor.getString(0)
+                val item = JSONObject()
+                    .put("id", address)
+                    .put("source", address)
+                    .put("path", cursor.getString(2))
+                    .put("name", cursor.getString(1))
+                    .put("kind", "image")
+                    .put("analysis_version", cursor.getInt(10))
+                    .put("size", cursor.getLong(5))
+                    .put("added_at", added.format(java.util.Date(cursor.getLong(9))))
+                    .put("faces", cursor.getInt(11))
+                    .put("portrait", cursor.getInt(12) == 1)
+                if (!cursor.isNull(6)) item.put("modified", cursor.getLong(6))
+                if (!cursor.isNull(13)) item.put("indoor", cursor.getInt(13) == 1)
+                cursor.getString(14)?.takeIf { it.isNotBlank() }?.let { item.put("text", it) }
+                cursor.getString(7)?.takeIf { it.isNotBlank() }?.let { item.put("taken", it) }
+                if (!cursor.isNull(8) && cursor.getLong(8) > 0) item.put("taken_ms", cursor.getLong(8))
+                cursor.getString(3)?.takeIf { it.isNotBlank() }?.let { item.put("folder", it) }
+                cursor.getString(4)?.takeIf { it.isNotBlank() }?.let { item.put("mime", it) }
+                each(item, cursor.getLong(15))
+            }
+        }
+    }
+
     fun entries(addresses: List<String>): List<LibraryEntry> {
         val byAddress = HashMap<String, LibraryEntry>()
         addresses.chunked(400).forEach { chunk ->

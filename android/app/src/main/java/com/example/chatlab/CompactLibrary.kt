@@ -1,5 +1,7 @@
 package com.example.chatlab
 
+import org.json.JSONObject
+
 import android.content.Context
 import java.io.File
 
@@ -38,6 +40,11 @@ class CompactLibrary(context: Context) : RecordSink {
     }
 
     fun count(): Long = database.rowsByAddress().size.toLong()
+
+    /** Every stored photo, in the shape of library.json, with its vector. Read by the Photos page and the analysis. */
+    fun records(each: (JSONObject, FloatArray) -> Unit) {
+        database.records { item, row -> each(item, vector(row)) }
+    }
 
     /** The row of every stored photo, by address. */
     fun rows(): Map<String, Long> = database.rowsByAddress()
