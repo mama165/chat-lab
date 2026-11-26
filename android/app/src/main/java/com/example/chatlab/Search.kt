@@ -249,8 +249,9 @@ fun SearchScreen(
     val outcome by produceState(SearchOutcome.EMPTY, entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time) {
         value = withContext(Dispatchers.Default) {
             SearchStages.mark(context, "outcome.start")
-            SearchResults.compute(entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time)
-                .also { SearchStages.mark(context, "outcome.end") }
+            SearchResults.compute(entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time) {
+                SearchStages.mark(context, it)
+            }.also { SearchStages.mark(context, "outcome.end") }
         }
     }
     val rows = remember(outcome, state.newFrom, searchQuery) { resultItems(outcome, searchQuery, state.newFrom) }

@@ -57,20 +57,30 @@ object SearchResults {
         removed: Set<String>,
         shownExtra: Int,
         time: When,
+        /** Called at each step, with its name: for the journal. Does nothing by default. */
+        probe: (String) -> Unit = {},
     ): SearchOutcome {
         if (query.isBlank()) return SearchOutcome.EMPTY
+        probe("kept.start")
         val kept = distinctById(entries, { it.source.ifBlank { it.path } }).filter { filters.matches(it, time) }
+        probe("kept.end")
+        probe("words.start")
         val words = Library.searchWords(kept, query, Place.ALL).filter { keyOf(it) !in removed }
+        probe("words.end")
         val wordKeys = words.map { keyOf(it) }.toSet()
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()
+        probe("candidates.start")
         val candidates = distinctById(ranked, { keyOf(it) }).filter { match ->
             val key = keyOf(match)
             key in allowed && key !in removed && key !in wordKeys
         }
+        probe("candidates.end")
+        probe("threshold.start")
         val close = Library.aboveThreshold(candidates, filters.resemblance.floor)
         val closeKeys = close.map { keyOf(it) }.toSet()
         val below = candidates.filter { keyOf(it) !in closeKeys && (it.score ?: 0f) >= MoreResults.FLOOR }
         val offered = below.take(MoreResults.MAX_EXTRA)
+        probe("threshold.end")
         val shown = shownExtra.coerceIn(0, offered.size)
         return SearchOutcome(
             words = words,
