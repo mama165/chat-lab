@@ -138,7 +138,6 @@ private fun AppContent() {
                     dataVersion++
                 },
             )
-            Page.TESTS -> TestsPage(onBack = { page = Page.SETTINGS })
             Page.LEVEL -> LevelPage(onBack = { page = Page.SETTINGS })
             Page.HISTORY -> AnalysisHistoryPage(
                 // The history is opened from the Photos tab: its arrow goes back there.

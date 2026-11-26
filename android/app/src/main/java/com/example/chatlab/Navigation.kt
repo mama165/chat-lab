@@ -1,11 +1,11 @@
 package com.example.chatlab
 
 /** The separate pages, which cover the whole screen and are left with the arrow or the back button. */
-enum class Page { TABS, SETTINGS, WIPE, TESTS, STORAGE, ADD_FOLDER, LEVEL, HISTORY, RUN }
+enum class Page { TABS, SETTINGS, WIPE, STORAGE, ADD_FOLDER, LEVEL, HISTORY, RUN }
 
 /** The page the back button returns to from a given page. */
 fun Page.parent(): Page = when (this) {
-    Page.WIPE, Page.TESTS -> Page.SETTINGS
+    Page.WIPE -> Page.SETTINGS
     Page.STORAGE -> Page.TABS
     Page.LEVEL -> Page.SETTINGS
     // The history is opened from the Photos tab.
