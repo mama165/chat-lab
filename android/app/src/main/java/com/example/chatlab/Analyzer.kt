@@ -104,9 +104,10 @@ class Analyzer(
         val models = ModelFiles.folder(context, tree)
         check(OpenCVLoader.initLocal()) { "OpenCV ne s'est pas chargé" }
         // The test page chooses the arena and the threads; by default, as before the experiment.
-        val onnx = OnnxExperiment.read(appContext)
         vision = timed(ModelNames.IMAGES) {
-            OnnxExperiment.options(onnx, threads).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
+            ai.onnxruntime.OrtSession.SessionOptions().apply {
+                if (threads > 0) setIntraOpNumThreads(threads)
+            }.use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
         }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
@@ -138,45 +139,10 @@ class Analyzer(
     }
 
     /**
-     * Analyses the images of the test subfolder of the chatlab folder. Each image is copied
-     * for the time of its analysis into the cache, then the copy is deleted.
-     */
-    fun analyzeAll(): List<ImageResult> {
-        val folder = DocumentFile.fromTreeUri(appContext, tree)?.findFile("test") ?: return emptyList()
-        val images = folder.listFiles()
-            .filter { it.isFile && (it.name ?: "").substringAfterLast('.').lowercase() in setOf("jpg", "jpeg", "png", "webp") }
-            .sortedBy { it.name }
-        val work = File(appContext.cacheDir, "test").apply { mkdirs() }
-        return images.map { image ->
-            val temp = File(work, image.name ?: "image")
-            val started = System.nanoTime()
-            val partial = try {
-                val input = appContext.contentResolver.openInputStream(image.uri) ?: error("lecture impossible")
-                input.use { source -> temp.outputStream().use { source.copyTo(it) } }
-                analyze(temp)
-            } catch (e: Throwable) {
-                ImageResult(temp, null, 0, false, null, 0, e.message ?: e.javaClass.simpleName)
-            } finally {
-                temp.delete()
-            }
-            partial.copy(
-                millis = (System.nanoTime() - started) / 1_000_000,
-                source = image.uri.toString(),
-                size = image.length(),
-                modified = image.lastModified(),
-            )
-        }
-    }
-
-    /**
      * Analyses any image, already copied into the private space of the application.
      * [checkpoint] is called between the steps: a pause freezes the computation there, a stop leaves.
      */
     fun analyzeFile(file: File, checkpoint: () -> Unit = {}): ImageResult = analyze(file, checkpoint)
-
-    /** Writes the library in the format expected by cmd/query (-library). */
-    fun writeLibrary(results: List<ImageResult>, keep: List<JSONObject> = emptyList()): File =
-        LibraryWriter.write(appContext, results, keep)
 
     private fun analyze(file: File, checkpoint: () -> Unit = {}): ImageResult {
         val bitmap = timedStage(StageTimes.DECODE) { loadUpright(file) }
