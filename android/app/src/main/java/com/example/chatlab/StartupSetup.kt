@@ -2,7 +2,6 @@ package com.example.chatlab
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -20,9 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -166,9 +165,10 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
                 "Introuvable dans le dossier chatlab : vérifiez que le sous-dossier models y est. " +
                     "Si ce n'est pas le bon dossier, choisissez-en un autre."
             },
-            action = "Choisir un autre dossier chatlab",
-            onAction = pickers.chooseChatlab,
-            secondary = "Vérifier à nouveau" to onChanged,
+            locked = SetupStep.CHATLAB in missing,
+            action = if (SetupStep.CHATLAB in missing) "Vérifier à nouveau" else "Choisir un autre dossier chatlab",
+            onAction = if (SetupStep.CHATLAB in missing) onChanged else pickers.chooseChatlab,
+            secondary = if (SetupStep.CHATLAB in missing) null else "Vérifier à nouveau" to onChanged,
         )
         Text(
             "Les dossiers de photos à analyser se choisissent ensuite, dans l'onglet Photos.",
@@ -191,12 +191,13 @@ private fun SetupCard(
     hint: String? = null,
     secondary: Pair<String, () -> Unit>? = null,
     found: List<Pair<String, Boolean>>? = null,
+    locked: Boolean = false,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Palette.Field)
+            .background(if (locked) Color(0xFFF7F8FA) else Palette.Field)
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -204,7 +205,7 @@ private fun SetupCard(
             "$number · $title",
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
-            color = Palette.Ink,
+            color = if (locked) Color(0xFF9AA3AF) else Palette.Ink,
         )
         if (done) {
             Text("$doneText ✓", fontSize = 14.sp, color = Palette.Accent)
@@ -218,18 +219,9 @@ private fun SetupCard(
         } else {
             Text(detail, fontSize = 13.sp, color = Palette.Muted)
             if (hint != null) Text(hint, fontSize = 13.sp, color = Palette.Ink)
-            PrimaryButton(action, onClick = onAction)
+            PrimaryButton(action, onClick = onAction, enabled = !locked)
             if (secondary != null) {
-                Text(
-                    secondary.first,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Palette.Accent,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .clickable(onClick = secondary.second)
-                        .padding(vertical = 6.dp),
-                )
+                PrimaryButton(secondary.first, onClick = secondary.second)
             }
         }
     }
