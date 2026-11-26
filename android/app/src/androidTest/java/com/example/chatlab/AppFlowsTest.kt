@@ -88,11 +88,11 @@ class AppFlowsTest {
     }
 
     @Test
-    fun aWordFindsThePhotoWhoseTextContainsIt() {
-        type("facture")
-        compose.onNodeWithText("Texte lu").assertExists()
+    fun aSearchShowsTheResemblingPhotosWithoutTextRows() {
+        type("une facture")
+        waitFor("Ressemblantes")
+        compose.onNodeWithText("Texte lu").assertDoesNotExist()
         compose.onNodeWithContentDescription("facture_fictive.png").assertExists()
-        compose.onNodeWithText("1 résultat").assertExists()
     }
 
     @Test
@@ -103,7 +103,7 @@ class AppFlowsTest {
 
     @Test
     fun tappingSelectsAndTheBarCancels() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("facture_fictive.png").performClick()
         compose.onNodeWithText("1 sélectionnée").assertExists()
         compose.onNodeWithText("Retirer", substring = true).assertExists()
@@ -114,14 +114,14 @@ class AppFlowsTest {
 
     @Test
     fun removedPhotoLeavesTheSearchAndCanBeRestored() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("facture_fictive.png").performClick()
         compose.onNodeWithText("Retirer", substring = true).performClick()
         waitFor("Aucune photo ne correspond")
 
         compose.onNodeWithContentDescription("Réglages").performClick()
         compose.onNodeWithText("Non classifiées").performClick()
-        compose.onNodeWithText("« facture » (1)").assertExists()
+        compose.onNodeWithText("« une facture » (1)").assertExists()
         compose.onNodeWithText("Rétablir").performClick()
         compose.onNodeWithText("Aucune photo retirée de vos recherches.").assertExists()
         back()
@@ -131,7 +131,7 @@ class AppFlowsTest {
 
     @Test
     fun aFilterShowsATagThatRemovesIt() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
         compose.onNodeWithText("Lieu").assertExists()
         compose.onNodeWithText("Intérieur").performClick()
@@ -146,7 +146,7 @@ class AppFlowsTest {
 
     @Test
     fun twoFiltersOfferReinitialiser() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
         compose.onNodeWithText("Intérieur").performScrollTo().performClick()
         compose.onNodeWithText("7 derniers jours").performScrollTo().performClick()
@@ -170,11 +170,11 @@ class AppFlowsTest {
 
     @Test
     fun aSearchBecomesARecentSearch() {
-        type("facture")
+        type("une facture")
         compose.onNode(hasSetTextAction()).performImeAction()
         compose.onNodeWithContentDescription("Effacer la recherche").performClick()
         compose.onNodeWithText("Récentes").assertExists()
-        compose.onNodeWithText("facture").performClick()
+        compose.onNodeWithText("une facture").performClick()
         compose.onNodeWithContentDescription("facture_fictive.png").assertExists()
     }
 
@@ -209,7 +209,7 @@ class AppFlowsTest {
 
     @Test
     fun aDatePresetKeepsOrDropsPhotosByTheirShootingTime() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
         // The invoice is three days old: it is not in the last 24 hours.
         compose.onNodeWithText("24 dernières heures").performClick()
@@ -237,7 +237,7 @@ class AppFlowsTest {
 
     @Test
     fun aFolderFilterKeepsOnlyItsPhotos() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
         // The folder chip is at the bottom of the page: scroll to it before touching it.
         compose.onNodeWithText("Documents", substring = true).performScrollTo().performClick()
@@ -263,7 +263,7 @@ class AppFlowsTest {
 
     @Test
     fun anExactDateRangeAppliesFromTheCalendar() {
-        type("facture")
+        type("une facture")
         compose.onNodeWithContentDescription("Filtres").performClick()
         compose.onNodeWithText("Choisir des dates…").performClick()
         // Today: the invoice, from three days ago, is not in it.

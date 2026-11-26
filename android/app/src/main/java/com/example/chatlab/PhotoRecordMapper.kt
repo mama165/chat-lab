@@ -35,7 +35,7 @@ object PhotoRecordMapper {
                 faces = r.faces,
                 portrait = r.portrait,
                 indoor = r.indoor,
-                text = r.text.ifBlank { null },
+                text = null,
                 vector = vector,
             )
         }

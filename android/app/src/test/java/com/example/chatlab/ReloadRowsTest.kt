@@ -9,7 +9,7 @@ class ReloadRowsTest {
     @Test
     fun rows_follow_the_loading_order_of_the_models() {
         assertEquals(
-            listOf(ModelNames.IMAGES, ModelNames.TEXTS, ModelNames.FACES),
+            listOf(ModelNames.IMAGES, ModelNames.FACES),
             reloadRows(emptyMap(), loading = true).map { it.first },
         )
     }
@@ -17,20 +17,20 @@ class ReloadRowsTest {
     @Test
     fun first_row_turns_then_the_next_ones_wait_while_loading() {
         val rows = reloadRows(emptyMap(), loading = true).map { it.second }
-        assertEquals(listOf(ModelRowState.LOADING, ModelRowState.WAITING, ModelRowState.WAITING), rows)
+        assertEquals(listOf(ModelRowState.LOADING, ModelRowState.WAITING), rows)
     }
 
     @Test
     fun loaded_models_are_checked_with_the_turning_one_next() {
         val steps = mapOf(ModelNames.IMAGES to 800L)
         val rows = reloadRows(steps, loading = true).map { it.second }
-        assertEquals(listOf(ModelRowState.DONE, ModelRowState.LOADING, ModelRowState.WAITING), rows)
+        assertEquals(listOf(ModelRowState.DONE, ModelRowState.LOADING), rows)
     }
 
     @Test
     fun all_checked_when_nothing_is_loading_any_more() {
-        val steps = mapOf(ModelNames.IMAGES to 800L, ModelNames.TEXTS to 900L, ModelNames.FACES to 400L)
-        assertEquals(List(3) { ModelRowState.DONE }, reloadRows(steps, loading = false).map { it.second })
+        val steps = mapOf(ModelNames.IMAGES to 800L, ModelNames.FACES to 400L)
+        assertEquals(List(2) { ModelRowState.DONE }, reloadRows(steps, loading = false).map { it.second })
     }
 
     @Test
@@ -50,13 +50,13 @@ class ReloadRowsTest {
 class ReloadSummaryTest {
     @Test
     fun all_three_models_reloaded_in_the_total_time() {
-        val steps = mapOf(ModelNames.IMAGES to 800L, ModelNames.TEXTS to 900L, ModelNames.FACES to 400L)
-        assertEquals("Modèles rechargés : 3 sur 3, en 2,1 s", reloadSummary(steps))
+        val steps = mapOf(ModelNames.IMAGES to 800L, ModelNames.FACES to 400L)
+        assertEquals("Modèles rechargés : 2 sur 2, en 1,2 s", reloadSummary(steps))
     }
 
     @Test
     fun a_partial_reload_counts_only_the_models_loaded() {
-        assertEquals("Modèles rechargés : 1 sur 3, en 0,8 s", reloadSummary(mapOf(ModelNames.IMAGES to 800L)))
+        assertEquals("Modèles rechargés : 1 sur 2, en 0,8 s", reloadSummary(mapOf(ModelNames.IMAGES to 800L)))
     }
 }
 

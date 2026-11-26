@@ -8,7 +8,6 @@ data class Facets(
     val customRange: Int?,
     val places: Map<Place, Int>,
     val people: Map<People, Int>,
-    val texts: Map<TextFilter, Int>,
     /** Photos that would pass by turning on "Visage en gros plan". */
     val closeUp: Int,
     val folders: Map<String, Int>,
@@ -40,7 +39,6 @@ object FacetCounts {
             customRange = range?.let { count(filters.copy(date = DateFilter(range = it))) },
             places = Place.entries.associateWith { count(filters.copy(place = it)) },
             people = People.entries.associateWith { count(filters.copy(people = it)) },
-            texts = TextFilter.entries.associateWith { count(filters.copy(text = it)) },
             closeUp = count(filters.copy(closeUp = true)),
             folders = FilterOptions.folders(entries).associate { it.name to count(filters.copy(folders = setOf(it.name))) },
             types = FilterOptions.types(entries).associate { it.mime to count(filters.copy(types = setOf(it.mime))) },

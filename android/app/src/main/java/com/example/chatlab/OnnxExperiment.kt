@@ -47,8 +47,10 @@ object OnnxExperiment {
     }
 
     /** Session options for one session. Close them once the session is open. */
-    fun options(settings: Settings): OrtSession.SessionOptions = OrtSession.SessionOptions().apply {
+    fun options(settings: Settings, defaultThreads: Int = 0): OrtSession.SessionOptions = OrtSession.SessionOptions().apply {
         setCPUArenaAllocator(settings.arenaOn)
-        if (settings.threads > 0) setIntraOpNumThreads(settings.threads)
+        // The test page chooses the threads when it is set; otherwise the analysis gives its share.
+        val threads = if (settings.threads > 0) settings.threads else defaultThreads
+        if (threads > 0) setIntraOpNumThreads(threads)
     }
 }

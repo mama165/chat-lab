@@ -40,9 +40,6 @@ data class ImageResult(
     val vector: FloatArray?,
     val millis: Long,
     val error: String? = null,
-    val text: String = "",
-    val textNote: String = "",
-    val textTrace: String = "",
     val taken: String = "",
     val source: String = "",
     val modified: Long = 0L,
@@ -53,8 +50,6 @@ data class ImageResult(
     val mime: String = "",
     /** Instant de prise de vue en millisecondes, 0 si inconnu. */
     val takenMs: Long = 0L,
-    /** The words added by each contrast pass (1 and 2) that the normal reading did not find. */
-    val textExtra: Map<Int, List<String>> = emptyMap(),
 )
 
 /**
@@ -84,6 +79,8 @@ class Analyzer(
     private val onStage: (String, Long) -> Unit = { _, _ -> },
     /** Called as each model is loaded, with the native memory before and after it, in bytes. */
     private val onNativeMemory: (String, Long, Long) -> Unit = { _, _, _ -> },
+    /** Threads of the model session: the share of this worker (0: the runtime's default). */
+    private val threads: Int = 0,
 ) : AutoCloseable {
     private val appContext = context.applicationContext
 
@@ -94,7 +91,6 @@ class Analyzer(
     private val outdoor: FloatArray
     private val flat: FloatArray
     private val detector: FaceDetectorYN
-    private val reader: TextReader
 
     /** Milliseconds each model took to load, by name, in the order they were loaded. */
     private val timings = LinkedHashMap<String, Long>()
@@ -110,13 +106,12 @@ class Analyzer(
         // The test page chooses the arena and the threads; by default, as before the experiment.
         val onnx = OnnxExperiment.read(appContext)
         vision = timed(ModelNames.IMAGES) {
-            OnnxExperiment.options(onnx).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
+            OnnxExperiment.options(onnx, threads).use { ModelFiles.session(env, context, models, "vision_model.onnx", it) }
         }
         val judge = JSONObject(ModelFiles.text(context, models, "judge_vectors.json"))
         indoor = judge.floats("indoor")
         outdoor = judge.floats("outdoor")
         flat = judge.floats("flat")
-        reader = timed(ModelNames.TEXTS) { TextReader(env, context, models, onnx, onStage) }
         detector = timed(ModelNames.FACES) {
             FaceDetectorYN.create(
                 "onnx",
@@ -197,13 +192,7 @@ class Analyzer(
             else inScore > outScore
         val (faces, portrait) = timedStage(StageTimes.FACES) { countFaces(bitmap) }
         checkpoint()
-        // A failure while reading the text is reported, not allowed to stop the whole analysis.
-        return try {
-            val text = timedStage(StageTimes.TEXT) { reader.read(bitmap) }
-            ImageResult(file, answer, faces, portrait, vector, 0, text = text, textNote = reader.summary(), textTrace = reader.trace(), textExtra = reader.extras())
-        } catch (e: Throwable) {
-            ImageResult(file, answer, faces, portrait, vector, 0, textNote = "lecture du texte impossible : ${e.javaClass.simpleName} ${e.message ?: ""}")
-        }
+        return ImageResult(file, answer, faces, portrait, vector, 0)
     }
 
     /** Runs one stage of a photo's analysis and reports its time. */
@@ -307,6 +296,5 @@ class Analyzer(
 
     override fun close() {
         vision.close()
-        reader.close()
     }
 }

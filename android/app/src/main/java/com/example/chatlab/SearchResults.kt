@@ -58,10 +58,15 @@ object SearchResults {
         /** Called at each step, with its name: for the journal. Does nothing by default. */
         probe: (String) -> Unit = {},
     ): SearchOutcome {
-        if (query.isBlank()) return SearchOutcome.EMPTY
+        // Without words, a date alone still lists its photos: the ones of that date, in the order of the day.
+        if (query.isBlank() && !filters.date.isActive) return SearchOutcome.EMPTY
         probe("kept.start")
         val kept = distinctById(entries, { it.source.ifBlank { it.path } }).filter { filters.matches(it, time) }
         probe("kept.end")
+        if (query.isBlank()) {
+            val day = kept.filter { it.source.ifBlank { it.path } !in removed }.sortedByDescending { it.takenMs }
+            return SearchOutcome(day.map { Match(it, null) }, emptyList(), 0, false)
+        }
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()
         probe("candidates.start")
         val candidates = distinctById(ranked, { keyOf(it) }).filter { match ->
@@ -70,7 +75,8 @@ object SearchResults {
         }
         probe("candidates.end")
         probe("threshold.start")
-        val close = Library.aboveThreshold(candidates, filters.resemblance.floor)
+        // The score decides which photos come (the threshold); the order shown is always the most recent first.
+        val close = Library.aboveThreshold(candidates, filters.resemblance.floor).sortedByDescending { it.entry.takenMs }
         val closeKeys = close.map { keyOf(it) }.toSet()
         val below = candidates.filter { keyOf(it) !in closeKeys && (it.score ?: 0f) >= MoreResults.FLOOR }
         val offered = below.take(MoreResults.MAX_EXTRA)
@@ -78,7 +84,7 @@ object SearchResults {
         val shown = shownExtra.coerceIn(0, offered.size)
         return SearchOutcome(
             close = close,
-            extra = offered.take(shown),
+            extra = offered.take(shown).sortedByDescending { it.entry.takenMs },
             remaining = offered.size - shown,
             limitReached = below.size > MoreResults.MAX_EXTRA && shown >= offered.size,
         )

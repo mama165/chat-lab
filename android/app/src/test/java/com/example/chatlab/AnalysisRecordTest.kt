@@ -12,7 +12,7 @@ class AnalysisRecordTest {
 
     private fun sample(t: Int, cpu: Float, mem: Int, battery: Int = 80) = Sample(t, cpu, mem, battery, 36f, 1)
 
-    private fun record(samples: List<Sample> = emptyList(), analyzed: Int = 100, durationMs: Long = 100_000L) = AnalysisRecord(
+    private fun record(samples: List<Sample> = emptyList(), analyzed: Int = 100, durationMs: Long = 100_000L) = AnalysisRecord(threadsPerSession = 3, 
         startMs = start,
         endMs = start + durationMs,
         level = "equilibre",
@@ -46,6 +46,7 @@ class AnalysisRecordTest {
         assertEquals(780, back.samples[1].memMb)
         assertEquals(79, back.samples[1].batteryPct)
         assertEquals(original.durationMs, back.durationMs)
+        assertEquals(original.threadsPerSession, back.threadsPerSession)
     }
 
     @Test

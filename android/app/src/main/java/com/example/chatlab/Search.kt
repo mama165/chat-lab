@@ -155,9 +155,11 @@ fun SearchScreen(
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var recents by remember { mutableStateOf(RecentStore.read(context)) }
-    val time = remember(query, state.filters, entries) { When(System.currentTimeMillis()) }
+    val time = remember(query, state.filters) { When(System.currentTimeMillis()) }
     // The place is chosen, but does not filter the results yet: see Filters.withoutPlace.
     val resultFilters = state.filters.withoutPlace()
+    // A date typed in the box ("hier", "26 novembre 2026") filters the results; the rest is what gets compared.
+    val typed = remember(query, time) { TypedDates.parse(query, time) }
     val gridState = rememberLazyGridState()
 
     // A new search or other filters start again from the beginning: neither photos less close, nor selection.
@@ -168,10 +170,10 @@ fun SearchScreen(
     }
 
     // The sentence becomes a vector once typing pauses, for the similar photos.
-    LaunchedEffect(query) {
+    LaunchedEffect(typed.rest) {
         queryVector = null
         modelError = null
-        if (query.isNotBlank()) {
+        if (typed.rest.isNotBlank()) {
             SearchStages.begin()
             SearchStages.mark(context, "typed")
             delay(400)
@@ -179,7 +181,7 @@ fun SearchScreen(
             try {
                 queryVector = withContext(Dispatchers.Default) {
                     SearchStages.mark(context, "encode.start")
-                    TextModels.vectorFor(context, query).also { SearchStages.mark(context, "encode.end") }
+                    TextModels.vectorFor(context, typed.rest).also { SearchStages.mark(context, "encode.end") }
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -190,26 +192,34 @@ fun SearchScreen(
     }
     // The vector whose ranking is in state.ranked: until it matches the current vector, the search is still running.
     var rankedFor by remember { mutableStateOf<FloatArray?>(null) }
+    // The photos already scored for rankedFor. While the sentence stays the same, a change of the library
+    // scores only the new photos: the search does not start again, so it does not flicker during an analysis.
+    var rankedIds by remember { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(queryVector, entries) {
         val vector = queryVector
-        rankedFor = null
+        val sameQuery = vector != null && rankedFor === vector
+        if (!sameQuery) rankedFor = null
         if (vector == null) {
             state.ranked = emptyList()
+            rankedIds = emptySet()
             return@LaunchedEffect
         }
+        val fresh = IncrementalRanking.photosToScore(entries, rankedIds, sameQuery)
+        if (sameQuery && fresh.isEmpty()) return@LaunchedEffect
         // The timing goes to the journal from the background thread: writing it on the main thread would be a violation.
-        state.ranked = withContext(Dispatchers.Default) {
+        val found = withContext(Dispatchers.Default) {
             val started = System.currentTimeMillis()
             SearchStages.mark(context, "rank.start")
-            val found = Library.rankDescription(entries, vector, Place.ALL, null)
+            val scored = Library.rankDescription(fresh, vector, Place.ALL, null)
             SearchStages.mark(context, "rank.end")
             Diagnostics.event(
                 context,
                 "searchRank",
                 JSONObject()
                     .put("ms", System.currentTimeMillis() - started)
-                    .put("photos", entries.size)
-                    .put("found", found.size)
+                    .put("photos", fresh.size)
+                    .put("found", scored.size)
+                    .put("incremental", sameQuery)
                     // Memory at each search: the native part (models) and the Java part (the library).
                     .put("nativeMb", android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024))
                     .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024))
@@ -217,11 +227,13 @@ fun SearchScreen(
                     .put("thumbMb", ThumbStats.megabytes())
                     .put("thumbs", ThumbStats.count()),
             )
-            found
+            scored
         }
+        state.ranked = if (sameQuery) IncrementalRanking.merge(state.ranked, found) else found
+        rankedIds = if (sameQuery) rankedIds + fresh.map { it.id } else entries.map { it.id }.toSet()
         rankedFor = vector
     }
-    val pending = rankingPending(query.isBlank(), modelError != null, queryVector, rankedFor)
+    val pending = rankingPending(typed.rest.isBlank(), modelError != null, queryVector, rankedFor)
     var timedOut by remember { mutableStateOf(false) }
     LaunchedEffect(pending, queryKey) {
         timedOut = false
@@ -246,10 +258,12 @@ fun SearchScreen(
     val removed by produceState<Set<String>>(initialValue = emptySet(), searchKey, removalsVersion) {
         value = withContext(Dispatchers.IO) { Removals.sourcesFor(context, searchKey) }
     }
-    val outcome by produceState(SearchOutcome.EMPTY, entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time) {
+    val searchTyped = remember(searchQuery, time) { TypedDates.parse(searchQuery, time) }
+    val searchFilters = resultFilters.withTypedDate(searchTyped.range)
+    val outcome by produceState(SearchOutcome.EMPTY, entries, searchTyped.rest, state.ranked, searchFilters, removed, state.shownExtra, time) {
         value = withContext(Dispatchers.Default) {
             SearchStages.mark(context, "outcome.start")
-            SearchResults.compute(entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time) {
+            SearchResults.compute(entries, searchTyped.rest, state.ranked, searchFilters, removed, state.shownExtra, time) {
                 SearchStages.mark(context, it)
             }.also { SearchStages.mark(context, "outcome.end") }
         }

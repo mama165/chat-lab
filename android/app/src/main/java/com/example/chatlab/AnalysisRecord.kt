@@ -53,6 +53,8 @@ data class AnalysisRecord(
     val startWorkers: Int = 0,
     /** The memory free at the start of the run, in megabytes (0 when not kept). */
     val memoryAtStartMb: Long = 0L,
+    /** The threads each model session was allowed, from the cores shared by the workers (0 when not kept). */
+    val threadsPerSession: Int = 0,
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val analyzed: Int get() = folders.sumOf { it.analyzed }
@@ -95,6 +97,7 @@ data class AnalysisRecord(
         .put("diagnosticsRun", diagnosticsRun)
         .put("startWorkers", startWorkers)
         .put("memoryAtStartMb", memoryAtStartMb)
+        .put("threadsPerSession", threadsPerSession)
         .put("device", JSONObject()
             .put("model", device)
             .put("android", androidVersion)
@@ -152,6 +155,7 @@ data class AnalysisRecord(
                 diagnosticsRun = json.optString("diagnosticsRun", ""),
                 startWorkers = json.optInt("startWorkers", 0),
                 memoryAtStartMb = json.optLong("memoryAtStartMb", 0L),
+                threadsPerSession = json.optInt("threadsPerSession", 0),
                 types = json.optJSONObject("types")?.let { t -> t.keys().asSequence().associateWith { t.getInt(it) } }.orEmpty(),
                 modelLoads = json.optJSONArray("models")?.let { m ->
                     val start = parseIso(run.getString("start"))

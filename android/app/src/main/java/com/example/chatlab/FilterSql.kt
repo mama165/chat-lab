@@ -27,7 +27,6 @@ object FilterSql {
         }
         if (filters.closeUp) where += "portrait = 1"
         // Without text cannot be narrowed in SQL (a blank text is blank in Kotlin): it is left to the exact check.
-        if (filters.text == TextFilter.WITH) where += "COALESCE(text, '') <> ''"
         if (filters.folders.isNotEmpty()) {
             where += "COALESCE(folder, '') IN (${marks(filters.folders.size)})"
             args += filters.folders
