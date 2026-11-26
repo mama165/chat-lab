@@ -5,6 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.asAndroidBitmap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -199,7 +203,10 @@ fun SearchScreen(
                     .put("found", found.size)
                     // Memory at each search: the native part (models) and the Java part (the library).
                     .put("nativeMb", android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024))
-                    .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)),
+                    .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024))
+                    // Thumbnails on screen: their pixels, in native memory, and how many there are.
+                    .put("thumbMb", ThumbStats.megabytes())
+                    .put("thumbs", ThumbStats.count()),
             )
             found
         }
@@ -784,6 +791,12 @@ fun GridThumb(location: String, modifier: Modifier) {
             }
         }
     }
+    // The pixels of a thumbnail are counted while it is shown, and removed when it leaves the screen.
+    DisposableEffect(image) {
+        val bytes = image?.asAndroidBitmap()?.allocationByteCount?.toLong()
+        if (bytes != null) ThumbStats.show(bytes)
+        onDispose { if (bytes != null) ThumbStats.hide(bytes) }
+    }
     Box(modifier = modifier.background(Palette.Field), contentAlignment = Alignment.Center) {
         image?.let {
             Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -829,3 +842,23 @@ private fun openImage(context: Context, location: String): java.io.InputStream? 
     } else {
         java.io.File(location).takeIf { it.exists() }?.inputStream()
     }
+
+/** Pixels of the thumbnails currently shown, in bytes, and their number. For the journal only. */
+object ThumbStats {
+    private val bytes = AtomicLong()
+    private val count = AtomicInteger()
+
+    fun show(size: Long) {
+        bytes.addAndGet(size)
+        count.incrementAndGet()
+    }
+
+    fun hide(size: Long) {
+        bytes.addAndGet(-size)
+        count.decrementAndGet()
+    }
+
+    fun megabytes(): Long = bytes.get() / (1024 * 1024)
+
+    fun count(): Int = count.get()
+}
