@@ -121,7 +121,7 @@ object LibraryMigration {
                     // Already copied: only the check runs, to see that the store still matches the JSON.
                     val compact = CompactLibrary(context)
                     try {
-                        check(context, compact)
+                        Diagnostics.native(context, "check") { check(context, compact) }
                     } finally {
                         compact.close()
                     }
@@ -133,7 +133,7 @@ object LibraryMigration {
                     input.bufferedReader(Charsets.UTF_8).use { reader ->
                         val report = run(reader, store, System.currentTimeMillis())
                         marker.writeText("migrated=${report.migrated} skipped=${report.skipped}")
-                        check(context, store)
+                        Diagnostics.native(context, "check") { check(context, store) }
                         Diagnostics.event(
                             context,
                             "migration",
