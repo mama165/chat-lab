@@ -30,6 +30,18 @@ class SearchResultsTest {
     }
 
     @Test
+    fun aDateAloneListsItsPhotosInTheOrderOfTheDay() {
+        val later = entry("later", takenMs = hoursAgo(1))
+        val earlier = entry("earlier", takenMs = hoursAgo(3))
+        val old = entry("old", takenMs = daysAgo(3))
+        val filters = Filters(date = DateFilter(preset = DatePreset.LAST_24H))
+        val outcome = compute(listOf(later, old, earlier), query = "", filters = filters)
+        assertEquals(listOf(earlier, later), outcome.close.map { it.entry })
+        assertTrue(outcome.extra.isEmpty())
+        assertFalse(outcome.hasMore)
+    }
+
+    @Test
     fun aPhotoAppearsOnlyOnce() {
         val a = entry("a", "gaufre maison")
         val b = entry("b", "")

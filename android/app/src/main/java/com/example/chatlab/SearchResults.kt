@@ -58,10 +58,15 @@ object SearchResults {
         /** Called at each step, with its name: for the journal. Does nothing by default. */
         probe: (String) -> Unit = {},
     ): SearchOutcome {
-        if (query.isBlank()) return SearchOutcome.EMPTY
+        // Without words, a date alone still lists its photos: the ones of that date, in the order of the day.
+        if (query.isBlank() && !filters.date.isActive) return SearchOutcome.EMPTY
         probe("kept.start")
         val kept = distinctById(entries, { it.source.ifBlank { it.path } }).filter { filters.matches(it, time) }
         probe("kept.end")
+        if (query.isBlank()) {
+            val day = kept.filter { it.source.ifBlank { it.path } !in removed }.sortedBy { it.takenMs }
+            return SearchOutcome(day.map { Match(it, null) }, emptyList(), 0, false)
+        }
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()
         probe("candidates.start")
         val candidates = distinctById(ranked, { keyOf(it) }).filter { match ->
