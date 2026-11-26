@@ -42,6 +42,17 @@ class CompactLibrary(context: Context) : RecordSink {
     /** The row of every stored photo, by address. */
     fun rows(): Map<String, Long> = database.rowsByAddress()
 
+    /**
+     * Every stored photo as a library entry, with its vector: what the search screen reads, in place of
+     * library.json. Read in one pass, with the vectors from the vector file.
+     */
+    fun loadAll(): List<LibraryEntry> {
+        val rows = database.rowsByAddress()
+        return database.entries(rows.keys.toList()).map { entry ->
+            entry.copy(vector = rows[entry.id]?.let { vector(it) })
+        }
+    }
+
     /** The best [k] rows for a query, read from the vector file. */
     fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> =
         VectorRanking.topRows(query, database.nextFreeRow(), vectors, k)
