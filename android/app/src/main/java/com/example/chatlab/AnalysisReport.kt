@@ -206,6 +206,16 @@ object LibraryMerge {
      * The entries of the old library to keep: those whose folder is known and no longer in
      * the current list. The others are redone by the analysis (or gone with their file).
      */
+    /** Same rule as above, read entry by entry from the file. */
+    fun keepFromRemovedFolders(reader: java.io.Reader, currentFolders: Set<String>): List<JSONObject> {
+        val kept = ArrayList<JSONObject>()
+        KnownSummary.forEachEntry(reader) { item ->
+            val folder = item.optString("folder")
+            if (folder.isNotBlank() && folder !in currentFolders) kept += item
+        }
+        return kept
+    }
+
     fun keepFromRemovedFolders(old: JSONArray?, currentFolders: Set<String>): List<JSONObject> {
         if (old == null) return emptyList()
         return (0 until old.length()).mapNotNull { old.optJSONObject(it) }
