@@ -10,13 +10,6 @@ enum class People(val label: String) {
     MANY("2 et plus"),
 }
 
-/** With or without text read on the photo. */
-enum class TextFilter(val label: String) {
-    ANY("Peu importe"),
-    WITH("Avec texte"),
-    WITHOUT("Sans texte"),
-}
-
 /** Sliding time windows, counted backwards from now. */
 enum class DatePreset(val label: String) {
     ALL("Toutes les dates"),
@@ -122,7 +115,6 @@ data class Filters(
     val place: Place = Place.ALL,
     val people: People = People.ANY,
     val closeUp: Boolean = false,
-    val text: TextFilter = TextFilter.ANY,
     /** Noms de dossiers choisis ; vide veut dire tous. */
     val folders: Set<String> = emptySet(),
     /** Types MIME choisis ; vide veut dire tous. */
@@ -147,7 +139,6 @@ data class Filters(
         if (place != Place.ALL) add(FilterChip("Lieu · ${placeLabel(place)}", copy(place = Place.ALL)))
         if (people != People.ANY) add(FilterChip("Personnes · ${people.label}", copy(people = People.ANY)))
         if (closeUp) add(FilterChip("Gros plan", copy(closeUp = false)))
-        if (text != TextFilter.ANY) add(FilterChip(text.label, copy(text = TextFilter.ANY)))
         if (folders.isNotEmpty()) add(FilterChip(folders.sorted().joinToString(", "), copy(folders = emptySet())))
         if (types.isNotEmpty()) {
             add(FilterChip(types.map { FileSniffer.label(it) }.sorted().joinToString(", "), copy(types = emptySet())))
@@ -179,7 +170,6 @@ data class Filters(
             Library.inPlace(entry, place) &&
             matchesPeople(entry.faces) &&
             (!closeUp || entry.closeUp) &&
-            matchesText(entry.text) &&
             (folders.isEmpty() || entry.folder in folders) &&
             (types.isEmpty() || entry.mime in types) &&
             kind.matches(entry.mime)
@@ -189,12 +179,6 @@ data class Filters(
         People.NONE -> faces == 0
         People.ONE -> faces == 1
         People.MANY -> faces >= 2
-    }
-
-    private fun matchesText(text: String): Boolean = when (this.text) {
-        TextFilter.ANY -> true
-        TextFilter.WITH -> text.isNotBlank()
-        TextFilter.WITHOUT -> text.isBlank()
     }
 
     companion object {
