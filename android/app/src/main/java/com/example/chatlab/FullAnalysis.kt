@@ -325,10 +325,6 @@ class AnalysisService : Service() {
                                 is Outcome.Done -> {
                                     results[index] = outcome.result
                                     report.analyzed(item.folderIndex)
-                                    if (outcome.result.textExtra.isNotEmpty()) {
-                                        // Only the number of words of each pass goes to the journal.
-                                        Diagnostics.event(this@AnalysisService, "textExtra", textExtraData(outcome.result.textExtra))
-                                    }
                                     val count = photosDone.incrementAndGet()
                                     if (NativeMemory.isPhotoPoint(count)) {
                                         Diagnostics.event(
@@ -673,7 +669,6 @@ private fun carriedResult(item: JSONObject, values: FloatArray?, planItem: PlanI
         portrait = item.optBoolean("portrait", false),
         vector = values,
         millis = 0,
-        text = item.optString("text", ""),
         taken = taken,
         source = item.optString("source", ""),
         modified = item.optLong("modified", 0L),
@@ -725,11 +720,3 @@ fun overview(context: Context): List<FolderOverview> {
     }
 }
 
-/**
- * What a text pass adds, for the journal: how many words each pass read, never the words themselves. The name
- * of the photo and the text read are private, so neither is written.
- */
-internal fun textExtraData(passes: Map<*, List<String>>): JSONObject =
-    JSONObject().put("passes", JSONObject().apply {
-        passes.forEach { (pass, list) -> put(pass.toString(), list.size) }
-    })
