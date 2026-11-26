@@ -51,7 +51,18 @@ fun MainScreen() {
     }
     // The library is read in the background, once per change of the data: not on each change of tab, which
     // used to freeze the screen while the whole file was parsed.
-    val libraryCache = remember { VersionedCache { Library.load(context) } }
+    // The search reads the compact store, not library.json: the store is read by parts, so this does not
+    // depend on the memory free at the start of the app.
+    val libraryCache = remember {
+        VersionedCache {
+            val store = CompactLibrary(context)
+            try {
+                store.loadAll()
+            } finally {
+                store.close()
+            }
+        }
+    }
     // null until the library is read: "still loading" is not the same as "no photo yet".
     val library by produceState<List<LibraryEntry>?>(initialValue = null, dataVersion) {
         value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion) }
