@@ -110,10 +110,9 @@ private fun AppContent() {
                 dataVersion = dataVersion,
                 onBack = { page = Page.TABS },
                 onOpen = { page = it },
-                onFoldersChanged = { dataVersion++ },
-                onAddFolders = {
-                    addBack = Page.SETTINGS
-                    page = Page.ADD_FOLDER
+                onWiped = {
+                    search.reset()
+                    dataVersion++
                 },
             )
             Page.STORAGE -> StorageChooser(
@@ -127,14 +126,6 @@ private fun AppContent() {
                 onBack = {
                     dataVersion++
                     page = addBack
-                },
-            )
-            Page.WIPE -> WipePage(
-                entries = entries,
-                onBack = { page = Page.SETTINGS },
-                onWiped = {
-                    search.reset()
-                    dataVersion++
                 },
             )
             Page.LEVEL -> LevelPage(onBack = { page = Page.SETTINGS })

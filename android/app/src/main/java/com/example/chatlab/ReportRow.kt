@@ -1,8 +1,6 @@
 package com.example.chatlab
 
 import android.content.Context
-import android.content.Intent
-import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -83,7 +81,7 @@ fun ReportRow() {
                                     }
                                 }
                             }
-                            ReportState.DONE -> openSnapshotFolder(context)
+                            ReportState.DONE -> OpenFolder.open(context, "snapshots")
                             ReportState.RUNNING -> Unit
                         }
                     },
@@ -131,16 +129,4 @@ private fun RunningLabel() {
                 .background(Palette.Accent),
         )
     }
-}
-
-/** Opens the folder of the copies in the Files app, when it is on the shared storage. */
-private fun openSnapshotFolder(context: Context) {
-    if (!StorageAccess.granted()) {
-        Toast.makeText(context, "Le dossier est dans l'espace privé de l'app.", Toast.LENGTH_LONG).show()
-        return
-    }
-    val uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:ChatLab/snapshots")
-    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
-    runCatching { context.startActivity(intent) }
-        .onFailure { Toast.makeText(context, "Impossible d'ouvrir le dossier.", Toast.LENGTH_LONG).show() }
 }

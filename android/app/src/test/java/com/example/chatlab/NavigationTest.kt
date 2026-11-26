@@ -6,7 +6,6 @@ import org.junit.Test
 class NavigationTest {
     @Test
     fun pagesOpenedFromSettingsGoBackToSettings() {
-        assertEquals(Page.SETTINGS, Page.WIPE.parent())
     }
 
     @Test
