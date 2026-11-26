@@ -26,10 +26,6 @@ object LibraryStore {
     fun open(context: Context): java.io.InputStream? =
         LibraryExport.snapshotFile(context).takeIf { it.exists() }?.inputStream()
 
-    /** The content of the backup, or null if there is none yet. */
-    fun read(context: Context): String? =
-        open(context)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
-
     /** Writes the trace of a crash to erreur.txt, in the chatlab folder, so it can be read. */
     fun saveErrorReport(context: Context, text: String) {
         try {
@@ -93,7 +89,6 @@ object LibraryStore {
 }
 
 /** The saved library, read from the chatlab folder (or the private space otherwise). */
-fun Library.load(context: Context): List<LibraryEntry> = parse(LibraryStore.read(context))
 
 /** Size of the saved library, in bytes (0 if it does not exist). */
 fun LibraryStore.librarySize(context: Context): Long = try {

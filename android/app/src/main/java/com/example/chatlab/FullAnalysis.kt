@@ -591,34 +591,6 @@ private fun parseArray(text: String?): JSONArray? = try {
     null
 }
 
-/** The entries of the existing library that have a source, indexed by that source. */
-internal fun readKnown(text: String?): KnownLibrary =
-    if (text == null) KnownLibrary(emptyMap()) else readKnownFrom(java.io.StringReader(text))
-
-/**
- * Same as [readKnown], read from the file entry by entry. The vectors are kept apart, as numbers, and taken
- * out of the entries: the entries then weigh a few hundred bytes each instead of a tree of 768 boxed numbers.
- */
-internal fun readKnownFrom(reader: java.io.Reader): KnownLibrary {
-    val byId = LinkedHashMap<String, JSONObject>()
-    val vectors = HashMap<String, FloatArray>()
-    try {
-        KnownSummary.forEachEntry(reader) { item ->
-            if (!item.has("source") || item.optInt("analysis_version") != ANALYSIS_VERSION) return@forEachEntry
-            val source = item.getString("source")
-            item.optJSONArray("vectors")?.optJSONArray(0)?.let { array ->
-                vectors[source] = FloatArray(array.length()) { array.getDouble(it).toFloat() }
-            }
-            item.remove("vectors")
-            byId[source] = item
-        }
-    } catch (e: Exception) {
-        // A library that cannot be read is treated as empty, as before.
-        return KnownLibrary(emptyMap())
-    }
-    return KnownLibrary(byId, vectors)
-}
-
 /** The known library of the store, read entry by entry; empty if there is none yet. */
 internal fun readKnownFromStore(context: Context): KnownLibrary {
     val store = CompactLibrary(context)
