@@ -2,6 +2,12 @@ package com.example.chatlab
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,10 +24,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,12 +42,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.ui.Palette
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -159,13 +169,14 @@ private enum class WipeStep { IDLE, ASKED, DONE }
 
 /**
  * Tout effacer, in place: a first press asks for a second one, which erases what the app created.
- * Once erased, or when there is nothing to erase, the button is grey.
+ * Once erased, or when there is nothing to erase, the button is grey. Animated as in the mock-up.
  */
 @Composable
 private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
     val context = LocalContext.current
     var step by remember { mutableStateOf(WipeStep.IDLE) }
     var version by remember { mutableStateOf(0) }
+    var taps by remember { mutableStateOf(0) }
     val nothingToErase by produceState(initialValue = false, dataVersion, version) {
         value = withContext(Dispatchers.IO) { !hasCreatedData(context) }
     }
@@ -179,8 +190,10 @@ private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
         WipeButton(
             label = if (step == WipeStep.ASKED && !grey) "Appuyer à nouveau pour confirmer" else "Tout effacer",
             grey = grey,
+            taps = taps,
             onClick = {
                 if (!running) {
+                    taps++
                     if (step == WipeStep.IDLE) {
                         step = WipeStep.ASKED
                     } else {
@@ -200,31 +213,33 @@ private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
                 color = Palette.Muted,
             )
         }
-        if (step == WipeStep.ASKED && !running) {
+        AnimatedVisibility(visible = step == WipeStep.ASKED && !running, exit = fadeOut(tween(300))) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WarningIcon()
-                    Text("Cette opération est irréversible.", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Appear(600) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WarningIcon()
+                        Text("Cette opération est irréversible.", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
                 }
-                WipeLine("✕", Palette.Danger, "Les données créées par l'application")
-                WipeLine("✓", Green, "Vos fichiers originaux restent intacts")
-                WipeLine("✓", Green, "Les modèles d'IA")
+                Appear(1000) { WipeLine("✕", Palette.Danger, "Les données créées par l'application") }
+                Appear(1400) { WipeLine("✓", Green, "Vos fichiers originaux restent intacts") }
+                Appear(1800) { WipeLine("✓", Green, "Les modèles d'IA") }
             }
         }
-        if (step == WipeStep.DONE) {
+        AnimatedVisibility(visible = step == WipeStep.DONE, enter = fadeIn(tween(400))) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                WipeLine("✓", Green, "Données créées par l'application supprimées")
-                WipeLine("✓", Green, "Vos fichiers originaux restent intacts")
+                Appear(500) { WipeLine("✓", Green, "Données créées par l'application supprimées") }
+                Appear(1100) { WipeLine("✓", Green, "Vos fichiers originaux restent intacts") }
             }
         }
     }
 }
 
-/** The erase button: red outline, or grey when nothing can be erased. */
+/** The erase button: red outline, or grey when nothing can be erased. Each press shows a ring. */
 @Composable
-private fun WipeButton(label: String, grey: Boolean, onClick: () -> Unit) {
-    val color = if (grey) GreyText else Palette.Danger
-    val border = if (grey) GreyLine else Palette.Danger
+private fun WipeButton(label: String, grey: Boolean, taps: Int, onClick: () -> Unit) {
+    val color by animateColorAsState(if (grey) GreyText else Palette.Danger, tween(400), label = "wipe-text")
+    val border by animateColorAsState(if (grey) GreyLine else Palette.Danger, tween(400), label = "wipe-border")
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -235,6 +250,51 @@ private fun WipeButton(label: String, grey: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = color)
+        TapRing(taps)
+    }
+}
+
+/** The press ring of the mock-up: a red disc that grows and fades from the centre of the button. */
+@Composable
+private fun TapRing(taps: Int) {
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(taps) {
+        if (taps > 0) {
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(800))
+        }
+    }
+    val p = progress.value
+    if (p < 1f) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .graphicsLayer {
+                    val scale = if (p < 0.3f) 0.5f + 0.4f * (p / 0.3f) else 0.9f + 0.4f * ((p - 0.3f) / 0.7f)
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = if (p < 0.3f) p / 0.3f else (1f - p) / 0.7f
+                }
+                .background(Palette.Danger.copy(alpha = 0.18f), CircleShape),
+        )
+    }
+}
+
+/** Fades in and rises a line after a delay, as in the mock-up. */
+@Composable
+private fun Appear(delayMillis: Long, content: @Composable () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(delayMillis)
+        progress.animateTo(1f, tween(400))
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            alpha = progress.value
+            translationY = (1f - progress.value) * 4.dp.toPx()
+        },
+    ) {
+        content()
     }
 }
 
