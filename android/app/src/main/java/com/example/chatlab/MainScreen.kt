@@ -109,7 +109,6 @@ private fun AppContent() {
             Page.SETTINGS -> SettingsPage(
                 dataVersion = dataVersion,
                 onBack = { page = Page.TABS },
-                onOpen = { page = it },
                 onWiped = {
                     search.reset()
                     dataVersion++

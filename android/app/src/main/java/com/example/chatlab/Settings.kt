@@ -2,6 +2,7 @@ package com.example.chatlab
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,58 +29,105 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.ui.Palette
-import com.example.chatlab.ui.PageHeader
-import com.example.chatlab.ui.SectionLabel
-import com.example.chatlab.ui.SettingRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
-/** Settings page, opened by the gear: the last analysis, the copy and the metrics, and erasing everything. */
+private val Green = Color(0xFF1F8A4C)
+private val Warning = Color(0xFFF5B700)
+private val GreyText = Color(0xFF9CA3AF)
+private val GreyLine = Color(0xFFD1D5DB)
+
+/** Paramètres, as in the mock-up: the last analysis, the report, the metrics, and erasing what the app created. */
 @Composable
 fun SettingsPage(
     dataVersion: Int,
     onBack: () -> Unit,
-    onOpen: (Page) -> Unit,
     onWiped: () -> Unit,
 ) {
     val context = LocalContext.current
-    val lastDate = remember(dataVersion) { ReportStore.lastDate(context) }
-    val history = remember(dataVersion) { RunArchive.list(context).size }
+    val lastMillis = remember(dataVersion) { ReportStore.lastMillis(context) }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Palette.Page)
             .padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Spacer(Modifier.height(4.dp))
-        PageHeader("Paramètres", onBack = onBack)
-        Column {
-            SectionLabel("Analyse")
-            SettingRow("Dernière analyse", lastDate?.let { formatLongDate(it) } ?: "jamais")
-            SettingRow("Performance", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
-            SettingRow("Historique des analyses", "$history", onClick = { onOpen(Page.HISTORY) })
+        Row(
+            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("‹", fontSize = 22.sp, color = Palette.Accent, modifier = Modifier.clickable(onClick = onBack))
+            Text("Paramètres", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
         }
-        Column {
-            SectionLabel("Sauvegarde et mesures")
-            ReportRow()
-            MetricsRow()
-        }
+        LastAnalysis(lastMillis)
+        Divider()
+        Block { ReportRow() }
+        Divider()
+        Block { MetricsRow() }
+        Divider()
         WipeSection(dataVersion = dataVersion, onWiped = onWiped)
-        Spacer(Modifier.height(16.dp))
+        Spacer16()
     }
 }
 
-/** "26 novembre 2026", for the last analysis. */
-private fun formatLongDate(date: SimpleDate): String =
-    "${date.day} ${Dates.MONTH_NAMES[date.month - 1].lowercase()} ${date.year}"
+/** A line of the page, with its own vertical padding. */
+@Composable
+private fun Block(content: @Composable () -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 14.dp)) { content() }
+}
+
+@Composable
+private fun Divider() {
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
+}
+
+@Composable
+private fun Spacer16() {
+    Box(modifier = Modifier.height(16.dp))
+}
+
+/** Dernière analyse, with the Détail button that opens its curve. */
+@Composable
+private fun LastAnalysis(lastMillis: Long?) {
+    Block {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Dernière analyse", fontSize = 15.sp, color = Palette.Ink)
+                // The detail view is added with its own change: for now the button is shown, not yet wired.
+                PillButton("Détail", enabled = lastMillis != null) {}
+            }
+            Text(
+                lastMillis?.let { formatWhen(it) } ?: "Aucune analyse pour l'instant",
+                fontSize = 12.sp,
+                color = Palette.Muted,
+            )
+        }
+    }
+}
+
+/** "26 novembre 2026, 17 h 48". */
+private fun formatWhen(millis: Long): String {
+    val c = Calendar.getInstance().apply { timeInMillis = millis }
+    val month = Dates.MONTH_NAMES[c.get(Calendar.MONTH)].lowercase()
+    return "${c.get(Calendar.DAY_OF_MONTH)} $month ${c.get(Calendar.YEAR)}, " +
+        "${c.get(Calendar.HOUR_OF_DAY)} h ${"%02d".format(c.get(Calendar.MINUTE))}"
+}
 
 /** Métriques: the folder of the measurements, grey when it is not there or not reachable. */
 @Composable
@@ -87,7 +136,7 @@ private fun MetricsRow() {
     val available by produceState(initialValue = false) {
         value = withContext(Dispatchers.IO) { OpenFolder.exists("diagnostics") }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -120,13 +169,12 @@ private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
         value = withContext(Dispatchers.IO) { !hasCreatedData(context) }
     }
     val grey = nothingToErase || step == WipeStep.DONE
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(
+        modifier = Modifier.padding(top = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         WipeButton(
-            label = when {
-                grey -> "Tout effacer"
-                step == WipeStep.ASKED -> "Appuyer à nouveau pour confirmer"
-                else -> "Tout effacer"
-            },
+            label = if (step == WipeStep.ASKED && !grey) "Appuyer à nouveau pour confirmer" else "Tout effacer",
             grey = grey,
             onClick = {
                 if (step == WipeStep.IDLE) {
@@ -141,31 +189,36 @@ private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
             },
         )
         if (step == WipeStep.ASKED) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("⚠", fontSize = 16.sp, color = Palette.Danger)
-                Text("Cette opération est irréversible.", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Ink)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WarningIcon()
+                    Text("Cette opération est irréversible.", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                }
+                WipeLine("✕", Palette.Danger, "Les données créées par l'application")
+                WipeLine("✓", Green, "Vos fichiers originaux restent intacts")
+                WipeLine("✓", Green, "Les modèles d'IA")
             }
-            WipeLine("✕", Palette.Danger, "Les données créées par l'application")
-            WipeLine("✓", Palette.Accent, "Vos fichiers originaux restent intacts")
-            WipeLine("✓", Palette.Accent, "Les modèles d'IA")
         }
         if (step == WipeStep.DONE) {
-            WipeLine("✓", Palette.Accent, "Données créées par l'application supprimées")
-            WipeLine("✓", Palette.Accent, "Vos fichiers originaux restent intacts")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                WipeLine("✓", Green, "Données créées par l'application supprimées")
+                WipeLine("✓", Green, "Vos fichiers originaux restent intacts")
+            }
         }
     }
 }
 
-/** The erase button: red, or grey when nothing can be erased. */
+/** The erase button: red outline, or grey when nothing can be erased. */
 @Composable
 private fun WipeButton(label: String, grey: Boolean, onClick: () -> Unit) {
-    val color = if (grey) Palette.Disabled else Palette.Danger
+    val color = if (grey) GreyText else Palette.Danger
+    val border = if (grey) GreyLine else Palette.Danger
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, color, RoundedCornerShape(12.dp))
+            .background(Color.White, RoundedCornerShape(12.dp))
+            .border(1.dp, border, RoundedCornerShape(12.dp))
             .clickable(enabled = !grey, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -175,10 +228,28 @@ private fun WipeButton(label: String, grey: Boolean, onClick: () -> Unit) {
 
 /** One line of the erase details: a cross or a tick, and its text. */
 @Composable
-private fun WipeLine(icon: String, color: androidx.compose.ui.graphics.Color, text: String) {
+private fun WipeLine(icon: String, color: Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(icon, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color, modifier = Modifier.width(18.dp))
         Text(text, fontSize = 14.sp, color = Palette.Ink)
+    }
+}
+
+/** The yellow warning triangle with its mark, as in the mock-up. */
+@Composable
+private fun WarningIcon() {
+    Canvas(modifier = Modifier.size(18.dp)) {
+        val w = size.width
+        val h = size.height
+        val triangle = Path().apply {
+            moveTo(w / 2f, 0f)
+            lineTo(w, h)
+            lineTo(0f, h)
+            close()
+        }
+        drawPath(triangle, Warning)
+        drawRect(Palette.Ink, topLeft = Offset(w * 11f / 24f, h * 9f / 24f), size = Size(w * 2f / 24f, h * 6f / 24f))
+        drawRect(Palette.Ink, topLeft = Offset(w * 11f / 24f, h * 16.5f / 24f), size = Size(w * 2f / 24f, h * 2f / 24f))
     }
 }
 
