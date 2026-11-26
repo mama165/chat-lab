@@ -2,6 +2,7 @@ package com.example.chatlab
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -125,10 +127,12 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
             hint = if (SetupStep.CHATLAB in missing) {
                 "Choisissez d'abord le dossier chatlab."
             } else {
-                "Introuvable dans le dossier chatlab : vérifiez que le sous-dossier models y est, puis revenez ici."
+                "Introuvable dans le dossier chatlab : vérifiez que le sous-dossier models y est. " +
+                    "Si ce n'est pas le bon dossier, choisissez-en un autre."
             },
-            action = "Vérifier à nouveau",
-            onAction = onChanged,
+            action = "Choisir un autre dossier chatlab",
+            onAction = pickers.chooseChatlab,
+            secondary = "Vérifier à nouveau" to onChanged,
         )
         Text(
             "Les dossiers de photos à analyser se choisissent ensuite, dans l'onglet Photos.",
@@ -149,6 +153,7 @@ private fun SetupCard(
     action: String,
     onAction: () -> Unit,
     hint: String? = null,
+    secondary: Pair<String, () -> Unit>? = null,
 ) {
     Column(
         modifier = Modifier
@@ -170,6 +175,18 @@ private fun SetupCard(
             Text(detail, fontSize = 13.sp, color = Palette.Muted)
             if (hint != null) Text(hint, fontSize = 13.sp, color = Palette.Ink)
             PrimaryButton(action, onClick = onAction)
+            if (secondary != null) {
+                Text(
+                    secondary.first,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Palette.Accent,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clickable(onClick = secondary.second)
+                        .padding(vertical = 6.dp),
+                )
+            }
         }
     }
 }
