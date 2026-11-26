@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -168,7 +169,9 @@ private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
     val nothingToErase by produceState(initialValue = false, dataVersion, version) {
         value = withContext(Dispatchers.IO) { !hasCreatedData(context) }
     }
-    val grey = nothingToErase || step == WipeStep.DONE
+    // While an analysis runs, nothing is erased: it must be stopped first, by the person.
+    val running = AnalysisProgress.state.collectAsState().value.running
+    val grey = nothingToErase || step == WipeStep.DONE || running
     Column(
         modifier = Modifier.padding(top = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -177,18 +180,27 @@ private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
             label = if (step == WipeStep.ASKED && !grey) "Appuyer à nouveau pour confirmer" else "Tout effacer",
             grey = grey,
             onClick = {
-                if (step == WipeStep.IDLE) {
-                    step = WipeStep.ASKED
-                } else {
-                    eraseCreatedData(context)
-                    Toast.makeText(context, "Tout est effacé.", Toast.LENGTH_SHORT).show()
-                    step = WipeStep.DONE
-                    version++
-                    onWiped()
+                if (!running) {
+                    if (step == WipeStep.IDLE) {
+                        step = WipeStep.ASKED
+                    } else {
+                        eraseCreatedData(context)
+                        Toast.makeText(context, "Tout est effacé.", Toast.LENGTH_SHORT).show()
+                        step = WipeStep.DONE
+                        version++
+                        onWiped()
+                    }
                 }
             },
         )
-        if (step == WipeStep.ASKED) {
+        if (running) {
+            Text(
+                "Une analyse est en cours. Arrêtez-la pour pouvoir tout effacer.",
+                fontSize = 13.sp,
+                color = Palette.Muted,
+            )
+        }
+        if (step == WipeStep.ASKED && !running) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WarningIcon()
