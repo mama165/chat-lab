@@ -61,6 +61,10 @@ private fun AppContent() {
     var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()
 
+    // The search reads the library again at each save of a running analysis, not only at its end.
+    val saves by AnalysisProgress.saves.collectAsState()
+    LaunchedEffect(saves) { if (saves > 0) dataVersion++ }
+
     // The notice "Analyse terminée" appears only when a run ends while the app is open.
     var wasRunning by remember { mutableStateOf(progress.running) }
     LaunchedEffect(progress.running) {

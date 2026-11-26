@@ -36,6 +36,16 @@ object AnalysisProgress {
     private val value = MutableStateFlow(Progress())
     val state: StateFlow<Progress> = value.asStateFlow()
 
+    private val savedCount = MutableStateFlow(0)
+
+    /** Goes up each time the library is saved during an analysis: the search then reads the new photos. */
+    val saves: StateFlow<Int> = savedCount.asStateFlow()
+
+    @Synchronized
+    internal fun saved() {
+        savedCount.value = savedCount.value + 1
+    }
+
     internal fun set(progress: Progress) {
         value.value = progress
     }
@@ -349,6 +359,7 @@ class AnalysisService : Service() {
                                 if (System.currentTimeMillis() - lastSave >= SAVE_INTERVAL_MS) {
                                     lastSave = System.currentTimeMillis()
                                     LibraryWriter.write(this@AnalysisService, carried + results.filterNotNull(), keep)
+                                    AnalysisProgress.saved()
                                 }
                             }
                         }
