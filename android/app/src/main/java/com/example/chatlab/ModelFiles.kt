@@ -25,8 +25,21 @@ object ModelFiles {
                 .getString(KEY_FOLDER, null)?.let(Uri::parse)
             ?: error("dossier chatlab non choisi")
         val root = DocumentFile.fromTreeUri(context, uri) ?: error("dossier chatlab inaccessible")
-        return root.findFile("models")?.takeIf { it.isDirectory }
+        return chatlabDir(root).findFile("models")?.takeIf { it.isDirectory }
             ?: error("sous-dossier models absent du dossier chatlab")
+    }
+
+    /**
+     * The ChatLab folder itself: the one chosen, or the ChatLab (or chatlab) folder inside it when that is
+     * where the models are. The person may have chosen the folder above it.
+     */
+    fun chatlabDir(root: DocumentFile): DocumentFile {
+        fun holdsModels(folder: DocumentFile?) = folder?.findFile("models")?.isDirectory == true
+        if (holdsModels(root)) return root
+        val inside = listOf("ChatLab", "chatlab")
+            .map { name -> root.findFile(name)?.takeIf { it.isDirectory } }
+            .firstOrNull { holdsModels(it) }
+        return inside ?: root
     }
 
     fun exists(models: DocumentFile, name: String): Boolean =

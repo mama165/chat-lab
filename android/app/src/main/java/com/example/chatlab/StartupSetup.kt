@@ -58,7 +58,7 @@ object StartupSetup {
     private fun root(context: Context): DocumentFile? {
         val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
             ?: return null
-        return DocumentFile.fromTreeUri(context, Uri.parse(uri))
+        return DocumentFile.fromTreeUri(context, Uri.parse(uri))?.let { ModelFiles.chatlabDir(it) }
     }
 
     /** Creates the subfolders ChatLab writes to, if they are not there yet (an app restart keeps them). */
