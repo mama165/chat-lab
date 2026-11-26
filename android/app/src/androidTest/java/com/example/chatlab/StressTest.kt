@@ -20,12 +20,15 @@ import org.junit.runner.RunWith
 import kotlin.random.Random
 
 /**
- * Stress test: the real app, the real library and the real models, driven like a person would:
- * types searches (fast, slow, corrected), scrolls the results and taps "plus de photos", for a
- * given number of minutes (argument "minutes", 60 by default). Each step is logged under the tag
- * StressTest. A crash stops the run: the journal and the logcat show what happened before.
+ * Stress test: the real app, the real library and the real models, driven like a person would.
  *
- * Run it on the phone, with the app and this test installed (see the message that comes with it).
+ * Three rhythms are mixed at random:
+ * - calm: a search, a pause of a few seconds, sometimes scrolling and "plus de photos";
+ * - reading: a search, then a long pause (6 to 12 s), as if the results were looked at;
+ * - burst: about ten searches in three seconds (type a part, delete, type again), to pile them up.
+ *
+ * The argument "minutes" sets the duration (3 by default). Each step is logged under the tag
+ * StressTest. A crash stops the run: the logcat and the journal show what happened before.
  */
 @RunWith(AndroidJUnit4::class)
 class StressTest {
@@ -34,42 +37,81 @@ class StressTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     private val phrases = listOf(
-        "voiture", "chaussures", "plage", "2 personnes", "camion", "France", "Turquie", "gaufre",
-        "gouffre", "QR code", "3 personnes", "un coucher de soleil sur la mer",
-        "deux personnes qui mangent à table", "une facture ou un document",
-        "un paysage de montagne enneigée", "un chien dans l'herbe", "une photo prise de nuit",
-        "2 femmes qui sourient",
+        // Things in the library: food, objects, places.
+        "gâteau", "gaufre", "chaussures", "fleurs", "fenêtre", "porte", "tiroir", "meuble",
+        "cuisine", "jardin", "table", "canapé", "lampe", "vaisselle", "plante verte",
+        // Shops and brands.
+        "Ikea", "Leclerc",
+        // Vehicles, places, people.
+        "voiture", "camion", "plage", "France", "Turquie", "2 personnes", "3 personnes",
+        "2 femmes qui sourient", "bébé", "un chien dans l'herbe",
+        // Descriptions.
+        "un coucher de soleil sur la mer", "deux personnes qui mangent à table",
+        "un gâteau d'anniversaire", "des fleurs sur une table", "une fenêtre ouverte",
+        "une porte en bois", "un meuble blanc dans une pièce claire", "une photo prise de nuit",
     )
 
     @Test
     fun searchesUnderLoad() {
-        val minutes = InstrumentationRegistry.getArguments().getString("minutes")?.toLongOrNull() ?: 60L
+        val minutes = InstrumentationRegistry.getArguments().getString("minutes")?.toLongOrNull() ?: 3L
         val started = System.currentTimeMillis()
         val deadline = started + minutes * 60_000L
         val random = Random(System.nanoTime())
         var step = 0
         while (System.currentTimeMillis() < deadline) {
             step++
+            val rhythm = when (random.nextInt(10)) {
+                in 0..1 -> "burst"
+                in 2..5 -> "calm"
+                else -> "reading"
+            }
             val phrase = phrases.random(random)
-            val error = runCatching { oneSearch(phrase, random) }.exceptionOrNull()
+            val error = runCatching { oneStep(rhythm, phrase, random) }.exceptionOrNull()
             val elapsed = (System.currentTimeMillis() - started) / 1000
-            Log.i(TAG, "step=$step elapsedS=$elapsed phrase=\"$phrase\" error=${error?.javaClass?.simpleName ?: "none"}")
+            Log.i(TAG, "step=$step elapsedS=$elapsed rhythm=$rhythm phrase=\"$phrase\" error=${error?.javaClass?.simpleName ?: "none"}")
         }
         Log.i(TAG, "end steps=$step minutes=$minutes")
     }
 
-    private fun oneSearch(phrase: String, random: Random) {
+    private fun oneStep(rhythm: String, phrase: String, random: Random) {
+        when (rhythm) {
+            "burst" -> burst(random)
+            else -> {
+                typeOnce(phrase, random)
+                Thread.sleep(if (rhythm == "reading") random.nextLong(6_000, 12_000) else random.nextLong(1_500, 4_000))
+                if (rhythm == "calm") scrollAndMore(random)
+            }
+        }
+    }
+
+    /** One search: sometimes typed fast then corrected, sometimes typed at once. */
+    private fun typeOnce(phrase: String, random: Random) {
         val field = compose.onNode(hasSetTextAction())
         field.performTextReplacement("")
         if (random.nextInt(3) == 0) {
-            // Typed fast, then corrected: the search starts again from the new text.
             field.performTextInput(phrase.take(phrase.length / 2))
             Thread.sleep(random.nextLong(100, 600))
             field.performTextReplacement(phrase)
         } else {
             field.performTextInput(phrase)
         }
-        Thread.sleep(random.nextLong(1500, 4000))
+    }
+
+    /** About ten searches in three seconds: a part of a word, cleared, then another, with no pause. */
+    private fun burst(random: Random) {
+        val field = compose.onNode(hasSetTextAction())
+        repeat(10) {
+            val word = phrases.random(random)
+            field.performTextReplacement(word.take(random.nextInt(1, word.length + 1)))
+            Thread.sleep(random.nextLong(80, 250))
+            field.performTextReplacement("")
+            Thread.sleep(random.nextLong(60, 150))
+        }
+        field.performTextReplacement(phrases.random(random))
+        Thread.sleep(random.nextLong(1_000, 2_000))
+    }
+
+    private fun scrollAndMore(random: Random) {
         repeat(random.nextInt(0, 4)) {
             compose.onAllNodes(hasScrollAction()).onFirst().performTouchInput { swipeUp() }
             Thread.sleep(700)
