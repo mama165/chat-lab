@@ -18,9 +18,8 @@ class SearchResultsTest {
         query: String = "gaufre",
         ranked: List<Match> = emptyList(),
         filters: Filters = Filters(),
-        removed: Set<String> = emptySet(),
         shown: Int = 0,
-    ) = SearchResults.compute(entries, query, ranked, filters, removed, shown, TIME)
+    ) = SearchResults.compute(entries, query, ranked, filters, shown, TIME)
 
     @Test
     fun blankQueryGivesNothing() {
@@ -81,21 +80,8 @@ class SearchResultsTest {
     }
 
     @Test
-    fun removedPhotosNeverShow() {
-        val a = entry("a", "gaufre")
-        val b = entry("b", "")
-        val outcome = compute(
-            listOf(a, b),
-            ranked = ranked(listOf(a, b), listOf(0.2f, 0.2f)),
-            removed = setOf("content://photos/a", "content://photos/b"),
-        )
-        assertTrue(outcome.isEmpty)
-    }
-
-    @Test
-    fun removalUsesThePathWhenThereIsNoSource() {
+    fun aPhotoWithoutSourceIsIdentifiedByItsPath() {
         val a = entry("a", "gaufre", source = "")
-        assertTrue(compute(listOf(a), removed = setOf("/files/a.jpg")).isEmpty)
         assertEquals("/files/a.jpg", SearchResults.keyOf(Match(a, null)))
     }
 

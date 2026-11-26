@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
 
 const val PREFERENCES = "chatlab"
 
-/** The chatlab folder (models, library, removals), chosen by the user. */
+/** The chatlab folder (models, library), chosen by the user. */
 const val KEY_FOLDER = "folder"
 
 /** The folder of the photos to analyse. */

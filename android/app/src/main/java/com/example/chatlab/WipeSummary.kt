@@ -7,13 +7,12 @@ data class WipeLine(val title: String, val detail: String, val empty: Boolean)
 data class WipeSummary(
     val photos: Int,
     val librarySize: Long,
-    val removals: Int,
     val recents: List<String>,
     val lastAnalysis: SimpleDate?,
     val hasReport: Boolean,
 ) {
     val canWipe: Boolean
-        get() = photos > 0 || librarySize > 0 || removals > 0 || recents.isNotEmpty() || hasReport
+        get() = photos > 0 || librarySize > 0 || recents.isNotEmpty() || hasReport
 
     fun lines(): List<WipeLine> = listOf(
         WipeLine(
@@ -21,15 +20,6 @@ data class WipeSummary(
             if (photos > 0) "${Formats.photos(photos)} analysée${if (photos > 1) "s" else ""} · ${Formats.size(librarySize)}"
             else "aucune photo analysée",
             photos == 0 && librarySize == 0L,
-        ),
-        WipeLine(
-            "Les photos non classifiées",
-            when (removals) {
-                0 -> "aucune"
-                1 -> "1 photo retirée de vos recherches"
-                else -> "$removals photos retirées de vos recherches"
-            },
-            removals == 0,
         ),
         WipeLine(
             "Les recherches récentes",

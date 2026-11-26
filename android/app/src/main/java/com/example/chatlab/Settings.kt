@@ -59,7 +59,6 @@ import java.io.File
 fun SettingsPage(
     entries: List<LibraryEntry>,
     dataVersion: Int,
-    removalsVersion: Int,
     onBack: () -> Unit,
     onOpen: (Page) -> Unit,
     onFoldersChanged: () -> Unit,
@@ -73,7 +72,6 @@ fun SettingsPage(
     }
     val sources = remember(foldersVersion) { Sources.read(context) }
     val chatlab = remember(foldersVersion) { folderName(context, KEY_FOLDER) }
-    val removals = remember(removalsVersion) { RemovalsJson.count(LibraryStore.readRemovals(context)) }
     val history = remember(dataVersion) { RunArchive.list(context).size }
     val appSize by produceState<Long?>(initialValue = null, dataVersion) {
         value = withContext(Dispatchers.IO) { measureAppSize(context) }
@@ -106,7 +104,6 @@ fun SettingsPage(
         }
         Column {
             SectionLabel("Recherche")
-            SettingRow("Non classifiées", "$removals", onClick = { onOpen(Page.REMOVED) })
         }
         Column {
             SectionLabel("Analyse")
@@ -174,7 +171,6 @@ fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Uni
             WipeSummary(
                 photos = entries.size,
                 librarySize = LibraryStore.librarySize(context),
-                removals = RemovalsJson.count(LibraryStore.readRemovals(context)),
                 recents = RecentStore.read(context),
                 lastAnalysis = ReportStore.lastDate(context),
                 hasReport = ReportStore.read(context) != null,

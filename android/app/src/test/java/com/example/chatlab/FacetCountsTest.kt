@@ -22,8 +22,8 @@ class FacetCountsTest {
     private fun similar(list: List<LibraryEntry>, query: String): List<Match> =
         list.filter { it.text.contains(query) }.map { Match(it, 0.3f) }
 
-    private fun facets(query: String = "gaufre", filters: Filters = Filters(), removed: Set<String> = emptySet()) =
-        FacetCounts.compute(entries, query, similar(entries, query), filters, removed, TIME)
+    private fun facets(query: String = "gaufre", filters: Filters = Filters()) =
+        FacetCounts.compute(entries, query, similar(entries, query), filters, TIME)
 
     @Test
     fun theTotalIsTheNumberOfResults() {
@@ -86,7 +86,7 @@ class FacetCountsTest {
     @Test
     fun closeUpCountsWhatTheToggleWouldKeep() {
         val withCloseUp = entries.map { if (it.id == "b") it.copy(closeUp = true) else it }
-        val facets = FacetCounts.compute(withCloseUp, "gaufre", similar(withCloseUp, "gaufre"), Filters(), emptySet(), TIME)
+        val facets = FacetCounts.compute(withCloseUp, "gaufre", similar(withCloseUp, "gaufre"), Filters(), TIME)
         assertEquals(1, facets.closeUp)
     }
 
@@ -98,13 +98,6 @@ class FacetCountsTest {
         assertEquals(3, facets.customRange) // a, b (aujourd'hui) et c (il y a 3 jours)
         val shortRange = DateRange(TIME.today.plusDays(-1, TIME.zone), TIME.today)
         assertEquals(2, facets(filters = Filters(date = DateFilter(range = shortRange))).customRange)
-    }
-
-    @Test
-    fun removedPhotosAreNotCounted() {
-        val counts = facets(removed = setOf("content://photos/a"))
-        assertEquals(2, counts.total)
-        assertEquals(0, counts.datePresets.getValue(DatePreset.LAST_HOUR))
     }
 
     @Test

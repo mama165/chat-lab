@@ -14,7 +14,6 @@ import java.io.File
  */
 object LibraryStore {
     private const val NAME = "library.json"
-    private const val REMOVALS = "retraits.json"
 
     private fun folder(context: Context): DocumentFile? {
         val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
@@ -37,55 +36,6 @@ object LibraryStore {
         }
     }
 
-    /** The removals: for each search, the photos set aside. */
-    fun readRemovals(context: Context): JSONObject {
-        val text = try {
-            val inFolder = folder(context)?.findFile(REMOVALS)
-            if (inFolder != null && inFolder.exists()) {
-                context.contentResolver.openInputStream(inFolder.uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
-            } else {
-                File(context.filesDir, REMOVALS).takeIf { it.exists() }?.readText(Charsets.UTF_8)
-            }
-        } catch (e: Exception) {
-            null
-        }
-        return try {
-            JSONObject(text ?: "{}")
-        } catch (e: Exception) {
-            JSONObject()
-        }
-    }
-
-    /** Sets a photo aside for a given search; the removal is kept from one launch to the next. */
-    fun addRemoval(context: Context, query: String, source: String) {
-        val all = readRemovals(context)
-        val list = all.optJSONArray(query) ?: JSONArray().also { all.put(query, it) }
-        list.put(source)
-        val text = all.toString()
-        val dir = folder(context)
-        if (dir == null) {
-            File(context.filesDir, REMOVALS).writeText(text, Charsets.UTF_8)
-            return
-        }
-        val target = dir.findFile(REMOVALS) ?: dir.createFile("application/json", REMOVALS)
-            ?: error("impossible de créer retraits.json dans le dossier chatlab")
-        context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-            ?: error("impossible d'écrire retraits.json")
-    }
-
-    /** Writes all the removals, in the chatlab folder if possible. */
-    fun writeRemovals(context: Context, json: JSONObject) {
-        val text = json.toString()
-        val dir = folder(context)
-        if (dir == null) {
-            File(context.filesDir, REMOVALS).writeText(text, Charsets.UTF_8)
-            return
-        }
-        val target = dir.findFile(REMOVALS) ?: dir.createFile("application/json", REMOVALS)
-            ?: error("impossible de créer retraits.json dans le dossier chatlab")
-        context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-            ?: error("impossible d'écrire retraits.json")
-    }
 }
 
 /** The saved library, read from the chatlab folder (or the private space otherwise). */
@@ -103,13 +53,13 @@ private fun savedLibrarySize(context: Context): Long = try {
 }
 
 /**
- * Tout effacer: the library and the removals, in the chatlab folder and in the private space.
+ * Tout effacer: the library, in the chatlab folder and in the private space.
  * The photos, the models and the chosen folders are not touched.
  */
 fun LibraryStore.wipeAnalysis(context: Context) {
     val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
     val folder = uri?.let { DocumentFile.fromTreeUri(context, Uri.parse(it)) }
-    for (name in listOf("library.json", "retraits.json")) {
+    for (name in listOf("library.json")) {
         try {
             folder?.findFile(name)?.delete()
         } catch (e: Exception) {

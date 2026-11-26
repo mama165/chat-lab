@@ -142,8 +142,6 @@ fun SearchScreen(
     state: SearchUiState,
     entries: List<LibraryEntry>,
     loading: Boolean,
-    removalsVersion: Int,
-    onRemovalsChanged: () -> Unit,
     onSettings: () -> Unit,
     onFilters: () -> Unit,
     modifier: Modifier = Modifier,
@@ -255,15 +253,12 @@ fun SearchScreen(
         searchQuery = query
     }
     val searchKey = searchQuery.trim().lowercase()
-    val removed by produceState<Set<String>>(initialValue = emptySet(), searchKey, removalsVersion) {
-        value = withContext(Dispatchers.IO) { Removals.sourcesFor(context, searchKey) }
-    }
     val searchTyped = remember(searchQuery, time) { TypedDates.parse(searchQuery, time) }
     val searchFilters = resultFilters.withTypedDate(searchTyped.range)
-    val outcome by produceState(SearchOutcome.EMPTY, entries, searchTyped.rest, state.ranked, searchFilters, removed, state.shownExtra, time) {
+    val outcome by produceState(SearchOutcome.EMPTY, entries, searchTyped.rest, state.ranked, searchFilters, state.shownExtra, time) {
         value = withContext(Dispatchers.Default) {
             SearchStages.mark(context, "outcome.start")
-            SearchResults.compute(entries, searchTyped.rest, state.ranked, searchFilters, removed, state.shownExtra, time) {
+            SearchResults.compute(entries, searchTyped.rest, state.ranked, searchFilters, state.shownExtra, time) {
                 SearchStages.mark(context, it)
             }.also { SearchStages.mark(context, "outcome.end") }
         }
@@ -298,13 +293,7 @@ fun SearchScreen(
         if (selecting) {
             SelectionBar(
                 count = state.selected.size,
-                query = query,
                 onCancel = { state.selected = emptySet() },
-                onRemove = {
-                    Removals.add(context, queryKey, state.selected)
-                    state.selected = emptySet()
-                    onRemovalsChanged()
-                },
             )
         } else {
             TabTitle(
@@ -476,7 +465,7 @@ private fun SearchField(
 
 /** When selecting, the top bar replaces the field: number chosen, cancel, remove. */
 @Composable
-private fun SelectionBar(count: Int, query: String, onCancel: () -> Unit, onRemove: () -> Unit) {
+private fun SelectionBar(count: Int, onCancel: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -501,19 +490,6 @@ private fun SelectionBar(count: Int, query: String, onCancel: () -> Unit, onRemo
             fontWeight = FontWeight.SemiBold,
             color = Palette.Accent,
             modifier = Modifier.weight(1f),
-        )
-        Text(
-            "Retirer de « $query »",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(Palette.Accent)
-                .clickable(onClick = onRemove)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
         )
     }
     Text(
@@ -578,76 +554,6 @@ private fun Message(title: String, detail: String?) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
         if (detail != null) Text(detail, fontSize = 13.sp, color = Palette.Muted)
-    }
-}
-
-/** "Non classifiées" page: the removed photos, per search, with the date and Rétablir. */
-@Composable
-fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
-    val context = LocalContext.current
-    var items by remember { mutableStateOf(Removals.all(context)) }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Palette.Page)
-            .padding(horizontal = 20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Spacer(Modifier.height(4.dp))
-        PageHeader("Non classifiées", onBack = onBack)
-        val searches = items.map { it.query }.distinct().size
-        Text(
-            if (items.isEmpty()) "Aucune photo retirée de vos recherches."
-            else "${Formats.photos(items.size).replaceFirstChar { it.uppercase() }} retirée${if (items.size > 1) "s" else ""}, dans $searches recherche${if (searches > 1) "s" else ""}",
-            fontSize = 13.sp,
-            color = Palette.Muted,
-        )
-        items.groupBy { it.query }.forEach { (query, group) ->
-            Text("« $query » (${group.size})", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
-            group.forEach { removal ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Palette.Field)
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    GridThumb(removal.source, Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)))
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        if (removal.date.isBlank()) "Retirée" else "Retirée le ${removal.date}",
-                        fontSize = 12.sp,
-                        color = Palette.Muted,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        "Rétablir",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Palette.Accent,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White)
-                            .clickable {
-                                Removals.restore(context, removal.query, removal.source)
-                                items = Removals.all(context)
-                                onChanged()
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-        if (items.isNotEmpty()) {
-            Text(
-                "Rétablir fait disparaître la photo de cette liste et la remet tout de suite dans la recherche d'origine.",
-                fontSize = 11.sp,
-                color = Palette.Muted,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
     }
 }
 

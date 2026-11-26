@@ -34,7 +34,7 @@ class AppFlowsTest {
             val target = InstrumentationRegistry.getInstrumentation().targetContext
             val assets = InstrumentationRegistry.getInstrumentation().context.assets
             target.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().clear().commit()
-            for (name in listOf("retraits.json", "compte_rendu.txt")) File(target.filesDir, name).delete()
+            for (name in listOf("compte_rendu.txt")) File(target.filesDir, name).delete()
             assets.open("query_vectors.json").use { input -> File(target.filesDir, "query_vectors.json").outputStream().use { input.copyTo(it) } }
             File(target.filesDir, "library.json").writeText(datedLibrary(assets.open("library.json").use { String(it.readBytes()) }))
         }
