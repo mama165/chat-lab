@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -29,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.documentfile.provider.DocumentFile
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.PrimaryButton
 
@@ -37,12 +42,39 @@ enum class SetupStep { ACCESS, CHATLAB, MODELS }
 
 /** The checks made at each launch: access to the files, the chatlab folder, and its models subfolder. */
 object StartupSetup {
+    /** The subfolders ChatLab writes to, created in the chatlab folder when they are missing. */
+    val WRITE_FOLDERS = listOf("analyses", "diagnostics", "snapshots")
+
     /** The steps still missing, in order. Empty when the app can be used. */
     fun missing(context: Context): List<SetupStep> {
         val chatlabChosen = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .getString(KEY_FOLDER, null) != null
+        if (chatlabChosen) ensureWriteFolders(context)
         val modelsFound = chatlabChosen && modelsFolderFound(context)
         return missingSteps(StorageAccess.granted(), chatlabChosen, modelsFound)
+    }
+
+    /** The chatlab folder that was chosen, if there is one. */
+    private fun root(context: Context): DocumentFile? {
+        val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
+            ?: return null
+        return DocumentFile.fromTreeUri(context, Uri.parse(uri))
+    }
+
+    /** Creates the subfolders ChatLab writes to, if they are not there yet (an app restart keeps them). */
+    private fun ensureWriteFolders(context: Context) {
+        val chatlab = root(context) ?: return
+        for (name in WRITE_FOLDERS) {
+            if (chatlab.findFile(name)?.isDirectory != true) chatlab.createDirectory(name)
+        }
+    }
+
+    /** What the chatlab folder holds, for the setup page: each item with whether it is there. */
+    fun inventory(context: Context): List<Pair<String, Boolean>> {
+        val chatlab = root(context)
+        return (listOf("models") + WRITE_FOLDERS).map { name ->
+            name to (chatlab?.findFile(name)?.isDirectory == true)
+        }
     }
 
     /** True if the chatlab folder holds a readable models subfolder. */
@@ -83,6 +115,9 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
     }
     val pickers = rememberFolderPickers(onChanged = onChanged)
     val chatlab = remember(missing) { folderName(context, KEY_FOLDER) }
+    val found by produceState(initialValue = emptyList<Pair<String, Boolean>>(), missing) {
+        value = withContext(Dispatchers.IO) { StartupSetup.inventory(context) }
+    }
 
     Column(
         modifier = Modifier
@@ -115,6 +150,7 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
             detail = "Choisissez le dossier nommé chatlab. ChatLab y enregistre le carnet.",
             done = SetupStep.CHATLAB !in missing,
             doneText = "Choisi : ${chatlab ?: "chatlab"}",
+            found = found,
             action = "Choisir le dossier chatlab",
             onAction = pickers.chooseChatlab,
         )
@@ -154,6 +190,7 @@ private fun SetupCard(
     onAction: () -> Unit,
     hint: String? = null,
     secondary: Pair<String, () -> Unit>? = null,
+    found: List<Pair<String, Boolean>>? = null,
 ) {
     Column(
         modifier = Modifier
@@ -171,6 +208,13 @@ private fun SetupCard(
         )
         if (done) {
             Text("$doneText ✓", fontSize = 14.sp, color = Palette.Accent)
+            found?.forEach { (name, ok) ->
+                Text(
+                    "$name ${if (ok) "✓" else "absent"}",
+                    fontSize = 13.sp,
+                    color = if (ok) Palette.Accent else Palette.Muted,
+                )
+            }
         } else {
             Text(detail, fontSize = 13.sp, color = Palette.Muted)
             if (hint != null) Text(hint, fontSize = 13.sp, color = Palette.Ink)
