@@ -40,6 +40,13 @@ class AnalysisRecordFilesTest {
     }
 
     @Test
+    fun wipeMarksTheMigrationDoneWhenTheMarkerWasMissing() {
+        // Without a marker, the start would import the backup again: the wipe writes it.
+        AnalysisRecordFiles.wipe(folder.root)
+        assertTrue(File(folder.root, "photos.migrated").exists())
+    }
+
+    @Test
     fun sizeCountsOnlyTheRecordFiles() {
         file("photos.db", bytes = 100)
         file("vectors.bin", bytes = 50)
