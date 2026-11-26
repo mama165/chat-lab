@@ -12,7 +12,6 @@ import java.util.TimeZone
 /** Writes the library (library.json). Needs no model: it can be called without analysing anything. */
 object LibraryWriter {
     fun write(context: Context, results: List<ImageResult>, keep: List<JSONObject> = emptyList()): File {
-        val entries = JSONArray()
         val added = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
@@ -48,9 +47,15 @@ object LibraryWriter {
         // A photo is written once: the newest record of an address wins, so that a photo analysed
         // twice (two selected folders that overlap, or a second run) never gets two records.
         val all = distinctById(keep.map { it.optString("id") to it } + fresh, { it.first }, keepLast = true)
-        all.forEach { entries.put(it.second) }
-        // The library goes into the chosen chatlab folder (it survives a reinstall).
-        LibraryStore.write(context, entries.toString())
+        // The library goes into the chosen chatlab folder (it survives a reinstall), entry by entry.
+        LibraryStore.writeStreamed(context) { out ->
+            out.write("[")
+            all.forEachIndexed { index, pair ->
+                if (index > 0) out.write(",")
+                out.write(pair.second.toString())
+            }
+            out.write("]")
+        }
         writeCompact(context, results)
         return File(context.filesDir, "library.json")
     }

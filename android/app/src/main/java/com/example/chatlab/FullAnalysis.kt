@@ -225,8 +225,8 @@ class AnalysisService : Service() {
 
     private suspend fun run(chatlab: String, sources: List<SourceFolder>, started: Long, control: AnalysisControl) {
         val zone = TimeZone.getDefault()
-        val oldLibrary = LibraryStore.read(this)
-        val known = readKnown(oldLibrary)
+        // The library is read entry by entry: the whole file is never held in memory as one text or one tree.
+        val known = readKnownFromStore(this)
         val report = ReportBuilder(sources)
 
         // 1. List each folder. A file already known and unchanged is not read again.
@@ -241,7 +241,7 @@ class AnalysisService : Service() {
         // 2. What is already in the library is kept as it is; the rest is to analyse.
         val carried = plan.carried.map { item ->
             report.analyzed(item.folderIndex)
-            carriedResult(requireNotNull(known.find(item.candidate.file)), item, zone)
+            carriedResult(requireNotNull(known.find(item.candidate.file)), known.vectorOf(item.candidate.file), item, zone)
         }
         val total = plan.toProcess.size
         AnalysisProgress.update {
@@ -259,7 +259,7 @@ class AnalysisService : Service() {
         val photosDone = AtomicInteger(0)
         val saveLock = Any()
         var lastSave = System.currentTimeMillis()
-        val keep = LibraryMerge.keepFromRemovedFolders(parseArray(oldLibrary), sources.map { it.name }.toSet())
+        val keep = keepFromRemovedFolders(this, sources.map { it.name }.toSet())
 
         // One analyser per worker: each loads its models and works alone. With nothing to
         // analyse, no model is loaded.
@@ -592,25 +592,58 @@ private fun parseArray(text: String?): JSONArray? = try {
 }
 
 /** The entries of the existing library that have a source, indexed by that source. */
-internal fun readKnown(text: String?): KnownLibrary {
-    val array = parseArray(text) ?: return KnownLibrary(emptyMap())
-    return KnownLibrary(
-        (0 until array.length())
-            .mapNotNull { array.optJSONObject(it) }
-            .filter { it.has("source") && it.optInt("analysis_version") == ANALYSIS_VERSION }
-            .associateBy { it.getString("source") },
-    )
+internal fun readKnown(text: String?): KnownLibrary =
+    if (text == null) KnownLibrary(emptyMap()) else readKnownFrom(java.io.StringReader(text))
+
+/**
+ * Same as [readKnown], read from the file entry by entry. The vectors are kept apart, as numbers, and taken
+ * out of the entries: the entries then weigh a few hundred bytes each instead of a tree of 768 boxed numbers.
+ */
+internal fun readKnownFrom(reader: java.io.Reader): KnownLibrary {
+    val byId = LinkedHashMap<String, JSONObject>()
+    val vectors = HashMap<String, FloatArray>()
+    try {
+        KnownSummary.forEachEntry(reader) { item ->
+            if (!item.has("source") || item.optInt("analysis_version") != ANALYSIS_VERSION) return@forEachEntry
+            val source = item.getString("source")
+            item.optJSONArray("vectors")?.optJSONArray(0)?.let { array ->
+                vectors[source] = FloatArray(array.length()) { array.getDouble(it).toFloat() }
+            }
+            item.remove("vectors")
+            byId[source] = item
+        }
+    } catch (e: Exception) {
+        // A library that cannot be read is treated as empty, as before.
+        return KnownLibrary(emptyMap())
+    }
+    return KnownLibrary(byId, vectors)
 }
+
+/** The known library of the store, read entry by entry; empty if there is none yet. */
+internal fun readKnownFromStore(context: Context): KnownLibrary =
+    LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { readKnownFrom(it) } ?: KnownLibrary(emptyMap())
+
+/** The photos of the folders that are no longer in the list, kept as they are. Read entry by entry. */
+internal fun keepFromRemovedFolders(context: Context, currentFolders: Set<String>): List<JSONObject> =
+    LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use {
+        LibraryMerge.keepFromRemovedFolders(it, currentFolders)
+    } ?: emptyList()
 
 /**
  * The photos already analysed: by their address, or, if it has changed, by their name, their size
  * and their date (see [KnownFiles]).
  */
-internal class KnownLibrary(private val byId: Map<String, JSONObject>) {
+internal class KnownLibrary(
+    private val byId: Map<String, JSONObject>,
+    private val vectors: Map<String, FloatArray> = emptyMap(),
+) {
     private val byIdentity = KnownFiles.byIdentity(byId.values)
 
     fun find(file: FileNode): JSONObject? =
         KnownFiles.find(byId, byIdentity, file.id, file.name, file.length, file.lastModified)
+
+    /** The vector of a photo already analysed, by its entry (the entry's source). */
+    fun vectorOf(file: FileNode): FloatArray? = find(file)?.optString("source")?.let { vectors[it] }
 }
 
 /** The library knows this file as it is: same address, same size, same date. */
@@ -631,10 +664,7 @@ internal fun carry(known: KnownLibrary, file: FileNode): Carry {
 }
 
 /** Rebuilds a result from an entry of the library, with today's folder and type. */
-private fun carriedResult(item: JSONObject, planItem: PlanItem, zone: TimeZone): ImageResult {
-    val values = item.optJSONArray("vectors")?.optJSONArray(0)?.let { array ->
-        FloatArray(array.length()) { array.getDouble(it).toFloat() }
-    }
+private fun carriedResult(item: JSONObject, values: FloatArray?, planItem: PlanItem, zone: TimeZone): ImageResult {
     val taken = item.optString("taken", "")
     val file = planItem.candidate.file
     return ImageResult(
@@ -667,7 +697,7 @@ data class FolderOverview(
 /** Reads the folders without analysing anything: how many photos, which are new, which are refused. */
 fun overview(context: Context): List<FolderOverview> {
     val sources = Sources.read(context)
-    val known = readKnown(LibraryStore.read(context))
+    val known = readKnownFromStore(context)
     return sources.map { folder ->
         val root = Sources.rootOf(context, folder)
         val number = ReadProgress.start(folder.uri, FileTally.count(root))

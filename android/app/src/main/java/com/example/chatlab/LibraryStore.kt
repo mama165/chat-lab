@@ -62,6 +62,20 @@ object LibraryStore {
             ?: error("impossible d'écrire le carnet dans le dossier chatlab")
     }
 
+    /** Writes the library through [body], entry by entry: the whole text is never held in memory. */
+    fun writeStreamed(context: Context, body: (java.io.Writer) -> Unit) {
+        val dir = folder(context)
+        if (dir == null) {
+            File(context.filesDir, NAME).bufferedWriter(Charsets.UTF_8).use(body)
+            return
+        }
+        val target = dir.findFile(NAME) ?: dir.createFile("application/json", NAME)
+            ?: error("impossible de créer le carnet dans le dossier chatlab")
+        val out = context.contentResolver.openOutputStream(target.uri, "wt")
+            ?: error("impossible d'écrire le carnet dans le dossier chatlab")
+        out.bufferedWriter(Charsets.UTF_8).use(body)
+    }
+
     /** Writes the trace of a crash to erreur.txt, in the chatlab folder, so it can be read. */
     fun saveErrorReport(context: Context, text: String) {
         try {
