@@ -30,12 +30,11 @@ class SearchResultsTest {
     }
 
     @Test
-    fun wordMatchesComeFirstAndAppearOnlyOnce() {
+    fun aPhotoAppearsOnlyOnce() {
         val a = entry("a", "gaufre maison")
         val b = entry("b", "")
-        val outcome = compute(listOf(a, b), ranked = ranked(listOf(a, b), listOf(0.20f, 0.19f)))
-        assertEquals(listOf("a"), outcome.words.map { it.entry.id })
-        assertEquals(listOf("b"), outcome.close.map { it.entry.id })
+        val outcome = compute(listOf(a, b), ranked = listOf(Match(a, 0.30f), Match(a, 0.30f), Match(b, 0.29f)))
+        assertEquals(listOf("a", "b"), outcome.close.map { it.entry.id })
         assertEquals(2, outcome.total)
     }
 
@@ -59,33 +58,39 @@ class SearchResultsTest {
     }
 
     @Test
-    fun filtersApplyToWordsAndResemblance() {
-        val inside = entry("in", "gaufre", indoor = true)
-        val outside = entry("out", "gaufre", indoor = false)
-        val near = entry("near", "", indoor = false)
+    fun filtersApplyToResemblance() {
+        val inside = entry("in", "", indoor = true)
+        val outside = entry("out", "", indoor = false)
         val outcome = compute(
-            listOf(inside, outside, near),
-            ranked = ranked(listOf(near), listOf(0.2f)),
+            listOf(inside, outside),
+            ranked = ranked(listOf(inside, outside), listOf(0.3f, 0.3f)),
             filters = Filters(place = Place.INDOOR),
         )
-        assertEquals(listOf("in"), outcome.words.map { it.entry.id })
-        assertTrue(outcome.close.isEmpty())
+        assertEquals(listOf("in"), outcome.close.map { it.entry.id })
     }
 
     @Test
     fun dateFilterExcludesOldPhotos() {
-        val recent = entry("recent", "gaufre", takenMs = hoursAgo(3))
-        val old = entry("old", "gaufre", takenMs = daysAgo(40))
-        val outcome = compute(listOf(recent, old), filters = Filters(date = DateFilter(DatePreset.LAST_24H)))
-        assertEquals(listOf("recent"), outcome.words.map { it.entry.id })
+        val recent = entry("recent", "", takenMs = hoursAgo(3))
+        val old = entry("old", "", takenMs = daysAgo(40))
+        val outcome = compute(
+            listOf(recent, old),
+            ranked = ranked(listOf(recent, old), listOf(0.3f, 0.3f)),
+            filters = Filters(date = DateFilter(DatePreset.LAST_24H)),
+        )
+        assertEquals(listOf("recent"), outcome.close.map { it.entry.id })
     }
 
     @Test
     fun folderFilterKeepsOnlyThatFolder() {
-        val a = entry("a", "gaufre", folder = "Camera")
-        val b = entry("b", "gaufre", folder = "Screenshots")
-        val outcome = compute(listOf(a, b), filters = Filters(folders = setOf("Screenshots")))
-        assertEquals(listOf("b"), outcome.words.map { it.entry.id })
+        val a = entry("a", "", folder = "Camera")
+        val b = entry("b", "", folder = "Screenshots")
+        val outcome = compute(
+            listOf(a, b),
+            ranked = ranked(listOf(a, b), listOf(0.3f, 0.3f)),
+            filters = Filters(folders = setOf("Screenshots")),
+        )
+        assertEquals(listOf("b"), outcome.close.map { it.entry.id })
     }
 
     @Test
@@ -165,10 +170,9 @@ class SearchResultsTest {
     }
 
     @Test
-    fun wordsWorkBeforeTheDescriptionIsRead() {
+    fun withoutDescriptionThereIsNoPhoto() {
         val outcome = compute(listOf(entry("a", "gaufre")), ranked = emptyList())
-        assertEquals(1, outcome.words.size)
-        assertTrue(outcome.close.isEmpty())
+        assertTrue(outcome.isEmpty)
         assertFalse(outcome.hasMore)
     }
 
