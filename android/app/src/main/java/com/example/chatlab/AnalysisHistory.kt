@@ -1,16 +1,9 @@
 package com.example.chatlab
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Paint
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,15 +30,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -65,8 +55,6 @@ import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.RadioRow
 import com.example.chatlab.ui.SectionLabel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -96,26 +84,6 @@ private fun readRecords(context: Context): List<Pair<String, AnalysisRecord>> =
             null
         }
     }
-
-/** The text of an analysis file, exactly as it is saved, or null if it cannot be read. */
-private fun readText(context: Context, name: String): String? = try {
-    File(RunArchive.directory(context), name).readText()
-} catch (e: Exception) {
-    null
-}
-
-/**
- * What "Copier les données" puts on the clipboard: the analysis file, the journal of its run and
- * the recent journal of the application. If the journals cannot be read, the analysis file alone.
- */
-private fun copyText(context: Context, name: String): String? {
-    val analysis = readText(context, name) ?: return null
-    return runCatching {
-        val record = AnalysisRecord.fromJson(JSONObject(analysis))
-        val run = record.diagnosticsRun
-        Diagnostics.copyBundle(context, JSONObject(analysis), run, record.startMs).toString()
-    }.getOrElse { analysis }
-}
 
 private fun readRecord(context: Context, name: String): AnalysisRecord? = try {
     AnalysisRecord.fromJson(JSONObject(File(RunArchive.directory(context), name).readText()))
@@ -261,17 +229,8 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
             Loaded.Missing -> Text("Ce fichier d'analyse n'est plus là ou ne peut pas être lu.", fontSize = 14.sp, color = Palette.Muted)
             is Loaded.Ready -> {
                 val record = state.record
-                var copyPhase by remember { mutableStateOf(CopyPhase.IDLE) }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    // A plain text here: a section label would take the whole width and push the button away.
-                    Text("Courbes pendant l'analyse", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
-                    CopyDataButton(name, copyPhase) { copyPhase = it }
-                }
-                CopyDetails(visible = copyPhase == CopyPhase.COPIED)
+                // A plain text here: the curves are the content of this page.
+                Text("Courbes pendant l'analyse", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
                 CurvesLegend(workersUsed = AnalysisTechnical.workersUsed(record))
                 CurvesChart(record)
                 Block("Contexte") {
@@ -283,100 +242,6 @@ fun AnalysisDetailPage(name: String, onBack: () -> Unit) {
             }
         }
         Spacer(Modifier.height(16.dp))
-    }
-}
-
-private enum class CopyPhase { IDLE, COPYING, COPIED, FAILED }
-
-/**
- * What the copy holds, shown under the header once it is copied: the three parts, one after the
- * other, then the confirmation. It goes away when the button returns to its usual state.
- */
-@Composable
-private fun CopyDetails(visible: Boolean) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut(),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val parts = listOf("Le fichier de l'analyse", "Le journal de ce run", "Le journal de l'appli")
-            parts.forEachIndexed { index, label ->
-                var shown by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    delay(150L * (index + 1))
-                    shown = true
-                }
-                val alpha by animateFloatAsState(if (shown) 1f else 0f, animationSpec = tween(350), label = "copy$index")
-                Row(modifier = Modifier.alpha(alpha), verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(8.dp)) { drawCircle(Palette.Accent) }
-                    Spacer(Modifier.width(8.dp))
-                    Text(label, fontSize = 12.sp, color = Palette.Muted)
-                }
-            }
-            var confirmed by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                delay(600L)
-                confirmed = true
-            }
-            val alpha by animateFloatAsState(if (confirmed) 1f else 0f, animationSpec = tween(300), label = "copyDone")
-            Text(
-                "Copié dans le presse-papier",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Palette.Accent,
-                modifier = Modifier.alpha(alpha),
-            )
-        }
-    }
-}
-
-/**
- * "Copier les données": the analysis file, as saved, goes to the clipboard so that it can be
- * shared. While it is copied the button says so; then it confirms, and returns to its usual state.
- */
-@Composable
-private fun CopyDataButton(name: String, phase: CopyPhase, onPhase: (CopyPhase) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val shape = RoundedCornerShape(14.dp)
-    Row(
-        modifier = Modifier
-            .clip(shape)
-            .border(1.dp, Palette.Accent, shape)
-            .clickable(enabled = phase == CopyPhase.IDLE) {
-                onPhase(CopyPhase.COPYING)
-                scope.launch {
-                    val text = withContext(Dispatchers.IO) { copyText(context, name) }
-                    onPhase(if (text == null) {
-                        CopyPhase.FAILED
-                    } else {
-                        context.getSystemService(ClipboardManager::class.java)
-                            .setPrimaryClip(ClipData.newPlainText("Analyse ChatLab", text))
-                        CopyPhase.COPIED
-                    })
-                    delay(2_000)
-                    onPhase(CopyPhase.IDLE)
-                }
-            }
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        if (phase == CopyPhase.COPYING) {
-            GaugeRing(fraction = null, size = 12.dp)
-        }
-        Text(
-            when (phase) {
-                CopyPhase.IDLE -> "Copier les données"
-                CopyPhase.COPYING -> "Copie en cours…"
-                CopyPhase.COPIED -> "Copié dans le presse-papier"
-                CopyPhase.FAILED -> "Copie impossible"
-            },
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Palette.Accent,
-        )
     }
 }
 
