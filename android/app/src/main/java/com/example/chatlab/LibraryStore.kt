@@ -22,59 +22,13 @@ object LibraryStore {
         return DocumentFile.fromTreeUri(context, Uri.parse(uri))?.takeIf { it.canWrite() }
     }
 
-    /** The library file as a stream, read entry by entry by the folder page; null if it does not exist yet. */
-    fun open(context: Context): java.io.InputStream? {
-        val inFolder = folder(context)?.findFile(NAME)
-        if (inFolder != null && inFolder.exists()) {
-            return try {
-                context.contentResolver.openInputStream(inFolder.uri)
-            } catch (e: Exception) {
-                null
-            }
-        }
-        val local = File(context.filesDir, NAME)
-        return if (local.exists()) local.inputStream() else null
-    }
+    /** The backup of the library (ChatLab/snapshots/library.json) as a stream; null if there is none yet. */
+    fun open(context: Context): java.io.InputStream? =
+        LibraryExport.snapshotFile(context).takeIf { it.exists() }?.inputStream()
 
-    /** The content of the library, or null if it does not exist yet. */
-    fun read(context: Context): String? {
-        val inFolder = folder(context)?.findFile(NAME)
-        if (inFolder != null && inFolder.exists()) {
-            return try {
-                context.contentResolver.openInputStream(inFolder.uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
-            } catch (e: Exception) {
-                null
-            }
-        }
-        val local = File(context.filesDir, NAME)
-        return if (local.exists()) local.readText(Charsets.UTF_8) else null
-    }
-
-    fun write(context: Context, text: String) {
-        val dir = folder(context)
-        if (dir == null) {
-            File(context.filesDir, NAME).writeText(text, Charsets.UTF_8)
-            return
-        }
-        val target = dir.findFile(NAME) ?: dir.createFile("application/json", NAME)
-            ?: error("impossible de créer le carnet dans le dossier chatlab")
-        context.contentResolver.openOutputStream(target.uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-            ?: error("impossible d'écrire le carnet dans le dossier chatlab")
-    }
-
-    /** Writes the library through [body], entry by entry: the whole text is never held in memory. */
-    fun writeStreamed(context: Context, body: (java.io.Writer) -> Unit) {
-        val dir = folder(context)
-        if (dir == null) {
-            File(context.filesDir, NAME).bufferedWriter(Charsets.UTF_8).use(body)
-            return
-        }
-        val target = dir.findFile(NAME) ?: dir.createFile("application/json", NAME)
-            ?: error("impossible de créer le carnet dans le dossier chatlab")
-        val out = context.contentResolver.openOutputStream(target.uri, "wt")
-            ?: error("impossible d'écrire le carnet dans le dossier chatlab")
-        out.bufferedWriter(Charsets.UTF_8).use(body)
-    }
+    /** The content of the backup, or null if there is none yet. */
+    fun read(context: Context): String? =
+        open(context)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
 
     /** Writes the trace of a crash to erreur.txt, in the chatlab folder, so it can be read. */
     fun saveErrorReport(context: Context, text: String) {
