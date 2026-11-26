@@ -22,6 +22,28 @@ object LibraryWriter {
     }
 
     /**
+     * One batch of analysed photos, from the writing task: saved, then given to the search at once.
+     * Nothing is read back from the whole library.
+     */
+    fun writeBatch(context: Context, results: List<ImageResult>) {
+        if (results.isEmpty()) return
+        val started = System.currentTimeMillis()
+        val mapped = PhotoRecordMapper.map(results, started)
+        val store = CompactLibrary(context)
+        try {
+            store.add(mapped.records)
+            LiveLibrary.publish(store.entriesWithVectors(mapped.records.map { it.address }))
+        } finally {
+            store.close()
+        }
+        Diagnostics.event(
+            context,
+            "compactWritten",
+            JSONObject().put("photos", mapped.records.size).put("ms", System.currentTimeMillis() - started),
+        )
+    }
+
+    /**
      * The same results, in the compact store (parallel writing: the JSON is still the one the app reads).
      * A failure is recorded in the journal and never stops the analysis.
      */

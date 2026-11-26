@@ -67,6 +67,12 @@ class CompactLibrary(context: Context) : RecordSink {
         }
     }
 
+    /** The photos with these addresses, with their vectors: the ones just saved, read without the whole library. */
+    fun entriesWithVectors(addresses: List<String>): List<LibraryEntry> = synchronized(lock) {
+        val rows = database.rowsByAddress()
+        database.entries(addresses).map { entry -> entry.copy(vector = rows[entry.id]?.let { vectors.readOrNull(it) }) }
+    }
+
     /** The best [k] rows for a query, read from the vector file. */
     fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> = synchronized(lock) {
         VectorRanking.topRows(query, minOf(database.nextFreeRow(), vectors.rowCount()), vectors, k)

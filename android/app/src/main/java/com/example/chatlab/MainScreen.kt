@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
@@ -62,15 +61,6 @@ private fun AppContent() {
     var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()
 
-    // The search reads the library again at each save of a running analysis, not only at its end.
-    val saves by AnalysisProgress.saves.collectAsState()
-    LaunchedEffect(saves) {
-        if (saves > 0) {
-            // Several saves close together give one reading: the last one restarts the wait.
-            delay(200)
-            dataVersion++
-        }
-    }
 
     // The notice "Analyse terminée" appears only when a run ends while the app is open.
     var wasRunning by remember { mutableStateOf(progress.running) }
@@ -95,11 +85,15 @@ private fun AppContent() {
         }
     }
     // null until the library is read: "still loading" is not the same as "no photo yet".
+    // The whole library is read when the data changes as a whole. During an analysis, the photos just saved
+    // are added to the library in memory: the search follows them without reading everything again.
     val library by produceState<List<LibraryEntry>?>(initialValue = null, dataVersion) {
-        value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion) }
+        value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion).also { LiveLibrary.replaceAll(it) } }
     }
-    val entries = library ?: emptyList()
-    val libraryLoading = library == null
+    val liveVersion by LiveLibrary.changes.collectAsState()
+    val loaded = library != null
+    val entries = remember(loaded, liveVersion) { if (loaded) LiveLibrary.snapshot() else emptyList() }
+    val libraryLoading = !loaded
 
     BackHandler(enabled = page != Page.TABS) { page = page.parent() }
     BackHandler(enabled = search.sheetOpen) { search.sheetOpen = false }

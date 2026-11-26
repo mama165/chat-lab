@@ -36,15 +36,6 @@ object AnalysisProgress {
     private val value = MutableStateFlow(Progress())
     val state: StateFlow<Progress> = value.asStateFlow()
 
-    private val savedCount = MutableStateFlow(0)
-
-    /** Goes up each time the library is saved during an analysis: the search then reads the new photos. */
-    val saves: StateFlow<Int> = savedCount.asStateFlow()
-
-    @Synchronized
-    internal fun saved() {
-        savedCount.value = savedCount.value + 1
-    }
 
     internal fun set(progress: Progress) {
         value.value = progress
@@ -299,6 +290,14 @@ class AnalysisService : Service() {
                 parts = { it.modelTimings },
             )
         }
+        // One task writes the photos as they are analysed, in batches: the workers never wait for the disk.
+        val writer = BatchWriter<ImageResult>(
+            CoroutineScope(Dispatchers.IO),
+            intervalMs = WRITE_INTERVAL_MS,
+            maxBatch = WRITE_BATCH,
+            write = { batch -> LibraryWriter.writeBatch(this@AnalysisService, batch) },
+            onError = { Diagnostics.event(this@AnalysisService, "compactError", JSONObject().put("error", it.javaClass.simpleName)) },
+        )
         try {
             coroutineScope {
                 slots.mapIndexed { workerIndex, slot ->
@@ -332,9 +331,8 @@ class AnalysisService : Service() {
                             when (outcome) {
                                 is Outcome.Done -> {
                                     results[index] = outcome.result
-                                    // Saved as soon as it is analysed: the search finds it a moment later.
-                                    LibraryWriter.write(this@AnalysisService, listOf(outcome.result))
-                                    AnalysisProgress.saved()
+                                    // Queued for the writing task: saved within a few hundred milliseconds.
+                                    writer.submit(outcome.result)
                                     report.analyzed(item.folderIndex)
                                     val count = photosDone.incrementAndGet()
                                     if (NativeMemory.isPhotoPoint(count)) {
@@ -358,6 +356,7 @@ class AnalysisService : Service() {
                     }
                 }.awaitAll()
             }
+            writer.close()
             Diagnostics.event(
                 this@AnalysisService,
                 "workersEnd",
@@ -369,7 +368,8 @@ class AnalysisService : Service() {
             val elapsed = AnalysisProgress.state.value.activeElapsed(System.currentTimeMillis())
             val stopped = control.state == RunState.STOPPING
             val finalResults = carried + results.filterNotNull()
-            LibraryWriter.write(this@AnalysisService, finalResults, keep)
+            // The analysed photos are already saved; what remains is the photos carried over, completed.
+            LibraryWriter.write(this@AnalysisService, carried, keep)
             val runReport = report.build(System.currentTimeMillis(), elapsed, stopped)
             ReportStore.saveRun(this@AnalysisService, runReport)
             val samples = recorder?.stop().orEmpty()
@@ -720,3 +720,8 @@ fun overview(context: Context): List<FolderOverview> {
     }
 }
 
+/** The writing task saves the analysed photos at most this long after the first photo of a batch. */
+internal const val WRITE_INTERVAL_MS = 300L
+
+/** A batch is saved at once when it holds this many photos. */
+internal const val WRITE_BATCH = 50
