@@ -50,6 +50,36 @@ class StressTest {
         "une porte en bois", "un meuble blanc dans une pièce claire", "une photo prise de nuit",
     )
 
+    /**
+     * Slow and visible: the given words (argument "words", comma-separated), each written at once, then
+     * half of it, then cleared, with a pause (argument "pause", in ms) after each change so that the
+     * results can be seen and read in the logcat.
+     */
+    @Test
+    fun wordsSlowly() {
+        val args = InstrumentationRegistry.getArguments()
+        val words = args.getString("words")?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: return
+        val pause = args.getString("pause")?.toLongOrNull() ?: 10_000L
+        val minutes = args.getString("minutes")?.toLongOrNull() ?: 3L
+        val deadline = System.currentTimeMillis() + minutes * 60_000L
+        val field = compose.onNode(hasSetTextAction())
+        var round = 0
+        while (System.currentTimeMillis() < deadline) {
+            round++
+            for (word in words) {
+                field.performTextReplacement(word)
+                Thread.sleep(pause)
+                Log.i(TAG, "visible round=$round word=\"$word\" written=full pauseMs=$pause")
+                field.performTextReplacement(word.take(word.length / 2))
+                Thread.sleep(pause / 2)
+                Log.i(TAG, "visible round=$round word=\"$word\" written=half pauseMs=${pause / 2}")
+                field.performTextReplacement("")
+                Thread.sleep(pause / 2)
+            }
+        }
+        Log.i(TAG, "visible end rounds=$round")
+    }
+
     @Test
     fun searchesUnderLoad() {
         val minutes = InstrumentationRegistry.getArguments().getString("minutes")?.toLongOrNull() ?: 3L
