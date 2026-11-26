@@ -2,6 +2,7 @@ package com.example.chatlab
 
 import android.util.Log
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,11 +65,23 @@ class StressTest {
         val minutes = args.getString("minutes")?.toLongOrNull() ?: 3L
         val deadline = System.currentTimeMillis() + minutes * 60_000L
         val field = compose.onNode(hasSetTextAction())
+        val expect = args.getString("expect")?.toIntOrNull() ?: 1
+        val failures = mutableListOf<String>()
         var round = 0
         while (System.currentTimeMillis() < deadline) {
             round++
             for (word in words) {
                 field.performTextReplacement(word)
+                // Checks that photos appear for the word: at least "expect" thumbnails, within 30 s.
+                val started = System.currentTimeMillis()
+                val shown = runCatching {
+                    compose.waitUntil(30_000L) { photoTiles() >= expect }
+                }.isSuccess
+                val tiles = photoTiles()
+                val ms = System.currentTimeMillis() - started
+                val ok = shown && tiles >= expect
+                Log.i(TAG, "check round=$round word=\"$word\" tiles=$tiles expected=$expect ms=$ms ok=$ok")
+                if (!ok) failures += "\"$word\" (round $round): $tiles photos, $expect attendues"
                 Thread.sleep(pause)
                 Log.i(TAG, "visible round=$round word=\"$word\" written=full pauseMs=$pause")
                 field.performTextReplacement(word.take(word.length / 2))
@@ -77,8 +91,16 @@ class StressTest {
                 Thread.sleep(pause / 2)
             }
         }
-        Log.i(TAG, "visible end rounds=$round")
+        Log.i(TAG, "visible end rounds=$round failures=${failures.size}")
+        assertTrue("Aucune photo affichée pour : ${failures.joinToString("; ")}", failures.isEmpty())
     }
+
+    /** Thumbnails on screen: each one is described by the name of its photo. */
+    private fun photoTiles(): Int =
+        listOf(".jpg", ".jpeg", ".png", ".heic", ".webp").sumOf { extension ->
+            compose.onAllNodes(hasContentDescription(extension, substring = true, ignoreCase = true))
+                .fetchSemanticsNodes().size
+        }
 
     @Test
     fun searchesUnderLoad() {
