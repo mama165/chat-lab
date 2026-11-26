@@ -83,6 +83,29 @@ object Diagnostics {
         return file.name
     }
 
+    /** Native memory now, in megabytes. */
+    fun nativeMb(): Long = android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024)
+
+    /**
+     * Runs [block] and writes a "nativeStep" event when the native memory moved by 100 MB or more during it,
+     * so that the journal shows which step made the jump.
+     */
+    fun <T> native(context: Context, stage: String, block: () -> T): T {
+        val before = nativeMb()
+        try {
+            return block()
+        } finally {
+            val after = nativeMb()
+            if (kotlin.math.abs(after - before) >= 100) {
+                event(
+                    context,
+                    "nativeStep",
+                    JSONObject().put("stage", stage).put("beforeMb", before).put("afterMb", after),
+                )
+            }
+        }
+    }
+
     /** Writes one event, with the time since the app started. Never throws. */
     fun event(context: Context, kind: String, data: JSONObject = JSONObject()) {
         runCatching {

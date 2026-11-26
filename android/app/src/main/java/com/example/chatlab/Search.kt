@@ -778,7 +778,7 @@ fun GridThumb(location: String, modifier: Modifier) {
     val image by produceState<ImageBitmap?>(initialValue = null, location) {
         value = withContext(Dispatchers.IO) {
             try {
-                decodeThumbnail(context, location)?.asImageBitmap()
+                Diagnostics.native(context, "thumb") { decodeThumbnail(context, location) }?.asImageBitmap()
             } catch (e: Exception) {
                 null
             }
