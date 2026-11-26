@@ -95,7 +95,7 @@ fun ReportRow() {
             }
         }
         Text(
-            "Une copie de sauvegarde des photos analysées, créée à la demande.",
+            "Copie de sauvegarde des photos analysées",
             fontSize = 12.sp,
             color = Palette.Muted,
         )
