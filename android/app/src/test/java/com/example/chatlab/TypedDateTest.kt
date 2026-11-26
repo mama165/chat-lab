@@ -110,6 +110,73 @@ class TypedDateTest {
     }
 
     @Test
+    fun beforeADateIsEveryDayUpToTheDayBefore() {
+        val range = parse("avant le 20 novembre").range
+        assertEquals(day(1970, 1, 1), range?.from)
+        assertEquals(day(2026, 11, 19), range?.to)
+    }
+
+    @Test
+    fun afterADateStartsTheDayAfter() {
+        val range = parse("après le 20 novembre").range
+        assertEquals(day(2026, 11, 21), range?.from)
+        assertEquals(day(2100, 12, 31), range?.to)
+    }
+
+    @Test
+    fun afterAnAccentedOrPlainWordGivesTheSameRange() {
+        assertEquals(parse("apres le 20 novembre").range, parse("après le 20 novembre").range)
+    }
+
+    @Test
+    fun wordsAroundABeforeOrAfterDateAreKept() {
+        val result = parse("chat avant le 20 novembre")
+        assertEquals(day(2026, 11, 19), result.range?.to)
+        assertEquals("chat", result.rest)
+    }
+
+    @Test
+    fun beforeYesterdayIsStillTheDayBeforeYesterday() {
+        val result = parse("avant-hier")
+        assertEquals(day(2026, 11, 24), result.range?.from)
+        assertEquals("", result.rest)
+    }
+
+    @Test
+    fun betweenTwoDaysOfTheSameMonthIncludesBoth() {
+        val range = parse("entre le 3 et le 10 novembre").range
+        assertEquals(day(2026, 11, 3), range?.from)
+        assertEquals(day(2026, 11, 10), range?.to)
+    }
+
+    @Test
+    fun duAuGivesTheSameRange() {
+        assertEquals(parse("entre le 3 et le 10 novembre").range, parse("du 3 au 10 novembre").range)
+    }
+
+    @Test
+    fun betweenDatesOfDifferentMonthsAndAYear() {
+        val range = parse("entre le 25 octobre et le 3 novembre 2026").range
+        assertEquals(day(2026, 10, 25), range?.from)
+        assertEquals(day(2026, 11, 3), range?.to)
+    }
+
+    @Test
+    fun betweenWithTheStartAfterTheEndIsNotARange() {
+        // No range is made from it: only the last date, "3 novembre", is read as one day.
+        val result = parse("entre le 10 et le 3 novembre")
+        assertEquals(DateRange(day(2026, 11, 3), day(2026, 11, 3)), result.range)
+        assertEquals("entre le 10 et le", result.rest)
+    }
+
+    @Test
+    fun beforeWithoutAMonthIsNotADate() {
+        val result = parse("avant le 20")
+        assertNull(result.range)
+        assertEquals("avant le 20", result.rest)
+    }
+
+    @Test
     fun emptyTextHasNoDateAndNoWords() {
         val result = parse("   ")
         assertNull(result.range)

@@ -8,7 +8,9 @@ data class TypedDate(val range: DateRange?, val rest: String)
 /**
  * Reads the dates typed in the search box: "hier", "avant-hier", "aujourd'hui", "ce matin", "hier soir",
  * "26 novembre 2026", "26 nov." (this year, or last year if still to come), "26/11/2026", "2026-11-26",
- * "novembre 2026". Accents and capitals do not matter. What is not a date stays as the words to look for.
+ * "novembre 2026", "avant le 20 novembre" (strictly before), "après le 20 novembre" (strictly after),
+ * "entre le 3 et le 10 novembre" or "du 3 au 10 novembre" (both days included).
+ * Accents and capitals do not matter. What is not a date stays as the words to look for.
  */
 object TypedDates {
     private val MONTHS = mapOf(
@@ -26,12 +28,24 @@ object TypedDates {
     private val MONTH = MONTHS.keys.sortedByDescending { it.length }.joinToString("|")
     private const val PART = "matin|apres-midi|soir|nuit"
 
-    private val RELATIVE = Regex("(?<![a-z])(avant[- ]hier|hier|aujourd'?hui)(?:\\s+($PART))?(?![a-z])")
+    /** A date written out in full (no "hier" here): used after "avant", "après", "entre". */
+    private val EXPLICIT = "\\d{1,2}\\s+(?:$MONTH)\\.?(?:\\s+\\d{4})?|\\d{1,2}/\\d{1,2}(?:/\\d{4})?|\\d{4}-\\d{1,2}-\\d{1,2}"
+
     private val THIS = Regex("(?<![a-z])(?:ce|cet|cette)\\s+($PART)(?![a-z])")
+    private val BETWEEN = Regex(
+        "(?<![a-z])(?:entre\\s+(?:le\\s+)?|du\\s+)(\\d{1,2})(?:\\s+($MONTH)\\.?(?:\\s+(\\d{4}))?)?" +
+            "\\s+(?:et|au|a)\\s+(?:le\\s+)?(\\d{1,2})\\s+($MONTH)\\.?(?:\\s+(\\d{4}))?(?![a-z0-9])",
+    )
+    private val BEFORE_AFTER = Regex("(?<![a-z])(avant|apres)\\s+(?:le\\s+)?($EXPLICIT)(?![a-z0-9])")
+    private val RELATIVE = Regex("(?<![a-z])(avant[- ]hier|hier|aujourd'?hui)(?:\\s+($PART))?(?![a-z])")
     private val ISO = Regex("(?<![0-9])(\\d{4})-(\\d{1,2})-(\\d{1,2})(?![0-9])")
     private val NUMERIC = Regex("(?<![0-9])(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}))?(?![0-9])")
     private val DAY_MONTH = Regex("(?<![a-z0-9])(\\d{1,2})\\s+($MONTH)\\.?(?:\\s+(\\d{4}))?(?![a-z0-9])")
     private val MONTH_YEAR = Regex("(?<![a-z0-9])($MONTH)\\.?\\s+(\\d{4})(?![a-z0-9])")
+
+    /** Open ends of "avant" and "après": far enough to hold any photo. */
+    private val EARLIEST = SimpleDate(1970, 1, 1)
+    private val LATEST = SimpleDate(2100, 12, 31)
 
     fun parse(text: String, time: When): TypedDate {
         // Each character keeps its place: the dates found in the folded text are cut from the original one.
@@ -45,11 +59,17 @@ object TypedDates {
             if (range == null) range = found
         }
 
-        for (match in RELATIVE.findAll(folded)) {
-            claim(match, relative(match, time))
-        }
         for (match in THIS.findAll(folded)) {
             claim(match, single(time.today, PARTS[match.groupValues[1]] ?: DayPart.ALL))
+        }
+        for (match in BETWEEN.findAll(folded)) {
+            claim(match, between(match, time))
+        }
+        for (match in BEFORE_AFTER.findAll(folded)) {
+            claim(match, beforeOrAfter(match, time))
+        }
+        for (match in RELATIVE.findAll(folded)) {
+            claim(match, relative(match, time))
         }
         for (match in ISO.findAll(folded)) {
             val (year, month, day) = match.destructured
@@ -74,6 +94,31 @@ object TypedDates {
             text.forEachIndexed { index, c -> if (!consumed[index]) append(c) }
         }.replace(Regex("\\s+"), " ").trim()
         return TypedDate(range, rest)
+    }
+
+    /** "avant le 20 novembre": every day up to the day before. "après le 20 novembre": from the day after. */
+    private fun beforeOrAfter(match: MatchResult, time: When): DateRange? {
+        val day = parse(match.groupValues[2], time).range?.from ?: return null
+        return if (match.groupValues[1] == "avant") {
+            DateRange(EARLIEST, day.plusDays(-1, time.zone))
+        } else {
+            DateRange(day.plusDays(1, time.zone), LATEST)
+        }
+    }
+
+    /** "entre le 3 et le 10 novembre" or "du 25 octobre au 3 novembre 2026": both ends included. */
+    private fun between(match: MatchResult, time: When): DateRange? {
+        val g = match.groupValues
+        val endMonth = MONTHS.getValue(g[5])
+        val end = yearFor(endMonth, g[4].toInt(), g[6].ifEmpty { null }, time) ?: return null
+        val start = if (g[2].isEmpty()) {
+            // The month and year of the end are the ones of the start.
+            dayOf(end.year, end.month, g[1].toInt())
+        } else {
+            yearFor(MONTHS.getValue(g[2]), g[1].toInt(), g[3].ifEmpty { null }, time)
+        } ?: return null
+        if (start > end) return null
+        return DateRange(start, end)
     }
 
     private fun relative(match: MatchResult, time: When): DateRange {
