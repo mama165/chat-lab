@@ -91,7 +91,10 @@ object LibraryStore {
 /** The saved library, read from the chatlab folder (or the private space otherwise). */
 
 /** Size of the saved library, in bytes (0 if it does not exist). */
-fun LibraryStore.librarySize(context: Context): Long = try {
+fun LibraryStore.librarySize(context: Context): Long = AnalysisRecordFiles.size(context.filesDir) + savedLibrarySize(context)
+
+/** Size of the JSON copy of the library, the backup kept in the chatlab folder (0 if it does not exist). */
+private fun savedLibrarySize(context: Context): Long = try {
     val uri = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
     val inFolder = uri?.let { DocumentFile.fromTreeUri(context, Uri.parse(it))?.findFile("library.json") }
     inFolder?.length() ?: File(context.filesDir, "library.json").takeIf { it.exists() }?.length() ?: 0L
@@ -114,4 +117,5 @@ fun LibraryStore.wipeAnalysis(context: Context) {
         }
         File(context.filesDir, name).delete()
     }
+    AnalysisRecordFiles.wipe(context.filesDir)
 }
