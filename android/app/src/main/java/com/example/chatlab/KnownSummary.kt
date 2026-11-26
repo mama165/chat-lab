@@ -32,11 +32,22 @@ class KnownSummary private constructor(
         val EMPTY = KnownSummary(emptyMap(), emptyMap())
 
         /** Reads the library text of [reader] (a JSON array of entries), keeping the entries of [version] only. */
-        fun parse(reader: Reader, version: Int): KnownSummary {
+        fun parse(reader: Reader, version: Int): KnownSummary =
+            build(version) { action -> forEachEntry(reader, action) }
+
+        /** The same summary, from the photos of the database: the library text is not needed. */
+        fun fromStore(store: CompactLibrary, version: Int): KnownSummary =
+            build(version) { action -> store.recordItems(action) }
+
+        /** The summary of the entries given by [each], keeping the entries of [version] only. */
+        internal fun fromItems(version: Int, each: ((JSONObject) -> Unit) -> Unit): KnownSummary =
+            build(version, each)
+
+        private fun build(version: Int, each: ((JSONObject) -> Unit) -> Unit): KnownSummary {
             val byAddress = HashMap<String, Entry>()
             val byIdentity = HashMap<KnownFiles.Identity, Entry>()
-            forEachEntry(reader) { item ->
-                if (!item.has("source") || item.optInt("analysis_version") != version) return@forEachEntry
+            each { item ->
+                if (!item.has("source") || item.optInt("analysis_version") != version) return@each
                 val entry = Entry(item.optLong("size"), item.optLong("modified"), item.optString("mime"))
                 byAddress[item.getString("source")] = entry
                 if (item.has("name") && item.has("modified")) {
