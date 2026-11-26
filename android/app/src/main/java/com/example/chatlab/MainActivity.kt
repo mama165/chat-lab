@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
         ThreadWatch.installIfDebuggable(this)
         // Copies the JSON library into the compact store, once, in the background.
         LibraryMigration.startIfNeeded(applicationContext)
+        MemoryTimeline.start(applicationContext)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             LibraryStore.saveErrorReport(applicationContext, "Plantage : $error\n\n${error.stackTraceToString()}")
