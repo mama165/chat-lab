@@ -155,7 +155,7 @@ fun SearchScreen(
     var queryVector by remember { mutableStateOf<FloatArray?>(null) }
     var modelError by remember { mutableStateOf<String?>(null) }
     var recents by remember { mutableStateOf(RecentStore.read(context)) }
-    val time = remember(query, state.filters, entries) { When(System.currentTimeMillis()) }
+    val time = remember(query, state.filters) { When(System.currentTimeMillis()) }
     // The place is chosen, but does not filter the results yet: see Filters.withoutPlace.
     val resultFilters = state.filters.withoutPlace()
     // A date typed in the box ("hier", "26 novembre 2026") filters the results; the rest is what gets compared.
@@ -192,26 +192,34 @@ fun SearchScreen(
     }
     // The vector whose ranking is in state.ranked: until it matches the current vector, the search is still running.
     var rankedFor by remember { mutableStateOf<FloatArray?>(null) }
+    // The photos already scored for rankedFor. While the sentence stays the same, a change of the library
+    // scores only the new photos: the search does not start again, so it does not flicker during an analysis.
+    var rankedIds by remember { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(queryVector, entries) {
         val vector = queryVector
-        rankedFor = null
+        val sameQuery = vector != null && rankedFor === vector
+        if (!sameQuery) rankedFor = null
         if (vector == null) {
             state.ranked = emptyList()
+            rankedIds = emptySet()
             return@LaunchedEffect
         }
+        val fresh = IncrementalRanking.photosToScore(entries, rankedIds, sameQuery)
+        if (sameQuery && fresh.isEmpty()) return@LaunchedEffect
         // The timing goes to the journal from the background thread: writing it on the main thread would be a violation.
-        state.ranked = withContext(Dispatchers.Default) {
+        val found = withContext(Dispatchers.Default) {
             val started = System.currentTimeMillis()
             SearchStages.mark(context, "rank.start")
-            val found = Library.rankDescription(entries, vector, Place.ALL, null)
+            val scored = Library.rankDescription(fresh, vector, Place.ALL, null)
             SearchStages.mark(context, "rank.end")
             Diagnostics.event(
                 context,
                 "searchRank",
                 JSONObject()
                     .put("ms", System.currentTimeMillis() - started)
-                    .put("photos", entries.size)
-                    .put("found", found.size)
+                    .put("photos", fresh.size)
+                    .put("found", scored.size)
+                    .put("incremental", sameQuery)
                     // Memory at each search: the native part (models) and the Java part (the library).
                     .put("nativeMb", android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024))
                     .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024))
@@ -219,8 +227,10 @@ fun SearchScreen(
                     .put("thumbMb", ThumbStats.megabytes())
                     .put("thumbs", ThumbStats.count()),
             )
-            found
+            scored
         }
+        state.ranked = if (sameQuery) IncrementalRanking.merge(state.ranked, found) else found
+        rankedIds = if (sameQuery) rankedIds + fresh.map { it.id } else entries.map { it.id }.toSet()
         rankedFor = vector
     }
     val pending = rankingPending(typed.rest.isBlank(), modelError != null, queryVector, rankedFor)
