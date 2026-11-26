@@ -105,20 +105,7 @@ fun SettingsPage(
         Column {
             SectionLabel("Avancé")
             SettingRow("Historique des analyses", "$history", onClick = { onOpen(Page.HISTORY) })
-            SettingRow(
-                "Exporter la bibliothèque",
-                "sauvegarde library.json",
-                onClick = {
-                    Thread {
-                        val message = try {
-                            "Bibliothèque exportée : ${LibraryExport.run(context)} photos"
-                        } catch (e: Exception) {
-                            "Export impossible : ${e.message ?: e.javaClass.simpleName}"
-                        }
-                        context.mainExecutor.execute { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
-                    }.start()
-                },
-            )
+            ReportRow()
             SettingRow("Tout effacer", color = Palette.Danger, onClick = { onOpen(Page.WIPE) })
         }
         Text(
