@@ -30,6 +30,48 @@ class SearchResultsTest {
     }
 
     @Test
+    fun aDateAloneListsItsPhotosMostRecentFirst() {
+        val later = entry("later", takenMs = hoursAgo(1))
+        val earlier = entry("earlier", takenMs = hoursAgo(3))
+        val old = entry("old", takenMs = daysAgo(3))
+        val filters = Filters(date = DateFilter(preset = DatePreset.LAST_24H))
+        val outcome = compute(listOf(earlier, old, later), query = "", filters = filters)
+        assertEquals(listOf(later, earlier), outcome.close.map { it.entry })
+        assertTrue(outcome.extra.isEmpty())
+        assertFalse(outcome.hasMore)
+    }
+
+    @Test
+    fun aDescriptionAloneListsTheSimilarPhotosMostRecentFirst() {
+        val oldest = entry("oldest", takenMs = daysAgo(5))
+        val newest = entry("newest", takenMs = hoursAgo(1))
+        val middle = entry("middle", takenMs = daysAgo(2))
+        // All three look alike enough: the score decides who comes, the date decides the order.
+        val outcome = compute(
+            listOf(oldest, newest, middle),
+            query = "gâteau",
+            ranked = ranked(listOf(oldest, newest, middle), listOf(0.30f, 0.29f, 0.28f)),
+        )
+        assertEquals(listOf(newest, middle, oldest), outcome.close.map { it.entry })
+    }
+
+    @Test
+    fun aDateAndADescriptionListTheSimilarPhotosOfThatDateMostRecentFirst() {
+        val first = entry("first", takenMs = hoursAgo(2))
+        val second = entry("second", takenMs = hoursAgo(8))
+        val other = entry("other", takenMs = daysAgo(4))
+        val filters = Filters(date = DateFilter(preset = DatePreset.LAST_24H))
+        val outcome = compute(
+            listOf(second, other, first),
+            query = "gâteau",
+            ranked = ranked(listOf(second, other, first), listOf(0.30f, 0.30f, 0.29f)),
+            filters = filters,
+        )
+        // The photo of four days ago is filtered out by the date, whatever its score.
+        assertEquals(listOf(first, second), outcome.close.map { it.entry })
+    }
+
+    @Test
     fun aPhotoAppearsOnlyOnce() {
         val a = entry("a", "gaufre maison")
         val b = entry("b", "")

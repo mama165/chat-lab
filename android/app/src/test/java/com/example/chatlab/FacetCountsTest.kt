@@ -67,19 +67,7 @@ class FacetCountsTest {
     }
 
     @Test
-    fun textCountsOverAQueryAreAlwaysWithText() {
-        // A search by word only finds photos with text.
-        val counts = facets().texts
-        assertEquals(3, counts.getValue(TextFilter.WITH))
-        assertEquals(0, counts.getValue(TextFilter.WITHOUT))
-    }
-
-    @Test
     fun withoutAQueryEveryPhotoIsCounted() {
-        val counts = facets(query = "").texts
-        assertEquals(5, counts.getValue(TextFilter.ANY))
-        assertEquals(4, counts.getValue(TextFilter.WITH))
-        assertEquals(1, counts.getValue(TextFilter.WITHOUT))
         assertEquals(5, facets(query = "").total)
     }
 

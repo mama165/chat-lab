@@ -24,11 +24,6 @@ class FilterSqlTest {
         assertTrue(FilterSql.query(Filters(people = People.MANY), time).sql.contains("faces >= 2"))
     }
 
-    @Test
-    fun withTextIsANonEmptyText_andWithoutTextIsNotNarrowed() {
-        assertTrue(FilterSql.query(Filters(text = TextFilter.WITH), time).sql.contains("COALESCE(text, '') <> ''"))
-        assertEquals(FilterSql.query(Filters(), time).sql, FilterSql.query(Filters(text = TextFilter.WITHOUT), time).sql)
-    }
 
     @Test
     fun foldersAndTypesUseOnePlaceholderEach() {

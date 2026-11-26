@@ -36,14 +36,16 @@ class CompactLibrary(context: Context) : RecordSink {
     }
 
     companion object {
-        private val lock = Any()
+        /** Held by the writers and by "Tout effacer", so that the erase never runs in the middle of a write. */
+        internal val lock = Any()
     }
 
     fun count(): Long = database.rowsByAddress().size.toLong()
 
     /** Every stored photo, in the shape of library.json, with its vector. Read by the Photos page and the analysis. */
-    fun records(each: (JSONObject, FloatArray) -> Unit) {
-        database.records { item, row -> each(item, vector(row)) }
+    fun records(each: (JSONObject, FloatArray) -> Unit) = synchronized(lock) {
+        // A photo whose vector is missing is not known as analysed: it is left out, so it is analysed again.
+        database.records { item, row -> vectors.readOrNull(row)?.let { each(item, it) } }
     }
 
     /** Every stored photo in the shape of library.json, without the vector: enough to know what is already analysed. */
@@ -58,16 +60,23 @@ class CompactLibrary(context: Context) : RecordSink {
      * Every stored photo as a library entry, with its vector: what the search screen reads, in place of
      * library.json. Read in one pass, with the vectors from the vector file.
      */
-    fun loadAll(): List<LibraryEntry> {
+    fun loadAll(): List<LibraryEntry> = synchronized(lock) {
         val rows = database.rowsByAddress()
         return database.entries(rows.keys.toList()).map { entry ->
-            entry.copy(vector = rows[entry.id]?.let { vector(it) })
+            entry.copy(vector = rows[entry.id]?.let { vectors.readOrNull(it) })
         }
     }
 
+    /** The photos with these addresses, with their vectors: the ones just saved, read without the whole library. */
+    fun entriesWithVectors(addresses: List<String>): List<LibraryEntry> = synchronized(lock) {
+        val rows = database.rowsByAddress()
+        database.entries(addresses).map { entry -> entry.copy(vector = rows[entry.id]?.let { vectors.readOrNull(it) }) }
+    }
+
     /** The best [k] rows for a query, read from the vector file. */
-    fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> =
-        VectorRanking.topRows(query, database.nextFreeRow(), vectors, k)
+    fun topRows(query: FloatArray, k: Int): List<Pair<Long, Float>> = synchronized(lock) {
+        VectorRanking.topRows(query, minOf(database.nextFreeRow(), vectors.rowCount()), vectors, k)
+    }
 
     /** The addresses of the photos matching the words, best first. */
     fun searchAddresses(search: WordSearch.Query): List<String> = database.searchAddresses(search)

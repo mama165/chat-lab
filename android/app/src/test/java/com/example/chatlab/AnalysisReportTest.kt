@@ -148,6 +148,32 @@ class AnalysisReportTest {
         assertTrue(text, text.contains("arrêtée avant la fin"))
     }
 
+    private class DatedNode(override val name: String, date: Long) : FileNode {
+        override val length = 10L
+        override val lastModified = date
+        override val id = "dated://$name"
+        override fun open(): InputStream? = null
+    }
+
+    @Test
+    fun thePlanAnalysesTheMostRecentPhotoFirst() {
+        val camera = ScanResult(
+            "Camera",
+            listOf(
+                Candidate(DatedNode("old.jpg", 1_000L), FileSniffer.JPEG, "Camera"),
+                Candidate(DatedNode("new.jpg", 3_000L), FileSniffer.JPEG, "Camera"),
+            ),
+            emptyList(), emptyList(), emptyList(), false,
+        )
+        val drive = ScanResult(
+            "Drive",
+            listOf(Candidate(DatedNode("middle.jpg", 2_000L), FileSniffer.JPEG, "Drive")),
+            emptyList(), emptyList(), emptyList(), false,
+        )
+        val plan = AnalysisPlan.build(folders, listOf(camera, drive)) { Carry.PROCESS }
+        assertEquals(listOf("new.jpg", "middle.jpg", "old.jpg"), plan.toProcess.map { it.candidate.file.name })
+    }
+
     @Test
     fun thePlanSplitsNewFilesFromCarriedOnes() {
         val scans = listOf(scan("Camera", candidates = 5), scan("Drive", candidates = 3))

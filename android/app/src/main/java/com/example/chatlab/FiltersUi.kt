@@ -147,13 +147,6 @@ fun FiltersPage(
                 "Portraits : un visage occupe une bonne part de la photo",
                 filters.closeUp,
             ) { state.filters = filters.copy(closeUp = it) }
-            FilterGroup("Texte sur la photo", "Tickets, factures, panneaux, captures d'écran…") {
-                Segmented(
-                    TextFilter.entries, filters.text, { it.label },
-                    onSelect = { state.filters = filters.copy(text = it) },
-                    sub = { text -> facets?.texts?.get(text)?.toString() },
-                )
-            }
             if (folderOptions.isNotEmpty()) {
                 FilterGroup("Dossier", right = "trouvés dans vos photos") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

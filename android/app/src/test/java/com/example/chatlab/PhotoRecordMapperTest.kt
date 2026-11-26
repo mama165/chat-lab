@@ -25,7 +25,6 @@ class PhotoRecordMapperTest {
         vector = vector,
         millis = 10L,
         error = error,
-        text = text,
         taken = taken,
         source = source,
         modified = modified,
@@ -70,7 +69,7 @@ class PhotoRecordMapperTest {
 
     @Test
     fun blankOrZeroValuesBecomeNulls() {
-        val r = PhotoRecordMapper.map(listOf(result(text = "", taken = "", takenMs = 0L, modified = 0L)), now = 7L)
+        val r = PhotoRecordMapper.map(listOf(result(taken = "", takenMs = 0L, modified = 0L)), now = 7L)
             .records.single()
         assertNull(r.text)
         assertNull(r.taken)
@@ -87,12 +86,11 @@ class PhotoRecordMapperTest {
     }
 
     @Test
-    fun textAndDatesAreKeptWhenPresent() {
+    fun datesAreKeptWhenPresent() {
         val r = PhotoRecordMapper.map(
-            listOf(result(text = "Facture EDF", taken = "2026-11-03 18:42", takenMs = 1234L, modified = 42L)),
+            listOf(result(taken = "2026-11-03 18:42", takenMs = 1234L, modified = 42L)),
             now = 1L,
         ).records.single()
-        assertEquals("Facture EDF", r.text)
         assertEquals("2026-11-03 18:42", r.taken)
         assertEquals(1234L, r.takenMs)
         assertEquals(42L, r.modified)

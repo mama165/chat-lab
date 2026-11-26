@@ -173,9 +173,8 @@ enum class FolderMark { FINISHED, RUNNING, WAITING }
 /** The names of the models, as the analysis file and the screens show them, in loading order. */
 object ModelNames {
     const val IMAGES = "Modèle des images"
-    const val TEXTS = "Modèle des textes"
     const val FACES = "Détection des visages"
-    val ORDER = listOf(IMAGES, TEXTS, FACES)
+    val ORDER = listOf(IMAGES, FACES)
 }
 
 /**

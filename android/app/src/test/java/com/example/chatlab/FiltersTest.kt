@@ -34,21 +34,21 @@ class FiltersTest {
         assertEquals(2, Filters(place = Place.INDOOR, date = DateFilter(DatePreset.LAST_24H)).activeCount)
         val all = Filters(
             date = DateFilter(DatePreset.LAST_7D), place = Place.OUTDOOR, people = People.MANY, closeUp = true,
-            text = TextFilter.WITH, folders = setOf("Camera"), types = setOf(FileSniffer.JPEG), resemblance = Resemblance.WIDE,
+            folders = setOf("Camera"), types = setOf(FileSniffer.JPEG), resemblance = Resemblance.WIDE,
         )
-        assertEquals(8, all.activeCount)
+        assertEquals(7, all.activeCount)
     }
 
     @Test
     fun chipsFollowThePageOrderWithLabels() {
         val filters = Filters(
             date = DateFilter(DatePreset.LAST_24H), place = Place.INDOOR, people = People.NONE, closeUp = true,
-            text = TextFilter.WITH, folders = setOf("Screenshots", "Camera"), types = setOf(FileSniffer.PNG, FileSniffer.JPEG),
+            folders = setOf("Screenshots", "Camera"), types = setOf(FileSniffer.PNG, FileSniffer.JPEG),
             resemblance = Resemblance.CLOSE,
         )
         assertEquals(
             listOf(
-                "Date · 24 dernières heures", "Lieu · Intérieur", "Personnes · Aucune", "Gros plan", "Avec texte",
+                "Date · 24 dernières heures", "Lieu · Intérieur", "Personnes · Aucune", "Gros plan",
                 "Camera, Screenshots", "JPG, PNG", "Ressemblance proche",
             ),
             filters.chips(TIME).map { it.label },
@@ -108,19 +108,6 @@ class FiltersTest {
         assertTrue(matches(Filters(), entry("a", closeUp = false)))
         assertFalse(matches(Filters(closeUp = true), entry("a", closeUp = false)))
         assertTrue(matches(Filters(closeUp = true), entry("b", closeUp = true)))
-    }
-
-    @Test
-    fun matchesText() {
-        val with = entry("a", text = "FACTURE")
-        val without = entry("b", text = "")
-        val blank = entry("c", text = "   ")
-        assertTrue(matches(Filters(text = TextFilter.WITH), with))
-        assertFalse(matches(Filters(text = TextFilter.WITH), without))
-        assertFalse(matches(Filters(text = TextFilter.WITH), blank))
-        assertTrue(matches(Filters(text = TextFilter.WITHOUT), without))
-        assertTrue(matches(Filters(text = TextFilter.WITHOUT), blank))
-        assertFalse(matches(Filters(text = TextFilter.WITHOUT), with))
     }
 
     @Test
@@ -245,13 +232,12 @@ class FiltersTest {
     @Test
     fun allFiltersCombineWithAnd() {
         val filters = Filters(
-            date = DateFilter(DatePreset.LAST_24H), place = Place.INDOOR, text = TextFilter.WITH,
+            date = DateFilter(DatePreset.LAST_24H), place = Place.INDOOR,
             folders = setOf("Camera"), types = setOf(FileSniffer.JPEG),
         )
         val good = entry("a", indoor = true, text = "x", folder = "Camera", mime = FileSniffer.JPEG, takenMs = hoursAgo(2))
         assertTrue(matches(filters, good))
         assertFalse(matches(filters, good.copy(indoor = false)))
-        assertFalse(matches(filters, good.copy(text = "")))
         assertFalse(matches(filters, good.copy(folder = "Autre")))
         assertFalse(matches(filters, good.copy(mime = FileSniffer.PNG)))
         assertFalse(matches(filters, good.copy(takenMs = daysAgo(3))))

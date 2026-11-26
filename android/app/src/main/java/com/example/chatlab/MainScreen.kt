@@ -24,9 +24,29 @@ import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
 
-/** The main screen: two tabs (Rechercher, Photos) and the separate pages. */
+/**
+ * The first screen: while the access, the chatlab folder or its models are missing, the setup page
+ * is shown instead of the tabs, so the search never says "Aucune photo" for a missing access.
+ */
 @Composable
 fun MainScreen() {
+    val context = LocalContext.current
+    var setupVersion by remember { mutableIntStateOf(0) }
+    // null while the checks run in the background: nothing is shown yet.
+    val missing by produceState<List<SetupStep>?>(initialValue = null, setupVersion) {
+        value = withContext(Dispatchers.IO) { StartupSetup.missing(context) }
+    }
+    val steps = missing
+    when {
+        steps == null -> Unit
+        steps.isNotEmpty() -> StartupSetupPage(missing = steps, onChanged = { setupVersion++ })
+        else -> AppContent()
+    }
+}
+
+/** The app once set up: two tabs (Rechercher, Photos) and the separate pages. */
+@Composable
+private fun AppContent() {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var page by remember { mutableStateOf(Page.TABS) }
@@ -40,6 +60,7 @@ fun MainScreen() {
     var dataVersion by remember { mutableIntStateOf(0) }
     var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()
+
 
     // The notice "Analyse terminée" appears only when a run ends while the app is open.
     var wasRunning by remember { mutableStateOf(progress.running) }
@@ -64,11 +85,15 @@ fun MainScreen() {
         }
     }
     // null until the library is read: "still loading" is not the same as "no photo yet".
+    // The whole library is read when the data changes as a whole. During an analysis, the photos just saved
+    // are added to the library in memory: the search follows them without reading everything again.
     val library by produceState<List<LibraryEntry>?>(initialValue = null, dataVersion) {
-        value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion) }
+        value = withContext(Dispatchers.IO) { libraryCache.get(dataVersion).also { LiveLibrary.replaceAll(it) } }
     }
-    val entries = library ?: emptyList()
-    val libraryLoading = library == null
+    val liveVersion by LiveLibrary.changes.collectAsState()
+    val loaded = library != null
+    val entries = remember(loaded, liveVersion) { if (loaded) LiveLibrary.snapshot() else emptyList() }
+    val libraryLoading = !loaded
 
     BackHandler(enabled = page != Page.TABS) { page = page.parent() }
     BackHandler(enabled = search.sheetOpen) { search.sheetOpen = false }
