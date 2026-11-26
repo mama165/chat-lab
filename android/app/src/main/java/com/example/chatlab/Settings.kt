@@ -57,7 +57,6 @@ import java.io.File
 /** Settings page, opened by the gear: folders, unclassified, space, tools, erase everything. */
 @Composable
 fun SettingsPage(
-    entries: List<LibraryEntry>,
     dataVersion: Int,
     onBack: () -> Unit,
     onOpen: (Page) -> Unit,
@@ -73,12 +72,6 @@ fun SettingsPage(
     val sources = remember(foldersVersion) { Sources.read(context) }
     val chatlab = remember(foldersVersion) { folderName(context, KEY_FOLDER) }
     val history = remember(dataVersion) { RunArchive.list(context).size }
-    val appSize by produceState<Long?>(initialValue = null, dataVersion) {
-        value = withContext(Dispatchers.IO) { measureAppSize(context) }
-    }
-    val librarySize by produceState(initialValue = 0L, dataVersion) {
-        value = withContext(Dispatchers.IO) { LibraryStore.librarySize(context) }
-    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -110,14 +103,6 @@ fun SettingsPage(
             SettingRow("Performance", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
         }
         Column {
-            SectionLabel("Espace")
-            SettingRow("Application", appSize?.let { Formats.size(it) } ?: "…")
-            SettingRow(
-                "Carnet d'analyse",
-                if (entries.isEmpty()) "vide" else "${Formats.photos(entries.size)} · ${Formats.size(librarySize)}",
-            )
-        }
-        Column {
             SectionLabel("Avancé")
             SettingRow("Historique des analyses", "$history", onClick = { onOpen(Page.HISTORY) })
             SettingRow(
@@ -143,20 +128,6 @@ fun SettingsPage(
         )
         Spacer(Modifier.height(16.dp))
     }
-}
-
-/** Size of the application according to Android (program, data and cache), or that of the APK otherwise. */
-private fun measureAppSize(context: Context): Long {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        try {
-            val manager = context.getSystemService(StorageStatsManager::class.java)
-            val stats = manager.queryStatsForPackage(StorageManager.UUID_DEFAULT, context.packageName, Process.myUserHandle())
-            return stats.appBytes + stats.dataBytes + stats.cacheBytes
-        } catch (e: Exception) {
-            // Repli ci-dessous.
-        }
-    }
-    return File(context.applicationInfo.sourceDir).length()
 }
 
 /** "Tout effacer" page: what disappears, what stays, and the red button. */

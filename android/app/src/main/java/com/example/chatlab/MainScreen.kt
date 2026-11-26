@@ -107,7 +107,6 @@ private fun AppContent() {
     ) {
         when (page) {
             Page.SETTINGS -> SettingsPage(
-                entries = entries,
                 dataVersion = dataVersion,
                 onBack = { page = Page.TABS },
                 onOpen = { page = it },
