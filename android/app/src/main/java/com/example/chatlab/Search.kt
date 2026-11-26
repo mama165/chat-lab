@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Debug
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import java.util.concurrent.atomic.AtomicInteger
@@ -171,9 +172,15 @@ fun SearchScreen(
         queryVector = null
         modelError = null
         if (query.isNotBlank()) {
+            SearchStages.begin()
+            SearchStages.mark(context, "typed")
             delay(400)
+            SearchStages.mark(context, "delay.end")
             try {
-                queryVector = withContext(Dispatchers.Default) { TextModels.vectorFor(context, query) }
+                queryVector = withContext(Dispatchers.Default) {
+                    SearchStages.mark(context, "encode.start")
+                    TextModels.vectorFor(context, query).also { SearchStages.mark(context, "encode.end") }
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -193,7 +200,9 @@ fun SearchScreen(
         // The timing goes to the journal from the background thread: writing it on the main thread would be a violation.
         state.ranked = withContext(Dispatchers.Default) {
             val started = System.currentTimeMillis()
+            SearchStages.mark(context, "rank.start")
             val found = Library.rankDescription(entries, vector, Place.ALL, null)
+            SearchStages.mark(context, "rank.end")
             Diagnostics.event(
                 context,
                 "searchRank",
@@ -239,7 +248,9 @@ fun SearchScreen(
     }
     val outcome by produceState(SearchOutcome.EMPTY, entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time) {
         value = withContext(Dispatchers.Default) {
+            SearchStages.mark(context, "outcome.start")
             SearchResults.compute(entries, searchQuery, state.ranked, resultFilters, removed, state.shownExtra, time)
+                .also { SearchStages.mark(context, "outcome.end") }
         }
     }
     val rows = remember(outcome, state.newFrom, searchQuery) { resultItems(outcome, searchQuery, state.newFrom) }
@@ -886,4 +897,30 @@ object ThumbStats {
     fun megabytes(): Long = bytes.get() / (1024 * 1024)
 
     fun count(): Int = count.get()
+}
+
+/**
+ * Marks each step of a search in the journal ("searchStage"): the native and Java memory at that moment,
+ * and the time since the search was typed. The steps are: typed, delay.end, encode.start/end (the model, or
+ * the cache), rank.start/end (the ranking over the library), outcome.start/end (words, filters, thresholds).
+ */
+object SearchStages {
+    @Volatile private var startedAt = 0L
+
+    fun begin() {
+        startedAt = System.currentTimeMillis()
+    }
+
+    fun mark(context: Context, stage: String) {
+        val mb = 1024L * 1024L
+        Diagnostics.event(
+            context,
+            "searchStage",
+            JSONObject()
+                .put("stage", stage)
+                .put("sinceMs", System.currentTimeMillis() - startedAt)
+                .put("nativeMb", Debug.getNativeHeapAllocatedSize() / mb)
+                .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / mb),
+        )
+    }
 }
