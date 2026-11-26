@@ -65,6 +65,11 @@ object TextModels {
     private var failure: Exception? = null
     private var failedAt = 0L
 
+    /** The vectors of the last sentences searched, least recently used first out. Used under the lock of vectorFor. */
+    private val recent = object : LinkedHashMap<String, FloatArray>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, FloatArray>?): Boolean = size > 32
+    }
+
     /**
      * The model is loaded once. After a failure, it is not loaded again at each keystroke: each load takes
      * native memory, and the retries piled up until the process was aborted. The next try waits RETRY_MS.
@@ -107,10 +112,14 @@ object TextModels {
                 return FloatArray(array.length()) { array.getDouble(it).toFloat() }
             }
         }
+        // The same sentence again (typing back, or the same search repeated) does not call the model:
+        // each call leaves native memory behind, so fewer calls means less memory used.
+        recent[text]?.let { return it.copyOf() }
         // Measured around the model call only: the native memory before and after, and the time it took.
         val nativeBefore = android.os.Debug.getNativeHeapAllocatedSize()
         val started = System.currentTimeMillis()
         val vector = get(context).encode(text)
+        recent[text] = vector.copyOf()
         Diagnostics.event(
             context,
             "encodeMemory",

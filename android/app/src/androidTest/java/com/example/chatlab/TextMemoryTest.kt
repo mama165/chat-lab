@@ -37,7 +37,8 @@ class TextMemoryTest {
             words.forEachIndexed { index, text ->
                 val before = Debug.getNativeHeapAllocatedSize() / MB
                 val started = System.currentTimeMillis()
-                TextModels.vectorFor(context, text)
+                // A different sentence each round, otherwise the cache would answer and nothing would be encoded.
+                TextModels.vectorFor(context, "$text ($round)")
                 val ms = System.currentTimeMillis() - started
                 val after = Debug.getNativeHeapAllocatedSize() / MB
                 Log.i(TAG, "round=$round index=$index beforeMb=$before afterMb=$after ms=$ms")
