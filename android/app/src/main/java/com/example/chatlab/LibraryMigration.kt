@@ -37,78 +37,6 @@ object LibraryMigration {
         return Report(migrated, skipped)
     }
 
-    /** Compares the store with the JSON library, and writes the counts to the journal. */
-    private fun check(context: Context, store: CompactLibrary) {
-        val input = LibraryStore.open(context) ?: return
-        val rows = store.rows()
-        input.bufferedReader(Charsets.UTF_8).use { reader ->
-            val report = LibraryCheck.run(reader, rows, store::vector)
-            Diagnostics.event(
-                context,
-                "readCheck",
-                JSONObject()
-                    .put("checked", report.checked)
-                    .put("missing", report.missing)
-                    .put("different", report.different)
-                    .put("duplicates", report.duplicates),
-            )
-        }
-        if (rows.isEmpty()) return
-        // The word search, on one word of the library: the same photos, in the same order, on both sides.
-        val word = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { LibraryCheck.firstWord(it) }
-        if (word != null) {
-            val words = listOf(word)
-            val fromJson = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use {
-                LibraryCheck.wordMatches(it, words, Place.ALL)
-            }.orEmpty()
-            val fromStore = store.searchAddresses(WordSearch.query(words, Place.ALL))
-            // The word itself is not written: it comes from the text of the photos.
-            Diagnostics.event(
-                context,
-                "wordCheck",
-                JSONObject()
-                    .put("json", fromJson.size)
-                    .put("store", fromStore.size)
-                    .put("same", fromJson == fromStore),
-            )
-        }
-        // The filters: the same photos, in the same order, on both sides.
-        val time = When(System.currentTimeMillis())
-        val filters = Filters(place = Place.INDOOR, text = TextFilter.WITH)
-        val jsonPhotos = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use {
-            LibraryCheck.filterMatches(it, filters, time)
-        }.orEmpty()
-        val storePhotos = store.entries(store.searchAddresses(FilterSql.query(filters, time)))
-            .filter { filters.matches(it, time) }
-            .map { it.source }
-        Diagnostics.event(
-            context,
-            "filterCheck",
-            JSONObject()
-                .put("json", jsonPhotos.size)
-                .put("store", storePhotos.size)
-                .put("sameSet", LibraryCheck.sameSet(jsonPhotos, storePhotos))
-                .put("sameOrder", jsonPhotos == storePhotos),
-        )
-        // The same query on both sides: the best photos must be the same ones.
-        val k = 20
-        val query = store.vector(rows.values.first())
-        val addressByRow = rows.entries.associate { it.value to it.key }
-        val fromStore = store.topRows(query, k).mapNotNull { addressByRow[it.first] }
-        val fromJson = LibraryStore.open(context)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-            LibraryCheck.rank(reader, query, k).map { it.first }
-        }.orEmpty()
-        Diagnostics.event(
-            context,
-            "rankCheck",
-            JSONObject()
-                .put("k", k)
-                .put("common", LibraryCheck.common(fromJson, fromStore))
-                .put("storeCount", fromStore.size)
-                .put("jsonCount", fromJson.size),
-        )
-    }
-
     /**
      * Starts the copy in the background, if it has not been done yet. The marker is written only at the
      * end, so an interrupted copy is started again. Nothing happens when there is no library file.
@@ -117,23 +45,14 @@ object LibraryMigration {
         val marker = File(context.filesDir, "photos.migrated")
         Thread {
             try {
-                if (marker.exists()) {
-                    // Already copied: only the check runs, to see that the store still matches the JSON.
-                    val compact = CompactLibrary(context)
-                    try {
-                        Diagnostics.native(context, "check") { check(context, compact) }
-                    } finally {
-                        compact.close()
-                    }
-                    return@Thread
-                }
+                // Already copied: nothing to read from library.json.
+                if (marker.exists()) return@Thread
                 val input = LibraryStore.open(context) ?: return@Thread
                 val store = CompactLibrary(context)
                 try {
                     input.bufferedReader(Charsets.UTF_8).use { reader ->
                         val report = run(reader, store, System.currentTimeMillis())
                         marker.writeText("migrated=${report.migrated} skipped=${report.skipped}")
-                        Diagnostics.native(context, "check") { check(context, store) }
                         Diagnostics.event(
                             context,
                             "migration",
