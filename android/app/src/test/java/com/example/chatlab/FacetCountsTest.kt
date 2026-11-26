@@ -18,8 +18,12 @@ class FacetCountsTest {
         entry("e", "autre", indoor = true, faces = 0, folder = "Screenshots", mime = FileSniffer.PNG, takenMs = 0L),
     )
 
+    /** The photos that look like the query: here, the ones whose text contains it, all equally close. */
+    private fun similar(list: List<LibraryEntry>, query: String): List<Match> =
+        list.filter { it.text.contains(query) }.map { Match(it, 0.3f) }
+
     private fun facets(query: String = "gaufre", filters: Filters = Filters(), removed: Set<String> = emptySet()) =
-        FacetCounts.compute(entries, query, emptyList(), filters, removed, TIME)
+        FacetCounts.compute(entries, query, similar(entries, query), filters, removed, TIME)
 
     @Test
     fun theTotalIsTheNumberOfResults() {
@@ -94,7 +98,7 @@ class FacetCountsTest {
     @Test
     fun closeUpCountsWhatTheToggleWouldKeep() {
         val withCloseUp = entries.map { if (it.id == "b") it.copy(closeUp = true) else it }
-        val facets = FacetCounts.compute(withCloseUp, "gaufre", emptyList(), Filters(), emptySet(), TIME)
+        val facets = FacetCounts.compute(withCloseUp, "gaufre", similar(withCloseUp, "gaufre"), Filters(), emptySet(), TIME)
         assertEquals(1, facets.closeUp)
     }
 

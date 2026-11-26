@@ -357,19 +357,7 @@ fun SearchScreen(
                 ) { index ->
                     when (val item = rows[index]) {
                         is ResultItem.Label -> SectionLabel(item.text, Modifier.padding(top = 6.dp))
-                        is ResultItem.Line -> Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
                         is ResultItem.Separator -> TextDivider(item.text)
-                        is ResultItem.Word -> {
-                            val key = SearchResults.keyOf(item.match)
-                            WordRow(
-                                match = item.match,
-                                query = query,
-                                time = time,
-                                selected = key in state.selected,
-                                onTap = { state.selected = toggled(state.selected, key) },
-                                onLongPress = { openInGallery(context, item.match.entry.source) },
-                            )
-                        }
                         is ResultItem.Tile -> {
                             val key = SearchResults.keyOf(item.match)
                             ResultTile(
@@ -652,51 +640,6 @@ fun RemovedPage(onBack: () -> Unit, onChanged: () -> Unit) {
 private fun toggled(current: Set<String>, key: String): Set<String> =
     if (key in current) current - key else current + key
 
-/** A match by word: thumbnail, excerpt of the text read with the word highlighted, date. */
-@Composable
-private fun WordRow(match: Match, query: String, time: When, selected: Boolean, onTap: () -> Unit, onLongPress: () -> Unit) {
-    val entry = match.entry
-    val key = SearchResults.keyOf(match)
-    val excerpt = remember(entry.text, entry.name, query) {
-        Highlight.excerpt(entry.text.ifBlank { entry.name }, query)
-    }
-    val text = buildAnnotatedString {
-        var at = 0
-        for (mark in excerpt.marks) {
-            append(excerpt.text.substring(at, mark.first))
-            withStyle(SpanStyle(color = Palette.Accent, fontWeight = FontWeight.Bold)) {
-                append(excerpt.text.substring(mark.first, mark.last + 1))
-            }
-            at = mark.last + 1
-        }
-        append(excerpt.text.substring(at))
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressGesture(key, onTap, onLongPress)
-            .semantics { contentDescription = entry.name }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.size(52.dp)) {
-            GridThumb(
-                location = key,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .alpha(if (selected) 0.45f else 1f),
-            )
-            if (selected) Check(Modifier.align(Alignment.TopEnd).padding(2.dp), 18)
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(text, fontSize = 14.sp, color = Palette.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(Dates.display(entry.takenMs, entry.taken, time), fontSize = 11.sp, color = Palette.Muted)
-        }
-    }
-}
-
 @Composable
 private fun Check(modifier: Modifier, size: Int) {
     Box(
@@ -903,7 +846,7 @@ object ThumbStats {
 /**
  * Marks each step of a search in the journal ("searchStage"): the native and Java memory at that moment,
  * and the time since the search was typed. The steps are: typed, delay.end, encode.start/end (the model, or
- * the cache), rank.start/end (the ranking over the library), outcome.start/end (words, filters, thresholds).
+ * the cache), rank.start/end (the ranking over the library), outcome.start/end (filters, candidates, thresholds).
  */
 object SearchStages {
     @Volatile private var startedAt = 0L

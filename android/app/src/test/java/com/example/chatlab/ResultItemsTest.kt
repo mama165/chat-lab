@@ -8,25 +8,15 @@ import org.junit.Test
 class ResultItemsTest {
     private fun matches(prefix: String, count: Int) = (1..count).map { TestData.match("$prefix$it", 0.1f) }
 
-    private fun outcome(words: Int = 0, close: Int = 0, extra: Int = 0, remaining: Int = 0, limit: Boolean = false) =
-        SearchOutcome(matches("w", words), matches("c", close), matches("e", extra), remaining, limit)
+    private fun outcome(close: Int = 0, extra: Int = 0, remaining: Int = 0, limit: Boolean = false) =
+        SearchOutcome(matches("c", close), matches("e", extra), remaining, limit)
 
     @Test
-    fun wordsThenLineThenResemblingPhotos() {
-        val items = resultItems(outcome(words = 2, close = 2), "gaufre", -1)
-        assertEquals(ResultItem.Label("Texte lu"), items[0])
-        assertTrue(items[1] is ResultItem.Word)
-        assertTrue(items[2] is ResultItem.Word)
-        assertEquals(ResultItem.Line, items[3])
-        assertEquals(ResultItem.Label("Ressemblantes"), items[4])
-        assertEquals(2, items.count { it is ResultItem.Tile })
-    }
-
-    @Test
-    fun noLineWithoutWords() {
-        val items = resultItems(outcome(close = 1), "plage", -1)
-        assertFalse(items.contains(ResultItem.Line))
+    fun resemblingPhotosUnderOneLabel() {
+        val items = resultItems(outcome(close = 2), "gaufre", -1)
         assertEquals(ResultItem.Label("Ressemblantes"), items[0])
+        assertEquals(2, items.count { it is ResultItem.Tile })
+        assertEquals(3, items.size)
     }
 
     @Test
@@ -77,13 +67,13 @@ class ResultItemsTest {
 
     @Test
     fun noEndMessageWhenNoLessClosePhotoWasAsked() {
-        val items = resultItems(outcome(words = 1, close = 1), "gaufre", -1)
+        val items = resultItems(outcome(close = 1), "gaufre", -1)
         assertTrue(items.none { it is ResultItem.End || it is ResultItem.More })
     }
 
     @Test
     fun keysAreUnique() {
-        val items = resultItems(outcome(words = 3, close = 4, extra = 6, remaining = 2), "gaufre", 0)
+        val items = resultItems(outcome(close = 4, extra = 6, remaining = 2), "gaufre", 0)
         assertEquals(items.size, items.map { it.key }.toSet().size)
     }
 

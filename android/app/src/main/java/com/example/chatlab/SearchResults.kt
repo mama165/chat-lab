@@ -2,13 +2,11 @@ package com.example.chatlab
 
 /**
  * What the search screen shows for a query:
- * - [words]: the photos whose text read (or name) contains all the words;
  * - [close]: the similar photos, above the chosen starting point;
  * - [extra]: the "less close" photos already revealed, one by one.
  * A photo appears only once, and never if it was removed from this search.
  */
 data class SearchOutcome(
-    val words: List<Match>,
     val close: List<Match>,
     val extra: List<Match>,
     /** Less close photos still available, up to [MoreResults.MAX_EXTRA]. */
@@ -16,7 +14,7 @@ data class SearchOutcome(
     /** True if the limit of less close photos was reached while some were left. */
     val limitReached: Boolean,
 ) {
-    val total: Int get() = words.size + close.size + extra.size
+    val total: Int get() = close.size + extra.size
     val isEmpty: Boolean get() = total == 0
     val hasMore: Boolean get() = remaining > 0
 
@@ -24,7 +22,7 @@ data class SearchOutcome(
     val nextBatch: Int get() = minOf(MoreResults.BATCH, remaining)
 
     companion object {
-        val EMPTY = SearchOutcome(emptyList(), emptyList(), emptyList(), 0, false)
+        val EMPTY = SearchOutcome(emptyList(), emptyList(), 0, false)
     }
 }
 
@@ -64,15 +62,11 @@ object SearchResults {
         probe("kept.start")
         val kept = distinctById(entries, { it.source.ifBlank { it.path } }).filter { filters.matches(it, time) }
         probe("kept.end")
-        probe("words.start")
-        val words = Library.searchWords(kept, query, Place.ALL).filter { keyOf(it) !in removed }
-        probe("words.end")
-        val wordKeys = words.map { keyOf(it) }.toSet()
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()
         probe("candidates.start")
         val candidates = distinctById(ranked, { keyOf(it) }).filter { match ->
             val key = keyOf(match)
-            key in allowed && key !in removed && key !in wordKeys
+            key in allowed && key !in removed
         }
         probe("candidates.end")
         probe("threshold.start")
@@ -83,7 +77,6 @@ object SearchResults {
         probe("threshold.end")
         val shown = shownExtra.coerceIn(0, offered.size)
         return SearchOutcome(
-            words = words,
             close = close,
             extra = offered.take(shown),
             remaining = offered.size - shown,
