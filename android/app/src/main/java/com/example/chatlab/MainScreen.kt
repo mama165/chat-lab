@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
@@ -63,7 +64,13 @@ private fun AppContent() {
 
     // The search reads the library again at each save of a running analysis, not only at its end.
     val saves by AnalysisProgress.saves.collectAsState()
-    LaunchedEffect(saves) { if (saves > 0) dataVersion++ }
+    LaunchedEffect(saves) {
+        if (saves > 0) {
+            // Several saves close together give one reading: the last one restarts the wait.
+            delay(200)
+            dataVersion++
+        }
+    }
 
     // The notice "Analyse terminée" appears only when a run ends while the app is open.
     var wasRunning by remember { mutableStateOf(progress.running) }

@@ -267,8 +267,6 @@ class AnalysisService : Service() {
         val next = AtomicInteger(0)
         val errors = AtomicInteger(0)
         val photosDone = AtomicInteger(0)
-        val saveLock = Any()
-        var lastSave = System.currentTimeMillis()
         val keep = keepFromRemovedFolders(this, sources.map { it.name }.toSet())
 
         // One analyser per worker: each loads its models and works alone. With nothing to
@@ -334,6 +332,9 @@ class AnalysisService : Service() {
                             when (outcome) {
                                 is Outcome.Done -> {
                                     results[index] = outcome.result
+                                    // Saved as soon as it is analysed: the search finds it a moment later.
+                                    LibraryWriter.write(this@AnalysisService, listOf(outcome.result))
+                                    AnalysisProgress.saved()
                                     report.analyzed(item.folderIndex)
                                     val count = photosDone.incrementAndGet()
                                     if (NativeMemory.isPhotoPoint(count)) {
@@ -353,15 +354,6 @@ class AnalysisService : Service() {
                                 }
                             }
                             publish(item.folderIndex, item.candidate.file.name, errors.get())
-                            // Library saved regularly: closing the app only loses
-                            // the last images, and the restart resumes where it stopped.
-                            synchronized(saveLock) {
-                                if (System.currentTimeMillis() - lastSave >= SAVE_INTERVAL_MS) {
-                                    lastSave = System.currentTimeMillis()
-                                    LibraryWriter.write(this@AnalysisService, carried + results.filterNotNull(), keep)
-                                    AnalysisProgress.saved()
-                                }
-                            }
                         }
                     }
                 }.awaitAll()
@@ -522,9 +514,6 @@ class AnalysisService : Service() {
 
         /** Ends the analysis, keeping everything done. */
         fun stop() = current?.stop() ?: false
-
-        /** The library is saved at most every two minutes during the analysis. */
-        const val SAVE_INTERVAL_MS = 120_000L
 
         fun start(context: Context, chatlab: String) {
             val intent = Intent(context, AnalysisService::class.java).putExtra(EXTRA_CHATLAB, chatlab)
