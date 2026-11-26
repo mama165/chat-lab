@@ -24,9 +24,29 @@ import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
 
-/** The main screen: two tabs (Rechercher, Photos) and the separate pages. */
+/**
+ * The first screen: while the access, the chatlab folder or its models are missing, the setup page
+ * is shown instead of the tabs, so the search never says "Aucune photo" for a missing access.
+ */
 @Composable
 fun MainScreen() {
+    val context = LocalContext.current
+    var setupVersion by remember { mutableIntStateOf(0) }
+    // null while the checks run in the background: nothing is shown yet.
+    val missing by produceState<List<SetupStep>?>(initialValue = null, setupVersion) {
+        value = withContext(Dispatchers.IO) { StartupSetup.missing(context) }
+    }
+    val steps = missing
+    when {
+        steps == null -> Unit
+        steps.isNotEmpty() -> StartupSetupPage(missing = steps, onChanged = { setupVersion++ })
+        else -> AppContent()
+    }
+}
+
+/** The app once set up: two tabs (Rechercher, Photos) and the separate pages. */
+@Composable
+private fun AppContent() {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var page by remember { mutableStateOf(Page.TABS) }
