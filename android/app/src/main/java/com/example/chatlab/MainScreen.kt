@@ -37,9 +37,13 @@ fun MainScreen() {
         value = withContext(Dispatchers.IO) { StartupSetup.missing(context) }
     }
     val steps = missing
+    // Once the setup has started in this session, its last card stays until "Suivant" is pressed.
+    var setupInProgress by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(steps) { if (steps != null && steps.isNotEmpty()) setupInProgress = true }
     when {
         steps == null -> Unit
         steps.isNotEmpty() -> StartupSetupPage(missing = steps, onChanged = { setupVersion++ })
+        setupInProgress -> StartupSetupPage(missing = steps, onChanged = { setupVersion++ }, onNext = { setupInProgress = false })
         else -> AppContent()
     }
 }
