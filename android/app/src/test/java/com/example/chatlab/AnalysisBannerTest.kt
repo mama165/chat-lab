@@ -11,6 +11,12 @@ class AnalysisBannerTest {
     }
 
     @Test
+    fun pausedAnalysisIsShownAsPausedNotAsRunning() {
+        assertEquals(BannerKind.PAUSED, analysisBannerKind(running = true, done = 3, total = 10, notice = false, paused = true))
+        assertEquals(BannerKind.PAUSED, analysisBannerKind(running = true, done = 3, total = 10, notice = true, paused = true))
+    }
+
+    @Test
     fun finishedNoticeOnlyAfterARunThatCompleted() {
         assertEquals(BannerKind.FINISHED, analysisBannerKind(running = false, done = 10, total = 10, notice = true))
     }

@@ -28,13 +28,14 @@ import com.example.chatlab.ui.Palette
 import kotlinx.coroutines.delay
 
 /** What the bottom line shows: nothing, the analysis in progress, or the notice that it has finished. */
-enum class BannerKind { HIDDEN, RUNNING, FINISHED }
+enum class BannerKind { HIDDEN, RUNNING, PAUSED, FINISHED }
 
 /**
  * [notice] is set when an analysis has just finished, and cleared once the user has opened it:
  * an old analysis does not keep the notice on screen.
  */
-fun analysisBannerKind(running: Boolean, done: Int, total: Int, notice: Boolean): BannerKind = when {
+fun analysisBannerKind(running: Boolean, done: Int, total: Int, notice: Boolean, paused: Boolean = false): BannerKind = when {
+    running && paused -> BannerKind.PAUSED
     running -> BannerKind.RUNNING
     notice && total > 0 && done >= total -> BannerKind.FINISHED
     else -> BannerKind.HIDDEN
@@ -47,7 +48,7 @@ fun analysisBannerKind(running: Boolean, done: Int, total: Int, notice: Boolean)
 @Composable
 fun AnalysisBanner(notice: Boolean, onOpen: () -> Unit) {
     val progress by AnalysisProgress.state.collectAsState()
-    val kind = analysisBannerKind(progress.running, progress.done, progress.total, notice)
+    val kind = analysisBannerKind(progress.running, progress.done, progress.total, notice, progress.paused)
     if (kind == BannerKind.HIDDEN) return
     val finished = kind == BannerKind.FINISHED
 
@@ -88,6 +89,18 @@ fun AnalysisBanner(notice: Boolean, onOpen: () -> Unit) {
                     color = Palette.Accent,
                     modifier = Modifier.clickable(onClick = onOpen).padding(4.dp),
                 )
+            } else if (kind == BannerKind.PAUSED) {
+                Text("Analyse en pause", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("$percent %", fontSize = 13.sp, color = Palette.Muted)
+                    Text(
+                        "Reprendre",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Palette.Accent,
+                        modifier = Modifier.clickable { AnalysisService.resume() }.padding(4.dp),
+                    )
+                }
             } else {
                 Text("Analyse en cours", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
                 Text(
