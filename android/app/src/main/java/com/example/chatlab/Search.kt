@@ -111,6 +111,11 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 
 /**
  * The state of the search, shared between the search screen and the Filtres page so that the
@@ -741,11 +746,54 @@ private fun PhotoViewer(source: String, onClose: () -> Unit, onOpenExternal: () 
     val image by produceState<ImageBitmap?>(initialValue = null, source) {
         value = withContext(Dispatchers.IO) { decodeLarge(context, source)?.asImageBitmap() }
     }
+    // The zoom and the position of the photo: from 1 (the normal size) up to 4 times.
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var viewSize by remember { mutableStateOf(IntSize.Zero) }
+    // The photo stays inside its frame: no empty space appears around it when it is zoomed.
+    fun keepInside(move: Offset, zoom: Float): Offset {
+        val maxX = viewSize.width * (zoom - 1f) / 2f
+        val maxY = viewSize.height * (zoom - 1f) / 2f
+        return Offset(move.x.coerceIn(-maxX, maxX), move.y.coerceIn(-maxY, maxY))
+    }
+    // Pinch to zoom, and drag to move the zoomed photo.
+    val transform = rememberTransformableState { zoomChange, pan, _ ->
+        val next = (scale * zoomChange).coerceIn(1f, 4f)
+        scale = next
+        offset = if (next <= 1f) Offset.Zero else keepInside(offset + pan, next)
+    }
     // The system back gesture closes the dialog as well (onDismissRequest).
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             image?.let {
-                Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { viewSize = it }
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                        }
+                        .transformable(state = transform)
+                        // A double tap zooms to the place touched, or back to the normal size.
+                        .pointerInput(Unit) {
+                            detectTapGestures(onDoubleTap = { point ->
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                } else {
+                                    val center = Offset(size.width / 2f, size.height / 2f)
+                                    scale = 2.5f
+                                    offset = keepInside(-(point - center) * 1.5f, 2.5f)
+                                }
+                            })
+                        },
+                )
             }
             if (image == null) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.White)
             Text(
