@@ -136,10 +136,10 @@ fun PhotosScreen(
             // The plus adds a folder, as in the mockup; not before the chatlab folder and a first folder.
             onAdd = if (chatlab != null && sources.isNotEmpty()) onAddMore else null,
         )
-        when {
-            chatlab == null || sources.isEmpty() -> FirstSteps(chatlab, sources, pickers)
-            progress.running -> Running(progress, now, sources)
-            else -> Idle(
+        when (photosTab(chatlabChosen = chatlab != null, folders = sources.size, running = progress.running)) {
+            PhotosTab.EMPTY -> EmptyPhotos(onAdd = pickers.addSource)
+            PhotosTab.RUNNING -> Running(progress, now, sources)
+            PhotosTab.FOLDERS -> Idle(
                 sources = sources,
                 lastRun = lastRun,
                 message = progress.message,
@@ -160,35 +160,22 @@ private fun startFullAnalysis(context: Context) {
     if (chatlab != null && Sources.read(context).isNotEmpty()) AnalysisService.start(context, chatlab)
 }
 
-/** First launch: choose the chatlab folder, then at least one folder of photos. */
+/** No folder of photos yet (view 1.1.3): what the tab is for, and the button that adds the folder. */
 @Composable
-private fun FirstSteps(chatlab: String?, sources: List<SourceFolder>, pickers: FolderPickers) {
-    Text("Pour commencer, choisissez le dossier chatlab, puis les dossiers de photos.", fontSize = 15.sp, color = Palette.Ink)
-    Step(1, "Le dossier chatlab", "Il contient le sous-dossier models. Le carnet y est enregistré.", chatlab, "Choisir", pickers.chooseChatlab)
-    Step(
-        2,
-        "Les dossiers de photos",
-        "Sous-dossiers compris. Les photos restent à leur place. Vous pouvez en ajouter plusieurs.",
-        sources.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.name },
-        "Ajouter un dossier",
-        pickers.addSource,
-    )
-}
-
-@Composable
-private fun Step(number: Int, title: String, detail: String, chosen: String?, action: String, onChoose: () -> Unit) {
+private fun EmptyPhotos(onAdd: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Palette.Field)
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("$number · $title", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-        Text(detail, fontSize = 13.sp, color = Palette.Muted)
-        if (chosen != null) Text("Choisi : $chosen ✓", fontSize = 14.sp, color = Palette.Accent)
-        if (chosen == null || number == 2) PrimaryButton(if (chosen == null) action else "Ajouter un autre dossier", onClick = onChoose)
+        Text("Pas encore de photos 🙂", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        Text(
+            "Ajoutez le dossier où se trouvent vos photos pour commencer.",
+            fontSize = 15.sp,
+            color = Palette.Muted,
+            textAlign = TextAlign.Center,
+        )
+        PrimaryButton("Mes photos", onClick = onAdd)
     }
 }
 

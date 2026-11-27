@@ -162,8 +162,9 @@ private fun AppContent() {
                             page = Page.STORAGE
                         },
                         onAddMore = {
-                            addBack = Page.TABS
-                            page = Page.ADD_FOLDER
+                            // The plus of the Photos tab opens the internal storage choice (view 1.3 ter).
+                            storageBack = Page.TABS
+                            page = Page.STORAGE
                         },
                         modifier = content,
                     )
