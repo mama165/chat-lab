@@ -72,6 +72,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
@@ -560,6 +566,7 @@ private fun ResultTile(
 ) {
     val entry = match.entry
     val context = LocalContext.current
+    val touchSlop = LocalViewConfiguration.current.touchSlop
     // The photos that have just arrived are briefly outlined.
     val glow = remember { Animatable(0f) }
     LaunchedEffect(isNew, highlightKey) {
@@ -592,19 +599,23 @@ private fun ResultTile(
             .glow(glow.value)
             .semantics { contentDescription = entry.name }
             .onSizeChanged { tileSize = it }
-            .pointerInput(entry.id) {
-                detectTapGestures(
-                    onPress = {
-                        // Still held after two seconds: the information appears. A quick tap is left to onTap.
-                        val released = withTimeoutOrNull(RESULT_HOLD_MS) { tryAwaitRelease() }
-                        if (released == null) infoShown = true
-                    },
-                    onTap = { offset ->
-                        // A tap on the information copies the name: it does not open the photo.
-                        val onInfo = infoShown && offset.y >= tileSize.height - infoHeight
-                        if (!onInfo) onTap()
-                    },
-                )
+            .pointerInput(entry.id, touchSlop) {
+                // Reads the finger itself, before any layer above takes it: a quick release is a tap, a move is a
+                // scroll, and a finger still down after RESULT_HOLD_MS shows the information.
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val onInfo = infoShown && down.position.y >= tileSize.height - infoHeight
+                        when (withTimeoutOrNull(RESULT_HOLD_MS) { trackPress(down, touchSlop) }) {
+                            PressOutcome.TAP -> if (!onInfo) onTap()
+                            PressOutcome.MOVED -> Unit
+                            null -> {
+                                infoShown = true
+                                waitForRelease(down.id)
+                            }
+                        }
+                    }
+                }
             },
     ) {
         GridThumb(
@@ -623,6 +634,26 @@ private fun ResultTile(
                 onCopy = { copyName(context, entry.name) },
             )
         }
+    }
+}
+
+/** What a press on a photo turned out to be. */
+private enum class PressOutcome { TAP, MOVED }
+
+/** Follows the press: a release is a tap, a move beyond the touch slop is a scroll. Nothing is consumed. */
+private suspend fun AwaitPointerEventScope.trackPress(down: PointerInputChange, touchSlop: Float): PressOutcome {
+    while (true) {
+        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: continue
+        if (!change.pressed) return PressOutcome.TAP
+        if ((change.position - down.position).getDistance() > touchSlop) return PressOutcome.MOVED
+    }
+}
+
+/** Waits until the finger of [id] is lifted. */
+private suspend fun AwaitPointerEventScope.waitForRelease(id: PointerId) {
+    while (true) {
+        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == id } ?: continue
+        if (!change.pressed) return
     }
 }
 
