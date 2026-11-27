@@ -319,7 +319,8 @@ fun SearchScreen(
             "Rechercher",
             onSettings = onSettings,
             onFilters = onFilters,
-            filtersCount = state.filters.activeCount,
+            // A date typed in the search box counts as a filter, in place of the date of the sheet.
+            filtersCount = state.filters.withTypedDate(searchTyped.range).activeCount,
             subtitle = null,
         )
         Spacer(Modifier.height(12.dp))
@@ -343,10 +344,16 @@ fun SearchScreen(
             )
             Spacer(Modifier.height(18.dp))
         }
-        if (chips.isNotEmpty()) {
+        // A date typed in the search box is shown as a filter too; its cross takes the words of the date out of the search.
+        val typedLabel = searchTyped.range?.let { "Date · " + Dates.filterRangeLabel(it.from, it.to, time.today) }
+        if (chips.isNotEmpty() || typedLabel != null) {
             Text("Filtres", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
             Spacer(Modifier.height(8.dp))
-            ActiveFilterPills(chips, onRemove = { state.filters = it.without })
+            if (typedLabel != null) {
+                TypedDatePill(typedLabel, onRemove = { state.query = searchTyped.rest })
+                if (chips.isNotEmpty()) Spacer(Modifier.height(8.dp))
+            }
+            if (chips.isNotEmpty()) ActiveFilterPills(chips, onRemove = { state.filters = it.without })
             Spacer(Modifier.height(18.dp))
         }
 
@@ -983,5 +990,22 @@ private fun GridIcon(count: Int, color: Color) {
                 cornerRadius = CornerRadius(cell * 0.15f),
             )
         }
+    }
+}
+
+/** The date typed in the search box, shown as a filter pill, with its cross. */
+@Composable
+private fun TypedDatePill(label: String, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(Palette.Soft)
+            .clickable(onClick = onRemove)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(label, fontSize = 14.sp, color = Palette.Accent, maxLines = 1)
+        Text("✕", fontSize = 12.sp, color = Palette.Accent)
     }
 }

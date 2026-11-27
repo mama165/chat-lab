@@ -76,6 +76,22 @@ class SearchResultsTest {
     }
 
     @Test
+    fun aCompleteFileNameIsOneWordEndingWithAnExtension() {
+        assertTrue(SearchResults.isFileName("IMG_20261127_093012.jpg"))
+        assertTrue(SearchResults.isFileName("  IMG-20261127-WA0003.jpeg  "))
+        assertFalse(SearchResults.isFileName("gaufre"))
+        assertFalse(SearchResults.isFileName("gaufre hier.jpg"))
+        assertFalse(SearchResults.isFileName("x.y"))
+    }
+
+    @Test
+    fun aNameIsFoundWhateverThePunctuationOfTheQuery() {
+        val named = entry("named", name = "IMG_20261127_093012.jpg", takenMs = hoursAgo(1))
+        assertEquals(listOf(named), SearchResults.nameMatches(listOf(named), "IMG 20261127").map { it.entry })
+        assertEquals(listOf(named), SearchResults.nameMatches(listOf(named), "img_20261127_093012.JPG").map { it.entry })
+    }
+
+    @Test
     fun aShortQueryIsNotTakenForAName() {
         val entries = listOf(entry("a", name = "IMG_20261127_093012.jpg"))
         assertTrue(SearchResults.nameMatches(entries, "im").isEmpty())

@@ -151,6 +151,15 @@ object Dates {
     }
 
     /** "9 – 22 nov.", "28 oct. – 3 nov.", or with the year when it differs from today. */
+    /**
+     * The label of a date range in a filter pill: the year is always written on both dates, so that the range
+     * is clear whatever the month ("12 nov. 2026 – 17 nov. 2026"). A single day keeps its short label.
+     */
+    fun filterRangeLabel(from: SimpleDate, to: SimpleDate, today: SimpleDate): String {
+        if (from == to) return dayLabel(from, today)
+        return "${from.day} ${MONTHS[from.month - 1]} ${from.year} – ${to.day} ${MONTHS[to.month - 1]} ${to.year}"
+    }
+
     fun rangeLabel(from: SimpleDate, to: SimpleDate, today: SimpleDate): String {
         if (from == to) return dayLabel(from, today)
         val sameYear = from.year == to.year
