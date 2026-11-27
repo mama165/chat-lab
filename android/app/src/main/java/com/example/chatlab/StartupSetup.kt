@@ -37,7 +37,7 @@ import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.PrimaryButton
 
 /** What ChatLab needs before it can search, in the order the setup page shows them. */
-enum class SetupStep { ACCESS, CHATLAB, MODELS }
+enum class SetupStep { ACCESS, CHATLAB, MODELS, PHOTOS }
 
 /** The checks made at each launch: access to the files, the chatlab folder, and its models subfolder. */
 object StartupSetup {
@@ -50,7 +50,8 @@ object StartupSetup {
             .getString(KEY_FOLDER, null) != null
         if (chatlabChosen) ensureWriteFolders(context)
         val modelsFound = chatlabChosen && modelsFolderFound(context)
-        return missingSteps(StorageAccess.granted(), chatlabChosen, modelsFound)
+        val photosChosen = Sources.read(context).isNotEmpty()
+        return missingSteps(StorageAccess.granted(), chatlabChosen, modelsFound, photosChosen)
     }
 
     /** The chatlab folder that was chosen, if there is one. */
@@ -87,12 +88,19 @@ object StartupSetup {
 
 /**
  * The rule, without Android: a missing access or folder is listed. Without the chatlab folder,
- * its models cannot be checked, so they count as missing too.
+ * its models cannot be checked, so they count as missing too. At least one folder of photos is
+ * needed too: nothing can be searched before the photos have been walked through.
  */
-internal fun missingSteps(access: Boolean, chatlabChosen: Boolean, modelsFound: Boolean): List<SetupStep> = buildList {
+internal fun missingSteps(
+    access: Boolean,
+    chatlabChosen: Boolean,
+    modelsFound: Boolean,
+    photosChosen: Boolean,
+): List<SetupStep> = buildList {
     if (!access) add(SetupStep.ACCESS)
     if (!chatlabChosen) add(SetupStep.CHATLAB)
     if (!modelsFound) add(SetupStep.MODELS)
+    if (!photosChosen) add(SetupStep.PHOTOS)
 }
 
 /**
@@ -170,8 +178,18 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
             onAction = if (SetupStep.CHATLAB in missing) onChanged else pickers.chooseChatlab,
             secondary = if (SetupStep.CHATLAB in missing) null else "Vérifier à nouveau" to onChanged,
         )
+        SetupCard(
+            number = 4,
+            title = "Vos dossiers de photos",
+            detail = "Choisissez le dossier où se trouvent vos photos. Les photos restent à leur place.",
+            done = SetupStep.PHOTOS !in missing,
+            doneText = "Dossier de photos choisi",
+            action = "Choisir un dossier de photos",
+            onAction = pickers.addSource,
+            locked = SetupStep.CHATLAB in missing,
+        )
         Text(
-            "Les dossiers de photos à analyser se choisissent ensuite, dans l'onglet Photos.",
+            "Vous pourrez ajouter d'autres dossiers ensuite, dans l'onglet Photos.",
             fontSize = 13.sp,
             color = Palette.Muted,
             modifier = Modifier.padding(bottom = 24.dp),
