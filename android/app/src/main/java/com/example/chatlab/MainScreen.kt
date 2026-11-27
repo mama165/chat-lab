@@ -58,7 +58,6 @@ private fun AppContent() {
     val search = remember { SearchUiState() }
     // Increase when the library or the removals change, to read again what is saved.
     var dataVersion by remember { mutableIntStateOf(0) }
-    var removalsVersion by remember { mutableIntStateOf(0) }
     val progress by AnalysisProgress.state.collectAsState()
 
 
@@ -108,15 +107,11 @@ private fun AppContent() {
     ) {
         when (page) {
             Page.SETTINGS -> SettingsPage(
-                entries = entries,
                 dataVersion = dataVersion,
-                removalsVersion = removalsVersion,
                 onBack = { page = Page.TABS },
-                onOpen = { page = it },
-                onFoldersChanged = { dataVersion++ },
-                onAddFolders = {
-                    addBack = Page.SETTINGS
-                    page = Page.ADD_FOLDER
+                onWiped = {
+                    search.reset()
+                    dataVersion++
                 },
             )
             Page.STORAGE -> StorageChooser(
@@ -132,17 +127,6 @@ private fun AppContent() {
                     page = addBack
                 },
             )
-            Page.REMOVED -> RemovedPage(onBack = { page = Page.SETTINGS }, onChanged = { removalsVersion++ })
-            Page.WIPE -> WipePage(
-                entries = entries,
-                onBack = { page = Page.SETTINGS },
-                onWiped = {
-                    search.reset()
-                    dataVersion++
-                    removalsVersion++
-                },
-            )
-            Page.TESTS -> TestsPage(onBack = { page = Page.SETTINGS })
             Page.LEVEL -> LevelPage(onBack = { page = Page.SETTINGS })
             Page.HISTORY -> AnalysisHistoryPage(
                 // The history is opened from the Photos tab: its arrow goes back there.
@@ -160,8 +144,6 @@ private fun AppContent() {
                         state = search,
                         entries = entries,
                         loading = libraryLoading,
-                        removalsVersion = removalsVersion,
-                        onRemovalsChanged = { removalsVersion++ },
                         onSettings = { page = Page.SETTINGS },
                         onFilters = { search.sheetOpen = true },
                         modifier = content,

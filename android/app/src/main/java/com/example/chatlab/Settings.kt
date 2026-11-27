@@ -1,17 +1,19 @@
 package com.example.chatlab
 
-import android.app.usage.StorageStatsManager
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.os.Process
-import android.os.storage.StorageManager
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,405 +21,322 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
-import com.example.chatlab.ui.OutlineButton
-import com.example.chatlab.ui.PageHeader
 import com.example.chatlab.ui.Palette
-import com.example.chatlab.ui.PrimaryButton
-import com.example.chatlab.ui.RadioRow
-import com.example.chatlab.ui.SectionLabel
-import com.example.chatlab.ui.SettingRow
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.io.File
+import java.util.Calendar
 
-/** Settings page, opened by the gear: folders, unclassified, space, tools, erase everything. */
+private val Green = Color(0xFF1F8A4C)
+private val Warning = Color(0xFFF5B700)
+private val GreyText = Color(0xFF9CA3AF)
+private val GreyLine = Color(0xFFD1D5DB)
+
+/** Paramètres, as in the mock-up: the last analysis, the report, the metrics, and erasing what the app created. */
 @Composable
 fun SettingsPage(
-    entries: List<LibraryEntry>,
     dataVersion: Int,
-    removalsVersion: Int,
     onBack: () -> Unit,
-    onOpen: (Page) -> Unit,
-    onFoldersChanged: () -> Unit,
-    onAddFolders: () -> Unit,
+    onWiped: () -> Unit,
 ) {
     val context = LocalContext.current
-    var foldersVersion by remember { mutableIntStateOf(0) }
-    val pickers = rememberFolderPickers(onAddSource = onAddFolders) {
-        foldersVersion++
-        onFoldersChanged()
-    }
-    val sources = remember(foldersVersion) { Sources.read(context) }
-    val chatlab = remember(foldersVersion) { folderName(context, KEY_FOLDER) }
-    val removals = remember(removalsVersion) { RemovalsJson.count(LibraryStore.readRemovals(context)) }
-    val history = remember(dataVersion) { RunArchive.list(context).size }
-    val appSize by produceState<Long?>(initialValue = null, dataVersion) {
-        value = withContext(Dispatchers.IO) { measureAppSize(context) }
-    }
-    val librarySize by produceState(initialValue = 0L, dataVersion) {
-        value = withContext(Dispatchers.IO) { LibraryStore.librarySize(context) }
-    }
+    val lastMillis = remember(dataVersion) { ReportStore.lastMillis(context) }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Palette.Page)
             .padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Spacer(Modifier.height(4.dp))
-        PageHeader("Réglages", onBack = onBack)
-        Column {
-            SectionLabel("Dossiers")
-            SettingRow(
-                "Photos à analyser",
-                when (sources.size) {
-                    0 -> "à choisir"
-                    1 -> sources.single().name
-                    else -> "${sources.size} dossiers"
-                },
-                onClick = pickers.addSource,
+        Row(
+            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("‹", fontSize = 22.sp, color = Palette.Accent, modifier = Modifier.clickable(onClick = onBack))
+            Text("Paramètres", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        }
+        LastAnalysis(lastMillis)
+        Divider()
+        Block { ReportRow() }
+        Divider()
+        Block { MetricsRow() }
+        Divider()
+        WipeSection(dataVersion = dataVersion, onWiped = onWiped)
+        Spacer16()
+    }
+}
+
+/** A line of the page, with its own vertical padding. */
+@Composable
+private fun Block(content: @Composable () -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 14.dp)) { content() }
+}
+
+@Composable
+private fun Divider() {
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Palette.Line))
+}
+
+@Composable
+private fun Spacer16() {
+    Box(modifier = Modifier.height(16.dp))
+}
+
+/** Dernière analyse, with the Détail button that opens its curve. */
+@Composable
+private fun LastAnalysis(lastMillis: Long?) {
+    Block {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Dernière analyse", fontSize = 15.sp, color = Palette.Ink)
+                // The detail view is added with its own change: for now the button is shown, not yet wired.
+                PillButton("Détail", enabled = lastMillis != null) {}
+            }
+            Text(
+                lastMillis?.let { formatWhen(it) } ?: "Aucune analyse pour l'instant",
+                fontSize = 12.sp,
+                color = Palette.Muted,
             )
-            SettingRow("Dossier chatlab", chatlab ?: "à choisir", onClick = pickers.chooseChatlab)
         }
-        Column {
-            SectionLabel("Recherche")
-            SettingRow("Non classifiées", "$removals", onClick = { onOpen(Page.REMOVED) })
-        }
-        Column {
-            SectionLabel("Analyse")
-            SettingRow("Performance", LevelStore.read(context).label, onClick = { onOpen(Page.LEVEL) })
-        }
-        Column {
-            SectionLabel("Espace")
-            SettingRow("Application", appSize?.let { Formats.size(it) } ?: "…")
-            SettingRow(
-                "Carnet d'analyse",
-                if (entries.isEmpty()) "vide" else "${Formats.photos(entries.size)} · ${Formats.size(librarySize)}",
-            )
-        }
-        Column {
-            SectionLabel("Avancé")
-            SettingRow("Historique des analyses", "$history", onClick = { onOpen(Page.HISTORY) })
-            SettingRow(
-                "Exporter la bibliothèque",
-                "sauvegarde library.json",
-                onClick = {
-                    Thread {
-                        val message = try {
-                            "Bibliothèque exportée : ${LibraryExport.run(context)} photos"
-                        } catch (e: Exception) {
-                            "Export impossible : ${e.message ?: e.javaClass.simpleName}"
-                        }
-                        context.mainExecutor.execute { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
-                    }.start()
-                },
-            )
-            SettingRow("Outils de test", onClick = { onOpen(Page.TESTS) })
-            SettingRow("Tout effacer", color = Palette.Danger, onClick = { onOpen(Page.WIPE) })
+    }
+}
+
+/** "26 novembre 2026, 17 h 48". */
+private fun formatWhen(millis: Long): String {
+    val c = Calendar.getInstance().apply { timeInMillis = millis }
+    val month = Dates.MONTH_NAMES[c.get(Calendar.MONTH)].lowercase()
+    return "${c.get(Calendar.DAY_OF_MONTH)} $month ${c.get(Calendar.YEAR)}, " +
+        "${c.get(Calendar.HOUR_OF_DAY)} h ${"%02d".format(c.get(Calendar.MINUTE))}"
+}
+
+/** Métriques: the folder of the measurements, grey when it is not there or not reachable. */
+@Composable
+private fun MetricsRow() {
+    val context = LocalContext.current
+    val available by produceState(initialValue = false) {
+        value = withContext(Dispatchers.IO) { OpenFolder.exists("diagnostics") }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Métriques", fontSize = 15.sp, color = Palette.Ink)
+            PillButton("Ouvrir", enabled = available) { OpenFolder.open(context, "diagnostics") }
         }
         Text(
-            "Tout effacer remet l'application comme au premier jour, sans toucher aux photos ni aux modèles.",
+            "Les mesures de l'app, pour comprendre les analyses et les lenteurs.",
             fontSize = 12.sp,
             color = Palette.Muted,
         )
-        Spacer(Modifier.height(16.dp))
     }
 }
 
-/** Size of the application according to Android (program, data and cache), or that of the APK otherwise. */
-private fun measureAppSize(context: Context): Long {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        try {
-            val manager = context.getSystemService(StorageStatsManager::class.java)
-            val stats = manager.queryStatsForPackage(StorageManager.UUID_DEFAULT, context.packageName, Process.myUserHandle())
-            return stats.appBytes + stats.dataBytes + stats.cacheBytes
-        } catch (e: Exception) {
-            // Repli ci-dessous.
-        }
-    }
-    return File(context.applicationInfo.sourceDir).length()
-}
+/** The steps of erasing: asking for the second press, then erased. */
+private enum class WipeStep { IDLE, ASKED, DONE }
 
-/** "Tout effacer" page: what disappears, what stays, and the red button. */
+/**
+ * Tout effacer, in place: a first press asks for a second one, which erases what the app created.
+ * Once erased, or when there is nothing to erase, the button is grey. Animated as in the mock-up.
+ */
 @Composable
-fun WipePage(entries: List<LibraryEntry>, onBack: () -> Unit, onWiped: () -> Unit) {
+private fun WipeSection(dataVersion: Int, onWiped: () -> Unit) {
     val context = LocalContext.current
-    val progress by AnalysisProgress.state.collectAsState()
-    var version by remember { mutableIntStateOf(0) }
-    val summary by produceState<WipeSummary?>(initialValue = null, version, entries) {
-        value = withContext(Dispatchers.IO) {
-            WipeSummary(
-                photos = entries.size,
-                librarySize = LibraryStore.librarySize(context),
-                removals = RemovalsJson.count(LibraryStore.readRemovals(context)),
-                recents = RecentStore.read(context),
-                lastAnalysis = ReportStore.lastDate(context),
-                hasReport = ReportStore.read(context) != null,
-            )
-        }
+    var step by remember { mutableStateOf(WipeStep.IDLE) }
+    var version by remember { mutableStateOf(0) }
+    var taps by remember { mutableStateOf(0) }
+    val nothingToErase by produceState(initialValue = false, dataVersion, version) {
+        value = withContext(Dispatchers.IO) { !hasCreatedData(context) }
     }
-    val chatlab = remember { folderName(context, KEY_FOLDER) ?: "chatlab" }
-    val sourceNames = remember { Sources.read(context).map { it.name } }
+    // While an analysis runs, nothing is erased: it must be stopped first, by the person.
+    val running = AnalysisProgress.state.collectAsState().value.running
+    val grey = nothingToErase || step == WipeStep.DONE || running
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Palette.Page)
-            .padding(horizontal = 20.dp),
-    ) {
-        Spacer(Modifier.height(4.dp))
-        PageHeader("Tout effacer", onBack = onBack)
-        val current = summary
-        Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            Text(
-                if (current != null && !current.canWipe) "Rien à effacer : l'application est déjà dans son état de départ."
-                else "Les dossiers à analyser sont vidés. Le dossier chatlab reste choisi. La prochaine analyse reprendra toutes les photos depuis le début.",
-                fontSize = 14.sp,
-                color = Palette.Muted,
-            )
-            Column {
-                SectionLabel("Disparaît")
-                current?.lines()?.forEach { line ->
-                    WipeRow(if (line.empty) "–" else "✕", line.title, line.detail, if (line.empty) Palette.Disabled else Palette.Danger, line.empty)
-                }
-                if (sourceNames.isEmpty()) {
-                    WipeRow("–", "Les dossiers à analyser", "Aucun dossier choisi", Palette.Disabled, true)
-                } else {
-                    WipeRow("✕", "Les dossiers à analyser", sourceNames.joinToString(", "), Palette.Danger, false)
-                }
-            }
-            Column {
-                SectionLabel("Reste")
-                WipeRow("✓", "Vos photos", "Rien n'est supprimé dans la galerie", Palette.Muted, false)
-                WipeRow("✓", "Les modèles", "Dans $chatlab/models", Palette.Muted, false)
-                WipeRow("✓", "Le dossier chatlab", chatlab, Palette.Muted, false)
-            }
-        }
-        Column(modifier = Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val canWipe = current?.canWipe == true && !progress.running
-            PrimaryButton(
-                "Tout effacer",
-                enabled = canWipe,
-                color = Palette.Danger,
-                onClick = {
-                    LibraryStore.wipeAnalysis(context)
-                    RecentStore.clear(context)
-                    ReportStore.clear(context)
-                    AnalysisProgress.clearReport()
-                    Sources.clear(context)
-                    Toast.makeText(context, "Tout est effacé.", Toast.LENGTH_SHORT).show()
-                    onWiped()
-                    version++
-                },
-            )
-            Text(
-                when {
-                    progress.running -> "Arrêtez d'abord l'analyse en cours."
-                    current?.canWipe == false -> "Le bouton s'active dès qu'il y a quelque chose à effacer."
-                    else -> "Pour annuler, revenez en arrière avec la flèche."
-                },
-                fontSize = 12.sp,
-                color = Palette.Muted,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun WipeRow(icon: String, title: String, detail: String, iconColor: androidx.compose.ui.graphics.Color, empty: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
-        Text(icon, fontSize = 15.sp, color = iconColor, modifier = Modifier.width(24.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, fontSize = 15.sp, color = if (empty) Palette.Muted else Palette.Ink)
-            Text(detail, fontSize = 12.sp, color = Palette.Muted)
-        }
-    }
-}
-
-/** The analysis of the test images runs apart: leaving the page does not interrupt it. */
-private object TestRun {
-    val running = MutableStateFlow(false)
-    val report = MutableStateFlow<String?>(null)
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-}
-
-/** "Outils de test" page: analysis of the test images and last report. */
-@Composable
-fun TestsPage(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val running by TestRun.running.collectAsState()
-    val testReport by TestRun.report.collectAsState()
-    var copied by remember { mutableStateOf(false) }
-    val report = testReport ?: ReportStore.read(context) ?: "Aucun compte rendu pour l'instant."
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Palette.Page)
-            .padding(horizontal = 20.dp)
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.padding(top = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Spacer(Modifier.height(4.dp))
-        PageHeader("Outils de test", onBack = onBack)
-        Text(
-            "Analyse les images du sous-dossier test du dossier chatlab. Le carnet est remplacé par ces images.",
-            fontSize = 13.sp,
-            color = Palette.Muted,
-        )
-        // Experiment on the memory of the models: it applies to the analyses started after the change.
-        var arenaOn by remember { mutableStateOf(OnnxExperiment.arenaOn(context)) }
-        Text("Mémoire des modèles", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
-        RadioRow(
-            label = "Mémoire ONNX gardée (réglage actuel)",
-            count = "arène activée",
-            selected = arenaOn,
+        WipeButton(
+            label = if (step == WipeStep.ASKED && !grey) "Appuyer à nouveau pour confirmer" else "Tout effacer",
+            grey = grey,
+            taps = taps,
             onClick = {
-                arenaOn = true
-                OnnxExperiment.writeArena(context, true)
-            },
-        )
-        RadioRow(
-            label = "Mémoire ONNX rendue (essai)",
-            count = "arène désactivée",
-            selected = !arenaOn,
-            onClick = {
-                arenaOn = false
-                OnnxExperiment.writeArena(context, false)
-            },
-        )
-        // Experiment on the threads of the ONNX sessions: 0 leaves the choice to ONNX Runtime.
-        var threads by remember { mutableStateOf(OnnxExperiment.read(context).threads) }
-        Text("Threads par session (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
-        OnnxExperiment.THREAD_CHOICES.forEach { n ->
-            RadioRow(
-                label = if (n == 0) "Automatique (réglage actuel)" else "$n threads",
-                count = if (n == 0) "ONNX Runtime" else "essai",
-                selected = threads == n,
-                onClick = {
-                    threads = n
-                    OnnxExperiment.writeThreads(context, n)
-                },
-            )
-        }
-        // Optional, test only: forces the number of workers, bypassing the start memory budget.
-        var forcedWorkers by remember { mutableStateOf(WorkerOverride.read(context)) }
-        Text("Nombre de workers (essai)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
-        RadioRow(
-            label = "Automatique (réglage actuel)",
-            count = "selon la mémoire",
-            selected = forcedWorkers == null,
-            onClick = {
-                forcedWorkers = null
-                WorkerOverride.write(context, null)
-            },
-        )
-        (1..4).forEach { n ->
-            RadioRow(
-                label = "$n worker${if (n > 1) "s" else ""} forcé${if (n > 1) "s" else ""}",
-                count = "essai",
-                selected = forcedWorkers == n,
-                onClick = {
-                    forcedWorkers = n
-                    WorkerOverride.write(context, n)
-                },
-            )
-        }
-        PrimaryButton(
-            if (running) "Analyse en cours…" else "Analyser les images de test",
-            enabled = !running,
-            onClick = {
-                val folder = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY_FOLDER, null)
-                if (folder == null) {
-                    TestRun.report.value = "Choisissez d'abord le dossier chatlab."
-                } else {
-                    TestRun.running.value = true
-                    TestRun.report.value = "Analyse en cours…"
-                    val app = context.applicationContext
-                    TestRun.scope.launch {
-                        TestRun.report.value = runAnalysis(app, Uri.parse(folder))
-                        TestRun.running.value = false
+                if (!running) {
+                    taps++
+                    if (step == WipeStep.IDLE) {
+                        step = WipeStep.ASKED
+                    } else {
+                        eraseCreatedData(context)
+                        Toast.makeText(context, "Tout est effacé.", Toast.LENGTH_SHORT).show()
+                        step = WipeStep.DONE
+                        version++
+                        onWiped()
                     }
                 }
             },
         )
-        SectionLabel("Dernier compte rendu")
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlineButton(if (copied) "Copié" else "Copier", onClick = {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("compte rendu", report))
-                copied = true
-            }, modifier = Modifier.weight(1f))
-            OutlineButton("Partager", onClick = {
-                val send = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, report)
+        if (running) {
+            Text(
+                "Une analyse est en cours. Arrêtez-la pour pouvoir tout effacer.",
+                fontSize = 13.sp,
+                color = Palette.Muted,
+            )
+        }
+        AnimatedVisibility(visible = step == WipeStep.ASKED && !running, exit = fadeOut(tween(300))) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Appear(600) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WarningIcon()
+                        Text("Cette opération est irréversible.", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
                 }
-                context.startActivity(Intent.createChooser(send, "Partager le compte rendu"))
-            }, modifier = Modifier.weight(1f))
+                Appear(1000) { WipeLine("✕", Palette.Danger, "Les données créées par l'application") }
+                Appear(1400) { WipeLine("✓", Green, "Vos fichiers originaux restent intacts") }
+                Appear(1800) { WipeLine("✓", Green, "Les modèles d'IA") }
+            }
         }
-        SelectionContainer {
-            Text(report, fontSize = 12.sp, color = Palette.Ink)
+        AnimatedVisibility(visible = step == WipeStep.DONE, enter = fadeIn(tween(400))) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Appear(500) { WipeLine("✓", Green, "Données créées par l'application supprimées") }
+                Appear(1100) { WipeLine("✓", Green, "Vos fichiers originaux restent intacts") }
+            }
         }
-        Spacer(Modifier.height(16.dp))
     }
 }
 
-/** Analyses the test images and formats the report, image by image. */
-fun runAnalysis(context: Context, folder: Uri): String = try {
-    Analyzer(context, folder).use { analyzer ->
-        val started = System.nanoTime()
-        val results = analyzer.analyzeAll()
-        val total = (System.nanoTime() - started) / 1_000_000
-        buildString {
-            if (results.isEmpty()) appendLine("Aucune image trouvée dans le sous-dossier test.")
-            for (r in results) {
-                if (r.error != null) {
-                    appendLine("${r.file.name} : erreur, ${r.error}")
-                } else {
-                    val place = when (r.indoor) {
-                        true -> "intérieur"
-                        false -> "extérieur"
-                        null -> "inconnu"
-                    }
-                    appendLine("${r.file.name} : $place, ${r.faces} visage(s), ${r.millis} ms")
-                }
-            }
-            val library = analyzer.writeLibrary(results)
-            appendLine()
-            appendLine("Total : $total ms pour ${results.size} image(s).")
-            appendLine("Carnet écrit : ${library.path}")
-            appendLine(runCatching { TextModels.control(context) }.getOrElse { "contrôle texte : ${it.message}" })
-        }.also { ReportStore.save(context, it) }
+/** The erase button: red outline, or grey when nothing can be erased. Each press shows a ring. */
+@Composable
+private fun WipeButton(label: String, grey: Boolean, taps: Int, onClick: () -> Unit) {
+    val color by animateColorAsState(if (grey) GreyText else Palette.Danger, tween(400), label = "wipe-text")
+    val border by animateColorAsState(if (grey) GreyLine else Palette.Danger, tween(400), label = "wipe-border")
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(Color.White, RoundedCornerShape(12.dp))
+            .border(1.dp, border, RoundedCornerShape(12.dp))
+            .clickable(enabled = !grey, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = color)
+        TapRing(taps)
     }
-} catch (e: Exception) {
-    "Erreur au chargement : ${e.message ?: e.javaClass.simpleName}"
+}
+
+/** The press ring of the mock-up: a red disc that grows and fades from the centre of the button. */
+@Composable
+private fun TapRing(taps: Int) {
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(taps) {
+        if (taps > 0) {
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(800))
+        }
+    }
+    val p = progress.value
+    if (p < 1f) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .graphicsLayer {
+                    val scale = if (p < 0.3f) 0.5f + 0.4f * (p / 0.3f) else 0.9f + 0.4f * ((p - 0.3f) / 0.7f)
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = if (p < 0.3f) p / 0.3f else (1f - p) / 0.7f
+                }
+                .background(Palette.Danger.copy(alpha = 0.18f), CircleShape),
+        )
+    }
+}
+
+/** Fades in and rises a line after a delay, as in the mock-up. */
+@Composable
+private fun Appear(delayMillis: Long, content: @Composable () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(delayMillis)
+        progress.animateTo(1f, tween(400))
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            alpha = progress.value
+            translationY = (1f - progress.value) * 4.dp.toPx()
+        },
+    ) {
+        content()
+    }
+}
+
+/** One line of the erase details: a cross or a tick, and its text. */
+@Composable
+private fun WipeLine(icon: String, color: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(icon, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color, modifier = Modifier.width(18.dp))
+        Text(text, fontSize = 14.sp, color = Palette.Ink)
+    }
+}
+
+/** The yellow warning triangle with its mark, as in the mock-up. */
+@Composable
+private fun WarningIcon() {
+    Canvas(modifier = Modifier.size(18.dp)) {
+        val w = size.width
+        val h = size.height
+        val triangle = Path().apply {
+            moveTo(w / 2f, 0f)
+            lineTo(w, h)
+            lineTo(0f, h)
+            close()
+        }
+        drawPath(triangle, Warning)
+        drawRect(Palette.Ink, topLeft = Offset(w * 11f / 24f, h * 9f / 24f), size = Size(w * 2f / 24f, h * 6f / 24f))
+        drawRect(Palette.Ink, topLeft = Offset(w * 11f / 24f, h * 16.5f / 24f), size = Size(w * 2f / 24f, h * 2f / 24f))
+    }
+}
+
+/** True when the app has created something: the analysis record, the recent searches, a report or the folders. */
+private fun hasCreatedData(context: Context): Boolean =
+    AnalysisRecordFiles.size(context.filesDir) > 0 ||
+        RecentStore.read(context).isNotEmpty() ||
+        ReportStore.read(context) != null ||
+        Sources.read(context).isNotEmpty()
+
+/** Erases what the app created, and nothing else: the photos of the gallery and the models stay. */
+private fun eraseCreatedData(context: Context) {
+    LibraryStore.wipeAnalysis(context)
+    RecentStore.clear(context)
+    ReportStore.clear(context)
+    AnalysisProgress.clearReport()
+    Sources.clear(context)
 }

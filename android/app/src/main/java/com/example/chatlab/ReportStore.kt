@@ -17,9 +17,12 @@ object ReportStore {
         File(context.filesDir, FILE).takeIf { it.exists() }?.readText(Charsets.UTF_8)?.takeIf { it.isNotBlank() }
 
     /** Date of the last analysis, or null if there was none. */
-    fun lastDate(context: Context): SimpleDate? {
+    fun lastDate(context: Context): SimpleDate? = lastMillis(context)?.let { SimpleDate.of(it) }
+
+    /** Moment of the last analysis in milliseconds, or null if there was none. */
+    fun lastMillis(context: Context): Long? {
         val millis = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getLong(KEY_DATE, 0L)
-        return if (millis > 0) SimpleDate.of(millis) else null
+        return if (millis > 0) millis else null
     }
 
     private const val RUN_FILE = "derniere_analyse.json"

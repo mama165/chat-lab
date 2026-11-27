@@ -193,27 +193,6 @@ object Diagnostics {
 
     /** The name of an exit reason, from its code. */
     /**
-     * What "Copier les données" copies for a diagnosis: the analysis file, the journal of its run
-     * and the recent lines of the application's journal.
-     */
-    fun copyBundle(context: Context, analysis: JSONObject, runName: String, startMs: Long): JSONObject {
-        // An analysis saved without its journal's name: the journal started nearest to it.
-        val name = runName.ifBlank { runFor(context, startMs) }
-        val run = if (name.isBlank()) emptyList() else linesOf(dir(context), name)
-        return bundle(analysis, run, linesOf(dir(context), "session.jsonl"))
-    }
-
-    /** The bundle, from the lines already read. The application's journal keeps its last [SESSION_LINES] lines. */
-    fun bundle(analysis: JSONObject, runLines: List<String>, sessionLines: List<String>): JSONObject = JSONObject()
-        .put("analysis", analysis)
-        .put(
-            "diagnostics",
-            JSONObject()
-                .put("run", JSONArray(runLines.mapNotNull { parse(it) }))
-                .put("session", JSONArray(sessionLines.takeLast(SESSION_LINES).mapNotNull { parse(it) })),
-        )
-
-    /**
      * What "Copier le résultat en cours" copies during a run: the progress as it is, the journal of the run
      * as far as it is written, and the recent lines of the application's journal. The analysis goes on.
      */
@@ -245,10 +224,6 @@ object Diagnostics {
     private fun readLinesSafely(file: File): List<String> =
         runCatching { file.readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())
 
-    /** The journal of the run that started nearest to [startMs], within ten minutes; empty when there is none. */
-    fun runFor(context: Context, startMs: Long): String =
-        nearestRun(dir(context).list()?.toList().orEmpty(), startMs, TimeZone.getDefault())
-
     /** Pure choice of the journal name: the run file whose start time is nearest, within [windowMs]. */
     fun nearestRun(names: List<String>, startMs: Long, zone: TimeZone, windowMs: Long = 10 * 60_000L): String {
         val format = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).apply { timeZone = zone }
@@ -265,9 +240,6 @@ object Diagnostics {
 
     /** How many lines of the application's journal are copied: the recent ones. */
     const val SESSION_LINES = 300
-
-    private fun linesOf(folder: File, name: String): List<String> =
-        runCatching { File(folder, name).readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())
 
     private fun parse(line: String): JSONObject? = runCatching { JSONObject(line) }.getOrNull()
 

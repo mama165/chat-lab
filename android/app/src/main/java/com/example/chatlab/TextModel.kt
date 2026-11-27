@@ -141,14 +141,4 @@ object TextModels {
         )
         return vector
     }
-
-    /** Check line for the report: ids and first values, to compare with the computerateur. */
-    @Synchronized
-    fun control(context: Context): String {
-        val model = get(context)
-        val sentence = "une rose rouge dans un jardin"
-        val ids = model.ids(sentence).take(8).joinToString(", ")
-        val vector = model.encode(sentence).take(5).joinToString(" ; ") { "%.6f".format(it) }
-        return "contrôle texte : ids [$ids] ; vecteur [$vector]"
-    }
 }

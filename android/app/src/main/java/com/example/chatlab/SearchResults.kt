@@ -4,7 +4,7 @@ package com.example.chatlab
  * What the search screen shows for a query:
  * - [close]: the similar photos, above the chosen starting point;
  * - [extra]: the "less close" photos already revealed, one by one.
- * A photo appears only once, and never if it was removed from this search.
+ * A photo appears only once.
  */
 data class SearchOutcome(
     val close: List<Match>,
@@ -52,7 +52,6 @@ object SearchResults {
         query: String,
         ranked: List<Match>,
         filters: Filters,
-        removed: Set<String>,
         shownExtra: Int,
         time: When,
         /** Called at each step, with its name: for the journal. Does nothing by default. */
@@ -64,14 +63,14 @@ object SearchResults {
         val kept = distinctById(entries, { it.source.ifBlank { it.path } }).filter { filters.matches(it, time) }
         probe("kept.end")
         if (query.isBlank()) {
-            val day = kept.filter { it.source.ifBlank { it.path } !in removed }.sortedByDescending { it.takenMs }
+            val day = kept.sortedByDescending { it.takenMs }
             return SearchOutcome(day.map { Match(it, null) }, emptyList(), 0, false)
         }
         val allowed = kept.map { it.source.ifBlank { it.path } }.toSet()
         probe("candidates.start")
         val candidates = distinctById(ranked, { keyOf(it) }).filter { match ->
             val key = keyOf(match)
-            key in allowed && key !in removed
+            key in allowed
         }
         probe("candidates.end")
         probe("threshold.start")

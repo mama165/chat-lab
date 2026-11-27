@@ -25,12 +25,11 @@ object FacetCounts {
         query: String,
         ranked: List<Match>,
         filters: Filters,
-        removed: Set<String>,
         time: When,
     ): Facets {
         fun count(f: Filters): Int =
             if (query.isBlank()) entries.count { f.matches(it, time) }
-            else SearchResults.compute(entries, query, ranked, f, removed, 0, time).total
+            else SearchResults.compute(entries, query, ranked, f, 0, time).total
 
         val range = filters.date.range
         return Facets(

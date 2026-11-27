@@ -56,7 +56,6 @@ import kotlinx.coroutines.withContext
 fun FiltersPage(
     state: SearchUiState,
     entries: List<LibraryEntry>,
-    removalsVersion: Int,
     onBack: () -> Unit,
     onDates: () -> Unit,
 ) {
@@ -64,12 +63,11 @@ fun FiltersPage(
     val filters = state.filters
     val time = remember(filters, state.query) { When(System.currentTimeMillis()) }
     val queryKey = state.query.trim().lowercase()
-    val removed = remember(queryKey, removalsVersion) { Removals.sourcesFor(context, queryKey) }
     val folderOptions = remember(entries) { FilterOptions.folders(entries) }
     val typeOptions = remember(entries) { FilterOptions.types(entries) }
-    val facets by produceState<Facets?>(initialValue = null, filters, entries, state.ranked, state.query, removed) {
+    val facets by produceState<Facets?>(initialValue = null, filters, entries, state.ranked, state.query) {
         value = withContext(Dispatchers.Default) {
-            FacetCounts.compute(entries, state.query, state.ranked, filters, removed, time)
+            FacetCounts.compute(entries, state.query, state.ranked, filters, time)
         }
     }
     fun count(read: (Facets) -> Int?): String = facets?.let(read)?.toString() ?: "…"
