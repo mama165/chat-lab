@@ -106,6 +106,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 /**
  * The state of the search, shared between the search screen and the Filtres page so that the
@@ -117,7 +122,6 @@ class SearchUiState {
     var shownExtra by mutableIntStateOf(0)
     /** Position, in the photos less close, of the last batch added (to highlight it). */
     var newFrom by mutableIntStateOf(-1)
-    var selected by mutableStateOf(emptySet<String>())
     var ranked by mutableStateOf(emptyList<Match>())
     /** The filter sheet, which rises over the search. */
     var sheetOpen by mutableStateOf(false)
@@ -133,7 +137,6 @@ class SearchUiState {
         sheetOpen = false
         shownExtra = 0
         newFrom = -1
-        selected = emptySet()
         ranked = emptyList()
     }
 }
@@ -167,7 +170,6 @@ fun SearchScreen(
     LaunchedEffect(query, state.filters) {
         state.shownExtra = 0
         state.newFrom = -1
-        state.selected = emptySet()
     }
 
     // The sentence becomes a vector once typing pauses, for the similar photos.
@@ -284,9 +286,6 @@ fun SearchScreen(
         if (index >= 0) gridState.animateScrollToItem(index)
     }
 
-    BackHandler(enabled = state.selected.isNotEmpty()) { state.selected = emptySet() }
-
-    val selecting = state.selected.isNotEmpty()
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -294,44 +293,46 @@ fun SearchScreen(
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(16.dp))
-        if (selecting) {
-            SelectionBar(
-                count = state.selected.size,
-                onCancel = { state.selected = emptySet() },
-            )
-        } else {
-            TabTitle(
-                "Rechercher",
-                onSettings = onSettings,
-                onFilters = onFilters,
-                filtersCount = state.filters.activeCount,
-                subtitle = null,
-            )
-            Spacer(Modifier.height(12.dp))
-            SearchField(
-                value = query,
-                onChange = { state.query = it },
-                onSearch = {
-                    focus.clearFocus()
-                    if (!outcome.isEmpty) recents = RecentStore.add(context, query)
-                },
-            )
-        }
+        TabTitle(
+            "Rechercher",
+            onSettings = onSettings,
+            onFilters = onFilters,
+            filtersCount = state.filters.activeCount,
+            subtitle = null,
+        )
+        Spacer(Modifier.height(12.dp))
+        SearchField(
+            value = query,
+            onChange = { state.query = it },
+            onSearch = {
+                focus.clearFocus()
+                if (!outcome.isEmpty) recents = RecentStore.add(context, query)
+            },
+        )
         Spacer(Modifier.height(10.dp))
 
         // Recent searches, then the filters applied (on lines, never scrolled), then the results.
         val chips = state.filters.chips(time)
-        if (query.isBlank() && entries.isNotEmpty() && !selecting) {
+        if (query.isBlank() && entries.isNotEmpty()) {
             Recents(recents, onPick = { state.query = it })
             Spacer(Modifier.height(18.dp))
         }
-        if (chips.isNotEmpty() && !selecting) {
+        if (chips.isNotEmpty()) {
             Text("Filtres", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
             Spacer(Modifier.height(8.dp))
             ActiveFilterPills(chips, onRemove = { state.filters = it.without })
             Spacer(Modifier.height(18.dp))
         }
 
+        // The photo opened by a tap, shown in the application itself.
+        var viewing by remember { mutableStateOf("") }
+        if (viewing.isNotBlank()) {
+            PhotoViewer(
+                source = viewing,
+                onClose = { viewing = "" },
+                onOpenExternal = { openInGallery(context, viewing) },
+            )
+        }
         when {
             loading -> Loading("Veuillez patienter, la bibliothèque se charge…")
             entries.isEmpty() -> Message(
@@ -366,13 +367,11 @@ fun SearchScreen(
                         is ResultItem.Label -> SectionLabel(item.text, Modifier.padding(top = 6.dp))
                         is ResultItem.Separator -> TextDivider(item.text)
                         is ResultItem.Tile -> {
-                            val key = SearchResults.keyOf(item.match)
                             ResultTile(
                                 match = item.match,
                                 isNew = item.isNew,
                                 highlightKey = state.shownExtra,
-                                selected = key in state.selected,
-                                onTap = { state.selected = toggled(state.selected, key) },
+                                onTap = { viewing = item.match.entry.source.ifBlank { item.match.entry.path } },
                                 onLongPress = { openInGallery(context, item.match.entry.source) },
                             )
                         }
@@ -468,43 +467,6 @@ private fun SearchField(
     }
 }
 
-/** When selecting, the top bar replaces the field: number chosen, cancel, remove. */
-@Composable
-private fun SelectionBar(count: Int, onCancel: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Palette.Soft)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            "✕",
-            fontSize = 16.sp,
-            color = Palette.Accent,
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(onClick = onCancel)
-                .semantics { contentDescription = "Annuler la sélection" }
-                .padding(8.dp),
-        )
-        Text(
-            if (count == 1) "1 sélectionnée" else "$count sélectionnées",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Palette.Accent,
-            modifier = Modifier.weight(1f),
-        )
-    }
-    Text(
-        "Appui court pour choisir, appui long pour ouvrir",
-        fontSize = 12.sp,
-        color = Palette.Muted,
-        modifier = Modifier.padding(top = 6.dp),
-    )
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
@@ -562,25 +524,6 @@ private fun Message(title: String, detail: String?) {
     }
 }
 
-private fun toggled(current: Set<String>, key: String): Set<String> =
-    if (key in current) current - key else current + key
-
-@Composable
-private fun Check(modifier: Modifier, size: Int) {
-    Box(
-        modifier = modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(Color.White)
-            .padding(2.dp)
-            .clip(CircleShape)
-            .background(Palette.Accent),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("✓", fontSize = (size / 2 + 1).sp, color = Color.White)
-    }
-}
-
 /** Short tap = selection, long press = opening in the gallery. */
 private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -> Unit): Modifier =
     this.pointerInput(key) {
@@ -596,7 +539,6 @@ private fun ResultTile(
     match: Match,
     isNew: Boolean,
     highlightKey: Int,
-    selected: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
@@ -636,11 +578,9 @@ private fun ResultTile(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(14.dp))
-                .alpha(if (selected) 0.45f else 1f),
+                .clip(RoundedCornerShape(14.dp)),
         )
-        if (selected) Check(Modifier.align(Alignment.TopEnd).padding(6.dp), 22)
-        if (!selected && ring.value > 0f) {
+        if (ring.value > 0f) {
             Canvas(modifier = Modifier.matchParentSize()) {
                 val w = size.width
                 val h = size.height
@@ -791,5 +731,57 @@ object SearchStages {
                 .put("nativeMb", Debug.getNativeHeapAllocatedSize() / mb)
                 .put("javaMb", (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / mb),
         )
+    }
+}
+
+/** A photo full screen in the application: a back button at the top, the photo fitted on black. */
+@Composable
+private fun PhotoViewer(source: String, onClose: () -> Unit, onOpenExternal: () -> Unit) {
+    val context = LocalContext.current
+    val image by produceState<ImageBitmap?>(initialValue = null, source) {
+        value = withContext(Dispatchers.IO) { decodeLarge(context, source)?.asImageBitmap() }
+    }
+    // The system back gesture closes the dialog as well (onDismissRequest).
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            image?.let {
+                Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            }
+            if (image == null) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.White)
+            Text(
+                "‹ Retour",
+                color = Color.White,
+                fontSize = 16.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .clickable(onClick = onClose)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+            Text(
+                "Ouvrir dans la galerie",
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+                    .clickable(onClick = onOpenExternal),
+            )
+        }
+    }
+}
+
+/** The photo at a size where its longest side is about [maxSide] pixels: enough for the screen, not more. */
+private fun decodeLarge(context: Context, location: String, maxSide: Int = 1600): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    openImage(context, location)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+    return openImage(context, location)?.use {
+        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
     }
 }
