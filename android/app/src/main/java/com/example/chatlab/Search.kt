@@ -336,7 +336,11 @@ fun SearchScreen(
         // Recent searches, then the filters applied (on lines, never scrolled), then the results.
         val chips = state.filters.chips(time)
         if (query.isBlank() && entries.isNotEmpty()) {
-            Recents(recents, onPick = { state.query = it })
+            Recents(
+                recents,
+                onPick = { state.query = it },
+                onRemove = { recents = RecentStore.remove(context, it) },
+            )
             Spacer(Modifier.height(18.dp))
         }
         if (chips.isNotEmpty()) {
@@ -494,8 +498,9 @@ private fun SearchField(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
+private fun Recents(recents: List<String>, onPick: (String) -> Unit, onRemove: (String) -> Unit) {
     if (recents.isEmpty()) return
+    val touchSlop = LocalViewConfiguration.current.touchSlop
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("Récentes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -507,7 +512,8 @@ private fun Recents(recents: List<String>, onPick: (String) -> Unit) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .border(1.dp, Palette.Line, RoundedCornerShape(18.dp))
-                        .clickable { onPick(recent) }
+                        // A tap searches it; a hold of the same length as on a photo removes it, here and on the phone.
+                        .tapOrHold(recent, touchSlop, onTap = { onPick(recent) }, onHold = { onRemove(recent) })
                         .padding(horizontal = 14.dp, vertical = 7.dp),
                 )
             }
@@ -548,9 +554,6 @@ private fun Message(title: String, detail: String?) {
         if (detail != null) Text(detail, fontSize = 13.sp, color = Palette.Muted)
     }
 }
-
-/** How long a finger stays down on a photo before its information appears. */
-private const val RESULT_HOLD_MS = 2000L
 
 /**
  * A similar photo: a square thumbnail. A tap opens it. Held for two seconds, its name, folder and date
@@ -601,12 +604,12 @@ private fun ResultTile(
             .onSizeChanged { tileSize = it }
             .pointerInput(entry.id, touchSlop) {
                 // Reads the finger itself, before any layer above takes it: a quick release is a tap, a move is a
-                // scroll, and a finger still down after RESULT_HOLD_MS shows the information.
+                // scroll, and a finger still down after HOLD_MS shows the information.
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val onInfo = infoShown && down.position.y >= tileSize.height - infoHeight
-                        when (withTimeoutOrNull(RESULT_HOLD_MS) { trackPress(down, touchSlop) }) {
+                        when (withTimeoutOrNull(HOLD_MS) { trackPress(down, touchSlop) }) {
                             PressOutcome.TAP -> if (!onInfo) onTap()
                             PressOutcome.MOVED -> Unit
                             null -> {
@@ -634,26 +637,6 @@ private fun ResultTile(
                 onCopy = { copyName(context, entry.name) },
             )
         }
-    }
-}
-
-/** What a press on a photo turned out to be. */
-private enum class PressOutcome { TAP, MOVED }
-
-/** Follows the press: a release is a tap, a move beyond the touch slop is a scroll. Nothing is consumed. */
-private suspend fun AwaitPointerEventScope.trackPress(down: PointerInputChange, touchSlop: Float): PressOutcome {
-    while (true) {
-        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: continue
-        if (!change.pressed) return PressOutcome.TAP
-        if ((change.position - down.position).getDistance() > touchSlop) return PressOutcome.MOVED
-    }
-}
-
-/** Waits until the finger of [id] is lifted. */
-private suspend fun AwaitPointerEventScope.waitForRelease(id: PointerId) {
-    while (true) {
-        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == id } ?: continue
-        if (!change.pressed) return
     }
 }
 

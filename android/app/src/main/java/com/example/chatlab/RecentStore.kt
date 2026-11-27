@@ -15,6 +15,13 @@ object RecentStore {
         return list
     }
 
+    /** Removes a search from the list kept on the phone: it does not come back after a restart. */
+    fun remove(context: Context, query: String): List<String> {
+        val list = RecentSearches.remove(read(context), query)
+        write(context, list)
+        return list
+    }
+
     fun clear(context: Context) = write(context, emptyList())
 
     private fun write(context: Context, list: List<String>) {
