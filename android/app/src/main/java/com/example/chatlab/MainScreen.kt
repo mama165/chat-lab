@@ -23,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.BottomTabs
 import com.example.chatlab.ui.Palette
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.pointerInput
 
 /**
  * The first screen: while the access, the chatlab folder or its models are missing, the setup page
@@ -143,16 +145,28 @@ private fun AppContent() {
             Page.RUN -> AnalysisDetailPage(name = openedRun, onBack = { page = Page.HISTORY })
             Page.TABS -> {
                 val content = Modifier.weight(1f)
-                if (tab == 0) {
+                // Both tabs stay composed, so that nothing is lost when switching: only the one on top changes.
+                val searchOnTop = tab == 0
+                Box(modifier = content) {
                     SearchScreen(
                         state = search,
                         entries = entries,
                         loading = libraryLoading,
                         onSettings = { page = Page.SETTINGS },
                         onFilters = { search.sheetOpen = true },
-                        modifier = content,
+                        modifier = Modifier.fillMaxSize().zIndex(if (searchOnTop) 2f else 0f),
                     )
-                } else {
+                    // Absorbs the touches that the top tab does not use, so they never reach the hidden one.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(1f)
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                                }
+                            },
+                    )
                     PhotosScreen(
                         entries = entries,
                         onSettings = { page = Page.SETTINGS },
@@ -166,7 +180,7 @@ private fun AppContent() {
                             storageBack = Page.TABS
                             page = Page.STORAGE
                         },
-                        modifier = content,
+                        modifier = Modifier.fillMaxSize().zIndex(if (searchOnTop) 0f else 2f),
                     )
                 }
                 if (tab == 0) AnalysisBanner(
