@@ -43,4 +43,9 @@ class RecentSearchesTest {
         assertEquals(emptyList<String>(), RecentSearches.decode(null))
         assertEquals(emptyList<String>(), RecentSearches.decode("\n \n"))
     }
+
+    @Test
+    fun removeTakesTheWordOutOfTheList() {
+        assertEquals(listOf("wifi", "gaufre"), RecentSearches.remove(listOf("facture", "wifi", "gaufre"), "facture"))
+    }
 }

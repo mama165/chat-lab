@@ -12,6 +12,9 @@ object RecentSearches {
         return (listOf(clean) + list.filter { Library.fold(it) != key }).take(max)
     }
 
+    /** Removes a search from the list, exactly as it was kept. */
+    fun remove(list: List<String>, query: String): List<String> = list.filter { it != query }
+
     fun encode(list: List<String>): String = list.joinToString("\n")
 
     fun decode(text: String?): List<String> =
