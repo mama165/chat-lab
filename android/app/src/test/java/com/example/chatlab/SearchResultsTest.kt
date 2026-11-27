@@ -29,6 +29,33 @@ class SearchResultsTest {
     }
 
     @Test
+    fun aFileNameTypedAgainFindsItsPhotoFirst() {
+        val named = entry("named", name = "IMG_20261127_093012.jpg", takenMs = daysAgo(9))
+        val other = entry("other", name = "WA0003.jpg", takenMs = hoursAgo(1))
+        // Its description does not match at all: the name alone brings it.
+        val outcome = compute(
+            listOf(other, named),
+            query = "IMG_20261127_093012.jpg",
+            ranked = ranked(listOf(other), listOf(0.5f)),
+        )
+        assertEquals(named, outcome.close.first().entry)
+    }
+
+    @Test
+    fun aNamePartFindsThePhotosWhoseNameHoldsIt() {
+        val first = entry("first", name = "IMG_20261127_093012.jpg", takenMs = hoursAgo(2))
+        val second = entry("second", name = "IMG_20261127_101500.jpg", takenMs = hoursAgo(1))
+        val outcome = compute(listOf(first, second), query = "img_20261127")
+        assertEquals(listOf(second, first), outcome.close.map { it.entry })
+    }
+
+    @Test
+    fun aShortQueryIsNotTakenForAName() {
+        val entries = listOf(entry("a", name = "IMG_20261127_093012.jpg"))
+        assertTrue(SearchResults.nameMatches(entries, "im").isEmpty())
+    }
+
+    @Test
     fun aDateAloneListsItsPhotosMostRecentFirst() {
         val later = entry("later", takenMs = hoursAgo(1))
         val earlier = entry("earlier", takenMs = hoursAgo(3))

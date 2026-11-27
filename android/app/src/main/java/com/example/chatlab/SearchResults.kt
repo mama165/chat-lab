@@ -75,7 +75,12 @@ object SearchResults {
         probe("candidates.end")
         probe("threshold.start")
         // The score decides which photos come (the threshold); the order shown is always the most recent first.
-        val close = Library.aboveThreshold(candidates, filters.resemblance.floor).sortedByDescending { it.entry.takenMs }
+        // A file name typed again finds its photos first, whatever the description says.
+        val named = nameMatches(kept, query)
+        val namedKeys = named.map { keyOf(it) }.toSet()
+        val byScore = Library.aboveThreshold(candidates.filter { keyOf(it) !in namedKeys }, filters.resemblance.floor)
+            .sortedByDescending { it.entry.takenMs }
+        val close = named + byScore
         val closeKeys = close.map { keyOf(it) }.toSet()
         val below = candidates.filter { keyOf(it) !in closeKeys && (it.score ?: 0f) >= MoreResults.FLOOR }
         val offered = below.take(MoreResults.MAX_EXTRA)
@@ -87,6 +92,20 @@ object SearchResults {
             remaining = offered.size - shown,
             limitReached = below.size > MoreResults.MAX_EXTRA && shown >= offered.size,
         )
+    }
+
+    /**
+     * The photos whose name contains the query, read like the text (case and accents aside, the
+     * punctuation of the name is ignored): "IMG_20261127_093012.jpg" finds that file. A query shorter
+     * than three letters is not a name, so it does not pull in every photo. Most recent first.
+     */
+    fun nameMatches(entries: List<LibraryEntry>, query: String): List<Match> {
+        val phrase = Library.fold(query)
+        if (phrase.length < 3) return emptyList()
+        return entries
+            .filter { Library.fold(it.name).contains(phrase) }
+            .sortedByDescending { it.takenMs }
+            .map { Match(it, 1f) }
     }
 
     /** The number of less close photos after a new tap. */
