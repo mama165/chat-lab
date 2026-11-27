@@ -71,4 +71,11 @@ class StartupSetupTest {
     fun theStageIsDoneWhenNothingIsMissing() {
         assertEquals(3, setupStage(emptyList()))
     }
+
+    @Test
+    fun theCardsWaitForTheirReveal_likeInTheView() {
+        assertEquals(2600L, revealDelayMs(1))   // explorer and checks
+        assertEquals(1600L, revealDelayMs(2))   // photos, then "Tout est prêt"
+        assertEquals(0L, revealDelayMs(0))
+    }
 }
