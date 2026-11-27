@@ -10,7 +10,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** How long a finger stays down before a press becomes a hold: the information of a photo, or the removal of a recent search. */
-internal const val HOLD_MS = 1500L
+internal const val HOLD_MS = 500L
 
 /**
  * A tap runs [onTap] on release; a finger still down after [HOLD_MS] runs [onHold] (and nothing on release).
