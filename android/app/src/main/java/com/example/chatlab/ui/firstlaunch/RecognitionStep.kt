@@ -1,6 +1,9 @@
 package com.example.chatlab.ui.firstlaunch
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -161,14 +164,7 @@ fun RecognitionStep(onPickPhotos: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .border(1.2.dp, Check, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "i", color = Check, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+            InfoSymbol(size = 16.dp)
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "Aucune de vos données n’est supprimée ni collectée.",
@@ -188,5 +184,24 @@ fun RecognitionStep(onPickPhotos: () -> Unit) {
         ) {
             Text(text = "Choisir mes photos", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
+    }
+}
+
+/** The information symbol of view 1.1: a 16 dp ring with a dot and a bar, drawn rather than written. */
+@Composable
+private fun InfoSymbol(size: androidx.compose.ui.unit.Dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val ring = 1.2.dp.toPx()
+        val stroke = Stroke(width = ring)
+        drawCircle(color = Check, radius = this.size.minDimension / 2 - ring / 2, style = stroke)
+        val cx = this.size.width / 2
+        drawCircle(color = Check, radius = 1.1.dp.toPx(), center = Offset(cx, this.size.height * 0.30f))
+        drawLine(
+            color = Check,
+            start = Offset(cx, this.size.height * 0.46f),
+            end = Offset(cx, this.size.height * 0.78f),
+            strokeWidth = 1.6.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
     }
 }
