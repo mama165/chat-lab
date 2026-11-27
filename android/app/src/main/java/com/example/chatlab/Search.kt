@@ -505,17 +505,33 @@ private fun Recents(recents: List<String>, onPick: (String) -> Unit, onRemove: (
         SectionLabel("Récentes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             recents.forEach { recent ->
-                Text(
-                    recent,
-                    fontSize = 14.sp,
-                    color = Palette.Ink,
+                Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .border(1.dp, Palette.Line, RoundedCornerShape(18.dp))
+                        .padding(start = 14.dp, end = 6.dp, top = 7.dp, bottom = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        recent,
+                        fontSize = 14.sp,
+                        color = Palette.Ink,
                         // A tap searches it; a hold of the same length as on a photo removes it, here and on the phone.
-                        .tapOrHold(recent, touchSlop, onTap = { onPick(recent) }, onHold = { onRemove(recent) })
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                )
+                        modifier = Modifier.tapOrHold(recent, touchSlop, onTap = { onPick(recent) }, onHold = { onRemove(recent) }),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    // The cross on the right removes the search at once, as the hold does.
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Palette.Field)
+                            .clickable { onRemove(recent) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("×", fontSize = 12.sp, color = Palette.Muted)
+                    }
+                }
             }
         }
     }
