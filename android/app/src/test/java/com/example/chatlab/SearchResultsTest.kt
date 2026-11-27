@@ -42,6 +42,32 @@ class SearchResultsTest {
     }
 
     @Test
+    fun aCompleteFileNameShowsOnlyItsPhoto() {
+        val named = entry("named", name = "IMG_20261127_093012.jpg", takenMs = daysAgo(9))
+        val screenshot = entry("shot", name = "Screenshot_20261127_093012.png", takenMs = hoursAgo(1))
+        val similar = entry("similar", name = "WA0003.jpg", takenMs = hoursAgo(2))
+        val outcome = compute(
+            listOf(screenshot, similar, named),
+            query = "IMG_20261127_093012.jpg",
+            ranked = ranked(listOf(screenshot, similar), listOf(0.5f, 0.4f)),
+        )
+        assertEquals(listOf(named), outcome.close.map { it.entry })
+        assertTrue(outcome.extra.isEmpty())
+        assertFalse(outcome.hasMore)
+    }
+
+    @Test
+    fun aFileNameWithoutAMatchKeepsTheUsualResults() {
+        val other = entry("other", name = "WA0003.jpg", takenMs = hoursAgo(1))
+        val outcome = compute(
+            listOf(other),
+            query = "IMG_20261127_093012.jpg",
+            ranked = ranked(listOf(other), listOf(0.5f)),
+        )
+        assertEquals(listOf(other), outcome.close.map { it.entry })
+    }
+
+    @Test
     fun aNamePartFindsThePhotosWhoseNameHoldsIt() {
         val first = entry("first", name = "IMG_20261127_093012.jpg", takenMs = hoursAgo(2))
         val second = entry("second", name = "IMG_20261127_101500.jpg", takenMs = hoursAgo(1))

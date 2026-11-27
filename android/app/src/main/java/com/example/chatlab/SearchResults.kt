@@ -80,6 +80,10 @@ object SearchResults {
         val namedKeys = named.map { keyOf(it) }.toSet()
         val byScore = Library.aboveThreshold(candidates.filter { keyOf(it) !in namedKeys }, filters.resemblance.floor)
             .sortedByDescending { it.entry.takenMs }
+        // A complete file name ("IMG_20261127_093012.jpg") is looked for alone: when it matches, nothing else is shown.
+        if (named.isNotEmpty() && isFileName(query)) {
+            return SearchOutcome(named, emptyList(), 0, false)
+        }
         val close = named + byScore
         val closeKeys = close.map { keyOf(it) }.toSet()
         val below = candidates.filter { keyOf(it) !in closeKeys && (it.score ?: 0f) >= MoreResults.FLOOR }
@@ -107,6 +111,9 @@ object SearchResults {
             .sortedByDescending { it.takenMs }
             .map { Match(it, 1f) }
     }
+
+    /** A name with an extension at its end, as copied from the name of a photo: "IMG_20261127_093012.jpg". */
+    fun isFileName(query: String): Boolean = Regex("\\S+\\.[A-Za-z0-9]{2,5}").matches(query.trim())
 
     /** The number of less close photos after a new tap. */
     fun nextShown(outcome: SearchOutcome): Int = outcome.extra.size + outcome.nextBatch
