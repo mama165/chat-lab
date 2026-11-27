@@ -420,7 +420,8 @@ private fun SearchField(
                     val line = 1.5.dp.toPx()
                     drawLine(Palette.Accent, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = line)
                 }
-                .padding(vertical = 10.dp),
+                // A fixed height: the "✕" that appears while typing must not move the underline.
+                .height(48.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
