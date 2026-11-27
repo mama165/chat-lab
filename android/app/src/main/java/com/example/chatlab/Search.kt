@@ -39,7 +39,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -123,6 +123,9 @@ class SearchUiState {
     var sheetOpen by mutableStateOf(false)
     /** Set when an analysis has just finished, until the user opens it. */
     var analysisDone by mutableStateOf(false)
+    /** The list position and the last results, kept while the other tab is open. */
+    val gridState = LazyGridState()
+    var lastOutcome: SearchOutcome = SearchOutcome.EMPTY
 
     fun reset() {
         query = ""
@@ -158,7 +161,7 @@ fun SearchScreen(
     val resultFilters = state.filters.withoutPlace()
     // A date typed in the box ("hier", "26 novembre 2026") filters the results; the rest is what gets compared.
     val typed = remember(query, time) { TypedDates.parse(query, time) }
-    val gridState = rememberLazyGridState()
+    val gridState = state.gridState
 
     // A new search or other filters start again from the beginning: neither photos less close, nor selection.
     LaunchedEffect(query, state.filters) {
@@ -255,13 +258,14 @@ fun SearchScreen(
     val searchKey = searchQuery.trim().lowercase()
     val searchTyped = remember(searchQuery, time) { TypedDates.parse(searchQuery, time) }
     val searchFilters = resultFilters.withTypedDate(searchTyped.range)
-    val outcome by produceState(SearchOutcome.EMPTY, entries, searchTyped.rest, state.ranked, searchFilters, state.shownExtra, time) {
+    val outcome by produceState(state.lastOutcome, entries, searchTyped.rest, state.ranked, searchFilters, state.shownExtra, time) {
         value = withContext(Dispatchers.Default) {
             SearchStages.mark(context, "outcome.start")
             SearchResults.compute(entries, searchTyped.rest, state.ranked, searchFilters, state.shownExtra, time) {
                 SearchStages.mark(context, it)
             }.also { SearchStages.mark(context, "outcome.end") }
         }
+        state.lastOutcome = value
     }
     val rows = remember(outcome, state.newFrom, searchQuery) { resultItems(outcome, searchQuery, state.newFrom) }
     val latestOutcome by rememberUpdatedState(outcome)
