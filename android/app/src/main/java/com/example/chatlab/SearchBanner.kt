@@ -2,6 +2,7 @@ package com.example.chatlab
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -90,24 +97,21 @@ fun AnalysisBanner(notice: Boolean, onOpen: () -> Unit) {
                     modifier = Modifier.clickable(onClick = onOpen).padding(4.dp),
                 )
             } else if (kind == BannerKind.PAUSED) {
-                Text("Analyse en pause", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+                Text("Analyse en pause", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("$percent %", fontSize = 13.sp, color = Palette.Muted)
-                    Text(
-                        "Reprendre",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Palette.Accent,
-                        modifier = Modifier.clickable { AnalysisService.resume() }.padding(4.dp),
-                    )
+                    PlayPauseButton(paused = true, onClick = { AnalysisService.resume() })
                 }
             } else {
                 Text("Analyse en cours", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
-                Text(
-                    "$percent % · ${remainingText(progress.remaining(now))}",
-                    fontSize = 13.sp,
-                    color = Palette.Muted,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "$percent % · ${remainingText(progress.remaining(now))}",
+                        fontSize = 13.sp,
+                        color = Palette.Muted,
+                    )
+                    PlayPauseButton(paused = false, onClick = { AnalysisService.pause() })
+                }
             }
         }
         if (!finished) {
@@ -124,6 +128,39 @@ fun AnalysisBanner(notice: Boolean, onOpen: () -> Unit) {
                         .height(3.dp)
                         .background(Palette.Accent),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Pause or play of the analysis, a round outlined button. It acts on the same state as the notification and the
+ * Photos tab, so the three always agree.
+ */
+@Composable
+private fun PlayPauseButton(paused: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .border(1.dp, Palette.Accent, CircleShape)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = if (paused) "Reprendre l'analyse" else "Mettre l'analyse en pause" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.size(12.dp)) {
+            if (paused) {
+                val path = Path().apply {
+                    moveTo(size.width * 0.15f, 0f)
+                    lineTo(size.width, size.height / 2)
+                    lineTo(size.width * 0.15f, size.height)
+                    close()
+                }
+                drawPath(path, Palette.Accent)
+            } else {
+                val bar = size.width * 0.32f
+                drawRect(Palette.Accent, topLeft = Offset(0f, 0f), size = Size(bar, size.height))
+                drawRect(Palette.Accent, topLeft = Offset(size.width - bar, 0f), size = Size(bar, size.height))
             }
         }
     }
