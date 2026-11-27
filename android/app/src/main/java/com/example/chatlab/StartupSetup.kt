@@ -142,16 +142,6 @@ internal fun setupStage(missing: List<SetupStep>): Int = when {
 }
 
 /**
- * How long a card stays on screen before the next one comes, as in view 1.1: after the workspace is
- * found the explorer and the checks are shown (2.6 s), after the photos the last card comes (1.6 s).
- */
-internal fun revealDelayMs(shownStage: Int): Long = when (shownStage) {
-    1 -> 2600L
-    2 -> 1600L
-    else -> 0L
-}
-
-/**
  * The first screen when a step is missing, in the layout of the first-launch view: the stepper, then one
  * card at a time, sliding in from the right as in the view. [onNext] is given only once everything is there,
  * for the last card "Tout est prêt" with "Suivant".
@@ -177,16 +167,6 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: ((
         value = withContext(Dispatchers.IO) { Sources.read(context).firstOrNull()?.name }
     }
     val stage = setupStage(missing)
-    // The card on screen follows the real stage with a delay, so the explorer and the checks can be seen.
-    var shown by remember { mutableIntStateOf(stage) }
-    LaunchedEffect(stage) {
-        if (stage > shown) {
-            delay(revealDelayMs(shown))
-            shown = stage
-        } else {
-            shown = stage
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -198,9 +178,9 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: ((
     ) {
         Spacer(Modifier.height(24.dp))
         Text("Premiers pas", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-        Stepper(stage = shown)
+        Stepper(stage = stage)
         AnimatedContent(
-            targetState = shown,
+            targetState = stage,
             transitionSpec = {
                 (slideInHorizontally(tween(500)) { it * 11 / 10 } + fadeIn(tween(500))) togetherWith
                     (slideOutHorizontally(tween(500)) { -it * 11 / 10 } + fadeOut(tween(500)))
@@ -211,7 +191,6 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: ((
                 current == 0 -> AccessCard(onOpenSettings = { StorageAccess.openSettings(context) })
                 current == 1 -> WorkspaceCard(
                     missing = missing,
-                    chatlab = chatlab,
                     found = found,
                     onChoose = pickers.chooseChatlab,
                 )
@@ -241,13 +220,11 @@ private fun AccessCard(onOpenSettings: () -> Unit) {
 }
 
 /**
- * The workspace card of view 1.1: the question and "Mon workspace"; once the models are found, the explorer
- * and the two checks. If the models are not in the folder, view 1.1.1 offers to choose another one.
+ * The workspace card of view 1.1: the question and "Mon workspace"; once the models are found, the two checks. If the models are not in the folder, view 1.1.1 offers to choose another one.
  */
 @Composable
 private fun WorkspaceCard(
     missing: List<SetupStep>,
-    chatlab: String?,
     found: List<Pair<String, Boolean>>,
     onChoose: () -> Unit,
 ) {
@@ -269,53 +246,16 @@ private fun WorkspaceCard(
                 Text("✕  Modèles introuvables dans ce dossier", fontSize = 15.sp, color = Palette.Ink)
                 PrimaryButton("Choisir un autre workspace", onClick = onChoose)
             }
-            else -> ExplorerReveal(chatlab = chatlab, found = found)
+            else -> ModelsFound(found = found)
         }
     }
 }
 
-/** "Ouverture de l'explorateur" with its dots, then the two checks of view 1.1, one after the other. */
+/** The two checks of view 1.1, shown as soon as the models and the write folders are there. */
 @Composable
-private fun ExplorerReveal(chatlab: String?, found: List<Pair<String, Boolean>>) {
-    var checksShown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(1200)
-        checksShown = true
-    }
-    Text("Ouverture de l'explorateur", fontSize = 15.sp, color = Palette.Ink)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        repeat(3) { index -> RevealDot(index) }
-    }
-    if (checksShown) {
-        Text("✓  Modèles trouvés", fontSize = 15.sp, color = Color.Black)
-        Text("✓  Analyses, diagnostics et snapshots prêts", fontSize = 15.sp, color = Color.Black)
-    }
-}
-
-/** One of the three dots of the explorer, pulsing with a delay of 0.3 s between them. */
-@Composable
-private fun RevealDot(index: Int) {
-    val transition = rememberInfiniteTransition(label = "dot")
-    val alpha by transition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 900
-                0.2f at 0 using LinearEasing
-                1f at 297 using LinearEasing
-                0.2f at 900
-            },
-            initialStartOffset = StartOffset(index * 300),
-        ),
-        label = "dot alpha",
-    )
-    Box(
-        modifier = Modifier
-            .size(7.dp)
-            .alpha(alpha)
-            .background(Color.Black, CircleShape),
-    )
+private fun ModelsFound(found: List<Pair<String, Boolean>>) {
+    Text("✓  Modèles trouvés", fontSize = 15.sp, color = Color.Black)
+    Text("✓  Analyses, diagnostics et snapshots prêts", fontSize = 15.sp, color = Color.Black)
 }
 
 /** The stepper of the first-launch view: the done stages are filled, the current one is outlined. */
