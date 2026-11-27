@@ -60,6 +60,8 @@ object CalendarGrid {
 data class DateSelection(val from: SimpleDate? = null, val to: SimpleDate? = null) {
     /** A tap on a day: start, then end (swapped if we go backwards), then a new start. */
     fun tap(day: SimpleDate): DateSelection = when {
+        // A second tap on the only day chosen cancels it: no date filter any more.
+        from == day && to == null -> DateSelection()
         from == null || to != null -> DateSelection(day, null)
         day >= from -> DateSelection(from, day)
         else -> DateSelection(day, from)
