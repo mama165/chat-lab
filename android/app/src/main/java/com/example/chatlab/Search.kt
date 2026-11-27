@@ -116,6 +116,10 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 
 /**
  * The state of the search, shared between the search screen and the Filtres page so that the
@@ -125,6 +129,8 @@ class SearchUiState {
     var query by mutableStateOf("")
     var filters by mutableStateOf(Filters())
     var shownExtra by mutableIntStateOf(0)
+    /** How many photos per row: 1 to 4. */
+    var perRow by mutableIntStateOf(PerRow.DEFAULT)
     /** Position, in the photos less close, of the last batch added (to highlight it). */
     var newFrom by mutableIntStateOf(-1)
     var ranked by mutableStateOf(emptyList<Match>())
@@ -338,6 +344,9 @@ fun SearchScreen(
                 onOpenExternal = { openInGallery(context, viewing) },
             )
         }
+        if (perRowControlShown(query, hasResults = !outcome.isEmpty, loading = loading, ranking = waiting == Waiting.RANKING)) {
+            PerRowControl(selected = state.perRow, onSelect = { state.perRow = PerRow.clamp(it) })
+        }
         when {
             loading -> Loading("Veuillez patienter, la bibliothèque se charge…")
             entries.isEmpty() -> Message(
@@ -357,7 +366,7 @@ fun SearchScreen(
             )
             outcome.isEmpty -> Message("Aucune photo ne correspond à « $query ».", "Essayez d'autres mots.")
             else -> LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Fixed(state.perRow),
                 state = gridState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -373,6 +382,7 @@ fun SearchScreen(
                         is ResultItem.Separator -> TextDivider(item.text)
                         is ResultItem.Tile -> {
                             ResultTile(
+                                modifier = Modifier.animateItem(placementSpec = tween(1200, easing = FastOutSlowInEasing)),
                                 match = item.match,
                                 isNew = item.isNew,
                                 highlightKey = state.shownExtra,
@@ -541,6 +551,7 @@ private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -
 /** A similar photo: square thumbnail, tick if chosen, ring during a long press. */
 @Composable
 private fun ResultTile(
+    modifier: Modifier = Modifier,
     match: Match,
     isNew: Boolean,
     highlightKey: Int,
@@ -831,5 +842,62 @@ private fun decodeLarge(context: Context, location: String, maxSide: Int = 1600)
     while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
     return openImage(context, location)?.use {
         BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+}
+
+/** "Photos par ligne": four choices, the chosen one in navy. The colour and the grid icon change smoothly. */
+@Composable
+private fun PerRowControl(selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Photos par ligne", fontSize = 13.sp, color = Palette.Muted)
+        Row(
+            modifier = Modifier
+                .border(1.dp, Color(0xFFE4E7EC), CircleShape)
+                .background(Color(0xFFF7F8FA), CircleShape)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            listOf(1, 2, 3, 4).forEach { count ->
+                val on = count == selected
+                val background by animateColorAsState(if (on) Palette.Accent else Color.White, tween(600), label = "background")
+                val foreground by animateColorAsState(if (on) Color.White else Palette.Accent, tween(600), label = "foreground")
+                Box(
+                    modifier = Modifier
+                        .size(width = 44.dp, height = 34.dp)
+                        .clip(CircleShape)
+                        .background(background)
+                        .clickable { onSelect(count) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    GridIcon(count, foreground)
+                }
+            }
+        }
+    }
+}
+
+/** A square of squares: 1 big square, or a grid of 2 x 2, 3 x 3, 4 x 4 small ones. */
+@Composable
+private fun GridIcon(count: Int, color: Color) {
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val side = size.minDimension
+        if (count == 1) {
+            drawRoundRect(color, topLeft = Offset(side * 0.15f, side * 0.15f), size = Size(side * 0.7f, side * 0.7f), cornerRadius = CornerRadius(side * 0.12f))
+            return@Canvas
+        }
+        val gap = side * 0.06f
+        val cell = (side - gap * (count - 1)) / count
+        for (row in 0 until count) for (col in 0 until count) {
+            drawRoundRect(
+                color,
+                topLeft = Offset(col * (cell + gap), row * (cell + gap)),
+                size = Size(cell, cell),
+                cornerRadius = CornerRadius(cell * 0.15f),
+            )
+        }
     }
 }
