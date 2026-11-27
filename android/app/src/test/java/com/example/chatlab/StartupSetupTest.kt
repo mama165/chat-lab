@@ -58,4 +58,17 @@ class StartupSetupTest {
             missingSteps(access = false, chatlabChosen = false, modelsFound = false, photosChosen = false),
         )
     }
+
+    @Test
+    fun theStageFollowsTheFirstMissingStep() {
+        assertEquals(0, setupStage(listOf(SetupStep.ACCESS, SetupStep.CHATLAB, SetupStep.MODELS, SetupStep.PHOTOS)))
+        assertEquals(1, setupStage(listOf(SetupStep.CHATLAB, SetupStep.MODELS, SetupStep.PHOTOS)))
+        assertEquals(1, setupStage(listOf(SetupStep.MODELS, SetupStep.PHOTOS)))
+        assertEquals(2, setupStage(listOf(SetupStep.PHOTOS)))
+    }
+
+    @Test
+    fun theStageIsDoneWhenNothingIsMissing() {
+        assertEquals(3, setupStage(emptyList()))
+    }
 }

@@ -34,7 +34,14 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.Palette
+import com.example.chatlab.ui.OutlineButton
 import com.example.chatlab.ui.PrimaryButton
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
 
 /** What ChatLab needs before it can search, in the order the setup page shows them. */
 enum class SetupStep { ACCESS, CHATLAB, MODELS, PHOTOS }
@@ -104,12 +111,24 @@ internal fun missingSteps(
 }
 
 /**
- * The first screen when a step is missing, in place of the tabs: it says why each access is needed,
- * and it is checked again each time the app comes back to the front, so the tabs open by themselves
- * once everything is there.
+ * The stage shown in the stepper of the first-launch view: 0 access, 1 workspace (chatlab folder and
+ * models), 2 photos, 3 when everything is there.
+ */
+internal fun setupStage(missing: List<SetupStep>): Int = when {
+    SetupStep.ACCESS in missing -> 0
+    SetupStep.CHATLAB in missing || SetupStep.MODELS in missing -> 1
+    SetupStep.PHOTOS in missing -> 2
+    else -> 3
+}
+
+/**
+ * The first screen when a step is missing, in place of the tabs, in the layout of the first-launch view:
+ * a stepper, one card per stage, then "Tout est prêt" with "Suivant" once everything is there
+ * ([onNext] is given only for that last card). It is checked again each time the app comes back to the
+ * front, so the tabs open by themselves once everything is there.
  */
 @Composable
-fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
+fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: (() -> Unit)? = null) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnChanged by rememberUpdatedState(onChanged)
@@ -125,6 +144,10 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
     val found by produceState(initialValue = emptyList<Pair<String, Boolean>>(), missing) {
         value = withContext(Dispatchers.IO) { StartupSetup.inventory(context) }
     }
+    val photoFolder by produceState<String?>(initialValue = null, missing) {
+        value = withContext(Dispatchers.IO) { Sources.read(context).firstOrNull()?.name }
+    }
+    val stage = setupStage(missing)
 
     Column(
         modifier = Modifier
@@ -132,83 +155,124 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit) {
             .background(Palette.Page)
             .padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(Modifier.height(24.dp))
-        Text("Avant de chercher", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-        Text(
-            "ChatLab a besoin de trois éléments pour lire vos photos. Les photos restent sur le téléphone et ne sont jamais modifiées.",
-            fontSize = 14.sp,
-            color = Palette.Muted,
-        )
-        SetupCard(
-            number = 1,
-            title = "Accès à tous les fichiers",
-            detail = "Sans cet accès, ChatLab ne voit que les dossiers choisis un par un, et ne peut pas lire le dossier chatlab. " +
-                "Android ouvre ses réglages : activez « Autoriser l'accès à tous les fichiers », puis revenez ici.",
-            done = SetupStep.ACCESS !in missing,
-            doneText = "Accès accordé",
-            action = "Ouvrir les réglages",
-            onAction = { StorageAccess.openSettings(context) },
-        )
-        SetupCard(
-            number = 2,
-            title = "Le dossier chatlab",
-            detail = "Choisissez le dossier nommé chatlab. ChatLab y enregistre le carnet.",
-            done = SetupStep.CHATLAB !in missing,
-            doneText = "Choisi : ${chatlab ?: "chatlab"}",
-            found = found,
-            action = "Choisir le dossier chatlab",
-            onAction = pickers.chooseChatlab,
-        )
-        SetupCard(
-            number = 3,
-            title = "Le sous-dossier models",
-            detail = "Il se trouve dans le dossier chatlab et contient les fichiers des modèles.",
-            done = SetupStep.MODELS !in missing,
-            doneText = "Trouvé dans le dossier chatlab",
-            hint = if (SetupStep.CHATLAB in missing) {
-                "Choisissez d'abord le dossier chatlab."
-            } else {
-                "Introuvable dans le dossier chatlab : vérifiez que le sous-dossier models y est. " +
-                    "Si ce n'est pas le bon dossier, choisissez-en un autre."
-            },
-            locked = SetupStep.CHATLAB in missing,
-            action = if (SetupStep.CHATLAB in missing) "Vérifier à nouveau" else "Choisir un autre dossier chatlab",
-            onAction = if (SetupStep.CHATLAB in missing) onChanged else pickers.chooseChatlab,
-            secondary = if (SetupStep.CHATLAB in missing) null else "Vérifier à nouveau" to onChanged,
-        )
-        SetupCard(
-            number = 4,
-            title = "Vos dossiers de photos",
-            detail = "Choisissez le dossier où se trouvent vos photos. Les photos restent à leur place.",
-            done = SetupStep.PHOTOS !in missing,
-            doneText = "Dossier de photos choisi",
-            action = "Choisir un dossier de photos",
-            onAction = pickers.addSource,
-            locked = SetupStep.CHATLAB in missing,
-        )
-        Text(
-            "Vous pourrez ajouter d'autres dossiers ensuite, dans l'onglet Photos.",
-            fontSize = 13.sp,
-            color = Palette.Muted,
-            modifier = Modifier.padding(bottom = 24.dp),
-        )
+        Text("Premiers pas", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        Stepper(stage = stage)
+
+        if (stage == 3 && onNext != null) {
+            FinalCard(folder = photoFolder ?: "vos photos", onNext = onNext)
+        } else {
+            SetupCard(
+                title = "Autoriser l'accès à tous les fichiers",
+                done = SetupStep.ACCESS !in missing,
+                detail = "Sans cet accès, ChatLab ne voit que les dossiers choisis un par un. " +
+                    "Android ouvre ses réglages : activez « Autoriser l'accès à tous les fichiers », puis revenez ici.",
+                action = "Ouvrir les réglages",
+                onAction = { StorageAccess.openSettings(context) },
+            )
+            SetupCard(
+                title = "Qui va nous aider à reconnaître vos photos ? 🤖",
+                done = SetupStep.CHATLAB !in missing && SetupStep.MODELS !in missing,
+                doneLines = found.map { (name, ok) -> name to ok },
+                locked = SetupStep.ACCESS in missing,
+                detail = "Choisissez le workspace qui contient le dossier models.",
+                hint = if (SetupStep.CHATLAB !in missing && SetupStep.MODELS in missing) {
+                    "Modèles introuvables dans ce dossier."
+                } else {
+                    null
+                },
+                action = if (SetupStep.CHATLAB in missing) "Mon workspace" else "Choisir un autre workspace",
+                onAction = pickers.chooseChatlab,
+                secondary = if (SetupStep.CHATLAB !in missing && SetupStep.MODELS in missing) {
+                    "Vérifier à nouveau" to onChanged
+                } else {
+                    null
+                },
+                doneText = "Workspace ${chatlab ?: "chatlab"} : modèles trouvés",
+            )
+            SetupCard(
+                title = "Où se cachent vos photos ? 🕵️",
+                done = SetupStep.PHOTOS !in missing,
+                doneText = "Dossier de photos choisi",
+                locked = stage < 2,
+                detail = "Pour les retrouver, il faut d’abord les parcourir. Choisissez le dossier où elles se trouvent.",
+                action = "Choisir mes photos",
+                onAction = pickers.addSource,
+            )
+        }
+    }
+}
+
+/** The stepper of the first-launch view: the done stages are filled, the current one is outlined. */
+@Composable
+private fun Stepper(stage: Int) {
+    val labels = listOf("Accès", "Workspace", "Photos")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        labels.forEachIndexed { index, label ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val done = index < stage
+                val current = index == stage
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(if (done) Palette.Accent else Color.White)
+                        .border(1.5.dp, if (done || current) Palette.Accent else Color(0xFFD1D5DB), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (done) "✓" else "${index + 1}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (done) Color.White else if (current) Palette.Accent else Color(0xFF9AA3AF),
+                    )
+                }
+                Text(label, fontSize = 12.sp, color = Palette.Muted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinalCard(folder: String, onNext: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Palette.Field)
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Tout est prêt 🎉", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        Text("On a trouvé vos photos dans $folder 📸", fontSize = 15.sp, color = Palette.Ink)
+        listOf(
+            "Votre workspace est prêt",
+            "$folder est en route pour la recherche 🔍",
+            "Vous pouvez chercher une photo par description ✨",
+        ).forEach { line ->
+            Text("✓  $line", fontSize = 15.sp, color = Color.Black)
+        }
+        PrimaryButton("Suivant", onClick = onNext)
     }
 }
 
 @Composable
 private fun SetupCard(
-    number: Int,
     title: String,
-    detail: String,
     done: Boolean,
-    doneText: String,
+    detail: String,
     action: String,
     onAction: () -> Unit,
+    doneText: String = "",
+    doneLines: List<Pair<String, Boolean>> = emptyList(),
     hint: String? = null,
     secondary: Pair<String, () -> Unit>? = null,
-    found: List<Pair<String, Boolean>>? = null,
     locked: Boolean = false,
 ) {
     Column(
@@ -220,27 +284,21 @@ private fun SetupCard(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "$number · $title",
+            title,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (locked) Color(0xFF9AA3AF) else Palette.Ink,
         )
         if (done) {
-            Text("$doneText ✓", fontSize = 14.sp, color = Palette.Accent)
-            found?.forEach { (name, ok) ->
-                Text(
-                    "$name ${if (ok) "✓" else "absent"}",
-                    fontSize = 13.sp,
-                    color = if (ok) Palette.Accent else Palette.Muted,
-                )
+            if (doneText.isNotEmpty()) Text("✓  $doneText", fontSize = 14.sp, color = Color.Black)
+            doneLines.forEach { (name, ok) ->
+                Text("${if (ok) "✓" else "✕"}  $name", fontSize = 13.sp, color = if (ok) Color.Black else Palette.Muted)
             }
-        } else {
+        } else if (!locked) {
             Text(detail, fontSize = 13.sp, color = Palette.Muted)
             if (hint != null) Text(hint, fontSize = 13.sp, color = Palette.Ink)
-            PrimaryButton(action, onClick = onAction, enabled = !locked)
-            if (secondary != null) {
-                PrimaryButton(secondary.first, onClick = secondary.second)
-            }
+            PrimaryButton(action, onClick = onAction)
+            if (secondary != null) OutlineButton(secondary.first, onClick = secondary.second)
         }
     }
 }
