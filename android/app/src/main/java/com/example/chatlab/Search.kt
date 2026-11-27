@@ -23,10 +23,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +72,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -122,8 +121,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.geometry.Size
@@ -576,6 +573,8 @@ private fun ResultTile(
     }
     // The information stays until the tile leaves the screen: a short flicker, then its lines one by one.
     var infoShown by remember(entry.id) { mutableStateOf(false) }
+    var tileSize by remember(entry.id) { mutableStateOf(IntSize.Zero) }
+    var infoHeight by remember(entry.id) { mutableIntStateOf(0) }
     val flash = remember(entry.id) { Animatable(0f) }
     val reveal = remember(entry.id) { Animatable(0f) }
     LaunchedEffect(infoShown) {
@@ -589,22 +588,23 @@ private fun ResultTile(
         }
     }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .glow(glow.value)
             .semantics { contentDescription = entry.name }
+            .onSizeChanged { tileSize = it }
             .pointerInput(entry.id) {
-                awaitEachGesture {
-                    // A tap on the information is handled by the information itself, not by the photo.
-                    awaitFirstDown(requireUnconsumed = true)
-                    when (withTimeoutOrNull(RESULT_HOLD_MS) { waitForUpOrCancellation() != null }) {
-                        true -> onTap()
-                        false -> Unit
-                        null -> {
-                            infoShown = true
-                            waitForUpOrCancellation()
-                        }
-                    }
-                }
+                detectTapGestures(
+                    onPress = {
+                        // Still held after two seconds: the information appears. A quick tap is left to onTap.
+                        val released = withTimeoutOrNull(RESULT_HOLD_MS) { tryAwaitRelease() }
+                        if (released == null) infoShown = true
+                    },
+                    onTap = { offset ->
+                        // A tap on the information copies the name: it does not open the photo.
+                        val onInfo = infoShown && offset.y >= tileSize.height - infoHeight
+                        if (!onInfo) onTap()
+                    },
+                )
             },
     ) {
         GridThumb(
@@ -616,14 +616,19 @@ private fun ResultTile(
         )
         if (infoShown) {
             Box(Modifier.matchParentSize().background(Color.White.copy(alpha = flash.value)))
-            ResultInfo(entry = entry, reveal = reveal.value, onCopy = { copyName(context, entry.name) })
+            ResultInfo(
+                entry = entry,
+                reveal = reveal.value,
+                onHeight = { infoHeight = it },
+                onCopy = { copyName(context, entry.name) },
+            )
         }
     }
 }
 
 /** The name, folder and date of a photo, over its bottom edge: each line appears after the previous one. */
 @Composable
-private fun BoxScope.ResultInfo(entry: LibraryEntry, reveal: Float, onCopy: () -> Unit) {
+private fun BoxScope.ResultInfo(entry: LibraryEntry, reveal: Float, onHeight: (Int) -> Unit, onCopy: () -> Unit) {
     val lines = listOfNotNull(
         entry.name,
         entry.folder.takeIf { it.isNotBlank() },
@@ -633,6 +638,7 @@ private fun BoxScope.ResultInfo(entry: LibraryEntry, reveal: Float, onCopy: () -
         modifier = Modifier
             .align(Alignment.BottomStart)
             .fillMaxWidth()
+            .onSizeChanged { onHeight(it.height) }
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xD9111827))))
             .clickable(onClick = onCopy)
             .padding(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 8.dp),
