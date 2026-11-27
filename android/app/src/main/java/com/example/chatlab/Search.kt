@@ -401,6 +401,7 @@ fun SearchScreen(
                                 match = item.match,
                                 isNew = item.isNew,
                                 highlightKey = state.shownExtra,
+                                resetKey = state.perRow,
                                 onTap = { viewing = item.match.entry.source.ifBlank { item.match.entry.path } },
                             )
                         }
@@ -500,37 +501,32 @@ private fun SearchField(
 @Composable
 private fun Recents(recents: List<String>, onPick: (String) -> Unit, onRemove: (String) -> Unit) {
     if (recents.isEmpty()) return
-    val touchSlop = LocalViewConfiguration.current.touchSlop
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("Récentes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             recents.forEach { recent ->
+                // The same bubble and the same cross as the filters: the word and the cross are aligned on one line.
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .border(1.dp, Palette.Line, RoundedCornerShape(18.dp))
-                        .padding(start = 14.dp, end = 6.dp, top = 7.dp, bottom = 7.dp),
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         recent,
                         fontSize = 14.sp,
                         color = Palette.Ink,
-                        // A tap searches it; a hold of the same length as on a photo removes it, here and on the phone.
-                        modifier = Modifier.tapOrHold(recent, touchSlop, onTap = { onPick(recent) }, onHold = { onRemove(recent) }),
+                        maxLines = 1,
+                        modifier = Modifier.clickable { onPick(recent) },
                     )
-                    Spacer(Modifier.width(8.dp))
-                    // The cross on the right removes the search at once, as the hold does.
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(Palette.Field)
-                            .clickable { onRemove(recent) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("×", fontSize = 12.sp, color = Palette.Muted)
-                    }
+                    Text(
+                        "✕",
+                        fontSize = 12.sp,
+                        color = Palette.Ink,
+                        modifier = Modifier.clickable { onRemove(recent) },
+                    )
                 }
             }
         }
@@ -571,9 +567,13 @@ private fun Message(title: String, detail: String?) {
     }
 }
 
+/** How long the information of a photo stays on screen, from the moment it appears. */
+private const val INFO_SHOWN_MS = 2000L
+
 /**
- * A similar photo: a square thumbnail. A tap opens it. Held for two seconds, its name, folder and date
- * appear over its bottom edge; a tap on them copies the name, so that a search with that name finds the photo.
+ * A similar photo: a square thumbnail. A tap opens it. Held for HOLD_MS, a flicker follows, then its name, folder and
+ * date appear over the whole photo, one line after the other. They go away by themselves after two seconds, or at
+ * once when the number of photos per row changes; a tap on them copies the name.
  */
 @Composable
 private fun ResultTile(
@@ -581,6 +581,7 @@ private fun ResultTile(
     match: Match,
     isNew: Boolean,
     highlightKey: Int,
+    resetKey: Int,
     onTap: () -> Unit,
 ) {
     val entry = match.entry
@@ -597,12 +598,11 @@ private fun ResultTile(
             glow.snapTo(0f)
         }
     }
-    // The information stays until the tile leaves the screen: a short flicker, then its lines one by one.
     var infoShown by remember(entry.id) { mutableStateOf(false) }
-    var tileSize by remember(entry.id) { mutableStateOf(IntSize.Zero) }
-    var infoHeight by remember(entry.id) { mutableIntStateOf(0) }
     val flash = remember(entry.id) { Animatable(0f) }
     val reveal = remember(entry.id) { Animatable(0f) }
+    // A change of the number of photos per row clears the information at once.
+    LaunchedEffect(resetKey) { infoShown = false }
     LaunchedEffect(infoShown) {
         if (infoShown) {
             repeat(2) {
@@ -611,22 +611,22 @@ private fun ResultTile(
             }
             reveal.snapTo(0f)
             reveal.animateTo(3f, tween(900, easing = LinearEasing))
+            // Two seconds once the text is complete, so that it can be read before a copy.
+            delay(INFO_SHOWN_MS)
+            infoShown = false
         }
     }
     Box(
         modifier = modifier
             .glow(glow.value)
             .semantics { contentDescription = entry.name }
-            .onSizeChanged { tileSize = it }
             .pointerInput(entry.id, touchSlop) {
-                // Reads the finger itself, before any layer above takes it: a quick release is a tap, a move is a
-                // scroll, and a finger still down after HOLD_MS shows the information.
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                        val onInfo = infoShown && down.position.y >= tileSize.height - infoHeight
                         when (withTimeoutOrNull(HOLD_MS) { trackPress(down, touchSlop) }) {
-                            PressOutcome.TAP -> if (!onInfo) onTap()
+                            // While the information is shown, a tap is for it, not for the photo.
+                            PressOutcome.TAP -> if (!infoShown) onTap()
                             PressOutcome.MOVED -> Unit
                             null -> {
                                 infoShown = true
@@ -645,44 +645,51 @@ private fun ResultTile(
                 .clip(RoundedCornerShape(14.dp)),
         )
         if (infoShown) {
-            Box(Modifier.matchParentSize().background(Color.White.copy(alpha = flash.value)))
             ResultInfo(
                 entry = entry,
+                flash = flash.value,
                 reveal = reveal.value,
-                onHeight = { infoHeight = it },
                 onCopy = { copyName(context, entry.name) },
             )
         }
     }
 }
 
-/** The name, folder and date of a photo, over its bottom edge: each line appears after the previous one. */
+/** The name, folder and date of a photo, centred over the whole photo: each line appears after the previous one. */
 @Composable
-private fun BoxScope.ResultInfo(entry: LibraryEntry, reveal: Float, onHeight: (Int) -> Unit, onCopy: () -> Unit) {
+private fun BoxScope.ResultInfo(entry: LibraryEntry, flash: Float, reveal: Float, onCopy: () -> Unit) {
     val lines = listOfNotNull(
         entry.name,
         entry.folder.takeIf { it.isNotBlank() },
         Dates.long(entry.taken),
     )
-    Column(
+    // matchParentSize: the panel is exactly the size of the photo, whatever the number of photos per row.
+    Box(
         modifier = Modifier
-            .align(Alignment.BottomStart)
-            .fillMaxWidth()
-            .onSizeChanged { onHeight(it.height) }
-            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xD9111827))))
-            .clickable(onClick = onCopy)
-            .padding(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 8.dp),
+            .matchParentSize()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = flash.coerceIn(0f, 1f))),
     ) {
-        lines.forEachIndexed { index, line ->
-            val alpha = (reveal - index).coerceIn(0f, 1f)
-            Text(
-                line,
-                fontSize = 11.sp,
-                fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
-                color = Color.White.copy(alpha = alpha),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF111827).copy(alpha = 0.6f * reveal.coerceIn(0f, 1f)))
+                .clickable(onClick = onCopy)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            lines.forEachIndexed { index, line ->
+                Text(
+                    line,
+                    fontSize = if (index == 0) 12.sp else 11.sp,
+                    fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
+                    color = Color.White.copy(alpha = (reveal - index).coerceIn(0f, 1f)),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
@@ -923,15 +930,14 @@ private fun decodeLarge(context: Context, location: String, maxSide: Int = 1600)
     }
 }
 
-/** "Photos par ligne": four choices, the chosen one in navy. The colour and the grid icon change smoothly. */
+/** The number of photos per row: four choices, the chosen one in navy. The colour and the grid icon change smoothly. */
 @Composable
 private fun PerRowControl(selected: Int, onSelect: (Int) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
     ) {
-        Text("Photos par ligne", fontSize = 13.sp, color = Palette.Muted)
         Row(
             modifier = Modifier
                 .border(1.dp, Color(0xFFE4E7EC), CircleShape)

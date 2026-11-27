@@ -11,7 +11,7 @@ internal object PerRow {
 }
 
 /**
- * The "Photos par ligne" control is shown only once there are results to rearrange: a sentence is typed,
+ * The per-row control is shown only once there are results to rearrange: a sentence is typed,
  * some photos match it, and the search is not still running.
  */
 internal fun perRowControlShown(query: String, hasResults: Boolean, loading: Boolean, ranking: Boolean): Boolean =
