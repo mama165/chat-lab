@@ -151,8 +151,8 @@ fun RecognitionStep(onPickPhotos: () -> Unit) {
 
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 12.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 8.dp, end = 12.dp)
                     .alpha(RecognitionTimeline.checkAlpha(t))
             ) {
                 Text(text = "✓", color = Check, fontSize = 15.sp, fontWeight = FontWeight.Bold)
