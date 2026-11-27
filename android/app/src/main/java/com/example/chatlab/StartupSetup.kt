@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.Palette
 import com.example.chatlab.ui.OutlineButton
+import com.example.chatlab.ui.firstlaunch.RecognitionStep
 import com.example.chatlab.ui.PrimaryButton
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -192,15 +193,28 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: ((
                 },
                 doneText = "Workspace ${chatlab ?: "chatlab"} : modèles trouvés",
             )
-            SetupCard(
-                title = "Où se cachent vos photos ? 🕵️",
-                done = SetupStep.PHOTOS !in missing,
-                doneText = "Dossier de photos choisi",
-                locked = stage < 2,
-                detail = "Pour les retrouver, il faut d’abord les parcourir. Choisissez le dossier où elles se trouvent.",
-                action = "Choisir mes photos",
-                onAction = pickers.addSource,
-            )
+            if (SetupStep.PHOTOS in missing && stage == 2) {
+                // The photos walk-through, animated as in the view; the button is usable from the start.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Palette.Field)
+                        .padding(18.dp),
+                ) {
+                    RecognitionStep(onPickPhotos = pickers.addSource)
+                }
+            } else {
+                SetupCard(
+                    title = "Où se cachent vos photos ? 🕵️",
+                    done = SetupStep.PHOTOS !in missing,
+                    doneText = "Dossier de photos choisi",
+                    locked = stage < 2,
+                    detail = "Pour les retrouver, il faut d’abord les parcourir. Choisissez le dossier où elles se trouvent.",
+                    action = "Choisir mes photos",
+                    onAction = pickers.addSource,
+                )
+            }
         }
     }
 }
