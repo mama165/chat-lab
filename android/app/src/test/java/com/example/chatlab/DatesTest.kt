@@ -106,6 +106,14 @@ class DatesTest {
     }
 
     @Test
+    fun filterLabelsAlwaysWriteTheYearOnBothDates() {
+        val today = SimpleDate(2026, 11, 22)
+        assertEquals("12 nov. 2026 – 17 nov. 2026", Dates.filterRangeLabel(SimpleDate(2026, 11, 12), SimpleDate(2026, 11, 17), today))
+        assertEquals("12 oct. 2026 – 17 oct. 2026", Dates.filterRangeLabel(SimpleDate(2026, 10, 12), SimpleDate(2026, 10, 17), today))
+        assertEquals("9 nov.", Dates.filterRangeLabel(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 9), today))
+    }
+
+    @Test
     fun rangeLabelsDependOnTheYearAndMonth() {
         val today = SimpleDate(2026, 11, 22)
         assertEquals("9 – 22 nov.", Dates.rangeLabel(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 22), today))

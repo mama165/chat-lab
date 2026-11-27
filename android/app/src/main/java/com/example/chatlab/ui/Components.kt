@@ -34,7 +34,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatlab.R
@@ -90,13 +93,25 @@ fun TabTitle(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .offset(x = 2.dp, y = (-2).dp)
+                                .offset(x = 4.dp, y = (-4).dp)
                                 .size(16.dp)
                                 .clip(CircleShape)
                                 .background(Palette.Accent),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("$filtersCount", fontSize = 10.sp, color = Color.White)
+                            // No extra line height or font padding: the number sits in the middle of the disc.
+                            Text(
+                                "$filtersCount",
+                                fontSize = 10.sp,
+                                lineHeight = 10.sp,
+                                style = TextStyle(
+                                    fontSize = 10.sp,
+                                    lineHeight = 10.sp,
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                ),
+                                color = Color.White,
+                                textAlign = TextAlign.Center,
+                            )
                         }
                     }
                 }

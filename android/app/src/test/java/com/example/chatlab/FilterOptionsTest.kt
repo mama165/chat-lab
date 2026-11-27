@@ -115,6 +115,15 @@ class FilterOptionsTest {
     }
 
     @Test
+    fun aSecondTapOnTheOnlyDayChosenCancelsIt() {
+        val day = SimpleDate(2026, 11, 12)
+        val chosen = DateSelection().tap(day)
+        assertEquals(DateSelection(day, null), chosen)
+        assertEquals(DateSelection(), chosen.tap(day))
+        assertNull(DateSelection().tap(day).tap(day).toRange())
+    }
+
+    @Test
     fun theFirstTapSetsTheStartAndTheSecondTheEnd() {
         val first = DateSelection().tap(SimpleDate(2026, 11, 9))
         assertEquals(DateSelection(SimpleDate(2026, 11, 9), null), first)
@@ -135,10 +144,10 @@ class FilterOptionsTest {
     }
 
     @Test
-    fun tappingTheSameDayTwiceMakesOneDay() {
+    fun tappingTheSameDayTwiceCancelsIt() {
         val selection = DateSelection().tap(SimpleDate(2026, 11, 9)).tap(SimpleDate(2026, 11, 9))
-        assertEquals(DateSelection(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 9)), selection)
-        assertEquals(DateRange(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 9)), selection.toRange())
+        assertEquals(DateSelection(), selection)
+        assertNull(selection.toRange())
     }
 
     @Test

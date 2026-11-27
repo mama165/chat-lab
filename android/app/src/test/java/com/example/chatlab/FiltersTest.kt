@@ -58,13 +58,13 @@ class FiltersTest {
     @Test
     fun customDatesAreWrittenAsARange() {
         val range = DateRange(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 22))
-        assertEquals("Date · 9 – 22 nov.", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
+        assertEquals("Date · 9 nov. 2026 – 22 nov. 2026", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
     }
 
     @Test
     fun customDatesWithADayPartMentionIt() {
         val range = DateRange(SimpleDate(2026, 11, 9), SimpleDate(2026, 11, 22), DayPart.MORNING)
-        assertEquals("Date · 9 – 22 nov. · Matin", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
+        assertEquals("Date · 9 nov. 2026 – 22 nov. 2026 · Matin", Filters(date = DateFilter(range = range)).chips(TIME).single().label)
     }
 
     @Test

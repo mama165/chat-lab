@@ -155,7 +155,7 @@ data class Filters(
     private fun dateLabel(time: When): String {
         val range = date.range
         if (range != null) {
-            val days = Dates.rangeLabel(range.from, range.to, time.today)
+            val days = Dates.filterRangeLabel(range.from, range.to, time.today)
             return if (range.dayPart == DayPart.ALL) days else "$days · ${range.dayPart.label}"
         }
         return date.preset.label
