@@ -689,7 +689,7 @@ private fun openInGallery(context: Context, source: String) {
         return
     }
     val intent = Intent(Intent.ACTION_VIEW)
-        .setDataAndType(Uri.parse(source), "image/*")
+        .setDataAndType(Uri.parse(source), imageMimeOf(source))
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     try {
         context.startActivity(intent)
