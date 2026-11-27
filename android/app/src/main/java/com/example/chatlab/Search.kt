@@ -1,6 +1,8 @@
 package com.example.chatlab
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -14,16 +16,21 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -67,6 +74,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -387,7 +395,6 @@ fun SearchScreen(
                                 isNew = item.isNew,
                                 highlightKey = state.shownExtra,
                                 onTap = { viewing = item.match.entry.source.ifBlank { item.match.entry.path } },
-                                onLongPress = { openInGallery(context, item.match.entry.source) },
                             )
                         }
                         is ResultItem.More -> Text(
@@ -539,16 +546,13 @@ private fun Message(title: String, detail: String?) {
     }
 }
 
-/** Short tap = selection, long press = opening in the gallery. */
-private fun Modifier.pressGesture(key: Any, onTap: () -> Unit, onLongPress: () -> Unit): Modifier =
-    this.pointerInput(key) {
-        detectTapGestures(onPress = {
-            val result = withTimeoutOrNull(LONG_PRESS_MS) { tryAwaitRelease() }
-            if (result == null) onLongPress() else if (result) onTap()
-        })
-    }
+/** How long a finger stays down on a photo before its information appears. */
+private const val RESULT_HOLD_MS = 2000L
 
-/** A similar photo: square thumbnail, tick if chosen, ring during a long press. */
+/**
+ * A similar photo: a square thumbnail. A tap opens it. Held for two seconds, its name, folder and date
+ * appear over its bottom edge; a tap on them copies the name, so that a search with that name finds the photo.
+ */
 @Composable
 private fun ResultTile(
     modifier: Modifier = Modifier,
@@ -556,14 +560,9 @@ private fun ResultTile(
     isNew: Boolean,
     highlightKey: Int,
     onTap: () -> Unit,
-    onLongPress: () -> Unit,
 ) {
     val entry = match.entry
-    val ring = remember { Animatable(0f) }
-    var pressing by remember { mutableStateOf(false) }
-    LaunchedEffect(pressing) {
-        if (pressing) ring.animateTo(1f, tween(LONG_PRESS_MS.toInt())) else ring.snapTo(0f)
-    }
+    val context = LocalContext.current
     // The photos that have just arrived are briefly outlined.
     val glow = remember { Animatable(0f) }
     LaunchedEffect(isNew, highlightKey) {
@@ -575,18 +574,37 @@ private fun ResultTile(
             glow.snapTo(0f)
         }
     }
-    val primary = Palette.Accent
+    // The information stays until the tile leaves the screen: a short flicker, then its lines one by one.
+    var infoShown by remember(entry.id) { mutableStateOf(false) }
+    val flash = remember(entry.id) { Animatable(0f) }
+    val reveal = remember(entry.id) { Animatable(0f) }
+    LaunchedEffect(infoShown) {
+        if (infoShown) {
+            repeat(2) {
+                flash.snapTo(0.5f)
+                flash.animateTo(0f, tween(150))
+            }
+            reveal.snapTo(0f)
+            reveal.animateTo(3f, tween(900, easing = LinearEasing))
+        }
+    }
     Box(
         modifier = Modifier
             .glow(glow.value)
             .semantics { contentDescription = entry.name }
             .pointerInput(entry.id) {
-                detectTapGestures(onPress = {
-                    pressing = true
-                    val result = withTimeoutOrNull(LONG_PRESS_MS) { tryAwaitRelease() }
-                    if (result == null) onLongPress() else if (result) onTap()
-                    pressing = false
-                })
+                awaitEachGesture {
+                    // A tap on the information is handled by the information itself, not by the photo.
+                    awaitFirstDown(requireUnconsumed = true)
+                    when (withTimeoutOrNull(RESULT_HOLD_MS) { waitForUpOrCancellation() != null }) {
+                        true -> onTap()
+                        false -> Unit
+                        null -> {
+                            infoShown = true
+                            waitForUpOrCancellation()
+                        }
+                    }
+                }
             },
     ) {
         GridThumb(
@@ -596,23 +614,48 @@ private fun ResultTile(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(14.dp)),
         )
-        if (ring.value > 0f) {
-            Canvas(modifier = Modifier.matchParentSize()) {
-                val w = size.width
-                val h = size.height
-                val perimeter = 2f * (w + h)
-                val path = Path().apply { addRect(Rect(0f, 0f, w, h)) }
-                drawPath(
-                    path = path,
-                    color = primary,
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(maxOf(0.01f, perimeter * ring.value), perimeter * 2f)),
-                    ),
-                )
-            }
+        if (infoShown) {
+            Box(Modifier.matchParentSize().background(Color.White.copy(alpha = flash.value)))
+            ResultInfo(entry = entry, reveal = reveal.value, onCopy = { copyName(context, entry.name) })
         }
     }
+}
+
+/** The name, folder and date of a photo, over its bottom edge: each line appears after the previous one. */
+@Composable
+private fun BoxScope.ResultInfo(entry: LibraryEntry, reveal: Float, onCopy: () -> Unit) {
+    val lines = listOfNotNull(
+        entry.name,
+        entry.folder.takeIf { it.isNotBlank() },
+        Dates.long(entry.taken),
+    )
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xD9111827))))
+            .clickable(onClick = onCopy)
+            .padding(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 8.dp),
+    ) {
+        lines.forEachIndexed { index, line ->
+            val alpha = (reveal - index).coerceIn(0f, 1f)
+            Text(
+                line,
+                fontSize = 11.sp,
+                fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
+                color = Color.White.copy(alpha = alpha),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Copies the file name to the clipboard, so that it can be used elsewhere or searched again. */
+private fun copyName(context: Context, name: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Nom du fichier", name))
+    Toast.makeText(context, "Nom copié : $name", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
@@ -641,7 +684,6 @@ fun GridThumb(location: String, modifier: Modifier) {
     }
 }
 
-private const val LONG_PRESS_MS = 500L
 
 /** Opens the original photo in the gallery application of the phone. */
 private fun openInGallery(context: Context, source: String) {
