@@ -14,8 +14,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.material3.Switch
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.draw.alpha
+import com.example.chatlab.ui.firstlaunch.RecognitionStep
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -34,11 +56,8 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.chatlab.ui.Palette
-import com.example.chatlab.ui.OutlineButton
-import com.example.chatlab.ui.firstlaunch.RecognitionStep
 import com.example.chatlab.ui.PrimaryButton
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
@@ -123,10 +142,19 @@ internal fun setupStage(missing: List<SetupStep>): Int = when {
 }
 
 /**
- * The first screen when a step is missing, in place of the tabs, in the layout of the first-launch view:
- * a stepper, one card per stage, then "Tout est prêt" with "Suivant" once everything is there
- * ([onNext] is given only for that last card). It is checked again each time the app comes back to the
- * front, so the tabs open by themselves once everything is there.
+ * How long a card stays on screen before the next one comes, as in view 1.1: after the workspace is
+ * found the explorer and the checks are shown (2.6 s), after the photos the last card comes (1.6 s).
+ */
+internal fun revealDelayMs(shownStage: Int): Long = when (shownStage) {
+    1 -> 2600L
+    2 -> 1600L
+    else -> 0L
+}
+
+/**
+ * The first screen when a step is missing, in the layout of the first-launch view: the stepper, then one
+ * card at a time, sliding in from the right as in the view. [onNext] is given only once everything is there,
+ * for the last card "Tout est prêt" with "Suivant".
  */
 @Composable
 fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: (() -> Unit)? = null) {
@@ -149,6 +177,16 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: ((
         value = withContext(Dispatchers.IO) { Sources.read(context).firstOrNull()?.name }
     }
     val stage = setupStage(missing)
+    // The card on screen follows the real stage with a delay, so the explorer and the checks can be seen.
+    var shown by remember { mutableIntStateOf(stage) }
+    LaunchedEffect(stage) {
+        if (stage > shown) {
+            delay(revealDelayMs(shown))
+            shown = stage
+        } else {
+            shown = stage
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -160,63 +198,124 @@ fun StartupSetupPage(missing: List<SetupStep>, onChanged: () -> Unit, onNext: ((
     ) {
         Spacer(Modifier.height(24.dp))
         Text("Premiers pas", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
-        Stepper(stage = stage)
-
-        if (stage == 3 && onNext != null) {
-            FinalCard(folder = photoFolder ?: "vos photos", onNext = onNext)
-        } else {
-            SetupCard(
-                title = "Autoriser l'accès à tous les fichiers",
-                done = SetupStep.ACCESS !in missing,
-                detail = "Sans cet accès, ChatLab ne voit que les dossiers choisis un par un. " +
-                    "Android ouvre ses réglages : activez « Autoriser l'accès à tous les fichiers », puis revenez ici.",
-                action = "Ouvrir les réglages",
-                onAction = { StorageAccess.openSettings(context) },
-            )
-            SetupCard(
-                title = "Qui va nous aider à reconnaître vos photos ? 🤖",
-                done = SetupStep.CHATLAB !in missing && SetupStep.MODELS !in missing,
-                doneLines = found.map { (name, ok) -> name to ok },
-                locked = SetupStep.ACCESS in missing,
-                detail = "Choisissez le workspace qui contient le dossier models.",
-                hint = if (SetupStep.CHATLAB !in missing && SetupStep.MODELS in missing) {
-                    "Modèles introuvables dans ce dossier."
-                } else {
-                    null
-                },
-                action = if (SetupStep.CHATLAB in missing) "Mon workspace" else "Choisir un autre workspace",
-                onAction = pickers.chooseChatlab,
-                secondary = if (SetupStep.CHATLAB !in missing && SetupStep.MODELS in missing) {
-                    "Vérifier à nouveau" to onChanged
-                } else {
-                    null
-                },
-                doneText = "Workspace ${chatlab ?: "chatlab"} : modèles trouvés",
-            )
-            if (SetupStep.PHOTOS in missing && stage == 2) {
-                // The photos walk-through, animated as in the view; the button is usable from the start.
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Palette.Field)
-                        .padding(18.dp),
-                ) {
-                    RecognitionStep(onPickPhotos = pickers.addSource)
-                }
-            } else {
-                SetupCard(
-                    title = "Où se cachent vos photos ? 🕵️",
-                    done = SetupStep.PHOTOS !in missing,
-                    doneText = "Dossier de photos choisi",
-                    locked = stage < 2,
-                    detail = "Pour les retrouver, il faut d’abord les parcourir. Choisissez le dossier où elles se trouvent.",
-                    action = "Choisir mes photos",
-                    onAction = pickers.addSource,
+        Stepper(stage = shown)
+        AnimatedContent(
+            targetState = shown,
+            transitionSpec = {
+                (slideInHorizontally(tween(500)) { it * 11 / 10 } + fadeIn(tween(500))) togetherWith
+                    (slideOutHorizontally(tween(500)) { -it * 11 / 10 } + fadeOut(tween(500)))
+            },
+            label = "setup card",
+        ) { current ->
+            when {
+                current == 0 -> AccessCard(onOpenSettings = { StorageAccess.openSettings(context) })
+                current == 1 -> WorkspaceCard(
+                    missing = missing,
+                    chatlab = chatlab,
+                    found = found,
+                    onChoose = pickers.chooseChatlab,
                 )
+                current == 2 -> RecognitionStep(onPickPhotos = pickers.addSource)
+                onNext != null -> FinalCard(folder = photoFolder ?: "vos photos", onNext = onNext)
+                else -> Unit
             }
         }
     }
+}
+
+/** The access card of view 1.1: one line and a switch. The switch opens the settings of the access. */
+@Composable
+private fun AccessCard(onOpenSettings: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Palette.Field)
+            .padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Autoriser l'accès à tous les fichiers", fontSize = 15.sp, color = Palette.Ink, modifier = Modifier.weight(1f))
+        Switch(checked = false, onCheckedChange = { onOpenSettings() })
+    }
+}
+
+/**
+ * The workspace card of view 1.1: the question and "Mon workspace"; once the models are found, the explorer
+ * and the two checks. If the models are not in the folder, view 1.1.1 offers to choose another one.
+ */
+@Composable
+private fun WorkspaceCard(
+    missing: List<SetupStep>,
+    chatlab: String?,
+    found: List<Pair<String, Boolean>>,
+    onChoose: () -> Unit,
+) {
+    val chatlabMissing = SetupStep.CHATLAB in missing
+    val modelsMissing = SetupStep.MODELS in missing
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Palette.Field)
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Qui va nous aider à reconnaître vos photos ? 🤖", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
+        Text("Choisissez le workspace qui contient le dossier models.", fontSize = 15.sp, color = Palette.Ink, lineHeight = 22.sp)
+        when {
+            chatlabMissing -> PrimaryButton("Mon workspace", onClick = onChoose)
+            modelsMissing -> {
+                Text("✕  Modèles introuvables dans ce dossier", fontSize = 15.sp, color = Palette.Ink)
+                PrimaryButton("Choisir un autre workspace", onClick = onChoose)
+            }
+            else -> ExplorerReveal(chatlab = chatlab, found = found)
+        }
+    }
+}
+
+/** "Ouverture de l'explorateur" with its dots, then the two checks of view 1.1, one after the other. */
+@Composable
+private fun ExplorerReveal(chatlab: String?, found: List<Pair<String, Boolean>>) {
+    var checksShown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(1200)
+        checksShown = true
+    }
+    Text("Ouverture de l'explorateur", fontSize = 15.sp, color = Palette.Ink)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(3) { index -> RevealDot(index) }
+    }
+    if (checksShown) {
+        Text("✓  Modèles trouvés", fontSize = 15.sp, color = Color.Black)
+        Text("✓  Analyses, diagnostics et snapshots prêts", fontSize = 15.sp, color = Color.Black)
+    }
+}
+
+/** One of the three dots of the explorer, pulsing with a delay of 0.3 s between them. */
+@Composable
+private fun RevealDot(index: Int) {
+    val transition = rememberInfiniteTransition(label = "dot")
+    val alpha by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 900
+                0.2f at 0 using LinearEasing
+                1f at 297 using LinearEasing
+                0.2f at 900
+            },
+            initialStartOffset = StartOffset(index * 300),
+        ),
+        label = "dot alpha",
+    )
+    Box(
+        modifier = Modifier
+            .size(7.dp)
+            .alpha(alpha)
+            .background(Color.Black, CircleShape),
+    )
 }
 
 /** The stepper of the first-launch view: the done stages are filled, the current one is outlined. */
@@ -253,6 +352,7 @@ private fun Stepper(stage: Int) {
     }
 }
 
+/** "Tout est prêt" (view 1.1): the folder found, three lines, and "Suivant". */
 @Composable
 private fun FinalCard(folder: String, onNext: () -> Unit) {
     Column(
@@ -265,54 +365,9 @@ private fun FinalCard(folder: String, onNext: () -> Unit) {
     ) {
         Text("Tout est prêt 🎉", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Palette.Ink)
         Text("On a trouvé vos photos dans $folder 📸", fontSize = 15.sp, color = Palette.Ink)
-        listOf(
-            "Votre workspace est prêt",
-            "$folder est en route pour la recherche 🔍",
-            "Vous pouvez chercher une photo par description ✨",
-        ).forEach { line ->
-            Text("✓  $line", fontSize = 15.sp, color = Color.Black)
-        }
+        Text("✓  Votre workspace est prêt", fontSize = 15.sp, color = Color.Black)
+        Text("✓  $folder est en route pour la recherche 🔍", fontSize = 15.sp, color = Color.Black)
+        Text("✓  Vous pouvez chercher une photo par description ✨", fontSize = 15.sp, color = Color.Black)
         PrimaryButton("Suivant", onClick = onNext)
-    }
-}
-
-@Composable
-private fun SetupCard(
-    title: String,
-    done: Boolean,
-    detail: String,
-    action: String,
-    onAction: () -> Unit,
-    doneText: String = "",
-    doneLines: List<Pair<String, Boolean>> = emptyList(),
-    hint: String? = null,
-    secondary: Pair<String, () -> Unit>? = null,
-    locked: Boolean = false,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (locked) Color(0xFFF7F8FA) else Palette.Field)
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            title,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (locked) Color(0xFF9AA3AF) else Palette.Ink,
-        )
-        if (done) {
-            if (doneText.isNotEmpty()) Text("✓  $doneText", fontSize = 14.sp, color = Color.Black)
-            doneLines.forEach { (name, ok) ->
-                Text("${if (ok) "✓" else "✕"}  $name", fontSize = 13.sp, color = if (ok) Color.Black else Palette.Muted)
-            }
-        } else if (!locked) {
-            Text(detail, fontSize = 13.sp, color = Palette.Muted)
-            if (hint != null) Text(hint, fontSize = 13.sp, color = Palette.Ink)
-            PrimaryButton(action, onClick = onAction)
-            if (secondary != null) OutlineButton(secondary.first, onClick = secondary.second)
-        }
     }
 }
