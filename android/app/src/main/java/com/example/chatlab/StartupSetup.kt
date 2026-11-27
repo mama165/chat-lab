@@ -62,6 +62,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 
 /** What ChatLab needs before it can search, in the order the setup page shows them. */
 enum class SetupStep { ACCESS, CHATLAB, MODELS, PHOTOS }
@@ -263,12 +265,27 @@ private fun ModelsFound(found: List<Pair<String, Boolean>>) {
 private fun Stepper(stage: Int) {
     val labels = listOf("Accès", "Workspace", "Photos")
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            // The line between the circles: navy up to the current stage, grey after it.
+            .drawBehind {
+                val y = 17.dp.toPx()
+                val left = size.width / 6f
+                val right = size.width * 5f / 6f
+                val reached = (size.width / 6f + size.width / 3f * stage.coerceAtMost(2)).coerceAtMost(right)
+                drawLine(color = Color(0xFFD1D5DB), start = Offset(left, y), end = Offset(right, y), strokeWidth = 2.dp.toPx())
+                if (reached > left) {
+                    drawLine(color = Palette.Accent, start = Offset(left, y), end = Offset(reached, y), strokeWidth = 2.dp.toPx())
+                }
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         labels.forEachIndexed { index, label ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 val done = index < stage
                 val current = index == stage
                 Box(
